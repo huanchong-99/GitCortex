@@ -14,6 +14,8 @@ mod tests {
         OrchestratorRunState,
         LLMMessage,
         create_llm_client,
+        MessageBus,
+        BusMessage,
     };
 
     // Tests will be added in subsequent tasks
@@ -439,6 +441,129 @@ mod tests {
     // =========================================================================
     // Test Suite 5: Message Bus
     // =========================================================================
+
+    #[tokio::test]
+    async fn test_message_bus_creation() {
+        let bus = MessageBus::new(100);
+
+        // Should be able to create broadcast subscribers
+        let _sub1 = bus.subscribe_broadcast();
+        let _sub2 = bus.subscribe_broadcast();
+
+        // Broadcast should work
+        let result = bus.broadcast(BusMessage::Shutdown);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_message_bus_topic_subscription() {
+        let bus = MessageBus::new(100);
+        let mut subscriber = bus.subscribe("workflow:wf-1").await;
+
+        // Publish to topic
+        bus.publish("workflow:wf-1", BusMessage::StatusUpdate {
+            workflow_id: "wf-1".to_string(),
+            status: "running".to_string(),
+        }).await;
+
+        // Receive message
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            subscriber.recv()
+        ).await;
+
+        assert!(msg.is_ok());
+        let msg = msg.unwrap().unwrap();
+        match msg {
+            BusMessage::StatusUpdate { workflow_id, status } => {
+                assert_eq!(workflow_id, "wf-1");
+                assert_eq!(status, "running");
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_message_bus_topic_isolation() {
+        let bus = MessageBus::new(100);
+
+        let mut sub_wf1 = bus.subscribe("workflow:wf-1").await;
+        let mut sub_wf2 = bus.subscribe("workflow:wf-2").await;
+
+        // Publish to wf-1 only
+        bus.publish("workflow:wf-1", BusMessage::StatusUpdate {
+            workflow_id: "wf-1".to_string(),
+            status: "running".to_string(),
+        }).await;
+
+        // wf-1 should receive
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub_wf1.recv()
+        ).await;
+        assert!(msg.is_ok());
+
+        // wf-2 should NOT receive (timeout)
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub_wf2.recv()
+        ).await;
+        assert!(msg.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_message_bus_broadcast() {
+        let bus = MessageBus::new(100);
+
+        let mut sub1 = bus.subscribe_broadcast();
+        let mut sub2 = bus.subscribe_broadcast();
+
+        bus.broadcast(BusMessage::Shutdown).unwrap();
+
+        // Both should receive
+        let msg1 = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub1.recv()
+        ).await;
+        assert!(msg1.is_ok());
+
+        let msg2 = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub2.recv()
+        ).await;
+        assert!(msg2.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_publish_terminal_completed() {
+        let bus = MessageBus::new(100);
+        let mut sub = bus.subscribe("workflow:wf-1").await;
+
+        let event = TerminalCompletionEvent {
+            terminal_id: "terminal-1".to_string(),
+            task_id: "task-1".to_string(),
+            workflow_id: "wf-1".to_string(),
+            status: TerminalCompletionStatus::Completed,
+            commit_hash: Some("abc123".to_string()),
+            commit_message: Some("feat: add feature".to_string()),
+            metadata: None,
+        };
+
+        bus.publish_terminal_completed(event).await;
+
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub.recv()
+        ).await.unwrap().unwrap();
+
+        match msg {
+            BusMessage::TerminalCompleted(e) => {
+                assert_eq!(e.terminal_id, "terminal-1");
+                assert_eq!(e.workflow_id, "wf-1");
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
 
     // =========================================================================
     // Test Suite 6: OrchestratorAgent
