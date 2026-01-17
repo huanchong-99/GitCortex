@@ -1,132 +1,125 @@
 <p align="center">
-  <a href="https://vibekanban.com">
-    <picture>
-      <source srcset="frontend/public/vibe-kanban-logo-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="frontend/public/vibe-kanban-logo.svg" media="(prefers-color-scheme: light)">
-      <img src="frontend/public/vibe-kanban-logo.svg" alt="Vibe Kanban Logo">
-    </picture>
-  </a>
+  <img src="docs/assets/gitcortex-logo.svg" alt="GitCortex Logo" width="200">
 </p>
 
-<p align="center">Get 10X more out of Claude Code, Gemini CLI, Codex, Amp and other coding agents...</p>
 <p align="center">
-  <a href="https://www.npmjs.com/package/vibe-kanban"><img alt="npm" src="https://img.shields.io/npm/v/vibe-kanban?style=flat-square" /></a>
-  <a href="https://github.com/BloopAI/vibe-kanban/blob/main/.github/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/BloopAI/vibe-kanban/.github%2Fworkflows%2Fpublish.yml" /></a>
-  <a href="https://deepwiki.com/BloopAI/vibe-kanban"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+  <strong>AI Agent 跨终端任务协调平台</strong>
 </p>
 
-<h1 align="center">
-  <a href="https://jobs.polymer.co/vibe-kanban?source=github"><strong>We're hiring!</strong></a>
-</h1>
+<p align="center">
+  基于 <a href="https://github.com/BloopAI/vibe-kanban">Vibe Kanban</a> 改造，集成 <a href="https://github.com/farion1231/cc-switch">CC-Switch</a> 模型切换能力
+</p>
 
-![](frontend/public/vibe-kanban-screenshot-overview.png)
+---
 
-## Overview
+## 概述
 
-AI coding agents are increasingly writing the world's code and human engineers now spend the majority of their time planning, reviewing, and orchestrating tasks. Vibe Kanban streamlines this process, enabling you to:
+GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编码代理（Claude Code、Gemini CLI、Codex 等）能够并行协作完成复杂的软件开发任务。
 
-- Easily switch between different coding agents
-- Orchestrate the execution of multiple coding agents in parallel or in sequence
-- Quickly review work and start dev servers
-- Track the status of tasks that your coding agents are working on
-- Centralise configuration of coding agent MCP configs
-- Open projects remotely via SSH when running Vibe Kanban on a remote server
+### 核心特性
 
-You can watch a video overview [here](https://youtu.be/TFT3KnZOOAk).
+| 特性 | 说明 |
+|------|------|
+| **主 Agent 协调** | AI 驱动的中央控制器，负责任务分发、进度监控、结果审核 |
+| **多任务并行** | 多个 Task 同时执行，每个 Task 有独立 Git 分支 |
+| **任务内串行** | 每个 Task 内的 Terminal 按顺序执行（编码→审核→修复） |
+| **cc-switch 集成** | 一键切换任意 CLI 的模型配置 |
+| **事件驱动** | 基于 Git 提交的事件驱动模式，节省 98%+ Token 消耗 |
+| **终端调试视图** | 启动后可进入原生终端验证环境配置 |
 
-## Installation
+### 架构概览
 
-Make sure you have authenticated with your favourite coding agent. A full list of supported coding agents can be found in the [docs](https://vibekanban.com/docs). Then in your terminal run:
-
-```bash
-npx vibe-kanban
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║                     Orchestrator (主 Agent)                        ║
+║           用户配置: API类型 + Base URL + API Key + 模型            ║
+╚═══════════════════════════════════════════════════════════════════╝
+         │                      │                      │
+         ▼                      ▼                      ▼
+  ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+  │   Task 1    │       │   Task 2    │       │   Task 3    │
+  │ branch:login│       │ branch:i18n │       │ branch:theme│
+  │  T1→T2→T3   │       │   TA→TB     │       │   TX→TY     │
+  └─────────────┘       └─────────────┘       └─────────────┘
+         ║                      ║                      ║
+         ╚══════════════════════╩══════════════════════╝
+                         任务间并行执行
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                   全局合并终端 (Merge Terminal)                  │
+  └─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                          [ main ]
 ```
 
-## Documentation
+## 安装
 
-Please head to the [website](https://vibekanban.com/docs) for the latest documentation and user guides.
-
-## Support
-
-We use [GitHub Discussions](https://github.com/BloopAI/vibe-kanban/discussions) for feature requests. Please open a discussion to create a feature request. For bugs please open an issue on this repo.
-
-## Contributing
-
-We would prefer that ideas and changes are first raised with the core team via [GitHub Discussions](https://github.com/BloopAI/vibe-kanban/discussions) or [Discord](https://discord.gg/AC4nwVtJM3), where we can discuss implementation details and alignment with the existing roadmap. Please do not open PRs without first discussing your proposal with the team.
-
-## Development
-
-### Prerequisites
+### 前置要求
 
 - [Rust](https://rustup.rs/) (latest stable)
 - [Node.js](https://nodejs.org/) (>=18)
 - [pnpm](https://pnpm.io/) (>=8)
 
-Additional development tools:
+### 开发工具
+
 ```bash
 cargo install cargo-watch
 cargo install sqlx-cli
 ```
 
-Install dependencies:
+### 安装依赖
+
 ```bash
 pnpm i
 ```
 
-### Running the dev server
+### 运行开发服务器
 
 ```bash
 pnpm run dev
 ```
 
-This will start the backend. A blank DB will be copied from the `dev_assets_seed` folder.
+## 支持的 CLI
 
-### Building the frontend
+- Claude Code
+- Gemini CLI
+- Codex
+- Amp
+- Cursor Agent
+- Qwen Code
+- Copilot
+- Droid
+- Opencode
 
-To build just the frontend:
+## 文档
 
-```bash
-cd frontend
-pnpm build
-```
+- [设计文档](docs/plans/2026-01-16-orchestrator-design.md)
+- [实现计划](docs/plans/2026-01-16-gitcortex-implementation.md)
 
-### Build from source (macOS)
+## 致谢
 
-1. Run `./local-build.sh`
-2. Test with `cd npx-cli && node bin/cli.js`
+本项目基于以下优秀的开源项目：
 
+- **[Vibe Kanban](https://github.com/BloopAI/vibe-kanban)** - AI 编码代理任务管理平台 (Apache 2.0)
+- **[CC-Switch](https://github.com/farion1231/cc-switch)** - Claude Code/Codex/Gemini CLI 配置切换工具 (MIT)
 
-### Environment Variables
+感谢这些项目的作者和贡献者！
 
-The following environment variables can be configured at build time or runtime:
+## 许可证
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `POSTHOG_API_KEY` | Build-time | Empty | PostHog analytics API key (disables analytics if empty) |
-| `POSTHOG_API_ENDPOINT` | Build-time | Empty | PostHog analytics endpoint (disables analytics if empty) |
-| `PORT` | Runtime | Auto-assign | **Production**: Server port. **Dev**: Frontend port (backend uses PORT+1) |
-| `BACKEND_PORT` | Runtime | `0` (auto-assign) | Backend server port (dev mode only, overrides PORT+1) |
-| `FRONTEND_PORT` | Runtime | `3000` | Frontend dev server port (dev mode only, overrides PORT) |
-| `HOST` | Runtime | `127.0.0.1` | Backend server host |
-| `MCP_HOST` | Runtime | Value of `HOST` | MCP server connection host (use `127.0.0.1` when `HOST=0.0.0.0` on Windows) |
-| `MCP_PORT` | Runtime | Value of `BACKEND_PORT` | MCP server connection port |
-| `DISABLE_WORKTREE_ORPHAN_CLEANUP` | Runtime | Not set | Disable git worktree cleanup (for debugging) |
+本项目遵循上游项目的开源协议：
 
-**Build-time variables** must be set when running `pnpm run build`. **Runtime variables** are read when the application starts.
+- Vibe Kanban 部分：Apache License 2.0
+- CC-Switch 部分：MIT License
 
-### Remote Deployment
+详见 [LICENSE](LICENSE) 文件。
 
-When running Vibe Kanban on a remote server (e.g., via systemctl, Docker, or cloud hosting), you can configure your editor to open projects via SSH:
+## 贡献
 
-1. **Access via tunnel**: Use Cloudflare Tunnel, ngrok, or similar to expose the web UI
-2. **Configure remote SSH** in Settings → Editor Integration:
-   - Set **Remote SSH Host** to your server hostname or IP
-   - Set **Remote SSH User** to your SSH username (optional)
-3. **Prerequisites**:
-   - SSH access from your local machine to the remote server
-   - SSH keys configured (passwordless authentication)
-   - VSCode Remote-SSH extension
+欢迎提交 Issue 和 Pull Request！
 
-When configured, the "Open in VSCode" buttons will generate URLs like `vscode://vscode-remote/ssh-remote+user@host/path` that open your local editor and connect to the remote server.
+---
 
-See the [documentation](https://vibekanban.com/docs/configuration-customisation/global-settings#remote-ssh-configuration) for detailed setup instructions.
+*GitCortex - 让 AI 代理协同工作*
