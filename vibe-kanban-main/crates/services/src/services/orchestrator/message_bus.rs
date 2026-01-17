@@ -17,7 +17,7 @@ pub enum BusMessage {
 
 pub struct MessageBus {
     broadcast_tx: broadcast::Sender<BusMessage>,
-    subscribers: Arc<RwLock<HashMap<String, Vec<mpsc::Sender<BusMessage>>>>,
+    subscribers: Arc<RwLock<HashMap<String, Vec<mpsc::Sender<BusMessage>>>>>,
 }
 
 impl MessageBus {
@@ -36,13 +36,13 @@ impl MessageBus {
 
     pub async fn subscribe(&self, topic: &str) -> mpsc::Receiver<BusMessage> {
         let (tx, rx) = mpsc::channel(100);
-        let mut subscribers = self.subscribers.write().await;
+        let mut subscribers: tokio::sync::RwLockWriteGuard<'_, HashMap<String, Vec<mpsc::Sender<BusMessage>>>> = self.subscribers.write().await;
         subscribers.entry(topic.to_string()).or_default().push(tx);
         rx
     }
 
     pub async fn publish(&self, topic: &str, message: BusMessage) {
-        let subscribers = self.subscribers.read().await;
+        let subscribers: tokio::sync::RwLockReadGuard<'_, HashMap<String, Vec<mpsc::Sender<BusMessage>>>> = self.subscribers.read().await;
         if let Some(subs) = subscribers.get(topic) {
             for tx in subs { let _ = tx.send(message.clone()).await; }
         }

@@ -26,3 +26,4 @@ pub mod workspace_manager;
 pub mod worktree_manager;
 pub mod cc_switch;
 pub use cc_switch::CCSwitchService;
+pub mod orchestrator;
