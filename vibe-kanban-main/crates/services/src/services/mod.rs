@@ -24,3 +24,5 @@ pub mod repo;
 pub mod share;
 pub mod workspace_manager;
 pub mod worktree_manager;
+pub mod cc_switch;
+pub use cc_switch::CCSwitchService;
