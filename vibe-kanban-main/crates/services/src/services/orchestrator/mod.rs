@@ -14,3 +14,6 @@ pub use state::{OrchestratorState, OrchestratorRunState, SharedOrchestratorState
 pub use types::*;
 pub use llm::{LLMClient, create_llm_client, OpenAICompatibleClient};
 pub use message_bus::{MessageBus, SharedMessageBus, BusMessage};
+
+#[cfg(test)]
+mod tests;
