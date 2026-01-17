@@ -6,6 +6,7 @@ use axum::{
 use crate::DeploymentImpl;
 
 pub mod approvals;
+pub mod cli_types;
 pub mod config;
 pub mod containers;
 pub mod filesystem;
@@ -25,6 +26,7 @@ pub mod shared_tasks;
 pub mod tags;
 pub mod task_attempts;
 pub mod tasks;
+pub mod workflows;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
@@ -47,6 +49,8 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(scratch::router(&deployment))
         .merge(sessions::router(&deployment))
         .nest("/images", images::routes())
+        .nest("/cli_types", cli_types::cli_types_routes())
+        .nest("/workflows", workflows::workflows_routes())
         .with_state(deployment);
 
     Router::new()

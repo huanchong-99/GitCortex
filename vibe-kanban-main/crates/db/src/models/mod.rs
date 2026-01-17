@@ -13,3 +13,12 @@ pub mod tag;
 pub mod task;
 pub mod workspace;
 pub mod workspace_repo;
+
+// GitCortex Workflow models
+pub mod cli_type;
+pub mod workflow;
+pub mod terminal;
+
+pub use cli_type::*;
+pub use workflow::*;
+pub use terminal::*;

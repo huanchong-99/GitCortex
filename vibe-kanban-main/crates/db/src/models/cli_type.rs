@@ -1,0 +1,202 @@
+//! CLI Type Model
+//!
+//! Stores supported AI coding agent CLI information like Claude Code, Gemini CLI, Codex, etc.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, SqlitePool};
+use ts_rs::TS;
+
+/// CLI Type
+///
+/// Corresponds to database table: cli_type
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CliType {
+    /// Primary key ID, format: cli-{name}
+    pub id: String,
+
+    /// Internal name, e.g., 'claude-code'
+    pub name: String,
+
+    /// Display name, e.g., 'Claude Code'
+    pub display_name: String,
+
+    /// Detection command, e.g., 'claude --version'
+    pub detect_command: String,
+
+    /// Installation command (optional)
+    pub install_command: Option<String>,
+
+    /// Installation guide URL
+    pub install_guide_url: Option<String>,
+
+    /// Config file path template, e.g., '~/.claude/settings.json'
+    pub config_file_path: Option<String>,
+
+    /// Is system built-in
+    #[serde(default)]
+    pub is_system: bool,
+
+    /// Created timestamp
+    pub created_at: DateTime<Utc>,
+}
+
+/// Model Config
+///
+/// Corresponds to database table: model_config
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ModelConfig {
+    /// Primary key ID, format: model-{cli}-{name}
+    pub id: String,
+
+    /// Associated CLI type ID
+    pub cli_type_id: String,
+
+    /// Model internal name, e.g., 'sonnet'
+    pub name: String,
+
+    /// Display name, e.g., 'Claude Sonnet'
+    pub display_name: String,
+
+    /// API model ID, e.g., 'claude-sonnet-4-20250514'
+    pub api_model_id: Option<String>,
+
+    /// Is default model
+    #[serde(default)]
+    pub is_default: bool,
+
+    /// Is official model
+    #[serde(default)]
+    pub is_official: bool,
+
+    /// Created timestamp
+    pub created_at: DateTime<Utc>,
+
+    /// Updated timestamp
+    pub updated_at: DateTime<Utc>,
+}
+
+/// CLI Detection Status
+///
+/// For frontend display of CLI installation status
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CliDetectionStatus {
+    /// CLI type ID
+    pub cli_type_id: String,
+
+    /// CLI name
+    pub name: String,
+
+    /// Display name
+    pub display_name: String,
+
+    /// Is installed
+    pub installed: bool,
+
+    /// Version number (if installed)
+    pub version: Option<String>,
+
+    /// Executable file path (if installed)
+    pub executable_path: Option<String>,
+
+    /// Installation guide URL
+    pub install_guide_url: Option<String>,
+}
+
+impl CliType {
+    /// Get all CLI types from database
+    pub async fn find_all(pool: &SqlitePool) -> sqlx::Result<Vec<Self>> {
+        sqlx::query_as::<_, CliType>(
+            r#"
+            SELECT id, name, display_name, detect_command, install_command,
+                   install_guide_url, config_file_path, is_system, created_at
+            FROM cli_type
+            ORDER BY is_system DESC, name ASC
+            "#
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    /// Find CLI type by ID
+    pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, CliType>(
+            r#"
+            SELECT id, name, display_name, detect_command, install_command,
+                   install_guide_url, config_file_path, is_system, created_at
+            FROM cli_type
+            WHERE id = ?
+            "#
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Find CLI type by name
+    pub async fn find_by_name(pool: &SqlitePool, name: &str) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, CliType>(
+            r#"
+            SELECT id, name, display_name, detect_command, install_command,
+                   install_guide_url, config_file_path, is_system, created_at
+            FROM cli_type
+            WHERE name = ?
+            "#
+        )
+        .bind(name)
+        .fetch_optional(pool)
+        .await
+    }
+}
+
+impl ModelConfig {
+    /// Get all models for a CLI type
+    pub async fn find_by_cli_type(pool: &SqlitePool, cli_type_id: &str) -> sqlx::Result<Vec<Self>> {
+        sqlx::query_as::<_, ModelConfig>(
+            r#"
+            SELECT id, cli_type_id, name, display_name, api_model_id,
+                   is_default, is_official, created_at, updated_at
+            FROM model_config
+            WHERE cli_type_id = ?
+            ORDER BY is_default DESC, name ASC
+            "#
+        )
+        .bind(cli_type_id)
+        .fetch_all(pool)
+        .await
+    }
+
+    /// Find model config by ID
+    pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, ModelConfig>(
+            r#"
+            SELECT id, cli_type_id, name, display_name, api_model_id,
+                   is_default, is_official, created_at, updated_at
+            FROM model_config
+            WHERE id = ?
+            "#
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Get default model for a CLI type
+    pub async fn find_default_for_cli(pool: &SqlitePool, cli_type_id: &str) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, ModelConfig>(
+            r#"
+            SELECT id, cli_type_id, name, display_name, api_model_id,
+                   is_default, is_official, created_at, updated_at
+            FROM model_config
+            WHERE cli_type_id = ? AND is_default = 1
+            LIMIT 1
+            "#
+        )
+        .bind(cli_type_id)
+        .fetch_optional(pool)
+        .await
+    }
+}
