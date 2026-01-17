@@ -10,6 +10,8 @@ mod tests {
         TerminalCompletionStatus,
         CommitMetadata,
         OrchestratorConfig,
+        OrchestratorState,
+        OrchestratorRunState,
     };
 
     // Tests will be added in subsequent tasks
@@ -188,6 +190,115 @@ mod tests {
     // =========================================================================
     // Test Suite 3: State Management
     // =========================================================================
+
+    #[tokio::test]
+    async fn test_state_initialization() {
+        let state = OrchestratorState::new("workflow-1".to_string());
+
+        assert_eq!(state.workflow_id, "workflow-1");
+        assert_eq!(state.run_state, OrchestratorRunState::Idle);
+        assert!(state.task_states.is_empty());
+        assert!(state.conversation_history.is_empty());
+        assert!(state.pending_events.is_empty());
+        assert_eq!(state.total_tokens_used, 0);
+        assert_eq!(state.error_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_task_init_and_tracking() {
+        let mut state = OrchestratorState::new("workflow-1".to_string());
+
+        state.init_task("task-1".to_string(), 3);
+
+        assert!(state.task_states.contains_key("task-1"));
+        let task_state = state.task_states.get("task-1").unwrap();
+        assert_eq!(task_state.task_id, "task-1");
+        assert_eq!(task_state.total_terminals, 3);
+        assert_eq!(task_state.current_terminal_index, 0);
+        assert!(task_state.completed_terminals.is_empty());
+        assert!(task_state.failed_terminals.is_empty());
+        assert!(!task_state.is_completed);
+    }
+
+    #[tokio::test]
+    async fn test_terminal_completion_marking() {
+        let mut state = OrchestratorState::new("workflow-1".to_string());
+        state.init_task("task-1".to_string(), 3);
+
+        // Mark first terminal as completed
+        state.mark_terminal_completed("task-1", "terminal-1", true);
+
+        {
+            let task_state = state.task_states.get("task-1").unwrap();
+            assert_eq!(task_state.completed_terminals.len(), 1);
+            assert!(task_state.completed_terminals.contains(&"terminal-1".to_string()));
+            assert!(!task_state.is_completed);
+        }
+
+        // Mark second as failed
+        state.mark_terminal_completed("task-1", "terminal-2", false);
+        {
+            let task_state = state.task_states.get("task-1").unwrap();
+            assert_eq!(task_state.failed_terminals.len(), 1);
+        }
+
+        // Mark third as completed - should complete the task
+        state.mark_terminal_completed("task-1", "terminal-3", true);
+        {
+            let task_state = state.task_states.get("task-1").unwrap();
+            assert!(task_state.is_completed);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_conversation_history() {
+        let mut state = OrchestratorState::new("workflow-1".to_string());
+
+        state.add_message("system", "You are a helpful assistant");
+        state.add_message("user", "Hello");
+        state.add_message("assistant", "Hi there!");
+
+        assert_eq!(state.conversation_history.len(), 3);
+        assert_eq!(state.conversation_history[0].role, "system");
+        assert_eq!(state.conversation_history[1].content, "Hello");
+    }
+
+    #[tokio::test]
+    async fn test_conversation_history_pruning() {
+        let mut state = OrchestratorState::new("workflow-1".to_string());
+
+        // Add system message
+        state.add_message("system", "System prompt");
+
+        // Add 60 user messages (exceeds MAX_HISTORY of 50)
+        for i in 0..60 {
+            state.add_message("user", &format!("Message {}", i));
+            state.add_message("assistant", &format!("Response {}", i));
+        }
+
+        // History should be pruned to MAX_HISTORY, keeping system messages
+        assert!(state.conversation_history.len() <= 51); // 1 system + 50 recent
+        assert_eq!(state.conversation_history[0].role, "system");
+    }
+
+    #[tokio::test]
+    async fn test_all_tasks_completed() {
+        let mut state = OrchestratorState::new("workflow-1".to_string());
+
+        state.init_task("task-1".to_string(), 2);
+        state.init_task("task-2".to_string(), 1);
+
+        assert!(!state.all_tasks_completed());
+
+        // Complete task-2
+        state.mark_terminal_completed("task-2", "terminal-1", true);
+        assert!(!state.all_tasks_completed());
+
+        // Complete task-1
+        state.mark_terminal_completed("task-1", "terminal-1", true);
+        state.mark_terminal_completed("task-1", "terminal-2", true);
+        assert!(state.all_tasks_completed());
+    }
 
     // =========================================================================
     // Test Suite 4: LLM Client
