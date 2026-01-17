@@ -568,4 +568,66 @@ mod tests {
     // =========================================================================
     // Test Suite 6: OrchestratorAgent
     // =========================================================================
+
+    #[test]
+    fn test_instruction_parsing() {
+        let json = r#"{"type":"send_to_terminal","terminal_id":"t1","message":"Do something"}"#;
+
+        let instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
+
+        match instruction {
+            OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
+                assert_eq!(terminal_id, "t1");
+                assert_eq!(message, "Do something");
+            }
+            _ => panic!("Wrong instruction type"),
+        }
+    }
+
+    #[test]
+    fn test_all_instruction_parsing() {
+        let test_cases = vec![
+            (
+                r#"{"type":"start_task","task_id":"task-1","instruction":"Build API"}"#,
+                "start_task"
+            ),
+            (
+                r#"{"type":"review_code","terminal_id":"t1","commit_hash":"abc123"}"#,
+                "review_code"
+            ),
+            (
+                r#"{"type":"fix_issues","terminal_id":"t1","issues":["bug1","bug2"]}"#,
+                "fix_issues"
+            ),
+            (
+                r#"{"type":"merge_branch","source_branch":"feature","target_branch":"main"}"#,
+                "merge_branch"
+            ),
+            (
+                r#"{"type":"pause_workflow","reason":"manual review"}"#,
+                "pause_workflow"
+            ),
+            (
+                r#"{"type":"complete_workflow","summary":"done"}"#,
+                "complete_workflow"
+            ),
+            (
+                r#"{"type":"fail_workflow","reason":"error"}"#,
+                "fail_workflow"
+            ),
+        ];
+
+        for (json, expected_type) in test_cases {
+            let instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
+            let json_obj = serde_json::from_str::<serde_json::Value>(json).unwrap();
+            assert_eq!(json_obj["type"], expected_type);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_agent_creation() {
+        // TODO: Implement proper DB service mock to enable agent creation tests
+        // OrchestratorAgent requires Arc<DBService> which needs mock infrastructure
+        todo!("Implement DB service mock for agent testing")
+    }
 }
