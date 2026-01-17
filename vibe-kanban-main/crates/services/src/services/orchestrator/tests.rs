@@ -12,6 +12,8 @@ mod tests {
         OrchestratorConfig,
         OrchestratorState,
         OrchestratorRunState,
+        LLMMessage,
+        create_llm_client,
     };
 
     // Tests will be added in subsequent tasks
@@ -303,6 +305,136 @@ mod tests {
     // =========================================================================
     // Test Suite 4: LLM Client
     // =========================================================================
+
+    #[tokio::test]
+    async fn test_llm_client_basic_request() {
+        // Install crypto provider for reqwest (ignore if already installed)
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+        use wiremock::{MockServer, Mock, ResponseTemplate};
+        use wiremock::matchers::{method, path};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello! How can I help you?"
+                    }
+                }],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 9,
+                    "total_tokens": 19
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = OrchestratorConfig {
+            base_url: mock_server.uri(),
+            api_key: "test-key".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let client = create_llm_client(&config).unwrap();
+        let messages = vec![
+            LLMMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            }
+        ];
+
+        let response = client.chat(messages).await.unwrap();
+
+        assert!(response.content.contains("Hello"));
+        assert!(response.usage.is_some());
+        let usage = response.usage.unwrap();
+        assert_eq!(usage.total_tokens, 19);
+    }
+
+    #[tokio::test]
+    async fn test_llm_client_error_handling() {
+        // Install crypto provider for reqwest (ignore if already installed)
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+        use wiremock::{MockServer, Mock, ResponseTemplate};
+        use wiremock::matchers::{method, path};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "error": {
+                    "message": "Invalid API key",
+                    "type": "invalid_request_error"
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = OrchestratorConfig {
+            base_url: mock_server.uri(),
+            api_key: "invalid-key".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let client = create_llm_client(&config).unwrap();
+        let messages = vec![
+            LLMMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            }
+        ];
+
+        let result = client.chat(messages).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_llm_client_empty_response() {
+        // Install crypto provider for reqwest (ignore if already installed)
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+        use wiremock::{MockServer, Mock, ResponseTemplate};
+        use wiremock::matchers::{method, path};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "choices": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = OrchestratorConfig {
+            base_url: mock_server.uri(),
+            api_key: "test-key".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let client = create_llm_client(&config).unwrap();
+        let messages = vec![
+            LLMMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            }
+        ];
+
+        let response = client.chat(messages).await.unwrap();
+
+        assert_eq!(response.content, "");
+    }
 
     // =========================================================================
     // Test Suite 5: Message Bus
