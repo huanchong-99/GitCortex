@@ -897,6 +897,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc-switch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "toml",
+ "tracing",
+]
+
+[[package]]
 name = "cexpr"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4786,6 +4801,7 @@ dependencies = [
  "axum",
  "backon",
  "base64",
+ "cc-switch",
  "chrono",
  "dashmap",
  "db",
