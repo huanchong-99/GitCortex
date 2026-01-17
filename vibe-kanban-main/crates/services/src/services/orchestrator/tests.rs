@@ -9,6 +9,7 @@ mod tests {
         TerminalCompletionEvent,
         TerminalCompletionStatus,
         CommitMetadata,
+        OrchestratorConfig,
     };
 
     // Tests will be added in subsequent tasks
@@ -111,6 +112,78 @@ mod tests {
     // =========================================================================
     // Test Suite 2: Configuration
     // =========================================================================
+
+    #[test]
+    fn test_default_config() {
+        let config = OrchestratorConfig::default();
+
+        assert_eq!(config.api_type, "openai");
+        assert_eq!(config.base_url, "https://api.openai.com/v1");
+        assert_eq!(config.model, "gpt-4o");
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.timeout_secs, 120);
+        assert!(!config.system_prompt.is_empty());
+    }
+
+    #[test]
+    fn test_config_validation() {
+        // Valid config
+        let config = OrchestratorConfig {
+            api_key: "sk-test-123".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+
+        // Missing API key
+        let config = OrchestratorConfig {
+            api_key: String::new(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // Missing base URL
+        let config = OrchestratorConfig {
+            api_key: "sk-test-123".to_string(),
+            base_url: String::new(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+
+        // Missing model
+        let config = OrchestratorConfig {
+            api_key: "sk-test-123".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            model: String::new(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_config_from_workflow() {
+        // All Some
+        let config = OrchestratorConfig::from_workflow(
+            Some("anthropic"),
+            Some("https://api.anthropic.com"),
+            Some("sk-ant-123"),
+            Some("claude-4-opus"),
+        );
+        assert!(config.is_some());
+        let config = config.unwrap();
+        assert_eq!(config.api_type, "anthropic");
+        assert_eq!(config.base_url, "https://api.anthropic.com");
+        assert_eq!(config.api_key, "sk-ant-123");
+        assert_eq!(config.model, "claude-4-opus");
+
+        // None returns None
+        let config = OrchestratorConfig::from_workflow(None, None, None, None);
+        assert!(config.is_none());
+    }
 
     // =========================================================================
     // Test Suite 3: State Management
