@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use super::{
     config::OrchestratorConfig,
     llm::{LLMClient, create_llm_client},
-    message_bus::{BusMessage, MessageBus, SharedMessageBus},
+    message_bus::{BusMessage, SharedMessageBus},
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
     types::*,
 };

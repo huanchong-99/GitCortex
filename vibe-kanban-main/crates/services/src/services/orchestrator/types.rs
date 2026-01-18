@@ -1,7 +1,5 @@
 //! Orchestrator 类型定义
 
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 /// 主 Agent 指令类型
