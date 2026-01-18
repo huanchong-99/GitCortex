@@ -23,6 +23,56 @@ pub struct OpenAICompatibleClient {
     model: String,
 }
 
+/// Mock LLM Client for testing
+#[cfg(test)]
+pub struct MockLLMClient {
+    pub should_fail: bool,
+    pub response_content: String,
+}
+
+#[cfg(test)]
+impl MockLLMClient {
+    pub fn new() -> Self {
+        Self {
+            should_fail: false,
+            response_content: "Mock response for testing".to_string(),
+        }
+    }
+
+    pub fn with_response(content: &str) -> Self {
+        Self {
+            should_fail: false,
+            response_content: content.to_string(),
+        }
+    }
+
+    pub fn that_fails() -> Self {
+        Self {
+            should_fail: true,
+            response_content: String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl LLMClient for MockLLMClient {
+    async fn chat(&self, _messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
+        if self.should_fail {
+            return Err(anyhow::anyhow!("Mock LLM client error"));
+        }
+
+        Ok(LLMResponse {
+            content: self.response_content.clone(),
+            usage: Some(LLMUsage {
+                prompt_tokens: 10,
+                completion_tokens: 20,
+                total_tokens: 30,
+            }),
+        })
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct ChatRequest {
     model: String,

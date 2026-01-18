@@ -40,6 +40,26 @@ impl OrchestratorAgent {
         })
     }
 
+    /// Create a new agent with a custom LLM client (for testing)
+    #[cfg(test)]
+    pub async fn with_llm_client(
+        config: OrchestratorConfig,
+        workflow_id: String,
+        message_bus: SharedMessageBus,
+        db: Arc<DBService>,
+        llm_client: Box<dyn LLMClient>,
+    ) -> anyhow::Result<Self> {
+        let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
+
+        Ok(Self {
+            config,
+            state,
+            message_bus,
+            llm_client,
+            db,
+        })
+    }
+
     /// 启动 Agent 事件循环
     pub async fn run(&self) -> anyhow::Result<()> {
         let workflow_id = {

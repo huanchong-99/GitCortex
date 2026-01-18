@@ -12,6 +12,8 @@ pub mod types;
 pub use agent::OrchestratorAgent;
 pub use config::OrchestratorConfig;
 pub use llm::{LLMClient, OpenAICompatibleClient, create_llm_client};
+#[cfg(test)]
+pub use llm::MockLLMClient;
 pub use message_bus::{BusMessage, MessageBus, SharedMessageBus};
 pub use state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState};
 pub use types::*;

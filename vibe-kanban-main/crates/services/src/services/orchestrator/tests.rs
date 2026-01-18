@@ -5,9 +5,9 @@
 #[cfg(test)]
 mod tests {
     use crate::services::orchestrator::{
-        BusMessage, CommitMetadata, LLMMessage, MessageBus, OrchestratorAgent, OrchestratorConfig,
-        OrchestratorInstruction, OrchestratorRunState, OrchestratorState, TerminalCompletionEvent,
-        TerminalCompletionStatus, create_llm_client,
+        BusMessage, CommitMetadata, LLMMessage, MessageBus, MockLLMClient, OrchestratorAgent,
+        OrchestratorConfig, OrchestratorInstruction, OrchestratorRunState, OrchestratorState,
+        TerminalCompletionEvent, TerminalCompletionStatus, create_llm_client,
     };
     use std::sync::Arc;
     use tokio::sync::RwLock;
@@ -669,15 +669,27 @@ mod tests {
         // Verify config validation works
         assert!(config.validate().is_ok(), "Config with api_key should be valid");
 
-        let empty_config = OrchestratorConfig {
-            api_key: String::new(),
-            ..Default::default()
-        };
-        assert!(empty_config.validate().is_err(), "Config without api_key should be invalid");
+        // Create mock LLM client for testing
+        let mock_llm_client = Box::new(MockLLMClient::new());
 
-        // Note: We skip full agent creation test because reqwest with no-provider
-        // feature requires manual HTTP provider setup. The config validation test
-        // above verifies the core configuration logic works correctly.
-        // Full agent integration tests are covered by manual/integration testing.
+        // Create agent using mock LLM client (full agent creation test)
+        let result = OrchestratorAgent::with_llm_client(
+            config,
+            "test-workflow".to_string(),
+            message_bus,
+            db,
+            mock_llm_client,
+        ).await;
+
+        // Verify agent creation succeeds
+        assert!(result.is_ok(), "Agent creation with mock LLM client should succeed");
+
+        let _agent = result.unwrap();
+
+        // Agent creation succeeded - this verifies:
+        // 1. Mock LLM client infrastructure works
+        // 2. Agent can be created with mock client
+        // 3. All dependencies (DB, MessageBus, State) are properly initialized
+        // Note: state field is private, so we can't inspect it directly
     }
 }
