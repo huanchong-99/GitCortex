@@ -178,27 +178,68 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
   };
 
   const renderStep = () => {
-    const stepProps = {
-      config,
-      errors,
-      onUpdate: handleUpdateConfig,
-    };
-
     switch (currentStep) {
       case WizardStep.Project:
-        return <Step0Project {...stepProps} />;
+        return (
+          <Step0Project
+            config={config.project}
+            errors={errors}
+            onChange={(updates) => handleUpdateConfig({ project: { ...config.project, ...updates } })}
+          />
+        );
       case WizardStep.Basic:
-        return <Step1Basic {...stepProps} />;
+        return (
+          <Step1Basic
+            config={config.basic}
+            errors={errors}
+            onChange={(updates) => handleUpdateConfig({ basic: { ...config.basic, ...updates } })}
+          />
+        );
       case WizardStep.Tasks:
-        return <Step2Tasks {...stepProps} />;
+        return (
+          <Step2Tasks
+            config={config.tasks}
+            taskCount={config.basic.taskCount}
+            onChange={(tasks) => handleUpdateConfig({ tasks })}
+            errors={errors}
+          />
+        );
       case WizardStep.Models:
-        return <Step3Models {...stepProps} />;
+        return (
+          <Step3Models
+            config={config.models}
+            errors={errors}
+            onUpdate={(updates) => handleUpdateConfig({ models: updates })}
+          />
+        );
       case WizardStep.Terminals:
-        return <Step4Terminals {...stepProps} />;
+        return (
+          <Step4Terminals
+            config={config.terminals}
+            tasks={config.tasks}
+            models={config.models}
+            errors={errors}
+            onUpdate={(updates) => handleUpdateConfig({ terminals: updates })}
+          />
+        );
       case WizardStep.Commands:
-        return <Step5Commands {...stepProps} />;
+        return (
+          <Step5Commands
+            config={config.commands}
+            errors={errors}
+            onUpdate={(updates) => handleUpdateConfig({ commands: { ...config.commands, ...updates } })}
+          />
+        );
       case WizardStep.Advanced:
-        return <Step6Advanced {...stepProps} />;
+        return (
+          <Step6Advanced
+            config={config.advanced}
+            models={config.models}
+            tasks={config.tasks}
+            errors={errors}
+            onUpdate={(updates) => handleUpdateConfig({ advanced: { ...config.advanced, ...updates } })}
+          />
+        );
       default:
         return null;
     }
