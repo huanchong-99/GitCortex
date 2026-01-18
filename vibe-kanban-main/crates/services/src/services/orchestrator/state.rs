@@ -140,7 +140,131 @@ impl OrchestratorState {
             .values()
             .any(|s| !s.failed_terminals.is_empty())
     }
+
+    /// 状态转移验证和执行
+    pub fn transition_to(
+        &mut self,
+        new_state: OrchestratorRunState,
+    ) -> anyhow::Result<()> {
+        let valid_transitions = match (self.run_state, new_state) {
+            (OrchestratorRunState::Idle, OrchestratorRunState::Processing) => true,
+            (OrchestratorRunState::Idle, OrchestratorRunState::Paused) => true,
+            (OrchestratorRunState::Idle, OrchestratorRunState::Stopped) => true,
+            (OrchestratorRunState::Processing, OrchestratorRunState::Idle) => true,
+            (OrchestratorRunState::Processing, OrchestratorRunState::Paused) => true,
+            (OrchestratorRunState::Processing, OrchestratorRunState::Stopped) => true,
+            (OrchestratorRunState::Paused, OrchestratorRunState::Processing) => true,
+            (OrchestratorRunState::Paused, OrchestratorRunState::Idle) => true,
+            (OrchestratorRunState::Paused, OrchestratorRunState::Stopped) => true,
+            (from, to) => {
+                tracing::error!("Invalid state transition: {:?} → {:?}", from, to);
+                false
+            }
+        };
+
+        if valid_transitions {
+            tracing::debug!("State transition: {:?} → {:?}", self.run_state, new_state);
+            self.run_state = new_state;
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Invalid state transition: {:?} → {:?}",
+                self.run_state, new_state
+            ))
+        }
+    }
 }
 
 /// 线程安全的状态包装
 pub type SharedOrchestratorState = std::sync::Arc<RwLock<OrchestratorState>>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_state_transitions() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+
+        // Idle -> Processing
+        assert!(state.transition_to(OrchestratorRunState::Processing).is_ok());
+        assert_eq!(state.run_state, OrchestratorRunState::Processing);
+
+        // Processing -> Paused
+        assert!(state.transition_to(OrchestratorRunState::Paused).is_ok());
+
+        // Paused -> Processing
+        assert!(state.transition_to(OrchestratorRunState::Processing).is_ok());
+
+        // Processing -> Idle
+        assert!(state.transition_to(OrchestratorRunState::Idle).is_ok());
+
+        // Idle -> Paused
+        assert!(state.transition_to(OrchestratorRunState::Paused).is_ok());
+
+        // Paused -> Stopped
+        assert!(state.transition_to(OrchestratorRunState::Stopped).is_ok());
+        assert_eq!(state.run_state, OrchestratorRunState::Stopped);
+    }
+
+    #[test]
+    fn test_invalid_state_transitions() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+
+        // Can't stay in the same state
+        assert!(state.transition_to(OrchestratorRunState::Processing).is_ok());
+        let result = state.transition_to(OrchestratorRunState::Processing);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid state transition"));
+
+        // After Stopped, can't transition to other states
+        state.run_state = OrchestratorRunState::Stopped;
+        assert!(state.transition_to(OrchestratorRunState::Processing).is_err());
+        assert!(state.transition_to(OrchestratorRunState::Idle).is_err());
+        assert!(state.transition_to(OrchestratorRunState::Paused).is_err());
+    }
+
+    #[test]
+    fn test_all_valid_transitions_from_idle() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+
+        // From Idle, can go to Processing, Paused, or Stopped
+        assert!(state.transition_to(OrchestratorRunState::Processing).is_ok());
+        state.run_state = OrchestratorRunState::Idle;
+
+        assert!(state.transition_to(OrchestratorRunState::Paused).is_ok());
+        state.run_state = OrchestratorRunState::Idle;
+
+        assert!(state.transition_to(OrchestratorRunState::Stopped).is_ok());
+    }
+
+    #[test]
+    fn test_all_valid_transitions_from_processing() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.run_state = OrchestratorRunState::Processing;
+
+        // From Processing, can go to Idle, Paused, or Stopped
+        assert!(state.transition_to(OrchestratorRunState::Idle).is_ok());
+        state.run_state = OrchestratorRunState::Processing;
+
+        assert!(state.transition_to(OrchestratorRunState::Paused).is_ok());
+        state.run_state = OrchestratorRunState::Processing;
+
+        assert!(state.transition_to(OrchestratorRunState::Stopped).is_ok());
+    }
+
+    #[test]
+    fn test_all_valid_transitions_from_paused() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.run_state = OrchestratorRunState::Paused;
+
+        // From Paused, can go to Processing, Idle, or Stopped
+        assert!(state.transition_to(OrchestratorRunState::Processing).is_ok());
+        state.run_state = OrchestratorRunState::Paused;
+
+        assert!(state.transition_to(OrchestratorRunState::Idle).is_ok());
+        state.run_state = OrchestratorRunState::Paused;
+
+        assert!(state.transition_to(OrchestratorRunState::Stopped).is_ok());
+    }
+}
