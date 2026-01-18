@@ -1,8 +1,9 @@
 # Phase 5: Git 事件驱动系统
 
-> **状态:** ⬜ 未开始
+> **状态:** ✅ 完成
 > **进度追踪:** 查看 `TODO.md`
 > **前置条件:** Phase 4 完成
+> **完成日期:** 2024-01-18
 
 ## 概述
 
@@ -14,7 +15,7 @@
 
 ### Task 5.1: 实现 GitWatcher
 
-**状态:** ⬜ 未开始
+**状态:** ✅ 完成
 
 **前置条件:**
 - Phase 4 已完成
@@ -173,7 +174,7 @@ impl GitWatcher {
 
 ### Task 5.2: 实现提交信息解析器
 
-**状态:** ⬜ 未开始
+**状态:** ✅ 完成
 
 **涉及文件:**
 - 创建: `vibe-kanban-main/crates/services/src/services/git_watcher/parser.rs`
@@ -198,7 +199,7 @@ impl CommitParser {
     ///
     /// 格式:
     /// ```text
-    /// [Terminal:{id}] [Status:{status}] {summary}
+    /// [Terminal:xxx] [Status:xxx] summary
     ///
     /// {body}
     ///
@@ -336,7 +337,7 @@ next_action: continue"#;
 
 ### Task 5.3: 连接 Git 事件到 Orchestrator
 
-**状态:** ⬜ 未开始
+**状态:** ✅ 完成
 
 **涉及文件:**
 - 创建: `vibe-kanban-main/crates/services/src/services/git_watcher/handler.rs`
@@ -667,8 +668,36 @@ cargo test -p services git_watcher -- --nocapture
 
 ## Phase 5 完成检查清单
 
-- [ ] Task 5.1: GitWatcher 实现完成
-- [ ] Task 5.2: CommitParser 实现完成
-- [ ] Task 5.3: GitEventHandler 实现完成
+- [x] Task 5.1: GitWatcher 实现完成
+- [x] Task 5.2: CommitParser 实现完成
+- [x] Task 5.3: GitEventHandler 实现完成
 
 ---
+
+## 实现完成
+
+**完成日期:** 2024-01-18
+
+**提交数量:** 10 commits
+
+**测试覆盖:** 12 单元测试，全部通过
+
+**实现的模块:**
+1. `git_watcher/mod.rs` - 模块声明
+2. `git_watcher/parser.rs` - CommitParser 解析器
+3. `git_watcher/watcher.rs` - GitWatcher 文件监控
+4. `git_watcher/handler.rs` - GitEventHandler 事件处理
+5. `git_watcher/tests.rs` - 完整测试套件
+
+**集成点:**
+- MessageBus: 新增 `publish_git_event()` 方法
+- Database: 使用现有 `GitEvent` 和 `Terminal` 模型
+- Orchestrator: 发布 `TerminalCompletionEvent`
+
+**验收标准:**
+- [x] 编译通过
+- [x] Git 事件可以正确解析
+- [x] 事件转发到 Orchestrator
+- [x] 数据库记录正确创建
+- [x] 终端状态正确更新
+- [x] 所有测试通过
