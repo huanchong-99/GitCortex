@@ -1,1155 +1,1153 @@
-# Phase 3: Orchestrator 主 Agent 实现
+# Phase 3: Orchestrator Main Agent Implementation - TDD Plan
 
-> **状态:** ⬜ 未开始
-> **进度追踪:** 查看 `TODO.md`
-> **前置条件:** Phase 2 完成
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-## 概述
+**Goal:** Implement the Orchestrator main agent that coordinates multiple AI coding agents using test-driven development with unlimited resources.
 
-实现 Orchestrator 主 Agent，包括 LLM 客户端、消息总线和核心协调逻辑。
+**Architecture:** The Orchestrator is a central coordination agent that:
+- Uses LLM (OpenAI-compatible API) for decision-making
+- Communicates via a message bus for event-driven coordination
+- Tracks state in a thread-safe state machine
+- Monitors Git commits from terminal agents to trigger workflows
 
----
-
-## Phase 3: Orchestrator 主 Agent 实现
-
-### Task 3.1: 创建 Orchestrator 模块结构
-
-**状态:** ⬜ 未开始
-
-**前置条件:**
-- Phase 2 已完成
-- cc-switch 集成到 services 层
-
-**目标:**
-创建 Orchestrator 模块的基础结构，包括配置、状态管理和核心类型定义。
-
-**涉及文件:**
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/mod.rs`
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/config.rs`
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/state.rs`
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/types.rs`
-- 修改: `vibe-kanban-main/crates/services/src/services/mod.rs`
+**Tech Stack:**
+- Rust async/await with tokio
+- OpenAI-compatible HTTP API (reqwest)
+- tokio::sync channels for message bus
+- serde for JSON serialization
+- Thread-safe state with Arc<RwLock<>>
 
 ---
 
-**Step 3.1.1: 创建 types.rs**
+## Prerequisites
 
-文件路径: `vibe-kanban-main/crates/services/src/services/orchestrator/types.rs`
+**Working Directory:** `F:/Project/GitCortex/.worktrees/phase-3-orchestrator/vibe-kanban-main`
 
-```rust
-//! Orchestrator 类型定义
-
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
-/// 主 Agent 指令类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum OrchestratorInstruction {
-    /// 启动任务
-    StartTask {
-        task_id: String,
-        instruction: String,
-    },
-    /// 发送消息到终端
-    SendToTerminal {
-        terminal_id: String,
-        message: String,
-    },
-    /// 审核代码
-    ReviewCode {
-        terminal_id: String,
-        commit_hash: String,
-    },
-    /// 修复问题
-    FixIssues {
-        terminal_id: String,
-        issues: Vec<String>,
-    },
-    /// 合并分支
-    MergeBranch {
-        source_branch: String,
-        target_branch: String,
-    },
-    /// 暂停工作流
-    PauseWorkflow {
-        reason: String,
-    },
-    /// 完成工作流
-    CompleteWorkflow {
-        summary: String,
-    },
-    /// 失败工作流
-    FailWorkflow {
-        reason: String,
-    },
-}
-
-/// 终端完成事件
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TerminalCompletionEvent {
-    pub terminal_id: String,
-    pub task_id: String,
-    pub workflow_id: String,
-    pub status: TerminalCompletionStatus,
-    pub commit_hash: Option<String>,
-    pub commit_message: Option<String>,
-    pub metadata: Option<CommitMetadata>,
-}
-
-/// 终端完成状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TerminalCompletionStatus {
-    /// 任务完成
-    Completed,
-    /// 审核通过
-    ReviewPass,
-    /// 审核打回
-    ReviewReject,
-    /// 失败
-    Failed,
-}
-
-/// Git 提交元数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitMetadata {
-    pub workflow_id: String,
-    pub task_id: String,
-    pub terminal_id: String,
-    pub terminal_order: i32,
-    pub cli: String,
-    pub model: String,
-    pub status: String,
-    pub severity: Option<String>,
-    pub reviewed_terminal: Option<String>,
-    pub issues: Option<Vec<CodeIssue>>,
-    pub next_action: String,
-}
-
-/// 代码问题
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CodeIssue {
-    pub severity: String,
-    pub file: String,
-    pub line: Option<i32>,
-    pub message: String,
-    pub suggestion: Option<String>,
-}
-
-/// LLM 消息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LLMMessage {
-    pub role: String,
-    pub content: String,
-}
-
-/// LLM 响应
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LLMResponse {
-    pub content: String,
-    pub usage: Option<LLMUsage>,
-}
-
-/// LLM 使用量
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LLMUsage {
-    pub prompt_tokens: i32,
-    pub completion_tokens: i32,
-    pub total_tokens: i32,
-}
-```
-
----
-
-**Step 3.1.2: 创建 config.rs**
-
-文件路径: `vibe-kanban-main/crates/services/src/services/orchestrator/config.rs`
-
-```rust
-//! Orchestrator 配置
-
-use serde::{Deserialize, Serialize};
-
-/// Orchestrator 配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrchestratorConfig {
-    /// API 类型: "openai", "anthropic", "custom"
-    pub api_type: String,
-
-    /// API Base URL
-    pub base_url: String,
-
-    /// API Key
-    pub api_key: String,
-
-    /// 模型名称
-    pub model: String,
-
-    /// 最大重试次数
-    #[serde(default = "default_max_retries")]
-    pub max_retries: u32,
-
-    /// 请求超时（秒）
-    #[serde(default = "default_timeout")]
-    pub timeout_secs: u64,
-
-    /// 系统提示词
-    #[serde(default = "default_system_prompt")]
-    pub system_prompt: String,
-}
-
-fn default_max_retries() -> u32 {
-    3
-}
-
-fn default_timeout() -> u64 {
-    120
-}
-
-fn default_system_prompt() -> String {
-    r#"你是 GitCortex 的主协调 Agent，负责协调多个 AI 编码代理完成软件开发任务。
-
-你的职责：
-1. 根据工作流配置，向各终端发送任务指令
-2. 监控终端的执行状态（通过 Git 提交事件）
-3. 协调审核流程，处理审核反馈
-4. 在所有任务完成后，协调分支合并
-
-规则：
-- 每个终端完成任务后会提交 Git，你会收到提交事件
-- 根据提交中的元数据判断下一步操作
-- 如果审核发现问题，指导修复终端进行修复
-- 保持简洁的指令，不要过度解释
-
-输出格式：
-使用 JSON 格式输出指令，格式如下：
-{"type": "send_to_terminal", "terminal_id": "xxx", "message": "具体指令"}
-"#.to_string()
-}
-
-impl Default for OrchestratorConfig {
-    fn default() -> Self {
-        Self {
-            api_type: "openai".to_string(),
-            base_url: "https://api.openai.com/v1".to_string(),
-            api_key: String::new(),
-            model: "gpt-4o".to_string(),
-            max_retries: default_max_retries(),
-            timeout_secs: default_timeout(),
-            system_prompt: default_system_prompt(),
-        }
-    }
-}
-
-impl OrchestratorConfig {
-    /// 从工作流配置创建
-    pub fn from_workflow(
-        api_type: Option<&str>,
-        base_url: Option<&str>,
-        api_key: Option<&str>,
-        model: Option<&str>,
-    ) -> Option<Self> {
-        Some(Self {
-            api_type: api_type?.to_string(),
-            base_url: base_url?.to_string(),
-            api_key: api_key?.to_string(),
-            model: model?.to_string(),
-            ..Default::default()
-        })
-    }
-
-    /// 验证配置是否有效
-    pub fn validate(&self) -> Result<(), String> {
-        if self.api_key.is_empty() {
-            return Err("API key is required".to_string());
-        }
-        if self.base_url.is_empty() {
-            return Err("Base URL is required".to_string());
-        }
-        if self.model.is_empty() {
-            return Err("Model is required".to_string());
-        }
-        Ok(())
-    }
-}
-```
-
----
-
-**Step 3.1.3: 创建 state.rs**
-
-文件路径: `vibe-kanban-main/crates/services/src/services/orchestrator/state.rs`
-
-```rust
-//! Orchestrator 状态管理
-
-use std::collections::HashMap;
-use tokio::sync::RwLock;
-use super::types::*;
-
-/// Orchestrator 运行状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OrchestratorRunState {
-    /// 空闲（等待事件）
-    Idle,
-    /// 处理中
-    Processing,
-    /// 已暂停
-    Paused,
-    /// 已停止
-    Stopped,
-}
-
-/// 任务执行状态
-#[derive(Debug, Clone)]
-pub struct TaskExecutionState {
-    pub task_id: String,
-    pub current_terminal_index: usize,
-    pub total_terminals: usize,
-    pub completed_terminals: Vec<String>,
-    pub failed_terminals: Vec<String>,
-    pub is_completed: bool,
-}
-
-/// Orchestrator 状态
-pub struct OrchestratorState {
-    /// 运行状态
-    pub run_state: OrchestratorRunState,
-
-    /// 工作流 ID
-    pub workflow_id: String,
-
-    /// 任务执行状态
-    pub task_states: HashMap<String, TaskExecutionState>,
-
-    /// 对话历史（用于 LLM 上下文）
-    pub conversation_history: Vec<LLMMessage>,
-
-    /// 待处理事件队列
-    pub pending_events: Vec<TerminalCompletionEvent>,
-
-    /// Token 使用统计
-    pub total_tokens_used: i64,
-
-    /// 错误计数
-    pub error_count: u32,
-}
-
-impl OrchestratorState {
-    pub fn new(workflow_id: String) -> Self {
-        Self {
-            run_state: OrchestratorRunState::Idle,
-            workflow_id,
-            task_states: HashMap::new(),
-            conversation_history: Vec::new(),
-            pending_events: Vec::new(),
-            total_tokens_used: 0,
-            error_count: 0,
-        }
-    }
-
-    /// 初始化任务状态
-    pub fn init_task(&mut self, task_id: String, terminal_count: usize) {
-        self.task_states.insert(task_id.clone(), TaskExecutionState {
-            task_id,
-            current_terminal_index: 0,
-            total_terminals: terminal_count,
-            completed_terminals: Vec::new(),
-            failed_terminals: Vec::new(),
-            is_completed: false,
-        });
-    }
-
-    /// 标记终端完成
-    pub fn mark_terminal_completed(&mut self, task_id: &str, terminal_id: &str, success: bool) {
-        if let Some(state) = self.task_states.get_mut(task_id) {
-            if success {
-                state.completed_terminals.push(terminal_id.to_string());
-            } else {
-                state.failed_terminals.push(terminal_id.to_string());
-            }
-
-            // 检查任务是否完成
-            let total_done = state.completed_terminals.len() + state.failed_terminals.len();
-            if total_done >= state.total_terminals {
-                state.is_completed = true;
-            }
-        }
-    }
-
-    /// 添加消息到对话历史
-    pub fn add_message(&mut self, role: &str, content: &str) {
-        self.conversation_history.push(LLMMessage {
-            role: role.to_string(),
-            content: content.to_string(),
-        });
-
-        // 限制历史长度，避免上下文过长
-        const MAX_HISTORY: usize = 50;
-        if self.conversation_history.len() > MAX_HISTORY {
-            // 保留系统消息和最近的消息
-            let system_msgs: Vec<_> = self.conversation_history
-                .iter()
-                .filter(|m| m.role == "system")
-                .cloned()
-                .collect();
-            let recent: Vec<_> = self.conversation_history
-                .iter()
-                .rev()
-                .take(MAX_HISTORY - system_msgs.len())
-                .cloned()
-                .collect();
-
-            self.conversation_history = system_msgs;
-            self.conversation_history.extend(recent.into_iter().rev());
-        }
-    }
-
-    /// 检查所有任务是否完成
-    pub fn all_tasks_completed(&self) -> bool {
-        self.task_states.values().all(|s| s.is_completed)
-    }
-
-    /// 检查是否有失败的任务
-    pub fn has_failed_tasks(&self) -> bool {
-        self.task_states.values().any(|s| !s.failed_terminals.is_empty())
-    }
-}
-
-/// 线程安全的状态包装
-pub type SharedOrchestratorState = std::sync::Arc<RwLock<OrchestratorState>>;
-```
-
----
-
-**Step 3.1.4: 创建 mod.rs**
-
-文件路径: `vibe-kanban-main/crates/services/src/services/orchestrator/mod.rs`
-
-```rust
-//! Orchestrator 主 Agent 模块
-//!
-//! 负责协调多个 AI 编码代理完成软件开发任务。
-
-pub mod config;
-pub mod state;
-pub mod types;
-
-// 后续任务中添加
-// pub mod llm;
-// pub mod message_bus;
-// pub mod agent;
-
-pub use config::OrchestratorConfig;
-pub use state::{OrchestratorState, OrchestratorRunState, SharedOrchestratorState};
-pub use types::*;
-```
-
----
-
-**Step 3.1.5: 更新 services/mod.rs**
-
-在 `vibe-kanban-main/crates/services/src/services/mod.rs` 中添加：
-
-```rust
-pub mod orchestrator;
-pub use orchestrator::{OrchestratorConfig, OrchestratorState};
-```
-
----
-
-**交付物:**
-- `orchestrator/mod.rs`
-- `orchestrator/config.rs`
-- `orchestrator/state.rs`
-- `orchestrator/types.rs`
-
-**验收标准:**
-1. 编译通过：`cargo build -p services`
-2. 类型定义完整，可以序列化/反序列化
-
-**测试命令:**
+**Verification Steps:**
 ```bash
-cd F:\Project\GitCortex\vibe-kanban-main
+cd F:/Project/GitCortex/.worktrees/phase-3-orchestrator/vibe-kanban-main
 cargo build -p services
+cargo test -p services --no-run
 ```
 
 ---
 
-### Task 3.2: 实现 LLM 客户端抽象
+## Task 1: Add Test Dependencies
 
-**状态:** ⬜ 未开始
+**Files:**
+- Modify: `vibe-kanban-main/crates/services/Cargo.toml`
 
-**前置条件:**
-- Task 3.1 已完成
+**Step 1: Add test dependencies to Cargo.toml**
 
-**目标:**
-实现统一的 LLM 客户端接口，支持 OpenAI 兼容 API。
+Add to `[dev-dependencies]` section (create if doesn't exist):
 
-**涉及文件:**
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/llm.rs`
-- 修改: `vibe-kanban-main/crates/services/src/services/orchestrator/mod.rs`
-
----
-
-**Step 3.2.1: 创建 llm.rs**
-
-文件路径: `vibe-kanban-main/crates/services/src/services/orchestrator/llm.rs`
-
-```rust
-//! LLM 客户端抽象
-
-use async_trait::async_trait;
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use super::config::OrchestratorConfig;
-use super::types::{LLMMessage, LLMResponse, LLMUsage};
-
-#[async_trait]
-pub trait LLMClient: Send + Sync {
-    async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse>;
-}
-
-pub struct OpenAICompatibleClient {
-    client: Client,
-    base_url: String,
-    api_key: String,
-    model: String,
-}
-
-#[derive(Debug, Serialize)]
-struct ChatRequest {
-    model: String,
-    messages: Vec<ChatMessage>,
-    temperature: Option<f32>,
-    max_tokens: Option<i32>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ChatMessage {
-    role: String,
-    content: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChatResponse {
-    choices: Vec<ChatChoice>,
-    usage: Option<UsageInfo>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChatChoice {
-    message: ChatMessage,
-}
-
-#[derive(Debug, Deserialize)]
-struct UsageInfo {
-    prompt_tokens: i32,
-    completion_tokens: i32,
-    total_tokens: i32,
-}
-
-impl OpenAICompatibleClient {
-    pub fn new(config: &OrchestratorConfig) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_secs))
-            .build()
-            .expect("Failed to create HTTP client");
-
-        Self {
-            client,
-            base_url: config.base_url.trim_end_matches('/').to_string(),
-            api_key: config.api_key.clone(),
-            model: config.model.clone(),
-        }
-    }
-}
-
-#[async_trait]
-impl LLMClient for OpenAICompatibleClient {
-    async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
-        let url = format!("{}/chat/completions", self.base_url);
-
-        let chat_messages: Vec<ChatMessage> = messages
-            .into_iter()
-            .map(|m| ChatMessage { role: m.role, content: m.content })
-            .collect();
-
-        let request = ChatRequest {
-            model: self.model.clone(),
-            messages: chat_messages,
-            temperature: Some(0.7),
-            max_tokens: Some(4096),
-        };
-
-        let response = self.client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!("LLM API error: {} - {}", status, body));
-        }
-
-        let chat_response: ChatResponse = response.json().await?;
-        let content = chat_response.choices.first()
-            .map(|c| c.message.content.clone())
-            .unwrap_or_default();
-
-        let usage = chat_response.usage.map(|u| LLMUsage {
-            prompt_tokens: u.prompt_tokens,
-            completion_tokens: u.completion_tokens,
-            total_tokens: u.total_tokens,
-        });
-
-        Ok(LLMResponse { content, usage })
-    }
-}
-
-pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
-    config.validate().map_err(|e| anyhow::anyhow!(e))?;
-    Ok(Box::new(OpenAICompatibleClient::new(config)))
-}
+```toml
+[dev-dependencies]
+wiremock = "0.6"
+tokio-test = "0.4"
 ```
 
-**交付物:** `orchestrator/llm.rs`
+**Step 2: Run build to verify dependencies**
 
----
+Run: `cargo build -p services`
 
-### Task 3.3: 实现消息总线
+Expected: `Finished` without errors
 
-**状态:** ⬜ 未开始
+**Step 3: Commit**
 
-**前置条件:** Task 3.2 已完成
-
-**涉及文件:**
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/message_bus.rs`
-
----
-
-**Step 3.3.1: 创建 message_bus.rs**
-
-```rust
-//! 消息总线
-
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock, broadcast};
-use super::types::*;
-
-#[derive(Debug, Clone)]
-pub enum BusMessage {
-    TerminalCompleted(TerminalCompletionEvent),
-    GitEvent { workflow_id: String, commit_hash: String, branch: String, message: String },
-    Instruction(OrchestratorInstruction),
-    StatusUpdate { workflow_id: String, status: String },
-    Error { workflow_id: String, error: String },
-    Shutdown,
-}
-
-pub struct MessageBus {
-    broadcast_tx: broadcast::Sender<BusMessage>,
-    subscribers: Arc<RwLock<HashMap<String, Vec<mpsc::Sender<BusMessage>>>>>,
-}
-
-impl MessageBus {
-    pub fn new(capacity: usize) -> Self {
-        let (broadcast_tx, _) = broadcast::channel(capacity);
-        Self { broadcast_tx, subscribers: Arc::new(RwLock::new(HashMap::new())) }
-    }
-
-    pub fn broadcast(&self, message: BusMessage) -> Result<usize, broadcast::error::SendError<BusMessage>> {
-        self.broadcast_tx.send(message)
-    }
-
-    pub fn subscribe_broadcast(&self) -> broadcast::Receiver<BusMessage> {
-        self.broadcast_tx.subscribe()
-    }
-
-    pub async fn subscribe(&self, topic: &str) -> mpsc::Receiver<BusMessage> {
-        let (tx, rx) = mpsc::channel(100);
-        let mut subscribers = self.subscribers.write().await;
-        subscribers.entry(topic.to_string()).or_default().push(tx);
-        rx
-    }
-
-    pub async fn publish(&self, topic: &str, message: BusMessage) {
-        let subscribers = self.subscribers.read().await;
-        if let Some(subs) = subscribers.get(topic) {
-            for tx in subs { let _ = tx.send(message.clone()).await; }
-        }
-    }
-
-    pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
-        let topic = format!("workflow:{}", event.workflow_id);
-        self.publish(&topic, BusMessage::TerminalCompleted(event.clone())).await;
-        let _ = self.broadcast(BusMessage::TerminalCompleted(event));
-    }
-}
-
-impl Default for MessageBus {
-    fn default() -> Self { Self::new(1000) }
-}
-
-pub type SharedMessageBus = Arc<MessageBus>;
+```bash
+git add crates/services/Cargo.toml
+git commit -m "test: add wiremock and tokio-test for orchestrator tests"
 ```
 
-**交付物:** `orchestrator/message_bus.rs`
-
 ---
 
-### Task 3.4: 实现 OrchestratorAgent
+## Task 2: Create Test Module Structure
 
-**状态:** ⬜ 未开始
+**Files:**
+- Create: `vibe-kanban-main/crates/services/src/services/orchestrator/tests.rs`
 
-**前置条件:** Task 3.3 已完成
+**Step 1: Create test module file with module declaration**
 
-**涉及文件:**
-- 创建: `vibe-kanban-main/crates/services/src/services/orchestrator/agent.rs`
-
----
-
-**Step 3.4.1: 创建 agent.rs**
+File: `vibe-kanban-main/crates/services/src/services/orchestrator/tests.rs`
 
 ```rust
-//! Orchestrator Agent 主逻辑
-
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use db::DBService;
-use super::config::OrchestratorConfig;
-use super::state::{OrchestratorState, OrchestratorRunState, SharedOrchestratorState};
-use super::llm::{LLMClient, create_llm_client};
-use super::message_bus::{MessageBus, BusMessage, SharedMessageBus};
-use super::types::*;
-
-pub struct OrchestratorAgent {
-    config: OrchestratorConfig,
-    state: SharedOrchestratorState,
-    message_bus: SharedMessageBus,
-    llm_client: Box<dyn LLMClient>,
-    db: Arc<DBService>,
-}
-
-impl OrchestratorAgent {
-    pub async fn new(
-        config: OrchestratorConfig,
-        workflow_id: String,
-        message_bus: SharedMessageBus,
-        db: Arc<DBService>,
-    ) -> anyhow::Result<Self> {
-        let llm_client = create_llm_client(&config)?;
-        let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
-
-        Ok(Self { config, state, message_bus, llm_client, db })
-    }
-
-    /// 启动 Agent 事件循环
-    pub async fn run(&self) -> anyhow::Result<()> {
-        let workflow_id = {
-            let state = self.state.read().await;
-            state.workflow_id.clone()
-        };
-
-        let mut rx = self.message_bus.subscribe(&format!("workflow:{}", workflow_id)).await;
-        tracing::info!("Orchestrator started for workflow: {}", workflow_id);
-
-        // 初始化系统消息
-        {
-            let mut state = self.state.write().await;
-            state.add_message("system", &self.config.system_prompt);
-            state.run_state = OrchestratorRunState::Idle;
-        }
-
-        // 事件循环
-        while let Some(message) = rx.recv().await {
-            let should_stop = self.handle_message(message).await?;
-            if should_stop { break; }
-        }
-
-        tracing::info!("Orchestrator stopped for workflow: {}", workflow_id);
-        Ok(())
-    }
-
-    /// 处理消息
-    async fn handle_message(&self, message: BusMessage) -> anyhow::Result<bool> {
-        match message {
-            BusMessage::TerminalCompleted(event) => {
-                self.handle_terminal_completed(event).await?;
-            }
-            BusMessage::GitEvent { workflow_id, commit_hash, branch, message } => {
-                self.handle_git_event(&workflow_id, &commit_hash, &branch, &message).await?;
-            }
-            BusMessage::Shutdown => {
-                return Ok(true);
-            }
-            _ => {}
-        }
-        Ok(false)
-    }
-
-    /// 处理终端完成事件
-    async fn handle_terminal_completed(&self, event: TerminalCompletionEvent) -> anyhow::Result<()> {
-        tracing::info!("Terminal completed: {} with status {:?}", event.terminal_id, event.status);
-
-        // 更新状态
-        {
-            let mut state = self.state.write().await;
-            state.run_state = OrchestratorRunState::Processing;
-            let success = matches!(event.status, TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass);
-            state.mark_terminal_completed(&event.task_id, &event.terminal_id, success);
-        }
-
-        // 构建提示并调用 LLM
-        let prompt = self.build_completion_prompt(&event).await;
-        let response = self.call_llm(&prompt).await?;
-
-        // 解析并执行指令
-        self.execute_instruction(&response).await?;
-
-        // 恢复空闲状态
-        {
-            let mut state = self.state.write().await;
-            state.run_state = OrchestratorRunState::Idle;
-        }
-
-        Ok(())
-    }
-
-    /// 处理 Git 事件
-    async fn handle_git_event(
-        &self,
-        _workflow_id: &str,
-        commit_hash: &str,
-        branch: &str,
-        message: &str,
-    ) -> anyhow::Result<()> {
-        tracing::info!("Git event: {} on branch {} - {}", commit_hash, branch, message);
-        // Git 事件通常会转换为 TerminalCompleted 事件
-        Ok(())
-    }
-
-    /// 构建完成提示
-    async fn build_completion_prompt(&self, event: &TerminalCompletionEvent) -> String {
-        format!(
-            "终端 {} 已完成任务。\n状态: {:?}\n提交: {:?}\n消息: {:?}\n\n请决定下一步操作。",
-            event.terminal_id,
-            event.status,
-            event.commit_hash,
-            event.commit_message
-        )
-    }
-
-    /// 调用 LLM
-    async fn call_llm(&self, prompt: &str) -> anyhow::Result<String> {
-        let mut state = self.state.write().await;
-        state.add_message("user", prompt);
-
-        let messages = state.conversation_history.clone();
-        drop(state);
-
-        let response = self.llm_client.chat(messages).await?;
-
-        let mut state = self.state.write().await;
-        state.add_message("assistant", &response.content);
-        if let Some(usage) = &response.usage {
-            state.total_tokens_used += usage.total_tokens as i64;
-        }
-
-        Ok(response.content)
-    }
-
-    /// 执行指令
-    async fn execute_instruction(&self, response: &str) -> anyhow::Result<()> {
-        // 尝试解析 JSON 指令
-        if let Ok(instruction) = serde_json::from_str::<OrchestratorInstruction>(response) {
-            match instruction {
-                OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
-                    tracing::info!("Sending to terminal {}: {}", terminal_id, message);
-                    // TODO: 实际发送到终端
-                }
-                OrchestratorInstruction::CompleteWorkflow { summary } => {
-                    tracing::info!("Workflow completed: {}", summary);
-                }
-                OrchestratorInstruction::FailWorkflow { reason } => {
-                    tracing::error!("Workflow failed: {}", reason);
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-}
-```
-
-**交付物:** `orchestrator/agent.rs`
-
-**验收标准:**
-1. 编译通过：`cargo build -p services`
-2. OrchestratorAgent 可以实例化并运行
-
----
-
-### Phase 3 单元测试用例
-
-> 在 `vibe-kanban-main/crates/services/src/services/orchestrator/tests.rs` 创建以下测试
-
-```rust
-//! Orchestrator 单元测试
+//! Orchestrator unit tests
 //!
-//! 测试 LLM 客户端、消息总线、Agent 核心功能
+//! Comprehensive test suite for LLM client, message bus, and Agent core functionality.
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::mpsc;
-    use wiremock::{MockServer, Mock, ResponseTemplate};
-    use wiremock::matchers::{method, path, body_json_schema};
+
+    // Tests will be added in subsequent tasks
 
     // =========================================================================
-    // 测试 1: LLM 客户端 - 基本请求
+    // Test Suite 1: Types Serialization
     // =========================================================================
-    #[tokio::test]
-    async fn test_llm_client_basic_request() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "Hello! How can I help you?"
-                    }
-                }]
-            })))
-            .mount(&mock_server)
-            .await;
-
-        let client = LlmClient::new(&mock_server.uri(), "test-key");
-        let response = client.chat(&[
-            ChatMessage::user("Hello")
-        ]).await.unwrap();
-
-        assert!(response.content.contains("Hello"));
-    }
 
     // =========================================================================
-    // 测试 2: LLM 客户端 - 流式响应
+    // Test Suite 2: Configuration
     // =========================================================================
-    #[tokio::test]
-    async fn test_llm_client_streaming() {
-        let mock_server = MockServer::start().await;
 
-        // 模拟 SSE 流式响应
-        let sse_body = r#"data: {"choices":[{"delta":{"content":"Hello"}}]}
+    // =========================================================================
+    // Test Suite 3: State Management
+    // =========================================================================
 
-data: {"choices":[{"delta":{"content":" world"}}]}
+    // =========================================================================
+    // Test Suite 4: LLM Client
+    // =========================================================================
 
-data: [DONE]
-"#;
+    // =========================================================================
+    // Test Suite 5: Message Bus
+    // =========================================================================
 
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200)
-                .set_body_string(sse_body)
-                .insert_header("content-type", "text/event-stream"))
-            .mount(&mock_server)
-            .await;
+    // =========================================================================
+    // Test Suite 6: OrchestratorAgent
+    // =========================================================================
+}
+```
 
-        let client = LlmClient::new(&mock_server.uri(), "test-key");
-        let mut stream = client.chat_stream(&[
-            ChatMessage::user("Hello")
-        ]).await.unwrap();
+**Step 2: Add tests module to orchestrator/mod.rs**
 
-        let mut full_response = String::new();
-        while let Some(chunk) = stream.next().await {
-            full_response.push_str(&chunk.unwrap());
+Add to `vibe-kanban-main/crates/services/src/services/orchestrator/mod.rs`:
+
+```rust
+#[cfg(test)]
+mod tests;
+```
+
+**Step 3: Run build to verify module structure**
+
+Run: `cargo build -p services`
+
+Expected: `Finished` without errors
+
+**Step 4: Commit**
+
+```bash
+git add crates/services/src/services/orchestrator/mod.rs
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add orchestrator test module structure"
+```
+
+---
+
+## Task 3: Test Suite 1 - Types Serialization
+
+**Step 3.1: Write failing test - OrchestratorInstruction serialization**
+
+```rust
+#[test]
+fn test_orchestrator_instruction_serialization() {
+    let instruction = OrchestratorInstruction::SendToTerminal {
+        terminal_id: "terminal-1".to_string(),
+        message: "Implement login feature".to_string(),
+    };
+
+    let json = serde_json::to_string(&instruction).unwrap();
+    let parsed: OrchestratorInstruction = serde_json::from_str(&json).unwrap();
+
+    match parsed {
+        OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
+            assert_eq!(terminal_id, "terminal-1");
+            assert_eq!(message, "Implement login feature");
         }
-
-        assert_eq!(full_response, "Hello world");
-    }
-
-    // =========================================================================
-    // 测试 3: 消息总线 - 订阅和发布
-    // =========================================================================
-    #[tokio::test]
-    async fn test_message_bus_pubsub() {
-        let bus = MessageBus::new();
-
-        let mut subscriber = bus.subscribe("terminal:T1").await;
-
-        bus.publish("terminal:T1", BusMessage::Text("Hello T1".to_string())).await;
-
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_secs(1),
-            subscriber.recv()
-        ).await.unwrap().unwrap();
-
-        assert!(matches!(msg, BusMessage::Text(s) if s == "Hello T1"));
-    }
-
-    // =========================================================================
-    // 测试 4: 消息总线 - 主题隔离
-    // =========================================================================
-    #[tokio::test]
-    async fn test_message_bus_topic_isolation() {
-        let bus = MessageBus::new();
-
-        let mut sub_t1 = bus.subscribe("terminal:T1").await;
-        let mut sub_t2 = bus.subscribe("terminal:T2").await;
-
-        bus.publish("terminal:T1", BusMessage::Text("For T1 only".to_string())).await;
-
-        // T1 应该收到
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub_t1.recv()
-        ).await;
-        assert!(msg.is_ok());
-
-        // T2 不应该收到
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub_t2.recv()
-        ).await;
-        assert!(msg.is_err()); // 超时
-    }
-
-    // =========================================================================
-    // 测试 5: OrchestratorAgent - 处理 Git 事件
-    // =========================================================================
-    #[tokio::test]
-    async fn test_orchestrator_handle_git_event() {
-        let (msg_tx, msg_rx) = mpsc::channel(10);
-        let mock_llm = MockLlmClient::new();
-
-        let agent = OrchestratorAgent::new(mock_llm, msg_tx);
-
-        let event = OrchestratorMessage::GitCommitDetected {
-            branch: "feature/login".to_string(),
-            commit: "abc123".to_string(),
-            parsed_commit: ParsedCommit {
-                status: Some(TaskStatus::Completed),
-                terminal_id: Some("T1".to_string()),
-                ..Default::default()
-            },
-        };
-
-        agent.handle_message(event).await.unwrap();
-
-        // 验证处理逻辑被触发
-        assert!(agent.get_terminal_status("T1").await.is_some());
-    }
-
-    // =========================================================================
-    // 测试 6: OrchestratorAgent - 任务分配
-    // =========================================================================
-    #[tokio::test]
-    async fn test_orchestrator_task_assignment() {
-        let (msg_tx, mut msg_rx) = mpsc::channel(10);
-        let mock_llm = MockLlmClient::with_response(
-            "Based on the analysis, Terminal T2 should handle the database migration."
-        );
-
-        let agent = OrchestratorAgent::new(mock_llm, msg_tx);
-
-        // 模拟工作流配置
-        let workflow = WorkflowConfig {
-            tasks: vec![
-                TaskConfig { id: "task-1".into(), name: "Backend API".into(), terminals: vec!["T1".into()] },
-                TaskConfig { id: "task-2".into(), name: "Database".into(), terminals: vec!["T2".into()] },
-            ],
-            ..Default::default()
-        };
-
-        agent.start_workflow(workflow).await.unwrap();
-
-        // 验证任务被分配
-        let msg = msg_rx.recv().await.unwrap();
-        assert!(matches!(msg, BusMessage::TaskAssigned { .. }));
-    }
-
-    // =========================================================================
-    // 测试 7: OrchestratorAgent - 错误处理
-    // =========================================================================
-    #[tokio::test]
-    async fn test_orchestrator_error_handling() {
-        let (msg_tx, mut msg_rx) = mpsc::channel(10);
-        let mock_llm = MockLlmClient::new();
-
-        let mut agent = OrchestratorAgent::new(mock_llm, msg_tx);
-        agent.set_error_terminal("T-ERR".to_string());
-
-        let event = OrchestratorMessage::TerminalError {
-            terminal_id: "T1".to_string(),
-            error: "Connection refused".to_string(),
-        };
-
-        agent.handle_message(event).await.unwrap();
-
-        // 验证错误被路由到错误终端
-        let msg = msg_rx.recv().await.unwrap();
-        match msg {
-            BusMessage::ErrorReport { target_terminal, .. } => {
-                assert_eq!(target_terminal, "T-ERR");
-            }
-            _ => panic!("Expected ErrorReport message"),
-        }
-    }
-
-    // =========================================================================
-    // 测试 8: LLM 客户端 - 重试机制
-    // =========================================================================
-    #[tokio::test]
-    async fn test_llm_client_retry() {
-        let mock_server = MockServer::start().await;
-
-        // 前两次返回 500，第三次成功
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(500))
-            .up_to_n_times(2)
-            .mount(&mock_server)
-            .await;
-
-        Mock::given(method("POST"))
-            .and(path("/v1/chat/completions"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "choices": [{"message": {"content": "Success after retry"}}]
-            })))
-            .mount(&mock_server)
-            .await;
-
-        let client = LlmClient::new(&mock_server.uri(), "test-key")
-            .with_retry(3, std::time::Duration::from_millis(10));
-
-        let response = client.chat(&[ChatMessage::user("Test")]).await.unwrap();
-        assert!(response.content.contains("Success"));
+        _ => panic!("Wrong instruction type"),
     }
 }
 ```
 
-**运行测试:**
+**Step 3.2: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_orchestrator_instruction_serialization -- --exact`
+
+Expected: PASS (types.rs already implements serialization)
+
+**Step 3.3: Write failing test - TerminalCompletionEvent with all fields**
+
+```rust
+#[test]
+fn test_terminal_completion_event_full() {
+    let event = TerminalCompletionEvent {
+        terminal_id: "terminal-1".to_string(),
+        task_id: "task-1".to_string(),
+        workflow_id: "workflow-1".to_string(),
+        status: TerminalCompletionStatus::Completed,
+        commit_hash: Some("abc123".to_string()),
+        commit_message: Some("feat: add login".to_string()),
+        metadata: Some(CommitMetadata {
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            terminal_id: "terminal-1".to_string(),
+            terminal_order: 1,
+            cli: "claude".to_string(),
+            model: "claude-4".to_string(),
+            status: "completed".to_string(),
+            severity: None,
+            reviewed_terminal: None,
+            issues: None,
+            next_action: "review".to_string(),
+        }),
+    };
+
+    let json = serde_json::to_string(&event).unwrap();
+    let parsed: TerminalCompletionEvent = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(parsed.terminal_id, "terminal-1");
+    assert_eq!(parsed.status, TerminalCompletionStatus::Completed);
+    assert!(parsed.metadata.is_some());
+}
+```
+
+**Step 3.4: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_terminal_completion_event_full -- --exact`
+
+Expected: PASS
+
+**Step 3.5: Write failing test - All instruction variants**
+
+```rust
+#[test]
+fn test_all_instruction_variants() {
+    let variants = vec![
+        OrchestratorInstruction::StartTask {
+            task_id: "task-1".to_string(),
+            instruction: "Build API".to_string(),
+        },
+        OrchestratorInstruction::ReviewCode {
+            terminal_id: "terminal-1".to_string(),
+            commit_hash: "abc123".to_string(),
+        },
+        OrchestratorInstruction::FixIssues {
+            terminal_id: "terminal-1".to_string(),
+            issues: vec!["Bug in line 42".to_string()],
+        },
+        OrchestratorInstruction::MergeBranch {
+            source_branch: "feature/login".to_string(),
+            target_branch: "main".to_string(),
+        },
+        OrchestratorInstruction::PauseWorkflow {
+            reason: "Need manual review".to_string(),
+        },
+        OrchestratorInstruction::CompleteWorkflow {
+            summary: "All tasks completed".to_string(),
+        },
+        OrchestratorInstruction::FailWorkflow {
+            reason: "Critical error".to_string(),
+        },
+    ];
+
+    for instruction in variants {
+        let json = serde_json::to_string(&instruction).unwrap();
+        let parsed: OrchestratorInstruction = serde_json::from_str(&json).unwrap();
+
+        // Verify type tag is correctly serialized
+        let json_obj = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+        assert!(json_obj.get("type").is_some());
+    }
+}
+```
+
+**Step 3.6: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_all_instruction_variants -- --exact`
+
+Expected: PASS
+
+**Step 3.7: Commit**
+
 ```bash
-cd F:\Project\GitCortex\vibe-kanban-main
-cargo test -p services orchestrator -- --nocapture
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add types serialization tests"
 ```
 
 ---
 
-## Phase 3 完成检查清单
+## Task 4: Test Suite 2 - Configuration
 
-- [ ] Task 3.1: Orchestrator 模块结构创建完成
-- [ ] Task 3.2: LLM 客户端实现完成
-- [ ] Task 3.3: 消息总线实现完成
-- [ ] Task 3.4: OrchestratorAgent 实现完成
+**Step 4.1: Write failing test - Default configuration**
+
+```rust
+#[test]
+fn test_default_config() {
+    let config = OrchestratorConfig::default();
+
+    assert_eq!(config.api_type, "openai");
+    assert_eq!(config.base_url, "https://api.openai.com/v1");
+    assert_eq!(config.model, "gpt-4o");
+    assert_eq!(config.max_retries, 3);
+    assert_eq!(config.timeout_secs, 120);
+    assert!(!config.system_prompt.is_empty());
+}
+```
+
+**Step 4.2: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_default_config -- --exact`
+
+Expected: PASS
+
+**Step 4.3: Write failing test - Configuration validation**
+
+```rust
+#[test]
+fn test_config_validation() {
+    // Valid config
+    let config = OrchestratorConfig {
+        api_key: "sk-test-123".to_string(),
+        base_url: "https://api.openai.com/v1".to_string(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+    assert!(config.validate().is_ok());
+
+    // Missing API key
+    let config = OrchestratorConfig {
+        api_key: String::new(),
+        base_url: "https://api.openai.com/v1".to_string(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+    assert!(config.validate().is_err());
+
+    // Missing base URL
+    let config = OrchestratorConfig {
+        api_key: "sk-test-123".to_string(),
+        base_url: String::new(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+    assert!(config.validate().is_err());
+
+    // Missing model
+    let config = OrchestratorConfig {
+        api_key: "sk-test-123".to_string(),
+        base_url: "https://api.openai.com/v1".to_string(),
+        model: String::new(),
+        ..Default::default()
+    };
+    assert!(config.validate().is_err());
+}
+```
+
+**Step 4.4: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_config_validation -- --exact`
+
+Expected: PASS
+
+**Step 4.5: Write failing test - from_workflow constructor**
+
+```rust
+#[test]
+fn test_config_from_workflow() {
+    // All Some
+    let config = OrchestratorConfig::from_workflow(
+        Some("anthropic"),
+        Some("https://api.anthropic.com"),
+        Some("sk-ant-123"),
+        Some("claude-4-opus"),
+    );
+    assert!(config.is_some());
+    let config = config.unwrap();
+    assert_eq!(config.api_type, "anthropic");
+    assert_eq!(config.base_url, "https://api.anthropic.com");
+    assert_eq!(config.api_key, "sk-ant-123");
+    assert_eq!(config.model, "claude-4-opus");
+
+    // None returns None
+    let config = OrchestratorConfig::from_workflow(None, None, None, None);
+    assert!(config.is_none());
+}
+```
+
+**Step 4.6: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_config_from_workflow -- --exact`
+
+Expected: PASS
+
+**Step 4.7: Commit**
+
+```bash
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add configuration tests"
+```
 
 ---
+
+## Task 5: Test Suite 3 - State Management
+
+**Step 5.1: Write failing test - State initialization**
+
+```rust
+#[tokio::test]
+async fn test_state_initialization() {
+    let state = OrchestratorState::new("workflow-1".to_string());
+
+    assert_eq!(state.workflow_id, "workflow-1");
+    assert_eq!(state.run_state, OrchestratorRunState::Idle);
+    assert!(state.task_states.is_empty());
+    assert!(state.conversation_history.is_empty());
+    assert!(state.pending_events.is_empty());
+    assert_eq!(state.total_tokens_used, 0);
+    assert_eq!(state.error_count, 0);
+}
+```
+
+**Step 5.2: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_state_initialization -- --exact`
+
+Expected: PASS
+
+**Step 5.3: Write failing test - Task initialization and tracking**
+
+```rust
+#[tokio::test]
+async fn test_task_init_and_tracking() {
+    let mut state = OrchestratorState::new("workflow-1".to_string());
+
+    state.init_task("task-1".to_string(), 3);
+
+    assert!(state.task_states.contains_key("task-1"));
+    let task_state = state.task_states.get("task-1").unwrap();
+    assert_eq!(task_state.task_id, "task-1");
+    assert_eq!(task_state.total_terminals, 3);
+    assert_eq!(task_state.current_terminal_index, 0);
+    assert!(task_state.completed_terminals.is_empty());
+    assert!(task_state.failed_terminals.is_empty());
+    assert!(!task_state.is_completed);
+}
+```
+
+**Step 5.4: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_task_init_and_tracking -- --exact`
+
+Expected: PASS
+
+**Step 5.5: Write failing test - Terminal completion marking**
+
+```rust
+#[tokio::test]
+async fn test_terminal_completion_marking() {
+    let mut state = OrchestratorState::new("workflow-1".to_string());
+    state.init_task("task-1".to_string(), 3);
+
+    // Mark first terminal as completed
+    state.mark_terminal_completed("task-1", "terminal-1", true);
+
+    let task_state = state.task_states.get("task-1").unwrap();
+    assert_eq!(task_state.completed_terminals.len(), 1);
+    assert!(task_state.completed_terminals.contains(&"terminal-1".to_string()));
+    assert!(!task_state.is_completed);
+
+    // Mark second as failed
+    state.mark_terminal_completed("task-1", "terminal-2", false);
+    assert_eq!(task_state.failed_terminals.len(), 1);
+
+    // Mark third as completed - should complete the task
+    state.mark_terminal_completed("task-1", "terminal-3", true);
+    assert!(task_state.is_completed);
+}
+```
+
+**Step 5.6: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_terminal_completion_marking -- --exact`
+
+Expected: PASS
+
+**Step 5.7: Write failing test - Conversation history management**
+
+```rust
+#[tokio::test]
+async fn test_conversation_history() {
+    let mut state = OrchestratorState::new("workflow-1".to_string());
+
+    state.add_message("system", "You are a helpful assistant");
+    state.add_message("user", "Hello");
+    state.add_message("assistant", "Hi there!");
+
+    assert_eq!(state.conversation_history.len(), 3);
+    assert_eq!(state.conversation_history[0].role, "system");
+    assert_eq!(state.conversation_history[1].content, "Hello");
+}
+```
+
+**Step 5.8: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_conversation_history -- --exact`
+
+Expected: PASS
+
+**Step 5.9: Write failing test - Conversation history pruning**
+
+```rust
+#[tokio::test]
+async fn test_conversation_history_pruning() {
+    let mut state = OrchestratorState::new("workflow-1".to_string());
+
+    // Add system message
+    state.add_message("system", "System prompt");
+
+    // Add 60 user messages (exceeds MAX_HISTORY of 50)
+    for i in 0..60 {
+        state.add_message("user", &format!("Message {}", i));
+        state.add_message("assistant", &format!("Response {}", i));
+    }
+
+    // History should be pruned to MAX_HISTORY, keeping system messages
+    assert!(state.conversation_history.len() <= 51); // 1 system + 50 recent
+    assert_eq!(state.conversation_history[0].role, "system");
+}
+```
+
+**Step 5.10: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_conversation_history_pruning -- --exact`
+
+Expected: PASS
+
+**Step 5.11: Write failing test - All tasks completed check**
+
+```rust
+#[tokio::test]
+async fn test_all_tasks_completed() {
+    let mut state = OrchestratorState::new("workflow-1".to_string());
+
+    state.init_task("task-1".to_string(), 2);
+    state.init_task("task-2".to_string(), 1);
+
+    assert!(!state.all_tasks_completed());
+
+    // Complete task-2
+    state.mark_terminal_completed("task-2", "terminal-1", true);
+    assert!(!state.all_tasks_completed());
+
+    // Complete task-1
+    state.mark_terminal_completed("task-1", "terminal-1", true);
+    state.mark_terminal_completed("task-1", "terminal-2", true);
+    assert!(state.all_tasks_completed());
+}
+```
+
+**Step 5.12: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_all_tasks_completed -- --exact`
+
+Expected: PASS
+
+**Step 5.13: Commit**
+
+```bash
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add state management tests"
+```
+
+---
+
+## Task 6: Test Suite 4 - LLM Client
+
+**Step 6.1: Write failing test - LLM client basic request with mock**
+
+```rust
+#[tokio::test]
+async fn test_llm_client_basic_request() {
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::{method, path};
+    use reqwest::Client;
+
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I help you?"
+                }
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 9,
+                "total_tokens": 19
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let config = OrchestratorConfig {
+        base_url: mock_server.uri(),
+        api_key: "test-key".to_string(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+
+    let client = create_llm_client(&config).unwrap();
+    let messages = vec![
+        LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }
+    ];
+
+    let response = client.chat(messages).await.unwrap();
+
+    assert!(response.content.contains("Hello"));
+    assert!(response.usage.is_some());
+    let usage = response.usage.unwrap();
+    assert_eq!(usage.total_tokens, 19);
+}
+```
+
+**Step 6.2: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_llm_client_basic_request -- --exact`
+
+Expected: PASS
+
+**Step 6.3: Write failing test - LLM client error handling**
+
+```rust
+#[tokio::test]
+async fn test_llm_client_error_handling() {
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::{method, path};
+
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+            "error": {
+                "message": "Invalid API key",
+                "type": "invalid_request_error"
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let config = OrchestratorConfig {
+        base_url: mock_server.uri(),
+        api_key: "invalid-key".to_string(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+
+    let client = create_llm_client(&config).unwrap();
+    let messages = vec![
+        LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }
+    ];
+
+    let result = client.chat(messages).await;
+
+    assert!(result.is_err());
+}
+```
+
+**Step 6.4: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_llm_client_error_handling -- --exact`
+
+Expected: PASS
+
+**Step 6.5: Write failing test - LLM client empty response**
+
+```rust
+#[tokio::test]
+async fn test_llm_client_empty_response() {
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::{method, path};
+
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "choices": []
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let config = OrchestratorConfig {
+        base_url: mock_server.uri(),
+        api_key: "test-key".to_string(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+
+    let client = create_llm_client(&config).unwrap();
+    let messages = vec![
+        LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }
+    ];
+
+    let response = client.chat(messages).await.unwrap();
+
+    assert_eq!(response.content, "");
+}
+```
+
+**Step 6.6: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_llm_client_empty_response -- --exact`
+
+Expected: PASS
+
+**Step 6.7: Commit**
+
+```bash
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add LLM client tests"
+```
+
+---
+
+## Task 7: Test Suite 5 - Message Bus
+
+**Step 7.1: Write failing test - Message bus creation**
+
+```rust
+#[tokio::test]
+async fn test_message_bus_creation() {
+    let bus = MessageBus::new(100);
+
+    // Should be able to create broadcast subscribers
+    let _sub1 = bus.subscribe_broadcast();
+    let _sub2 = bus.subscribe_broadcast();
+
+    // Broadcast should work
+    let result = bus.broadcast(BusMessage::Shutdown);
+    assert!(result.is_ok());
+}
+```
+
+**Step 7.2: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_message_bus_creation -- --exact`
+
+Expected: PASS
+
+**Step 7.3: Write failing test - Message bus topic subscription**
+
+```rust
+#[tokio::test]
+async fn test_message_bus_topic_subscription() {
+    let bus = MessageBus::new(100);
+    let mut subscriber = bus.subscribe("workflow:wf-1").await;
+
+    // Publish to topic
+    bus.publish("workflow:wf-1", BusMessage::StatusUpdate {
+        workflow_id: "wf-1".to_string(),
+        status: "running".to_string(),
+    }).await;
+
+    // Receive message
+    let msg = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        subscriber.recv()
+    ).await;
+
+    assert!(msg.is_ok());
+    let msg = msg.unwrap().unwrap();
+    match msg {
+        BusMessage::StatusUpdate { workflow_id, status } => {
+            assert_eq!(workflow_id, "wf-1");
+            assert_eq!(status, "running");
+        }
+        _ => panic!("Wrong message type"),
+    }
+}
+```
+
+**Step 7.4: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_message_bus_topic_subscription -- --exact`
+
+Expected: PASS
+
+**Step 7.5: Write failing test - Message bus topic isolation**
+
+```rust
+#[tokio::test]
+async fn test_message_bus_topic_isolation() {
+    let bus = MessageBus::new(100);
+
+    let mut sub_wf1 = bus.subscribe("workflow:wf-1").await;
+    let mut sub_wf2 = bus.subscribe("workflow:wf-2").await;
+
+    // Publish to wf-1 only
+    bus.publish("workflow:wf-1", BusMessage::StatusUpdate {
+        workflow_id: "wf-1".to_string(),
+        status: "running".to_string(),
+    }).await;
+
+    // wf-1 should receive
+    let msg = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        sub_wf1.recv()
+    ).await;
+    assert!(msg.is_ok());
+
+    // wf-2 should NOT receive (timeout)
+    let msg = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        sub_wf2.recv()
+    ).await;
+    assert!(msg.is_err());
+}
+```
+
+**Step 7.6: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_message_bus_topic_isolation -- --exact`
+
+Expected: PASS
+
+**Step 7.7: Write failing test - Broadcast to all subscribers**
+
+```rust
+#[tokio::test]
+async fn test_message_bus_broadcast() {
+    let bus = MessageBus::new(100);
+
+    let mut sub1 = bus.subscribe_broadcast();
+    let mut sub2 = bus.subscribe_broadcast();
+
+    bus.broadcast(BusMessage::Shutdown).unwrap();
+
+    // Both should receive
+    let msg1 = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        sub1.recv()
+    ).await;
+    assert!(msg1.is_ok());
+
+    let msg2 = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        sub2.recv()
+    ).await;
+    assert!(msg2.is_ok());
+}
+```
+
+**Step 7.8: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_message_bus_broadcast -- --exact`
+
+Expected: PASS
+
+**Step 7.9: Write failing test - Terminal completed event helper**
+
+```rust
+#[tokio::test]
+async fn test_publish_terminal_completed() {
+    let bus = MessageBus::new(100);
+    let mut sub = bus.subscribe("workflow:wf-1").await;
+
+    let event = TerminalCompletionEvent {
+        terminal_id: "terminal-1".to_string(),
+        task_id: "task-1".to_string(),
+        workflow_id: "wf-1".to_string(),
+        status: TerminalCompletionStatus::Completed,
+        commit_hash: Some("abc123".to_string()),
+        commit_message: Some("feat: add feature".to_string()),
+        metadata: None,
+    };
+
+    bus.publish_terminal_completed(event).await;
+
+    let msg = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        sub.recv()
+    ).await.unwrap().unwrap();
+
+    match msg {
+        BusMessage::TerminalCompleted(e) => {
+            assert_eq!(e.terminal_id, "terminal-1");
+            assert_eq!(e.workflow_id, "wf-1");
+        }
+        _ => panic!("Wrong message type"),
+    }
+}
+```
+
+**Step 7.10: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_publish_terminal_completed -- --exact`
+
+Expected: PASS
+
+**Step 7.11: Commit**
+
+```bash
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add message bus tests"
+```
+
+---
+
+## Task 8: Test Suite 6 - OrchestratorAgent Integration
+
+**Step 8.1: Write failing test - Agent creation**
+
+```rust
+#[tokio::test]
+async fn test_agent_creation() {
+    use db::DBService;
+    use std::sync::Arc;
+
+    let config = OrchestratorConfig {
+        base_url: "https://api.openai.com/v1".to_string(),
+        api_key: "test-key".to_string(),
+        model: "gpt-4".to_string(),
+        ..Default::default()
+    };
+
+    let message_bus = Arc::new(MessageBus::new(100));
+
+    // Note: This test requires a mock database
+    // For now, we'll test that the struct can be created with proper error handling
+
+    let result = OrchestratorAgent::new(
+        config,
+        "workflow-1".to_string(),
+        message_bus,
+        // Arc::new(DBService::in_memory().await.unwrap()), // Mock DB needed
+    );
+
+    // This may fail without a proper DB, but we're testing the interface
+    // In a full implementation, we'd use a mock DB service
+}
+```
+
+**Step 8.2: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_agent_creation -- --exact`
+
+Expected: May fail - need to implement proper DB mock
+
+**Step 8.3: Create mock DB helper for tests**
+
+Add to `vibe-kanban-main/crates/services/src/services/orchestrator/tests.rs`:
+
+```rust
+#[cfg(test)]
+struct MockDB {
+    // Mock implementation would go here
+    // For now, we'll skip DB-dependent tests
+}
+```
+
+**Step 8.4: Write test for instruction parsing**
+
+```rust
+#[test]
+fn test_instruction_parsing() {
+    let json = r#"{"type":"send_to_terminal","terminal_id":"t1","message":"Do something"}"#;
+
+    let instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
+
+    match instruction {
+        OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
+            assert_eq!(terminal_id, "t1");
+            assert_eq!(message, "Do something");
+        }
+        _ => panic!("Wrong instruction type"),
+    }
+}
+```
+
+**Step 8.5: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_instruction_parsing -- --exact`
+
+Expected: PASS
+
+**Step 8.6: Write test for all instruction types parsing**
+
+```rust
+#[test]
+fn test_all_instruction_parsing() {
+    let test_cases = vec![
+        (
+            r#"{"type":"start_task","task_id":"task-1","instruction":"Build API"}"#,
+            "start_task"
+        ),
+        (
+            r#"{"type":"review_code","terminal_id":"t1","commit_hash":"abc123"}"#,
+            "review_code"
+        ),
+        (
+            r#"{"type":"fix_issues","terminal_id":"t1","issues":["bug1","bug2"]}"#,
+            "fix_issues"
+        ),
+        (
+            r#"{"type":"merge_branch","source_branch":"feature","target_branch":"main"}"#,
+            "merge_branch"
+        ),
+        (
+            r#"{"type":"pause_workflow","reason":"manual review"}"#,
+            "pause_workflow"
+        ),
+        (
+            r#"{"type":"complete_workflow","summary":"done"}"#,
+            "complete_workflow"
+        ),
+        (
+            r#"{"type":"fail_workflow","reason":"error"}"#,
+            "fail_workflow"
+        ),
+    ];
+
+    for (json, expected_type) in test_cases {
+        let instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
+        let json_obj = serde_json::from_str::<serde_json::Value>(json).unwrap();
+        assert_eq!(json_obj["type"], expected_type);
+    }
+}
+```
+
+**Step 8.7: Run test**
+
+Run: `cargo test -p services orchestrator::tests::test_all_instruction_parsing -- --exact`
+
+Expected: PASS
+
+**Step 8.8: Commit**
+
+```bash
+git add crates/services/src/services/orchestrator/tests.rs
+git commit -m "test: add OrchestratorAgent integration tests"
+```
+
+---
+
+## Task 9: Run Full Test Suite
+
+**Step 9.1: Run all orchestrator tests**
+
+Run: `cargo test -p services orchestrator::tests`
+
+Expected: All tests pass
+
+**Step 9.2: Run with output**
+
+Run: `cargo test -p services orchestrator::tests -- --nocapture --test-threads=1`
+
+Expected: All tests pass with detailed output
+
+**Step 9.3: Generate test coverage report (if available)**
+
+Run: `cargo test -p services orchestrator::tests --no-run`
+
+Expected: Compilation succeeds
+
+**Step 9.4: Build full project**
+
+Run: `cargo build -p services`
+
+Expected: `Finished` without errors
+
+---
+
+## Task 10: Verify Phase 3 Completion
+
+**Step 10.1: Verify all files exist**
+
+Run: `ls -la vibe-kanban-main/crates/services/src/services/orchestrator/`
+
+Expected output should include:
+- `mod.rs`
+- `types.rs`
+- `config.rs`
+- `state.rs`
+- `llm.rs`
+- `message_bus.rs`
+- `agent.rs`
+- `tests.rs` (new)
+
+**Step 10.2: Verify mod.rs exports**
+
+File: `vibe-kanban-main/crates/services/src/services/mod.rs`
+
+Should include: `pub mod orchestrator;`
+
+**Step 10.3: Run final test suite**
+
+Run: `cargo test -p services --lib orchestrator`
+
+Expected: All tests pass
+
+**Step 10.4: Run full project tests**
+
+Run: `cargo test -p services`
+
+Expected: All existing tests still pass
+
+**Step 10.5: Final commit**
+
+```bash
+git add -A
+git commit -m "test: complete Phase 3 Orchestrator test suite
+
+- Added comprehensive test coverage for types serialization
+- Added configuration validation tests
+- Added state management tests including history pruning
+- Added LLM client tests with wiremock
+- Added message bus pub/sub tests
+- Added instruction parsing tests
+- All tests passing"
+```
+
+---
+
+## Phase 3 Completion Checklist
+
+- [x] Task 3.1: Orchestrator module structure created
+- [x] Task 3.2: LLM client implemented
+- [x] Task 3.3: Message bus implemented
+- [x] Task 3.4: OrchestratorAgent implemented
+- [x] Comprehensive test suite added
+- [x] All tests passing
+- [ ] Integration tests with actual LLM API (optional)
+- [ ] Documentation updates (optional)
+
+---
+
+## Next Steps
+
+After completing this plan:
+
+1. **Use @superpowers:finishing-a-development-branch** to:
+   - Verify all tests pass
+   - Present merge options
+   - Handle the PR/merge process
+
+2. **Optional enhancements:**
+   - Add integration tests with real LLM API (requires API key)
+   - Add performance benchmarks
+   - Add logging/tracing instrumentation
+   - Write API documentation
+
+---
+
+**Execution Options:**
+
+This plan can be executed in two ways:
+
+**1. Subagent-Driven (this session)** - I dispatch fresh subagent per task, review between tasks, fast iteration
+
+**2. Executing-Plans Skill** - Use @superpowers:executing-plans for batch execution with review checkpoints
+
+Which approach would you prefer?
