@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use db::DBService;
 use tokio::sync::RwLock;
 
@@ -154,20 +155,206 @@ impl OrchestratorAgent {
     }
 
     /// 处理 Git 事件
-    async fn handle_git_event(
+    pub async fn handle_git_event(
         &self,
-        _workflow_id: &str,
+        workflow_id: &str,
         commit_hash: &str,
         branch: &str,
         message: &str,
     ) -> anyhow::Result<()> {
         tracing::info!(
             "Git event: {} on branch {} - {}",
-            commit_hash,
-            branch,
-            message
+            commit_hash, branch, message
         );
-        // Git 事件通常会转换为 TerminalCompleted 事件
+
+        // 1. Parse commit metadata
+        let metadata = crate::services::git_watcher::parse_commit_metadata(message)?;
+
+        // 2. Validate workflow_id matches
+        if metadata.workflow_id != workflow_id {
+            tracing::warn!(
+                "Workflow ID mismatch: expected {}, got {}",
+                workflow_id, metadata.workflow_id
+            );
+            return Ok(());
+        }
+
+        // 3. Route to handler based on status
+        match metadata.status.as_str() {
+            "completed" => {
+                self.handle_git_terminal_completed(
+                    &metadata.terminal_id,
+                    &metadata.task_id,
+                    commit_hash,
+                    message,
+                ).await?;
+            }
+            "review_pass" => {
+                self.handle_git_review_pass(
+                    &metadata.terminal_id,
+                    &metadata.task_id,
+                    &metadata.reviewed_terminal.ok_or_else(|| anyhow!("reviewed_terminal required for review_pass"))?,
+                ).await?;
+            }
+            "review_reject" => {
+                self.handle_git_review_reject(
+                    &metadata.terminal_id,
+                    &metadata.task_id,
+                    &metadata.reviewed_terminal.ok_or_else(|| anyhow!("reviewed_terminal required for review_reject"))?,
+                    &metadata.issues.ok_or_else(|| anyhow!("issues required for review_reject"))?,
+                ).await?;
+            }
+            "failed" => {
+                self.handle_git_terminal_failed(
+                    &metadata.terminal_id,
+                    &metadata.task_id,
+                    message,
+                ).await?;
+            }
+            _ => {
+                tracing::warn!("Unknown status in commit: {}", metadata.status);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Handle terminal completed status from git event
+    async fn handle_git_terminal_completed(
+        &self,
+        terminal_id: &str,
+        task_id: &str,
+        commit_hash: &str,
+        commit_message: &str,
+    ) -> anyhow::Result<()> {
+        tracing::info!(
+            "Terminal {} completed task {} (commit: {})",
+            terminal_id, task_id, commit_hash
+        );
+
+        // 1. Update terminal status
+        db::models::Terminal::update_status(
+            &self.db.pool,
+            terminal_id,
+            "completed"
+        ).await?;
+
+        // 2. Publish completion event
+        let event = BusMessage::TerminalCompleted(TerminalCompletionEvent {
+            terminal_id: terminal_id.to_string(),
+            task_id: task_id.to_string(),
+            workflow_id: self.state.read().await.workflow_id.clone(),
+            status: TerminalCompletionStatus::Completed,
+            commit_hash: Some(commit_hash.to_string()),
+            commit_message: Some(commit_message.to_string()),
+            metadata: None,
+        });
+
+        self.message_bus.publish(
+            &format!("workflow:{}", self.state.read().await.workflow_id),
+            event
+        ).await?;
+
+        Ok(())
+    }
+
+    /// Handle review passed status from git event
+    async fn handle_git_review_pass(
+        &self,
+        reviewer_terminal_id: &str,
+        _task_id: &str,
+        reviewed_terminal_id: &str,
+    ) -> anyhow::Result<()> {
+        tracing::info!(
+            "Terminal {} approved work from {}",
+            reviewer_terminal_id, reviewed_terminal_id
+        );
+
+        // 1. Update reviewed terminal status
+        db::models::Terminal::update_status(
+            &self.db.pool,
+            reviewed_terminal_id,
+            "review_passed"
+        ).await?;
+
+        // 2. Publish review passed event
+        let event = BusMessage::StatusUpdate {
+            workflow_id: self.state.read().await.workflow_id.clone(),
+            status: "review_passed".to_string(),
+        };
+
+        self.message_bus.publish(
+            &format!("workflow:{}", self.state.read().await.workflow_id),
+            event
+        ).await?;
+
+        Ok(())
+    }
+
+    /// Handle review rejected status from git event
+    async fn handle_git_review_reject(
+        &self,
+        reviewer_terminal_id: &str,
+        _task_id: &str,
+        reviewed_terminal_id: &str,
+        issues: &[crate::services::git_watcher::Issue],
+    ) -> anyhow::Result<()> {
+        tracing::warn!(
+            "Terminal {} rejected work from {}: {} issues found",
+            reviewer_terminal_id, reviewed_terminal_id, issues.len()
+        );
+
+        // 1. Update reviewed terminal status
+        db::models::Terminal::update_status(
+            &self.db.pool,
+            reviewed_terminal_id,
+            "review_rejected"
+        ).await?;
+
+        // 2. Publish review rejected event
+        let event = BusMessage::StatusUpdate {
+            workflow_id: self.state.read().await.workflow_id.clone(),
+            status: "review_rejected".to_string(),
+        };
+
+        self.message_bus.publish(
+            &format!("workflow:{}", self.state.read().await.workflow_id),
+            event
+        ).await?;
+
+        Ok(())
+    }
+
+    /// Handle terminal failed status from git event
+    async fn handle_git_terminal_failed(
+        &self,
+        terminal_id: &str,
+        task_id: &str,
+        error_message: &str,
+    ) -> anyhow::Result<()> {
+        tracing::error!(
+            "Terminal {} failed task {}: {}",
+            terminal_id, task_id, error_message
+        );
+
+        // 1. Update terminal status
+        db::models::Terminal::update_status(
+            &self.db.pool,
+            terminal_id,
+            "failed"
+        ).await?;
+
+        // 2. Publish failure event
+        let event = BusMessage::Error {
+            workflow_id: self.state.read().await.workflow_id.clone(),
+            error: error_message.to_string(),
+        };
+
+        self.message_bus.publish(
+            &format!("workflow:{}", self.state.read().await.workflow_id),
+            event
+        ).await?;
+
         Ok(())
     }
 

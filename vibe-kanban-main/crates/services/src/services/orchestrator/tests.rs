@@ -1085,4 +1085,248 @@ mod tests {
 
         assert_eq!(updated_workflow.status, "failed");
     }
+
+    // =========================================================================
+    // Test Suite 7: handle_git_event (Task 8)
+    // =========================================================================
+
+    /// Helper function to set up test workflow with terminal
+    async fn setup_test_workflow() -> (Arc<db::DBService>, db::models::Workflow, db::models::Terminal) {
+        use db::DBService;
+        use sqlx::sqlite::SqlitePoolOptions;
+        use std::path::PathBuf;
+        use std::sync::Arc;
+        use uuid::Uuid;
+
+        // Create in-memory database with migrations
+        let pool = SqlitePoolOptions::new()
+            .connect(":memory:")
+            .await
+            .unwrap();
+
+        // Run migrations
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let migration_dir = manifest_dir
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .join("db")
+            .join("migrations");
+
+        let migrator = sqlx::migrate::Migrator::new(migration_dir)
+            .await
+            .unwrap();
+        migrator.run(&pool).await.unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+
+        // Create workflow, task and terminal in database
+        let workflow_id = Uuid::new_v4().to_string();
+        let task_id = Uuid::new_v4().to_string();
+        let terminal_id = Uuid::new_v4().to_string();
+        let pty_session_id = Uuid::new_v4().to_string();
+
+        // First, we need to insert a project (required by workflow)
+        let project_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+        )
+        .bind(&project_id)
+        .bind("test-project")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow
+        sqlx::query(
+            r#"
+            INSERT INTO workflow (
+                id, project_id, name, target_branch,
+                merge_terminal_cli_id, merge_terminal_model_id,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#
+        )
+        .bind(&workflow_id)
+        .bind(&project_id)
+        .bind("test-workflow")
+        .bind("main")
+        .bind("cli-claude-code") // From migration
+        .bind("model-claude-sonnet") // From migration
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow_task
+        sqlx::query(
+            r#"
+            INSERT INTO workflow_task (
+                id, workflow_id, name, branch, order_index,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#
+        )
+        .bind(&task_id)
+        .bind(&workflow_id)
+        .bind("test-task")
+        .bind("feature/test")
+        .bind(0)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert terminal record
+        sqlx::query(
+            r#"
+            INSERT INTO terminal (
+                id, workflow_task_id, cli_type_id, model_config_id,
+                order_index, status, pty_session_id, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "#
+        )
+        .bind(&terminal_id)
+        .bind(&task_id)
+        .bind("cli-claude-code") // From migration
+        .bind("model-claude-sonnet") // From migration
+        .bind(0)
+        .bind("waiting")
+        .bind(&pty_session_id)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Fetch and return workflow and terminal
+        let workflow = db::models::Workflow::find_by_id(&pool, &workflow_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let terminal = db::models::Terminal::find_by_id(&pool, &terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        (db, workflow, terminal)
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_terminal_completed() {
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        ).await.unwrap();
+
+        // Subscribe to workflow topic
+        let mut workflow_rx = message_bus.subscribe(
+            &format!("workflow:{}", workflow.id)
+        ).await;
+
+        // Create valid commit message
+        let commit_message = format!(
+            r#"Terminal completed
+
+---METADATA---
+{{"workflowId":"{}","taskId":"{}","terminalId":"{}","status":"completed","reviewedTerminal":null,"issues":null,"filesChanged":[{{"path":"src/main.rs","changeType":"modified"}}]}}"#,
+            workflow.id, terminal.workflow_task_id, terminal.id
+        );
+
+        // Handle git event
+        agent.handle_git_event(
+            &workflow.id,
+            "abc123",
+            "main",
+            commit_message.as_str()
+        ).await.unwrap();
+
+        // Verify terminal status updated
+        let updated_terminal = db::models::Terminal::find_by_id(
+            &db.pool,
+            &terminal.id
+        ).await.unwrap().unwrap();
+
+        assert_eq!(updated_terminal.status, "completed");
+
+        // Verify event published
+        let timeout = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500),
+            workflow_rx.recv()
+        ).await;
+
+        assert!(timeout.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_workflow_mismatch() {
+        let (db, workflow, _terminal) = setup_test_workflow().await;
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        ).await.unwrap();
+
+        // Create commit with different workflow ID
+        let commit_message = r#"
+Terminal completed
+
+---METADATA---
+{"workflowId":"different-workflow","taskId":"task-1","terminalId":"term-1","status":"completed","reviewedTerminal":null,"issues":null,"filesChanged":[]}
+"#;
+
+        // Should succeed but do nothing (workflow mismatch)
+        let result = agent.handle_git_event(
+            &workflow.id,
+            "abc123",
+            "main",
+            commit_message
+        ).await;
+
+        assert!(result.is_ok());
+    }
 }
