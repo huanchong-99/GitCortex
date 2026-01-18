@@ -99,7 +99,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       apiKey: model.apiKey,
       modelId: model.modelId,
     });
-    setAvailableModels(API_TYPES[model.apiType].defaultModels);
+    setAvailableModels([...API_TYPES[model.apiType].defaultModels]);
     setFormErrors({});
     setIsDialogOpen(true);
   };
@@ -120,7 +120,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       baseUrl: config.defaultBaseUrl,
       modelId: '',
     });
-    setAvailableModels(config.defaultModels);
+    setAvailableModels([...config.defaultModels]);
   };
 
   const handleFetchModels = async () => {
@@ -136,7 +136,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       // TODO: Implement actual API call to fetch models
       // For now, use default models based on API type
       const defaultModels = API_TYPES[formData.apiType].defaultModels;
-      setAvailableModels(defaultModels);
+      setAvailableModels([...defaultModels]);
     } catch (error) {
       setFormErrors({ fetch: '获取模型列表失败，请检查 API Key' });
     } finally {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Play, Trash2, Edit } from 'lucide-react';
@@ -8,11 +8,11 @@ import { useWorkflows, useCreateWorkflow, useStartWorkflow, useDeleteWorkflow } 
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
 import { PipelineView } from '@/components/workflow/PipelineView';
 import type { WizardConfig } from '@/components/workflow/types';
+import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
 
 export function Workflows() {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
 
   const [showWizard, setShowWizard] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
@@ -68,10 +68,16 @@ export function Workflows() {
         })),
         terminals: config.terminals,
         commands: config.commands,
-        orchestrator: config.advanced.orchestrator,
-        errorTerminal: config.advanced.errorTerminal,
-        mergeTerminal: config.advanced.mergeTerminal,
-        targetBranch: config.advanced.targetBranch,
+        orchestrator: {
+          modelConfigId: config.advanced.orchestrator.modelConfigId,
+          errorTerminal: config.advanced.errorTerminal.enabled ? {
+            enabled: config.advanced.errorTerminal.enabled,
+            cliTypeId: config.advanced.errorTerminal.cliTypeId,
+            modelConfigId: config.advanced.errorTerminal.modelConfigId,
+          } : undefined,
+          mergeTerminal: config.advanced.mergeTerminal,
+          targetBranch: config.advanced.targetBranch,
+        },
       },
     };
 
@@ -124,9 +130,15 @@ export function Workflows() {
         </div>
 
         <PipelineView
-          workflow={selectedWorkflow}
+          name={selectedWorkflow.name}
+          status={selectedWorkflow.status as any}
           tasks={[]} // TODO: Fetch workflow tasks
-          onTerminalClick={(terminal) => console.log('Terminal clicked:', terminal)}
+          mergeTerminal={{
+            cliTypeId: selectedWorkflow.config.orchestrator.mergeTerminal.cliTypeId,
+            modelConfigId: selectedWorkflow.config.orchestrator.mergeTerminal.modelConfigId,
+            status: 'not_started' as TerminalStatus,
+          }}
+          onTerminalClick={(taskId, terminalId) => console.log('Terminal clicked:', taskId, terminalId)}
         />
       </div>
     );

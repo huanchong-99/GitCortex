@@ -1,7 +1,7 @@
 /// <reference types="vitest/globals" />
 
 declare global {
-  const WebSocket: any;
+  var WebSocket: any;
 }
 
 export {};
