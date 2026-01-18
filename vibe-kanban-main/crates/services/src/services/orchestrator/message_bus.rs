@@ -4,7 +4,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::{RwLock, broadcast, mpsc};
 
-use super::types::*;
+use super::{
+    constants::*,
+    types::*,
+};
 
 #[derive(Debug, Clone)]
 pub enum BusMessage {
@@ -81,7 +84,7 @@ impl MessageBus {
     }
 
     pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
-        let topic = format!("workflow:{}", event.workflow_id);
+        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, event.workflow_id);
         let _ = self.publish(&topic, BusMessage::TerminalCompleted(event.clone()))
             .await;
         let _ = self.broadcast(BusMessage::TerminalCompleted(event));

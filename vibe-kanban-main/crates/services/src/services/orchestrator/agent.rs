@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 
 use super::{
     config::OrchestratorConfig,
+    constants::*,
     llm::{LLMClient, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
@@ -70,7 +71,7 @@ impl OrchestratorAgent {
 
         let mut rx = self
             .message_bus
-            .subscribe(&format!("workflow:{}", workflow_id))
+            .subscribe(&format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id))
             .await;
         tracing::info!("Orchestrator started for workflow: {}", workflow_id);
 
@@ -181,7 +182,7 @@ impl OrchestratorAgent {
 
         // 3. Route to handler based on status
         match metadata.status.as_str() {
-            "completed" => {
+            TERMINAL_STATUS_COMPLETED => {
                 self.handle_git_terminal_completed(
                     &metadata.terminal_id,
                     &metadata.task_id,
@@ -204,7 +205,7 @@ impl OrchestratorAgent {
                     &metadata.issues.ok_or_else(|| anyhow!("issues required for review_reject"))?,
                 ).await?;
             }
-            "failed" => {
+            TERMINAL_STATUS_FAILED => {
                 self.handle_git_terminal_failed(
                     &metadata.terminal_id,
                     &metadata.task_id,
@@ -236,7 +237,7 @@ impl OrchestratorAgent {
         db::models::Terminal::update_status(
             &self.db.pool,
             terminal_id,
-            "completed"
+            TERMINAL_STATUS_COMPLETED
         ).await?;
 
         // 2. Publish completion event
@@ -251,7 +252,7 @@ impl OrchestratorAgent {
         });
 
         self.message_bus.publish(
-            &format!("workflow:{}", self.state.read().await.workflow_id),
+            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
             event
         ).await?;
 
@@ -277,17 +278,17 @@ impl OrchestratorAgent {
         db::models::Terminal::update_status(
             &self.db.pool,
             reviewed_terminal_id,
-            "review_passed"
+            TERMINAL_STATUS_REVIEW_PASSED
         ).await?;
 
         // 2. Publish review passed event
         let event = BusMessage::StatusUpdate {
             workflow_id: self.state.read().await.workflow_id.clone(),
-            status: "review_passed".to_string(),
+            status: TERMINAL_STATUS_REVIEW_PASSED.to_string(),
         };
 
         self.message_bus.publish(
-            &format!("workflow:{}", self.state.read().await.workflow_id),
+            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
             event
         ).await?;
 
@@ -314,17 +315,17 @@ impl OrchestratorAgent {
         db::models::Terminal::update_status(
             &self.db.pool,
             reviewed_terminal_id,
-            "review_rejected"
+            TERMINAL_STATUS_REVIEW_REJECTED
         ).await?;
 
         // 2. Publish review rejected event
         let event = BusMessage::StatusUpdate {
             workflow_id: self.state.read().await.workflow_id.clone(),
-            status: "review_rejected".to_string(),
+            status: TERMINAL_STATUS_REVIEW_REJECTED.to_string(),
         };
 
         self.message_bus.publish(
-            &format!("workflow:{}", self.state.read().await.workflow_id),
+            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
             event
         ).await?;
 
@@ -350,7 +351,7 @@ impl OrchestratorAgent {
         db::models::Terminal::update_status(
             &self.db.pool,
             terminal_id,
-            "failed"
+            TERMINAL_STATUS_FAILED
         ).await?;
 
         // 2. Publish failure event
@@ -360,7 +361,7 @@ impl OrchestratorAgent {
         };
 
         self.message_bus.publish(
-            &format!("workflow:{}", self.state.read().await.workflow_id),
+            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
             event
         ).await?;
 
@@ -452,16 +453,16 @@ impl OrchestratorAgent {
                     db::models::Workflow::update_status(
                         &self.db.pool,
                         &workflow_id,
-                        "completed"
+                        WORKFLOW_STATUS_COMPLETED
                     ).await
                     .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {}", e))?;
 
                     // Publish completion event
                     self.message_bus.publish(
-                        &format!("workflow:{}", workflow_id),
+                        &format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id),
                         BusMessage::StatusUpdate {
                             workflow_id: workflow_id.clone(),
-                            status: "completed".to_string(),
+                            status: WORKFLOW_STATUS_COMPLETED.to_string(),
                         }
                     ).await
                     .map_err(|e| anyhow::anyhow!("Failed to publish completion event: {}", e))?;
@@ -484,13 +485,13 @@ impl OrchestratorAgent {
                     db::models::Workflow::update_status(
                         &self.db.pool,
                         &workflow_id,
-                        "failed"
+                        WORKFLOW_STATUS_FAILED
                     ).await
                     .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {}", e))?;
 
                     // Publish failure event
                     self.message_bus.publish(
-                        &format!("workflow:{}", workflow_id),
+                        &format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id),
                         BusMessage::Error {
                             workflow_id: workflow_id.clone(),
                             error: reason.clone(),

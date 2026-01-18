@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::constants::*;
+
 /// Orchestrator 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -39,19 +41,19 @@ pub struct OrchestratorConfig {
 }
 
 fn default_max_retries() -> u32 {
-    3
+    DEFAULT_MAX_RETRIES
 }
 
 fn default_timeout() -> u64 {
-    120
+    DEFAULT_LLM_TIMEOUT_SECS
 }
 
 fn default_retry_delay() -> u64 {
-    1000
+    DEFAULT_RETRY_DELAY_MS
 }
 
 fn default_max_history() -> usize {
-    50
+    DEFAULT_MAX_CONVERSATION_HISTORY
 }
 
 fn default_system_prompt() -> String {

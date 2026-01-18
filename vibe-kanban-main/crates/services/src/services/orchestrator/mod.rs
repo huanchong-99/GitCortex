@@ -4,6 +4,7 @@
 
 pub mod agent;
 pub mod config;
+pub mod constants;
 pub mod llm;
 pub mod message_bus;
 pub mod state;
