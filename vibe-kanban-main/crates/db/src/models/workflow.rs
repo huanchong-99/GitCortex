@@ -154,16 +154,23 @@ impl Workflow {
 
     /// Get encryption key from environment variable
     fn get_encryption_key() -> anyhow::Result<[u8; 32]> {
-        std::env::var(Self::ENCRYPTION_KEY_ENV)
+        let key_str = std::env::var(Self::ENCRYPTION_KEY_ENV)
             .map_err(|_| anyhow::anyhow!(
                 "Encryption key not found. Please set {} environment variable with a 32-byte value.",
                 Self::ENCRYPTION_KEY_ENV
-            ))?
-            .as_bytes()
+            ))?;
+
+        // Check length FIRST before conversion to prevent zero-padding
+        if key_str.len() != 32 {
+            return Err(anyhow::anyhow!(
+                "Invalid encryption key length: got {} bytes, expected exactly 32 bytes",
+                key_str.len()
+            ));
+        }
+
+        key_str.as_bytes()
             .try_into()
-            .map_err(|_| anyhow::anyhow!(
-                "Invalid encryption key length. Must be exactly 32 bytes (64 hex chars or 32 ASCII chars)."
-            ))
+            .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))
     }
 
     /// Set API key with encryption
