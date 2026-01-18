@@ -26,6 +26,7 @@ pub mod shared_tasks;
 pub mod tags;
 pub mod task_attempts;
 pub mod tasks;
+pub mod terminal_ws;
 pub mod workflows;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
@@ -51,6 +52,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .nest("/images", images::routes())
         .nest("/cli_types", cli_types::cli_types_routes())
         .nest("/workflows", workflows::workflows_routes())
+        .nest("/terminal", terminal_ws::terminal_ws_routes())
         .with_state(deployment);
 
     Router::new()
