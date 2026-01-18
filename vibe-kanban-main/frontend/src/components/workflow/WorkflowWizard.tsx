@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { StepIndicator } from './StepIndicator';
@@ -26,6 +26,7 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
     errors: {},
   });
   const [completedSteps, setCompletedSteps] = useState<WizardStep[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { currentStep, config, isSubmitting, errors } = state;
 
@@ -50,7 +51,7 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
         break;
 
       case WizardStep.Tasks:
-        if (config.tasks.length === 0) {
+        if (!config.tasks || config.tasks.length === 0) {
           newErrors.tasks = '请至少添加一个任务';
         } else {
           config.tasks.forEach((task, index) => {
@@ -71,7 +72,7 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
         break;
 
       case WizardStep.Terminals:
-        if (config.terminals.length === 0) {
+        if (!config.terminals || config.terminals.length === 0) {
           newErrors.terminals = '请至少添加一个终端配置';
         } else {
           config.terminals.forEach((terminal, index) => {
@@ -113,20 +114,18 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
       return;
     }
 
-    // Mark current step as completed
+    // Mark current step as completed and move to next step
     const newCompletedSteps = [...completedSteps];
     if (!newCompletedSteps.includes(currentStep)) {
       newCompletedSteps.push(currentStep);
     }
     setCompletedSteps(newCompletedSteps);
 
-    // Move to next step
     if (currentStep < WizardStep.Advanced) {
       setState({
         ...state,
         currentStep: currentStep + 1,
         errors: {},
-        completedSteps: newCompletedSteps,
       });
     }
   };
@@ -149,12 +148,17 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
       return;
     }
 
-    setState({ ...state, isSubmitting: true });
+    setState({ ...state, isSubmitting: true, errors: {} });
+    setSubmitError(null);
 
     try {
       await onComplete(config);
+      // Reset submitting state after successful completion
+      setState({ ...state, isSubmitting: false });
     } catch (error) {
       console.error('Failed to create workflow:', error);
+      const errorMessage = error instanceof Error ? error.message : '创建工作流失败，请重试';
+      setSubmitError(errorMessage);
       setState({ ...state, isSubmitting: false });
     }
   };
@@ -201,9 +205,6 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
   };
 
   const getButtonText = () => {
-    if (currentStep === WizardStep.Project) {
-      return null; // First step shows cancel button
-    }
     if (currentStep === WizardStep.Advanced) {
       return isSubmitting ? '提交中...' : '创建工作流';
     }
@@ -218,9 +219,7 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
   };
 
   const handlePrimaryButtonClick = () => {
-    if (currentStep === WizardStep.Project) {
-      handleCancel();
-    } else if (currentStep === WizardStep.Advanced) {
+    if (currentStep === WizardStep.Advanced) {
       handleSubmit();
     } else {
       handleNext();
@@ -242,7 +241,7 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
         {/* Navigation Buttons */}
         <div className="flex justify-between items-center pt-4 border-t border-border">
           <div>
-            {currentStep > WizardStep.Project && (
+            {currentStep > WizardStep.Project ? (
               <button
                 onClick={handleBack}
                 disabled={isSubmitting}
@@ -254,7 +253,7 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
               >
                 {getBackButtonText()}
               </button>
-            )}
+            ) : null}
           </div>
 
           <div className="flex gap-3">
@@ -270,29 +269,40 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
               </button>
             ) : null}
 
-            <button
-              onClick={handlePrimaryButtonClick}
-              disabled={isSubmitting}
-              className={cn(
-                'px-4 py-2 rounded border text-sm',
-                'bg-brand text-white hover:opacity-90',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-            >
-              {getButtonText()}
-            </button>
+            {currentStep > WizardStep.Project && (
+              <button
+                onClick={handlePrimaryButtonClick}
+                disabled={isSubmitting}
+                className={cn(
+                  'px-4 py-2 rounded border text-sm',
+                  'bg-brand text-white hover:opacity-90',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+              >
+                {getButtonText()}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Error Display */}
-        {Object.keys(errors).length > 0 && (
+        {(Object.keys(errors).length > 0 || submitError) && (
           <div className="mt-4 p-3 bg-error/10 border border-error rounded">
-            <p className="text-sm text-error">请修正以下错误后继续:</p>
-            <ul className="mt-2 text-sm text-error list-disc list-inside">
-              {Object.values(errors).map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
+            {submitError ? (
+              <div>
+                <p className="text-sm text-error font-medium">提交失败</p>
+                <p className="mt-2 text-sm text-error">{submitError}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-error font-medium">请修正以下错误后继续:</p>
+                <ul className="mt-2 text-sm text-error list-disc list-inside">
+                  {Object.values(errors).map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

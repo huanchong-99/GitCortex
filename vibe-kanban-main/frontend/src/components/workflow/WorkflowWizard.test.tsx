@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { WorkflowWizard } from './WorkflowWizard';
-import { WizardStep } from './types';
 
 describe('WorkflowWizard', () => {
   it('should render wizard with step indicator', () => {

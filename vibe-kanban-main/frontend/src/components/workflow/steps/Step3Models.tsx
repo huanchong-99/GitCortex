@@ -1,9 +1,10 @@
 import React from 'react';
+import { WizardConfig } from '../types';
 
 interface Step3ModelsProps {
-  config: any;
+  config: WizardConfig;
   errors: Record<string, string>;
-  onUpdate: (updates: any) => void;
+  onUpdate: (updates: Partial<WizardConfig>) => void;
 }
 
 export const Step3Models: React.FC<Step3ModelsProps> = () => {
