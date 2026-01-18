@@ -199,7 +199,7 @@ impl OrchestratorAgent {
     }
 
     /// 执行指令
-    async fn execute_instruction(&self, response: &str) -> anyhow::Result<()> {
+    pub async fn execute_instruction(&self, response: &str) -> anyhow::Result<()> {
         // 尝试解析 JSON 指令
         if let Ok(instruction) = serde_json::from_str::<OrchestratorInstruction>(response) {
             match instruction {
@@ -208,7 +208,23 @@ impl OrchestratorAgent {
                     message,
                 } => {
                     tracing::info!("Sending to terminal {}: {}", terminal_id, message);
-                    // TODO: 实际发送到终端
+
+                    // 1. Get terminal from database
+                    let terminal = db::models::Terminal::find_by_id(&self.db.pool, &terminal_id).await
+                        .map_err(|e| anyhow::anyhow!("Failed to get terminal: {}", e))?
+                        .ok_or_else(|| anyhow::anyhow!("Terminal {} not found", terminal_id))?;
+
+                    // 2. Get PTY session ID
+                    let pty_session_id = terminal.pty_session_id
+                        .ok_or_else(|| anyhow::anyhow!("Terminal {} has no PTY session", terminal_id))?;
+
+                    // 3. Send message via message bus
+                    self.message_bus.publish(
+                        &pty_session_id,
+                        BusMessage::TerminalMessage { message: message.clone() }
+                    ).await;
+
+                    tracing::debug!("Message sent to terminal {}", terminal_id);
                 }
                 OrchestratorInstruction::CompleteWorkflow { summary } => {
                     tracing::info!("Workflow completed: {}", summary);

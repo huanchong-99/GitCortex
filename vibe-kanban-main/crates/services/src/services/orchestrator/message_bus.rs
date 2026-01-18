@@ -24,6 +24,9 @@ pub enum BusMessage {
         workflow_id: String,
         error: String,
     },
+    TerminalMessage {
+        message: String,
+    },
     Shutdown,
 }
 

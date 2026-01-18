@@ -692,4 +692,169 @@ mod tests {
         // 3. All dependencies (DB, MessageBus, State) are properly initialized
         // Note: state field is private, so we can't inspect it directly
     }
+
+    #[tokio::test]
+    async fn test_execute_instruction_send_to_terminal() {
+        use db::DBService;
+        use sqlx::sqlite::SqlitePoolOptions;
+        use std::path::PathBuf;
+        use std::sync::Arc;
+        use uuid::Uuid;
+
+        // Create in-memory database with migrations
+        let pool = SqlitePoolOptions::new()
+            .connect(":memory:")
+            .await
+            .unwrap();
+
+        // Run migrations
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let migration_dir = manifest_dir
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .join("db")
+            .join("migrations");
+
+        let migrator = sqlx::migrate::Migrator::new(migration_dir)
+            .await
+            .unwrap();
+        migrator.run(&pool).await.unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+
+        // Create workflow, task and terminal in database
+        let workflow_id = Uuid::new_v4().to_string();
+        let task_id = Uuid::new_v4().to_string();
+        let terminal_id = Uuid::new_v4().to_string();
+        let pty_session_id = Uuid::new_v4().to_string();
+
+        // First, we need to insert a project (required by workflow)
+        let project_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+        )
+        .bind(&project_id)
+        .bind("test-project")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow
+        sqlx::query(
+            r#"
+            INSERT INTO workflow (
+                id, project_id, name, target_branch,
+                merge_terminal_cli_id, merge_terminal_model_id,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#
+        )
+        .bind(&workflow_id)
+        .bind(&project_id)
+        .bind("test-workflow")
+        .bind("main")
+        .bind("cli-claude-code") // From migration
+        .bind("model-claude-sonnet") // From migration
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow_task
+        sqlx::query(
+            r#"
+            INSERT INTO workflow_task (
+                id, workflow_id, name, branch, order_index,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#
+        )
+        .bind(&task_id)
+        .bind(&workflow_id)
+        .bind("test-task")
+        .bind("feature/test")
+        .bind(0)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert terminal record
+        sqlx::query(
+            r#"
+            INSERT INTO terminal (
+                id, workflow_task_id, cli_type_id, model_config_id,
+                order_index, status, pty_session_id, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "#
+        )
+        .bind(&terminal_id)
+        .bind(&task_id)
+        .bind("cli-claude-code") // From migration
+        .bind("model-claude-sonnet") // From migration
+        .bind(0)
+        .bind("waiting")
+        .bind(&pty_session_id)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow_id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        ).await.unwrap();
+
+        // Subscribe to terminal topic to verify message sent
+        let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
+
+        // Execute instruction
+        let instruction_json = format!(
+            r#"{{"type":"send_to_terminal","terminal_id":"{}","message":"echo test"}}"#,
+            terminal_id
+        );
+
+        // Run in task to allow async message propagation
+        tokio::spawn(async move {
+            let _ = agent.execute_instruction(&instruction_json).await;
+        });
+
+        // Verify message received on terminal topic
+        let timeout = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500),
+            terminal_rx.recv()
+        ).await;
+
+        assert!(timeout.is_ok(), "Should receive message within timeout");
+
+        let msg = timeout.unwrap();
+        assert!(msg.is_some(), "Should receive a message");
+
+        match msg.as_ref().unwrap() {
+            BusMessage::TerminalMessage { message } => {
+                assert_eq!(message, "echo test");
+            }
+            other => panic!("Expected TerminalMessage, got {:?}", other),
+        }
+    }
 }
