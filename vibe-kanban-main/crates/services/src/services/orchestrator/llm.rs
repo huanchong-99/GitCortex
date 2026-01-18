@@ -248,6 +248,24 @@ impl LLMClient for OpenAICompatibleClient {
     }
 }
 
+/// Build terminal completion prompt
+///
+/// This helper function encapsulates the logic for building prompts
+/// to avoid string concatenation in business logic.
+pub fn build_terminal_completion_prompt(
+    terminal_id: &str,
+    task_id: &str,
+    commit_hash: &str,
+    commit_message: &str,
+) -> String {
+    format!(
+        "Terminal {terminal_id} has completed task {task_id}.\n\n\
+         Commit: {commit_hash}\n\
+         Message: {commit_message}\n\n\
+         Please analyze the results and decide on the next step."
+    )
+}
+
 pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
     config.validate().map_err(|e| anyhow::anyhow!(e))?;
     Ok(Box::new(OpenAICompatibleClient::new(config)))

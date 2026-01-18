@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use super::{
     config::OrchestratorConfig,
     constants::*,
-    llm::{LLMClient, create_llm_client},
+    llm::{LLMClient, create_llm_client, build_terminal_completion_prompt},
     message_bus::{BusMessage, SharedMessageBus},
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
     types::*,
@@ -386,9 +386,14 @@ impl OrchestratorAgent {
 
     /// 构建完成提示
     async fn build_completion_prompt(&self, event: &TerminalCompletionEvent) -> String {
-        format!(
-            "终端 {} 已完成任务。\n状态: {:?}\n提交: {:?}\n消息: {:?}\n\n请决定下一步操作。",
-            event.terminal_id, event.status, event.commit_hash, event.commit_message
+        let commit_hash = event.commit_hash.as_deref().unwrap_or("N/A");
+        let commit_message = event.commit_message.as_deref().unwrap_or("No message");
+
+        build_terminal_completion_prompt(
+            &event.terminal_id,
+            &event.task_id,
+            commit_hash,
+            commit_message,
         )
     }
 
