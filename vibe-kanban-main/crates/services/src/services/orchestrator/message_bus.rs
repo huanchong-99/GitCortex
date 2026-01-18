@@ -65,21 +65,24 @@ impl MessageBus {
         rx
     }
 
-    pub async fn publish(&self, topic: &str, message: BusMessage) {
+    pub async fn publish(&self, topic: &str, message: BusMessage) -> anyhow::Result<()> {
         let subscribers: tokio::sync::RwLockReadGuard<
             '_,
             HashMap<String, Vec<mpsc::Sender<BusMessage>>>,
         > = self.subscribers.read().await;
         if let Some(subs) = subscribers.get(topic) {
             for tx in subs {
-                let _ = tx.send(message.clone()).await;
+                tx.send(message.clone())
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to send message to subscriber: {}", e))?;
             }
         }
+        Ok(())
     }
 
     pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
         let topic = format!("workflow:{}", event.workflow_id);
-        self.publish(&topic, BusMessage::TerminalCompleted(event.clone()))
+        let _ = self.publish(&topic, BusMessage::TerminalCompleted(event.clone()))
             .await;
         let _ = self.broadcast(BusMessage::TerminalCompleted(event));
     }

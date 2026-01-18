@@ -221,8 +221,9 @@ impl OrchestratorAgent {
                     // 3. Send message via message bus
                     self.message_bus.publish(
                         &pty_session_id,
-                        BusMessage::TerminalMessage { message: message.clone() }
-                    ).await;
+                        BusMessage::TerminalMessage { message }
+                    ).await
+                    .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))?;
 
                     tracing::debug!("Message sent to terminal {}", terminal_id);
                 }
