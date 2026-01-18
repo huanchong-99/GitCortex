@@ -119,8 +119,8 @@ async fn create_workflow(
     let now = chrono::Utc::now();
     let workflow_id = Uuid::new_v4().to_string();
 
-    // 1. Create workflow
-    let workflow = Workflow {
+    // 1. Create workflow with encrypted API key
+    let mut workflow = Workflow {
         id: workflow_id.clone(),
         project_id: req.project_id,
         name: req.name,
@@ -130,7 +130,7 @@ async fn create_workflow(
         orchestrator_enabled: req.orchestrator_config.is_some(),
         orchestrator_api_type: req.orchestrator_config.as_ref().map(|c| c.api_type.clone()),
         orchestrator_base_url: req.orchestrator_config.as_ref().map(|c| c.base_url.clone()),
-        orchestrator_api_key: req.orchestrator_config.as_ref().map(|c| c.api_key.clone()),
+        orchestrator_api_key: None, // Will be set encrypted below
         orchestrator_model: req.orchestrator_config.as_ref().map(|c| c.model.clone()),
         error_terminal_enabled: req.error_terminal_config.is_some(),
         error_terminal_cli_id: req.error_terminal_config.as_ref().map(|c| c.cli_type_id.clone()),
@@ -144,6 +144,12 @@ async fn create_workflow(
         created_at: now,
         updated_at: now,
     };
+
+    // Encrypt and store API key if provided
+    if let Some(orch_config) = &req.orchestrator_config {
+        workflow.set_api_key(&orch_config.api_key)
+            .map_err(|e| ApiError::BadRequest(format!("Failed to encrypt API key: {}", e)))?;
+    }
 
     let workflow = Workflow::create(&deployment.db().pool, &workflow).await?;
 
