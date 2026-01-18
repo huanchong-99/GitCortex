@@ -2,6 +2,11 @@
 //!
 //! Stores workflow configuration and state for multi-terminal orchestration.
 
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Nonce, Key
+};
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
@@ -103,6 +108,7 @@ pub struct Workflow {
     pub orchestrator_base_url: Option<String>,
 
     /// Main Agent API Key (encrypted storage)
+    #[serde(skip_serializing)]
     pub orchestrator_api_key: Option<String>,
 
     /// Main Agent model
@@ -141,6 +147,72 @@ pub struct Workflow {
 
     /// Updated timestamp
     pub updated_at: DateTime<Utc>,
+}
+
+impl Workflow {
+    const ENCRYPTION_KEY_ENV: &str = "GITCORTEX_ENCRYPTION_KEY";
+
+    /// Get encryption key from environment variable
+    fn get_encryption_key() -> anyhow::Result<[u8; 32]> {
+        std::env::var(Self::ENCRYPTION_KEY_ENV)
+            .map_err(|_| anyhow::anyhow!(
+                "Encryption key not found. Please set {} environment variable with a 32-byte value.",
+                Self::ENCRYPTION_KEY_ENV
+            ))?
+            .as_bytes()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!(
+                "Invalid encryption key length. Must be exactly 32 bytes (64 hex chars or 32 ASCII chars)."
+            ))
+    }
+
+    /// Set API key with encryption
+    pub fn set_api_key(&mut self, plaintext: &str) -> anyhow::Result<()> {
+        let key = Self::get_encryption_key()?;
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
+        let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes())
+            .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
+
+        // Combine nonce + ciphertext
+        let mut combined = nonce.to_vec();
+        combined.extend_from_slice(&ciphertext);
+
+        // Base64 encode
+        self.orchestrator_api_key = Some(
+            general_purpose::STANDARD.encode(&combined)
+        );
+
+        tracing::debug!("API key encrypted for workflow {}", self.id);
+        Ok(())
+    }
+
+    /// Get API key with decryption
+    pub fn get_api_key(&self) -> anyhow::Result<Option<String>> {
+        match &self.orchestrator_api_key {
+            None => Ok(None),
+            Some(encoded) => {
+                let key = Self::get_encryption_key()?;
+                let combined = general_purpose::STANDARD.decode(encoded)
+                    .map_err(|e| anyhow::anyhow!("Base64 decode failed: {}", e))?;
+
+                if combined.len() < 12 {
+                    return Err(anyhow::anyhow!("Invalid encrypted data length"));
+                }
+
+                let (nonce_bytes, ciphertext) = combined.split_at(12);
+                let nonce = Nonce::from_slice(nonce_bytes);
+                let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+
+                let plaintext_bytes = cipher.decrypt(nonce, ciphertext)
+                    .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?;
+
+                Ok(Some(String::from_utf8(plaintext_bytes)
+                    .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in decrypted data: {}", e))?))
+            }
+        }
+    }
 }
 
 /// Workflow Task
@@ -535,5 +607,207 @@ impl WorkflowCommand {
         .bind(now)
         .fetch_one(pool)
         .await
+    }
+}
+
+#[cfg(test)]
+mod encryption_tests {
+    use super::*;
+
+    #[test]
+    fn test_api_key_encryption_decryption() {
+        // Setup encryption key
+        unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012"); }
+
+        let mut workflow = Workflow {
+            id: "test-workflow".to_string(),
+            project_id: "test-project".to_string(),
+            name: "Test Workflow".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: None,
+            started_at: None,
+            completed_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Test encryption
+        let original_key = "sk-test-key-12345";
+        workflow.set_api_key(original_key).unwrap();
+
+        assert!(workflow.orchestrator_api_key.is_some());
+        assert_ne!(
+            workflow.orchestrator_api_key.as_ref().unwrap(),
+            original_key,
+            "Encrypted key should not match original"
+        );
+
+        // Test decryption
+        let decrypted_key = workflow.get_api_key().unwrap().unwrap();
+        assert_eq!(decrypted_key, original_key);
+    }
+
+    #[test]
+    fn test_api_key_encryption_missing_env_key() {
+        // Clear environment variable and ensure it's not set
+        unsafe {
+            std::env::remove_var("GITCORTEX_ENCRYPTION_KEY");
+            // Double-check it's really gone
+            assert!(std::env::var("GITCORTEX_ENCRYPTION_KEY").is_err());
+        }
+
+        let mut workflow = Workflow {
+            id: "test-workflow".to_string(),
+            project_id: "test-project".to_string(),
+            name: "Test Workflow".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: None,
+            started_at: None,
+            completed_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        // Should fail without encryption key
+        let result = workflow.set_api_key("sk-test");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("GITCORTEX_ENCRYPTION_KEY"));
+    }
+
+    #[test]
+    fn test_api_key_encryption_invalid_key_length() {
+        // Set invalid key (too short)
+        unsafe {
+            std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "short");
+            // Verify it was set
+            assert_eq!(std::env::var("GITCORTEX_ENCRYPTION_KEY").unwrap(), "short");
+        }
+
+        let mut workflow = Workflow {
+            id: "test-workflow".to_string(),
+            project_id: "test-project".to_string(),
+            name: "Test Workflow".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: None,
+            started_at: None,
+            completed_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        let result = workflow.set_api_key("sk-test");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("32 bytes"));
+    }
+
+    #[test]
+    fn test_api_key_none_when_not_set() {
+        unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012"); }
+
+        let workflow = Workflow {
+            id: "test-workflow".to_string(),
+            project_id: "test-project".to_string(),
+            name: "Test Workflow".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: None,
+            started_at: None,
+            completed_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        let key = workflow.get_api_key().unwrap();
+        assert!(key.is_none());
+    }
+
+    #[test]
+    fn test_api_key_serialization_skips_encrypted() {
+        unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012"); }
+
+        let mut workflow = Workflow {
+            id: "test-workflow".to_string(),
+            project_id: "test-project".to_string(),
+            name: "Test Workflow".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: None,
+            started_at: None,
+            completed_at: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        workflow.set_api_key("sk-test").unwrap();
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&workflow).unwrap();
+
+        // Encrypted field should not be in JSON (due to #[serde(skip_serializing)])
+        assert!(!json.contains("orchestrator_api_key"));
+        assert!(!json.contains("sk-test"));
     }
 }
