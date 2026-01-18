@@ -8,10 +8,10 @@
 | 指标 | 值 |
 |------|-----|
 | 总任务数 | 33 |
-| 已完成 | 22 |
+| 已完成 | 27 |
 | 进行中 | 0 |
-| 未开始 | 11 |
-| **完成率** | **66.67%** |
+| 未开始 | 6 |
+| **完成率** | **81.82%** |
 
 ---
 
@@ -91,17 +91,17 @@
 
 ---
 
-## Phase 6: 前端界面改造 (7步向导) ⬜
+## Phase 6: 前端界面改造 (7步向导) ✅
 
 **计划文件:** `07-phase-6-frontend.md`
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 6.1 | 创建向导框架和类型定义 - types.ts, WorkflowWizard.tsx, StepIndicator.tsx | ⬜ | - |
-| 6.2 | 步骤 0-1 组件 - Step0Project.tsx (工作目录), Step1Basic.tsx (基础配置) | ⬜ | - |
-| 6.3 | 步骤 2-3 组件 - Step2Tasks.tsx (任务配置), Step3Models.tsx (模型配置) | ⬜ | - |
-| 6.4 | 步骤 4-6 组件 - Step4Terminals, Step5Commands, Step6Advanced | ⬜ | - |
-| 6.5 | 创建流水线视图 - PipelineView.tsx, TerminalCard.tsx, API Hooks | ⬜ | - |
+| 6.1 | 创建向导框架和类型定义 - types.ts, WorkflowWizard.tsx, StepIndicator.tsx | ✅ | 2026-01-18 |
+| 6.2 | 步骤 0-1 组件 - Step0Project.tsx (工作目录), Step1Basic.tsx (基础配置) | ✅ | 2026-01-18 |
+| 6.3 | 步骤 2-3 组件 - Step2Tasks.tsx (任务配置), Step3Models.tsx (模型配置) | ✅ | 2026-01-18 |
+| 6.4 | 步骤 4-6 组件 - Step4Terminals, Step5Commands, Step6Advanced | ✅ | 2026-01-18 |
+| 6.5 | 创建流水线视图 - PipelineView.tsx, TerminalCard.tsx, API Hooks | ✅ | 2026-01-18 |
 
 ---
 
@@ -154,3 +154,4 @@
 | 2026-01-18 | Phase 4 Terminal 完成 | Task 4.1-4.3 | 3/3 任务完成 + 集成测试 |
 | 2026-01-18 | Phase 3 测试遗留问题修复 | Task 3.5 (新增) | 添加 MockLLMClient，完整测试实现 |
 | 2024-01-18 | Phase 5 Git Watcher 完成 | Task 5.1-5.3 | 3/3 任务完成 + 12个测试通过 + 使用文档 |
+| 2026-01-18 | Phase 6 Frontend 完成 | Task 6.1-6.5 | 5/5 任务完成 + 180个测试通过 + 路由集成 |
