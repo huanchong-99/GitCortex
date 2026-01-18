@@ -69,7 +69,7 @@ class MockWebSocket {
   }
 }
 
-global.WebSocket = MockWebSocket as any;
+(globalThis as any).WebSocket = MockWebSocket;
 
 describe('TerminalEmulator', () => {
   beforeEach(() => {

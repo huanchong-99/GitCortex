@@ -9,7 +9,7 @@ describe('Step3Models', () => {
 
   beforeEach(() => {
     mockOnUpdate.mockClear();
-    global.confirm = mockConfirm;
+    (globalThis as any).confirm = mockConfirm;
   });
 
   afterEach(() => {

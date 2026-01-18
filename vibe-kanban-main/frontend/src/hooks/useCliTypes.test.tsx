@@ -13,7 +13,7 @@ import {
 
 // Mock global fetch
 let mockFetch: ReturnType<typeof vi.fn>;
-global.fetch = vi.fn() as unknown as typeof fetch;
+globalThis.fetch = vi.fn() as unknown as typeof fetch;
 
 // ============================================================================
 // Test Utilities
@@ -122,7 +122,7 @@ const mockModels: CliModel[] = [
 describe('useCliTypes', () => {
   beforeEach(() => {
     mockFetch = vi.fn();
-    global.fetch = mockFetch as unknown as typeof fetch;
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
     vi.clearAllMocks();
   });
 
@@ -144,7 +144,7 @@ describe('useCliTypes', () => {
 
   describe('useCliTypes', () => {
     it('should fetch CLI types successfully', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -163,7 +163,7 @@ describe('useCliTypes', () => {
     });
 
     it('should handle fetch errors', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: false,
           status: 500,
@@ -181,7 +181,7 @@ describe('useCliTypes', () => {
     });
 
     it('should use stale time of 1 hour', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -202,7 +202,7 @@ describe('useCliTypes', () => {
 
   describe('useCliDetection', () => {
     it('should detect CLI installation status successfully', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -223,7 +223,7 @@ describe('useCliTypes', () => {
     });
 
     it('should handle detection errors', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: false,
           status: 500,
@@ -241,7 +241,7 @@ describe('useCliTypes', () => {
     });
 
     it('should use stale time of 5 minutes', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -264,7 +264,7 @@ describe('useCliTypes', () => {
     it('should fetch models for CLI type successfully', async () => {
       const cliTypeId = 'claude-code';
 
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -285,7 +285,7 @@ describe('useCliTypes', () => {
     it('should handle fetch errors', async () => {
       const cliTypeId = 'claude-code';
 
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: false,
           status: 404,
@@ -311,7 +311,7 @@ describe('useCliTypes', () => {
     it('should use stale time of 30 minutes', async () => {
       const cliTypeId = 'claude-code';
 
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -332,7 +332,7 @@ describe('useCliTypes', () => {
 
   describe('data transformation', () => {
     it('should correctly parse CLI type metadata', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -355,7 +355,7 @@ describe('useCliTypes', () => {
     });
 
     it('should correctly parse detection results with installed status', async () => {
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>
@@ -385,7 +385,7 @@ describe('useCliTypes', () => {
     it('should correctly parse model information', async () => {
       const cliTypeId = 'claude-code';
 
-      global.fetch = vi.fn(() =>
+      globalThis.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
           json: () =>

@@ -17,7 +17,7 @@ describe('Step0Project', () => {
   beforeEach(() => {
     mockOnChange.mockClear();
     // Mock fetch to avoid actual API calls
-    global.fetch = vi.fn(() =>
+    globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({}),
@@ -174,7 +174,7 @@ describe('Step0Project', () => {
     };
 
     // Mock fetch to simulate loading
-    global.fetch = vi.fn(() =>
+    globalThis.fetch = vi.fn(() =>
       new Promise((resolve) => {
         // Never resolve to keep loading state
         setTimeout(() => {

@@ -110,7 +110,7 @@ describe('WorkflowDebugPage', () => {
         },
         isLoading: false,
         error: null,
-      });
+      } as any);
 
       render(<WorkflowDebugPage />, { wrapper });
 
@@ -147,7 +147,7 @@ describe('WorkflowDebugPage', () => {
         },
         isLoading: false,
         error: null,
-      });
+      } as any);
 
       render(<WorkflowDebugPage />, { wrapper });
 
@@ -184,7 +184,7 @@ describe('WorkflowDebugPage', () => {
         },
         isLoading: false,
         error: null,
-      });
+      } as any);
 
       render(<WorkflowDebugPage />, { wrapper });
 
@@ -222,7 +222,7 @@ describe('WorkflowDebugPage', () => {
         },
         isLoading: false,
         error: null,
-      });
+      } as any);
 
       render(<WorkflowDebugPage />, { wrapper });
 

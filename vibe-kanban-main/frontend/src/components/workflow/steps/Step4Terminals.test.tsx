@@ -64,7 +64,7 @@ describe('Step4Terminals', () => {
   beforeEach(() => {
     mockOnUpdate.mockClear();
     // Mock fetch API
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   it('should render terminal configuration UI', () => {
@@ -113,7 +113,7 @@ describe('Step4Terminals', () => {
   });
 
   it('should show CLI installation status', () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -137,7 +137,7 @@ describe('Step4Terminals', () => {
   });
 
   it('should show install guide links for uninstalled CLIs', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -199,7 +199,7 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -242,7 +242,7 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -283,7 +283,7 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -329,7 +329,7 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -382,7 +382,7 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -432,7 +432,7 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         'claude-code': true,
@@ -458,7 +458,7 @@ describe('Step4Terminals', () => {
   });
 
   it('should handle fetch error gracefully', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    (globalThis.fetch as any).mockRejectedValueOnce(new Error('Network error'));
 
     render(
       <Step4Terminals
