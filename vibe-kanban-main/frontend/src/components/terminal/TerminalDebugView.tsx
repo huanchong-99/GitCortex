@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { TerminalEmulator } from './TerminalEmulator';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { Terminal, WorkflowTask } from '@/shared/types';
+import type { Terminal } from '@/components/workflow/TerminalCard';
+import type { WorkflowTask } from '@/components/workflow/PipelineView';
 
 interface Props {
   tasks: Array<WorkflowTask & { terminals: Terminal[] }>;

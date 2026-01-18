@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TerminalDebugView } from './TerminalDebugView';
-import type { Terminal, WorkflowTask } from '@/shared/types';
+import type { Terminal } from '@/components/workflow/TerminalCard';
+import type { WorkflowTask } from '@/components/workflow/PipelineView';
 
 // Mock xterm
 vi.mock('@xterm/xterm', () => {
@@ -69,12 +70,7 @@ class MockWebSocket {
   }
 }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var WebSocket: typeof MockWebSocket;
-}
-
-global.WebSocket = MockWebSocket;
+global.WebSocket = MockWebSocket as any;
 
 const mockTerminals: Terminal[] = [
   {
