@@ -14,6 +14,9 @@ use strum_macros::{Display, EnumString};
 use ts_rs::TS;
 use uuid::Uuid;
 
+// Import Terminal type for batch operations
+use super::terminal::Terminal;
+
 /// Workflow Status Enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display)]
 #[sqlx(type_name = "workflow_status", rename_all = "lowercase")]
@@ -495,6 +498,109 @@ impl Workflow {
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
+    }
+
+    /// Create workflow with tasks and terminals in a single transaction
+    ///
+    /// This is a batch operation that creates a workflow along with its associated
+    /// workflow tasks and terminals atomically. If any part fails, the entire
+    /// transaction is rolled back.
+    pub async fn create_with_tasks(
+        pool: &SqlitePool,
+        workflow: &Workflow,
+        tasks: Vec<(WorkflowTask, Vec<Terminal>)>,
+    ) -> anyhow::Result<()> {
+        let mut tx = pool.begin().await?;
+
+        // Create workflow
+        sqlx::query(
+            r#"
+            INSERT INTO workflow (
+                id, project_id, name, description, status,
+                use_slash_commands, orchestrator_enabled,
+                orchestrator_api_type, orchestrator_base_url,
+                orchestrator_api_key, orchestrator_model,
+                error_terminal_enabled, error_terminal_cli_id, error_terminal_model_id,
+                merge_terminal_cli_id, merge_terminal_model_id,
+                target_branch, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+            "#
+        )
+        .bind(&workflow.id)
+        .bind(&workflow.project_id)
+        .bind(&workflow.name)
+        .bind(&workflow.description)
+        .bind(&workflow.status)
+        .bind(workflow.use_slash_commands)
+        .bind(workflow.orchestrator_enabled)
+        .bind(&workflow.orchestrator_api_type)
+        .bind(&workflow.orchestrator_base_url)
+        .bind(&workflow.orchestrator_api_key)
+        .bind(&workflow.orchestrator_model)
+        .bind(workflow.error_terminal_enabled)
+        .bind(&workflow.error_terminal_cli_id)
+        .bind(&workflow.error_terminal_model_id)
+        .bind(&workflow.merge_terminal_cli_id)
+        .bind(&workflow.merge_terminal_model_id)
+        .bind(&workflow.target_branch)
+        .bind(workflow.created_at)
+        .bind(workflow.updated_at)
+        .execute(&mut *tx)
+        .await?;
+
+        // Create tasks and terminals
+        for (task, terminals) in tasks {
+            sqlx::query(
+                r#"
+                INSERT INTO workflow_task (
+                    id, workflow_id, vk_task_id, name, description,
+                    branch, status, order_index, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                "#
+            )
+            .bind(&task.id)
+            .bind(&task.workflow_id)
+            .bind(task.vk_task_id)
+            .bind(&task.name)
+            .bind(&task.description)
+            .bind(&task.branch)
+            .bind(&task.status)
+            .bind(task.order_index)
+            .bind(task.created_at)
+            .bind(task.updated_at)
+            .execute(&mut *tx)
+            .await?;
+
+            // Create terminals for this task
+            for terminal in terminals {
+                sqlx::query(
+                    r#"
+                    INSERT INTO terminal (
+                        id, workflow_task_id, cli_type_id, model_config_id,
+                        custom_base_url, custom_api_key, role, role_description,
+                        order_index, status, created_at, updated_at
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                    "#
+                )
+                .bind(&terminal.id)
+                .bind(&terminal.workflow_task_id)
+                .bind(&terminal.cli_type_id)
+                .bind(&terminal.model_config_id)
+                .bind(&terminal.custom_base_url)
+                .bind(&terminal.custom_api_key)
+                .bind(&terminal.role)
+                .bind(&terminal.role_description)
+                .bind(terminal.order_index)
+                .bind(&terminal.status)
+                .bind(terminal.created_at)
+                .bind(terminal.updated_at)
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+
+        tx.commit().await?;
+        Ok(())
     }
 }
 
