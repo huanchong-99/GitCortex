@@ -25,10 +25,13 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         <div className="p-4 border-b">
           <h3 className="font-semibold">终端列表</h3>
         </div>
-        <div className="p-2">
+        <div role="list" className="p-2">
           {allTerminals.map((terminal) => (
             <button
               key={terminal.id}
+              role="listitem"
+              aria-pressed={selectedTerminalId === terminal.id}
+              aria-label={`${terminal.role || `Terminal ${terminal.orderIndex + 1}`} - ${terminal.status}`}
               className={cn(
                 'w-full p-3 rounded-lg text-left mb-2 transition-colors',
                 selectedTerminalId === terminal.id
@@ -38,7 +41,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
               onClick={() => setSelectedTerminalId(terminal.id)}
             >
               <div className="font-medium text-sm">
-                {terminal.role || `Terminal ${terminal.order_index + 1}`}
+                {terminal.role || `Terminal ${terminal.orderIndex + 1}`}
               </div>
               <div className="text-xs opacity-70">{terminal.taskName}</div>
               <div className="flex items-center gap-2 mt-1">
@@ -57,10 +60,10 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
             <div className="p-4 border-b flex items-center justify-between">
               <div>
                 <h3 className="font-semibold">
-                  {selectedTerminal.role || `Terminal ${selectedTerminal.order_index + 1}`}
+                  {selectedTerminal.role || `Terminal ${selectedTerminal.orderIndex + 1}`}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {selectedTerminal.cli_type_id} - {selectedTerminal.model_config_id}
+                  {selectedTerminal.cliTypeId} - {selectedTerminal.modelConfigId}
                 </p>
               </div>
               <div className="flex gap-2">

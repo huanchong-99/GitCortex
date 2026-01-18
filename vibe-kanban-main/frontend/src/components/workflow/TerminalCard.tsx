@@ -15,10 +15,14 @@ export type TerminalStatus =
 /** Runtime terminal data with status */
 export interface Terminal {
   id: string;
-  orderIndex: number;
+  workflowTaskId?: string;
   cliTypeId: string;
+  modelConfigId?: string;
   role?: string;
+  orderIndex: number;
   status: TerminalStatus;
+  processId?: number | null;
+  ptySessionId?: string | null;
 }
 
 /** Status styles for each terminal state */

@@ -69,41 +69,43 @@ class MockWebSocket {
   }
 }
 
-global.WebSocket = MockWebSocket as any;
+declare global {
+  // eslint-disable-next-line no-var
+  var WebSocket: typeof MockWebSocket;
+}
+
+global.WebSocket = MockWebSocket;
 
 const mockTerminals: Terminal[] = [
   {
     id: 'term-1',
-    workflow_task_id: 'task-1',
-    cli_type_id: 'claude-code',
-    model_config_id: 'model-1',
+    workflowTaskId: 'task-1',
+    cliTypeId: 'claude-code',
+    modelConfigId: 'model-1',
     role: 'Developer',
-    order_index: 0,
+    orderIndex: 0,
     status: 'working',
-    process_id: null,
-    pty_session_id: null,
+    processId: null,
+    ptySessionId: null,
   },
   {
     id: 'term-2',
-    workflow_task_id: 'task-1',
-    cli_type_id: 'cursor',
-    model_config_id: 'model-2',
+    workflowTaskId: 'task-1',
+    cliTypeId: 'cursor',
+    modelConfigId: 'model-2',
     role: 'Reviewer',
-    order_index: 1,
+    orderIndex: 1,
     status: 'not_started',
-    not_started: null,
-    pty_session_id: null,
+    processId: null,
+    ptySessionId: null,
   },
 ];
 
 const mockTasks: Array<WorkflowTask & { terminals: Terminal[] }> = [
   {
     id: 'task-1',
-    workflow_id: 'wf-1',
     name: 'Implementation Task',
-    description: 'Implement feature',
-    order_index: 0,
-    status: 'running',
+    branch: 'feature/implementation',
     terminals: mockTerminals,
   },
 ];
