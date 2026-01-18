@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { TerminalEmulator } from './TerminalEmulator';
+import { useState, useRef } from 'react';
+import { TerminalEmulator, type TerminalEmulatorRef } from './TerminalEmulator';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Terminal } from '@/components/workflow/TerminalCard';
@@ -12,12 +12,22 @@ interface Props {
 
 export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
+  const terminalRef = useRef<TerminalEmulatorRef>(null);
 
   const allTerminals = tasks.flatMap(task =>
     task.terminals.map(t => ({ ...t, taskName: task.name }))
   );
 
   const selectedTerminal = allTerminals.find(t => t.id === selectedTerminalId);
+
+  const handleClear = () => {
+    terminalRef.current?.clear();
+  };
+
+  const handleRestart = () => {
+    // TODO: Call API to restart terminal
+    console.log('Restart terminal:', selectedTerminalId);
+  };
 
   return (
     <div className="flex h-full">
@@ -68,12 +78,13 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">清空</Button>
-                <Button variant="outline" size="sm">重启</Button>
+                <Button variant="outline" size="sm" onClick={handleClear}>清空</Button>
+                <Button variant="outline" size="sm" onClick={handleRestart}>重启</Button>
               </div>
             </div>
             <div className="flex-1 p-4">
               <TerminalEmulator
+                ref={terminalRef}
                 terminalId={selectedTerminal.id}
                 wsUrl={wsUrl}
               />
