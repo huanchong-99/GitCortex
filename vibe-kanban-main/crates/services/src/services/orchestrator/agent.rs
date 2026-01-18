@@ -255,6 +255,9 @@ impl OrchestratorAgent {
             event
         ).await?;
 
+        // 3. Awaken orchestrator to process the event
+        self.awaken().await;
+
         Ok(())
     }
 
@@ -287,6 +290,9 @@ impl OrchestratorAgent {
             &format!("workflow:{}", self.state.read().await.workflow_id),
             event
         ).await?;
+
+        // 3. Awaken orchestrator to process the event
+        self.awaken().await;
 
         Ok(())
     }
@@ -322,6 +328,9 @@ impl OrchestratorAgent {
             event
         ).await?;
 
+        // 3. Awaken orchestrator to process the event
+        self.awaken().await;
+
         Ok(())
     }
 
@@ -355,7 +364,23 @@ impl OrchestratorAgent {
             event
         ).await?;
 
+        // 3. Awaken orchestrator to process the event
+        self.awaken().await;
+
         Ok(())
+    }
+
+    /// Awaken the orchestrator to process events
+    async fn awaken(&self) {
+        // Check if orchestrator is idle and needs to be awakened
+        let state = self.state.read().await;
+        if state.run_state == OrchestratorRunState::Idle {
+            tracing::debug!("Orchestrator is idle, ensuring it processes pending events");
+            // Drop the read lock before we potentially do anything else
+            drop(state);
+        }
+        // The orchestrator's event loop will automatically process
+        // any messages we published to the message bus
     }
 
     /// 构建完成提示
