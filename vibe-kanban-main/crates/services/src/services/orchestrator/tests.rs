@@ -1329,4 +1329,86 @@ Terminal completed
 
         assert!(result.is_ok());
     }
+
+    // =========================================================================
+    // Test Suite 8: LLM Retry with Backoff (Task 12)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_llm_retry_with_backoff() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use wiremock::{MockServer, Mock, ResponseTemplate};
+        use wiremock::matchers::{method, path};
+
+        // Install crypto provider for reqwest
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+        let mock_server = MockServer::start().await;
+
+        // Use a simple counter that will be captured by reference
+        // We'll verify retry behavior by checking the final response
+        let counter = AtomicUsize::new(0);
+
+        // Create a custom responder that tracks calls
+        struct RetryResponder {
+            counter: AtomicUsize,
+        }
+
+        impl wiremock::Respond for RetryResponder {
+            fn respond(&self, _request: &wiremock::Request) -> wiremock::ResponseTemplate {
+                let count = self.counter.fetch_add(1, Ordering::SeqCst) + 1;
+                if count < 3 {
+                    ResponseTemplate::new(500).set_body_json(serde_json::json!({
+                        "error": "Internal server error"
+                    }))
+                } else {
+                    ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                        "choices": [{
+                            "message": {
+                                "role": "assistant",
+                                "content": "Success after retries"
+                            }
+                        }],
+                        "usage": {
+                            "prompt_tokens": 10,
+                            "completion_tokens": 20,
+                            "total_tokens": 30
+                        }
+                    }))
+                }
+            }
+        }
+
+        // Mount the responder - it will be moved
+        let responder = RetryResponder {
+            counter: AtomicUsize::new(0),
+        };
+
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(responder)
+            .mount(&mock_server)
+            .await;
+
+        let config = OrchestratorConfig {
+            base_url: mock_server.uri(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let client = create_llm_client(&config).unwrap();
+
+        let messages = vec![LLMMessage {
+            role: "user".to_string(),
+            content: "Test".to_string(),
+        }];
+
+        let result = client.chat(messages).await;
+
+        // Test passes if retry logic is implemented (succeeds after retries)
+        // Test fails if no retry logic (fails on first 500 error)
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().content, "Success after retries");
+    }
 }

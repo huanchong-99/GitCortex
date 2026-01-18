@@ -1,10 +1,12 @@
 //! LLM 客户端抽象
 
 use std::time::Duration;
+use std::future::Future;
 
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tokio::time::sleep;
 
 use super::{
     config::OrchestratorConfig,
@@ -14,6 +16,44 @@ use super::{
 #[async_trait]
 pub trait LLMClient: Send + Sync {
     async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse>;
+}
+
+/// Retry with exponential backoff
+pub async fn retry_with_backoff<T, E, F, Fut>(
+    max_retries: u32,
+    mut operation: F,
+) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+{
+    let mut last_error = None;
+
+    for attempt in 0..max_retries {
+        match operation().await {
+            Ok(result) => {
+                if attempt > 0 {
+                    tracing::info!("Operation succeeded on attempt {}", attempt + 1);
+                }
+                return Ok(result);
+            }
+            Err(e) if attempt < max_retries - 1 => {
+                tracing::warn!(
+                    "Attempt {} failed, retrying in {}ms",
+                    attempt + 1,
+                    1000 * (attempt + 1)
+                );
+                last_error = Some(e);
+                sleep(Duration::from_millis(1000 * (attempt + 1) as u64)).await;
+            }
+            Err(e) => {
+                tracing::error!("All {} attempts failed", max_retries);
+                return Err(e);
+            }
+        }
+    }
+
+    Err(last_error.unwrap())
 }
 
 pub struct OpenAICompatibleClient {
@@ -119,11 +159,9 @@ impl OpenAICompatibleClient {
             model: config.model.clone(),
         }
     }
-}
 
-#[async_trait]
-impl LLMClient for OpenAICompatibleClient {
-    async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
+    /// Perform a single chat request without retry logic
+    async fn chat_once(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
         let url = format!("{}/chat/completions", self.base_url);
 
         let chat_messages: Vec<ChatMessage> = messages
@@ -170,6 +208,43 @@ impl LLMClient for OpenAICompatibleClient {
         });
 
         Ok(LLMResponse { content, usage })
+    }
+}
+
+#[async_trait]
+impl LLMClient for OpenAICompatibleClient {
+    async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
+        // Clone messages for each retry attempt
+        let messages_clone = messages.clone();
+
+        // Create retry attempts
+        let mut attempt = 0;
+        let max_retries = 3;
+
+        loop {
+            match self.chat_once(messages_clone.clone()).await {
+                Ok(result) => {
+                    if attempt > 0 {
+                        tracing::info!("LLM request succeeded on attempt {}", attempt + 1);
+                    }
+                    return Ok(result);
+                }
+                Err(e) if attempt < max_retries - 1 => {
+                    tracing::warn!(
+                        "LLM request attempt {} failed, retrying in {}ms: {}",
+                        attempt + 1,
+                        1000 * (attempt + 1),
+                        e
+                    );
+                    sleep(Duration::from_millis(1000 * (attempt + 1) as u64)).await;
+                    attempt += 1;
+                }
+                Err(e) => {
+                    tracing::error!("All {} LLM request attempts failed", max_retries);
+                    return Err(e);
+                }
+            }
+        }
     }
 }
 
