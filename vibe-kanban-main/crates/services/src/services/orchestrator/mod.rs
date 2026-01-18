@@ -2,18 +2,18 @@
 //!
 //! 负责协调多个 AI 编码代理完成软件开发任务。
 
+pub mod agent;
 pub mod config;
-pub mod state;
-pub mod types;
 pub mod llm;
 pub mod message_bus;
-pub mod agent;
+pub mod state;
+pub mod types;
 
 pub use config::OrchestratorConfig;
-pub use state::{OrchestratorState, OrchestratorRunState, SharedOrchestratorState};
+pub use llm::{LLMClient, OpenAICompatibleClient, create_llm_client};
+pub use message_bus::{BusMessage, MessageBus, SharedMessageBus};
+pub use state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState};
 pub use types::*;
-pub use llm::{LLMClient, create_llm_client, OpenAICompatibleClient};
-pub use message_bus::{MessageBus, SharedMessageBus, BusMessage};
 
 #[cfg(test)]
 mod tests;

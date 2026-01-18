@@ -1,7 +1,9 @@
 //! Orchestrator 状态管理
 
 use std::collections::HashMap;
+
 use tokio::sync::RwLock;
+
 use super::types::*;
 
 /// Orchestrator 运行状态
@@ -67,14 +69,17 @@ impl OrchestratorState {
 
     /// 初始化任务状态
     pub fn init_task(&mut self, task_id: String, terminal_count: usize) {
-        self.task_states.insert(task_id.clone(), TaskExecutionState {
-            task_id,
-            current_terminal_index: 0,
-            total_terminals: terminal_count,
-            completed_terminals: Vec::new(),
-            failed_terminals: Vec::new(),
-            is_completed: false,
-        });
+        self.task_states.insert(
+            task_id.clone(),
+            TaskExecutionState {
+                task_id,
+                current_terminal_index: 0,
+                total_terminals: terminal_count,
+                completed_terminals: Vec::new(),
+                failed_terminals: Vec::new(),
+                is_completed: false,
+            },
+        );
     }
 
     /// 标记终端完成
@@ -105,12 +110,14 @@ impl OrchestratorState {
         const MAX_HISTORY: usize = 50;
         if self.conversation_history.len() > MAX_HISTORY {
             // 保留系统消息和最近的消息
-            let system_msgs: Vec<_> = self.conversation_history
+            let system_msgs: Vec<_> = self
+                .conversation_history
                 .iter()
                 .filter(|m| m.role == "system")
                 .cloned()
                 .collect();
-            let recent: Vec<_> = self.conversation_history
+            let recent: Vec<_> = self
+                .conversation_history
                 .iter()
                 .rev()
                 .take(MAX_HISTORY - system_msgs.len())
@@ -129,7 +136,9 @@ impl OrchestratorState {
 
     /// 检查是否有失败的任务
     pub fn has_failed_tasks(&self) -> bool {
-        self.task_states.values().any(|s| !s.failed_terminals.is_empty())
+        self.task_states
+            .values()
+            .any(|s| !s.failed_terminals.is_empty())
     }
 }
 

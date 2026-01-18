@@ -56,7 +56,8 @@ fn default_system_prompt() -> String {
 输出格式：
 使用 JSON 格式输出指令，格式如下：
 {"type": "send_to_terminal", "terminal_id": "xxx", "message": "具体指令"}
-"#.to_string()
+"#
+    .to_string()
 }
 
 impl Default for OrchestratorConfig {

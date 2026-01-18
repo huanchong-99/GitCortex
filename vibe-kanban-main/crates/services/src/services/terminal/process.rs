@@ -2,11 +2,12 @@
 //!
 //! Manages terminal process lifecycle including spawning, monitoring, and cleanup.
 
-use std::collections::HashMap;
-use std::path::Path;
-use std::sync::Arc;
-use tokio::process::{Command, Child};
-use tokio::sync::RwLock;
+use std::{collections::HashMap, path::Path, sync::Arc};
+
+use tokio::{
+    process::{Child, Command},
+    sync::RwLock,
+};
 use uuid::Uuid;
 
 /// Process handle for tracking spawned processes
@@ -90,9 +91,11 @@ impl ProcessManager {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
-        let child = cmd.spawn()
+        let child = cmd
+            .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {}", e))?;
-        let pid = child.id()
+        let pid = child
+            .id()
             .ok_or_else(|| anyhow::anyhow!("Failed to get process ID"))?;
         let session_id = Uuid::new_v4().to_string();
 
@@ -138,8 +141,10 @@ impl ProcessManager {
     pub async fn kill(&self, pid: u32) -> anyhow::Result<()> {
         #[cfg(unix)]
         {
-            use nix::sys::signal::{self, Signal};
-            use nix::unistd::Pid;
+            use nix::{
+                sys::signal::{self, Signal},
+                unistd::Pid,
+            };
             signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
                 .map_err(|e| anyhow::anyhow!("Failed to kill process {}: {}", pid, e))?;
         }
@@ -238,7 +243,7 @@ impl ProcessManager {
             .filter_map(|(id, child)| {
                 match child.try_wait() {
                     Ok(Some(_)) => Some(id.clone()), // Process exited
-                    _ => None, // Still running or error
+                    _ => None,                       // Still running or error
                 }
             })
             .collect();
@@ -258,8 +263,9 @@ impl Default for ProcessManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::Duration;
+
+    use super::*;
 
     /// Helper function to create a long-running test process
     fn long_running_cmd() -> Command {
@@ -311,7 +317,9 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        let result = manager.spawn("test-terminal", long_running_cmd(), temp_dir.path()).await;
+        let result = manager
+            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
+            .await;
 
         assert!(result.is_ok(), "Spawn should succeed");
         let handle = result.unwrap();
@@ -325,7 +333,9 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        let _ = manager.spawn("test-terminal", long_running_cmd(), temp_dir.path()).await;
+        let _ = manager
+            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
+            .await;
 
         let running = manager.list_running().await;
         assert_eq!(running.len(), 1);
@@ -337,7 +347,9 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        let _ = manager.spawn("test-terminal", long_running_cmd(), temp_dir.path()).await;
+        let _ = manager
+            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
+            .await;
 
         assert!(manager.is_running("test-terminal").await);
         assert!(!manager.is_running("non-existent").await);
@@ -348,7 +360,9 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        let _ = manager.spawn("quick-exit", quick_exit_cmd(), temp_dir.path()).await;
+        let _ = manager
+            .spawn("quick-exit", quick_exit_cmd(), temp_dir.path())
+            .await;
 
         // Wait for process to exit
         tokio::time::sleep(Duration::from_millis(100)).await;

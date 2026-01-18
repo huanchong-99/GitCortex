@@ -1,17 +1,29 @@
 //! 消息总线
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock, broadcast};
+use std::{collections::HashMap, sync::Arc};
+
+use tokio::sync::{RwLock, broadcast, mpsc};
+
 use super::types::*;
 
 #[derive(Debug, Clone)]
 pub enum BusMessage {
     TerminalCompleted(TerminalCompletionEvent),
-    GitEvent { workflow_id: String, commit_hash: String, branch: String, message: String },
+    GitEvent {
+        workflow_id: String,
+        commit_hash: String,
+        branch: String,
+        message: String,
+    },
     Instruction(OrchestratorInstruction),
-    StatusUpdate { workflow_id: String, status: String },
-    Error { workflow_id: String, error: String },
+    StatusUpdate {
+        workflow_id: String,
+        status: String,
+    },
+    Error {
+        workflow_id: String,
+        error: String,
+    },
     Shutdown,
 }
 
@@ -23,10 +35,16 @@ pub struct MessageBus {
 impl MessageBus {
     pub fn new(capacity: usize) -> Self {
         let (broadcast_tx, _) = broadcast::channel(capacity);
-        Self { broadcast_tx, subscribers: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            broadcast_tx,
+            subscribers: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
-    pub fn broadcast(&self, message: BusMessage) -> Result<usize, broadcast::error::SendError<BusMessage>> {
+    pub fn broadcast(
+        &self,
+        message: BusMessage,
+    ) -> Result<usize, broadcast::error::SendError<BusMessage>> {
         self.broadcast_tx.send(message)
     }
 
@@ -36,27 +54,38 @@ impl MessageBus {
 
     pub async fn subscribe(&self, topic: &str) -> mpsc::Receiver<BusMessage> {
         let (tx, rx) = mpsc::channel(100);
-        let mut subscribers: tokio::sync::RwLockWriteGuard<'_, HashMap<String, Vec<mpsc::Sender<BusMessage>>>> = self.subscribers.write().await;
+        let mut subscribers: tokio::sync::RwLockWriteGuard<
+            '_,
+            HashMap<String, Vec<mpsc::Sender<BusMessage>>>,
+        > = self.subscribers.write().await;
         subscribers.entry(topic.to_string()).or_default().push(tx);
         rx
     }
 
     pub async fn publish(&self, topic: &str, message: BusMessage) {
-        let subscribers: tokio::sync::RwLockReadGuard<'_, HashMap<String, Vec<mpsc::Sender<BusMessage>>>> = self.subscribers.read().await;
+        let subscribers: tokio::sync::RwLockReadGuard<
+            '_,
+            HashMap<String, Vec<mpsc::Sender<BusMessage>>>,
+        > = self.subscribers.read().await;
         if let Some(subs) = subscribers.get(topic) {
-            for tx in subs { let _ = tx.send(message.clone()).await; }
+            for tx in subs {
+                let _ = tx.send(message.clone()).await;
+            }
         }
     }
 
     pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
         let topic = format!("workflow:{}", event.workflow_id);
-        self.publish(&topic, BusMessage::TerminalCompleted(event.clone())).await;
+        self.publish(&topic, BusMessage::TerminalCompleted(event.clone()))
+            .await;
         let _ = self.broadcast(BusMessage::TerminalCompleted(event));
     }
 }
 
 impl Default for MessageBus {
-    fn default() -> Self { Self::new(1000) }
+    fn default() -> Self {
+        Self::new(1000)
+    }
 }
 
 pub type SharedMessageBus = Arc<MessageBus>;

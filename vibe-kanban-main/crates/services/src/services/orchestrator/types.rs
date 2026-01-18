@@ -1,7 +1,8 @@
 //! Orchestrator 类型定义
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
 
 /// 主 Agent 指令类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,17 +34,11 @@ pub enum OrchestratorInstruction {
         target_branch: String,
     },
     /// 暂停工作流
-    PauseWorkflow {
-        reason: String,
-    },
+    PauseWorkflow { reason: String },
     /// 完成工作流
-    CompleteWorkflow {
-        summary: String,
-    },
+    CompleteWorkflow { summary: String },
     /// 失败工作流
-    FailWorkflow {
-        reason: String,
-    },
+    FailWorkflow { reason: String },
 }
 
 /// 终端完成事件

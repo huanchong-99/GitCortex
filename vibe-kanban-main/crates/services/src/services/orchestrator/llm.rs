@@ -1,11 +1,15 @@
 //! LLM 客户端抽象
 
+use std::time::Duration;
+
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use super::config::OrchestratorConfig;
-use super::types::{LLMMessage, LLMResponse, LLMUsage};
+
+use super::{
+    config::OrchestratorConfig,
+    types::{LLMMessage, LLMResponse, LLMUsage},
+};
 
 #[async_trait]
 pub trait LLMClient: Send + Sync {
@@ -74,7 +78,10 @@ impl LLMClient for OpenAICompatibleClient {
 
         let chat_messages: Vec<ChatMessage> = messages
             .into_iter()
-            .map(|m| ChatMessage { role: m.role, content: m.content })
+            .map(|m| ChatMessage {
+                role: m.role,
+                content: m.content,
+            })
             .collect();
 
         let request = ChatRequest {
@@ -84,7 +91,8 @@ impl LLMClient for OpenAICompatibleClient {
             max_tokens: Some(4096),
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -99,7 +107,9 @@ impl LLMClient for OpenAICompatibleClient {
         }
 
         let chat_response: ChatResponse = response.json().await?;
-        let content = chat_response.choices.first()
+        let content = chat_response
+            .choices
+            .first()
             .map(|c| c.message.content.clone())
             .unwrap_or_default();
 

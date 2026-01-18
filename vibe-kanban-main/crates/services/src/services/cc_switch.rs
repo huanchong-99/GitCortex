@@ -2,10 +2,13 @@
 //!
 //! 封装 cc-switch crate，提供与 vibe-kanban 集成的接口。
 
-use cc_switch::{CliType as CcCliType, SwitchConfig, ModelSwitcher};
-use db::models::{Terminal, CliType, ModelConfig};
-use db::DBService;
 use std::sync::Arc;
+
+use cc_switch::{CliType as CcCliType, ModelSwitcher, SwitchConfig};
+use db::{
+    DBService,
+    models::{CliType, ModelConfig, Terminal},
+};
 
 /// CC-Switch 服务
 pub struct CCSwitchService {
@@ -26,18 +29,16 @@ impl CCSwitchService {
     /// 根据终端配置切换对应 CLI 的模型。
     pub async fn switch_for_terminal(&self, terminal: &Terminal) -> anyhow::Result<()> {
         // 获取 CLI 类型信息
-        let cli_type = CliType::find_by_id(
-            &self.db.pool,
-            &terminal.cli_type_id,
-        ).await?
-        .ok_or_else(|| anyhow::anyhow!("CLI type not found: {}", terminal.cli_type_id))?;
+        let cli_type = CliType::find_by_id(&self.db.pool, &terminal.cli_type_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("CLI type not found: {}", terminal.cli_type_id))?;
 
         // 获取模型配置
-        let model_config = ModelConfig::find_by_id(
-            &self.db.pool,
-            &terminal.model_config_id,
-        ).await?
-        .ok_or_else(|| anyhow::anyhow!("Model config not found: {}", terminal.model_config_id))?;
+        let model_config = ModelConfig::find_by_id(&self.db.pool, &terminal.model_config_id)
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!("Model config not found: {}", terminal.model_config_id)
+            })?;
 
         // 解析 CLI 类型
         let cli = CcCliType::from_str(&cli_type.name)
@@ -46,9 +47,12 @@ impl CCSwitchService {
         // 构建切换配置
         let config = SwitchConfig {
             base_url: terminal.custom_base_url.clone(),
-            api_key: terminal.custom_api_key.clone()
+            api_key: terminal
+                .custom_api_key
+                .clone()
                 .ok_or_else(|| anyhow::anyhow!("API key not configured for terminal"))?,
-            model: model_config.api_model_id
+            model: model_config
+                .api_model_id
                 .clone()
                 .unwrap_or_else(|| model_config.name.clone()),
         };
@@ -80,10 +84,7 @@ impl CCSwitchService {
     pub async fn detect_cli(&self, cli_name: &str) -> anyhow::Result<bool> {
         use tokio::process::Command;
 
-        let cli_type = CliType::find_by_name(
-            &self.db.pool,
-            cli_name,
-        ).await?;
+        let cli_type = CliType::find_by_name(&self.db.pool, cli_name).await?;
 
         if let Some(cli) = cli_type {
             let parts: Vec<&str> = cli.detect_command.split_whitespace().collect();
@@ -91,10 +92,7 @@ impl CCSwitchService {
                 return Ok(false);
             }
 
-            let result = Command::new(parts[0])
-                .args(&parts[1..])
-                .output()
-                .await;
+            let result = Command::new(parts[0]).args(&parts[1..]).output().await;
 
             Ok(result.map(|o| o.status.success()).unwrap_or(false))
         } else {

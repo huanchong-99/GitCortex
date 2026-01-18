@@ -1,6 +1,7 @@
 pub mod analytics;
 pub mod approvals;
 pub mod auth;
+pub mod cc_switch;
 pub mod config;
 pub mod container;
 pub mod diff_stream;
@@ -25,6 +26,5 @@ pub mod share;
 pub mod terminal;
 pub mod workspace_manager;
 pub mod worktree_manager;
-pub mod cc_switch;
 pub use cc_switch::CCSwitchService;
 pub mod orchestrator;

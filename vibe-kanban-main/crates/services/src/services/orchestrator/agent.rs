@@ -1,13 +1,17 @@
 //! Orchestrator Agent 主逻辑
 
 use std::sync::Arc;
-use tokio::sync::RwLock;
+
 use db::DBService;
-use super::config::OrchestratorConfig;
-use super::state::{OrchestratorState, OrchestratorRunState, SharedOrchestratorState};
-use super::llm::{LLMClient, create_llm_client};
-use super::message_bus::{MessageBus, BusMessage, SharedMessageBus};
-use super::types::*;
+use tokio::sync::RwLock;
+
+use super::{
+    config::OrchestratorConfig,
+    llm::{LLMClient, create_llm_client},
+    message_bus::{BusMessage, MessageBus, SharedMessageBus},
+    state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
+    types::*,
+};
 
 pub struct OrchestratorAgent {
     config: OrchestratorConfig,
@@ -27,7 +31,13 @@ impl OrchestratorAgent {
         let llm_client = create_llm_client(&config)?;
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
 
-        Ok(Self { config, state, message_bus, llm_client, db })
+        Ok(Self {
+            config,
+            state,
+            message_bus,
+            llm_client,
+            db,
+        })
     }
 
     /// 启动 Agent 事件循环
@@ -37,7 +47,10 @@ impl OrchestratorAgent {
             state.workflow_id.clone()
         };
 
-        let mut rx = self.message_bus.subscribe(&format!("workflow:{}", workflow_id)).await;
+        let mut rx = self
+            .message_bus
+            .subscribe(&format!("workflow:{}", workflow_id))
+            .await;
         tracing::info!("Orchestrator started for workflow: {}", workflow_id);
 
         // 初始化系统消息
@@ -50,7 +63,9 @@ impl OrchestratorAgent {
         // 事件循环
         while let Some(message) = rx.recv().await {
             let should_stop = self.handle_message(message).await?;
-            if should_stop { break; }
+            if should_stop {
+                break;
+            }
         }
 
         tracing::info!("Orchestrator stopped for workflow: {}", workflow_id);
@@ -63,8 +78,14 @@ impl OrchestratorAgent {
             BusMessage::TerminalCompleted(event) => {
                 self.handle_terminal_completed(event).await?;
             }
-            BusMessage::GitEvent { workflow_id, commit_hash, branch, message } => {
-                self.handle_git_event(&workflow_id, &commit_hash, &branch, &message).await?;
+            BusMessage::GitEvent {
+                workflow_id,
+                commit_hash,
+                branch,
+                message,
+            } => {
+                self.handle_git_event(&workflow_id, &commit_hash, &branch, &message)
+                    .await?;
             }
             BusMessage::Shutdown => {
                 return Ok(true);
@@ -75,14 +96,24 @@ impl OrchestratorAgent {
     }
 
     /// 处理终端完成事件
-    async fn handle_terminal_completed(&self, event: TerminalCompletionEvent) -> anyhow::Result<()> {
-        tracing::info!("Terminal completed: {} with status {:?}", event.terminal_id, event.status);
+    async fn handle_terminal_completed(
+        &self,
+        event: TerminalCompletionEvent,
+    ) -> anyhow::Result<()> {
+        tracing::info!(
+            "Terminal completed: {} with status {:?}",
+            event.terminal_id,
+            event.status
+        );
 
         // 更新状态
         {
             let mut state = self.state.write().await;
             state.run_state = OrchestratorRunState::Processing;
-            let success = matches!(event.status, TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass);
+            let success = matches!(
+                event.status,
+                TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
+            );
             state.mark_terminal_completed(&event.task_id, &event.terminal_id, success);
         }
 
@@ -110,7 +141,12 @@ impl OrchestratorAgent {
         branch: &str,
         message: &str,
     ) -> anyhow::Result<()> {
-        tracing::info!("Git event: {} on branch {} - {}", commit_hash, branch, message);
+        tracing::info!(
+            "Git event: {} on branch {} - {}",
+            commit_hash,
+            branch,
+            message
+        );
         // Git 事件通常会转换为 TerminalCompleted 事件
         Ok(())
     }
@@ -119,10 +155,7 @@ impl OrchestratorAgent {
     async fn build_completion_prompt(&self, event: &TerminalCompletionEvent) -> String {
         format!(
             "终端 {} 已完成任务。\n状态: {:?}\n提交: {:?}\n消息: {:?}\n\n请决定下一步操作。",
-            event.terminal_id,
-            event.status,
-            event.commit_hash,
-            event.commit_message
+            event.terminal_id, event.status, event.commit_hash, event.commit_message
         )
     }
 
@@ -150,7 +183,10 @@ impl OrchestratorAgent {
         // 尝试解析 JSON 指令
         if let Ok(instruction) = serde_json::from_str::<OrchestratorInstruction>(response) {
             match instruction {
-                OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
+                OrchestratorInstruction::SendToTerminal {
+                    terminal_id,
+                    message,
+                } => {
                     tracing::info!("Sending to terminal {}: {}", terminal_id, message);
                     // TODO: 实际发送到终端
                 }

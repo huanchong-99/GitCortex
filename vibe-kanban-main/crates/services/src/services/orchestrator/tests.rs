@@ -5,17 +5,9 @@
 #[cfg(test)]
 mod tests {
     use crate::services::orchestrator::{
-        OrchestratorInstruction,
-        TerminalCompletionEvent,
-        TerminalCompletionStatus,
-        CommitMetadata,
-        OrchestratorConfig,
-        OrchestratorState,
-        OrchestratorRunState,
-        LLMMessage,
-        create_llm_client,
-        MessageBus,
-        BusMessage,
+        BusMessage, CommitMetadata, LLMMessage, MessageBus, OrchestratorConfig,
+        OrchestratorInstruction, OrchestratorRunState, OrchestratorState, TerminalCompletionEvent,
+        TerminalCompletionStatus, create_llm_client,
     };
 
     // Tests will be added in subsequent tasks
@@ -35,7 +27,10 @@ mod tests {
         let parsed: OrchestratorInstruction = serde_json::from_str(&json).unwrap();
 
         match parsed {
-            OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
+            OrchestratorInstruction::SendToTerminal {
+                terminal_id,
+                message,
+            } => {
                 assert_eq!(terminal_id, "terminal-1");
                 assert_eq!(message, "Implement login feature");
             }
@@ -235,7 +230,11 @@ mod tests {
         {
             let task_state = state.task_states.get("task-1").unwrap();
             assert_eq!(task_state.completed_terminals.len(), 1);
-            assert!(task_state.completed_terminals.contains(&"terminal-1".to_string()));
+            assert!(
+                task_state
+                    .completed_terminals
+                    .contains(&"terminal-1".to_string())
+            );
             assert!(!task_state.is_completed);
         }
 
@@ -313,8 +312,10 @@ mod tests {
         // Install crypto provider for reqwest (ignore if already installed)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
-        use wiremock::{MockServer, Mock, ResponseTemplate};
-        use wiremock::matchers::{method, path};
+        use wiremock::{
+            Mock, MockServer, ResponseTemplate,
+            matchers::{method, path},
+        };
 
         let mock_server = MockServer::start().await;
 
@@ -344,12 +345,10 @@ mod tests {
         };
 
         let client = create_llm_client(&config).unwrap();
-        let messages = vec![
-            LLMMessage {
-                role: "user".to_string(),
-                content: "Hello".to_string(),
-            }
-        ];
+        let messages = vec![LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }];
 
         let response = client.chat(messages).await.unwrap();
 
@@ -364,8 +363,10 @@ mod tests {
         // Install crypto provider for reqwest (ignore if already installed)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
-        use wiremock::{MockServer, Mock, ResponseTemplate};
-        use wiremock::matchers::{method, path};
+        use wiremock::{
+            Mock, MockServer, ResponseTemplate,
+            matchers::{method, path},
+        };
 
         let mock_server = MockServer::start().await;
 
@@ -388,12 +389,10 @@ mod tests {
         };
 
         let client = create_llm_client(&config).unwrap();
-        let messages = vec![
-            LLMMessage {
-                role: "user".to_string(),
-                content: "Hello".to_string(),
-            }
-        ];
+        let messages = vec![LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }];
 
         let result = client.chat(messages).await;
 
@@ -405,8 +404,10 @@ mod tests {
         // Install crypto provider for reqwest (ignore if already installed)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
-        use wiremock::{MockServer, Mock, ResponseTemplate};
-        use wiremock::matchers::{method, path};
+        use wiremock::{
+            Mock, MockServer, ResponseTemplate,
+            matchers::{method, path},
+        };
 
         let mock_server = MockServer::start().await;
 
@@ -426,12 +427,10 @@ mod tests {
         };
 
         let client = create_llm_client(&config).unwrap();
-        let messages = vec![
-            LLMMessage {
-                role: "user".to_string(),
-                content: "Hello".to_string(),
-            }
-        ];
+        let messages = vec![LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }];
 
         let response = client.chat(messages).await.unwrap();
 
@@ -461,21 +460,26 @@ mod tests {
         let mut subscriber = bus.subscribe("workflow:wf-1").await;
 
         // Publish to topic
-        bus.publish("workflow:wf-1", BusMessage::StatusUpdate {
-            workflow_id: "wf-1".to_string(),
-            status: "running".to_string(),
-        }).await;
+        bus.publish(
+            "workflow:wf-1",
+            BusMessage::StatusUpdate {
+                workflow_id: "wf-1".to_string(),
+                status: "running".to_string(),
+            },
+        )
+        .await;
 
         // Receive message
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            subscriber.recv()
-        ).await;
+        let msg =
+            tokio::time::timeout(std::time::Duration::from_millis(100), subscriber.recv()).await;
 
         assert!(msg.is_ok());
         let msg = msg.unwrap().unwrap();
         match msg {
-            BusMessage::StatusUpdate { workflow_id, status } => {
+            BusMessage::StatusUpdate {
+                workflow_id,
+                status,
+            } => {
                 assert_eq!(workflow_id, "wf-1");
                 assert_eq!(status, "running");
             }
@@ -491,23 +495,21 @@ mod tests {
         let mut sub_wf2 = bus.subscribe("workflow:wf-2").await;
 
         // Publish to wf-1 only
-        bus.publish("workflow:wf-1", BusMessage::StatusUpdate {
-            workflow_id: "wf-1".to_string(),
-            status: "running".to_string(),
-        }).await;
+        bus.publish(
+            "workflow:wf-1",
+            BusMessage::StatusUpdate {
+                workflow_id: "wf-1".to_string(),
+                status: "running".to_string(),
+            },
+        )
+        .await;
 
         // wf-1 should receive
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub_wf1.recv()
-        ).await;
+        let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub_wf1.recv()).await;
         assert!(msg.is_ok());
 
         // wf-2 should NOT receive (timeout)
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub_wf2.recv()
-        ).await;
+        let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub_wf2.recv()).await;
         assert!(msg.is_err());
     }
 
@@ -521,16 +523,10 @@ mod tests {
         bus.broadcast(BusMessage::Shutdown).unwrap();
 
         // Both should receive
-        let msg1 = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub1.recv()
-        ).await;
+        let msg1 = tokio::time::timeout(std::time::Duration::from_millis(100), sub1.recv()).await;
         assert!(msg1.is_ok());
 
-        let msg2 = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub2.recv()
-        ).await;
+        let msg2 = tokio::time::timeout(std::time::Duration::from_millis(100), sub2.recv()).await;
         assert!(msg2.is_ok());
     }
 
@@ -551,10 +547,10 @@ mod tests {
 
         bus.publish_terminal_completed(event).await;
 
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub.recv()
-        ).await.unwrap().unwrap();
+        let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
 
         match msg {
             BusMessage::TerminalCompleted(e) => {
@@ -576,7 +572,10 @@ mod tests {
         let instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
 
         match instruction {
-            OrchestratorInstruction::SendToTerminal { terminal_id, message } => {
+            OrchestratorInstruction::SendToTerminal {
+                terminal_id,
+                message,
+            } => {
                 assert_eq!(terminal_id, "t1");
                 assert_eq!(message, "Do something");
             }
@@ -589,31 +588,31 @@ mod tests {
         let test_cases = vec![
             (
                 r#"{"type":"start_task","task_id":"task-1","instruction":"Build API"}"#,
-                "start_task"
+                "start_task",
             ),
             (
                 r#"{"type":"review_code","terminal_id":"t1","commit_hash":"abc123"}"#,
-                "review_code"
+                "review_code",
             ),
             (
                 r#"{"type":"fix_issues","terminal_id":"t1","issues":["bug1","bug2"]}"#,
-                "fix_issues"
+                "fix_issues",
             ),
             (
                 r#"{"type":"merge_branch","source_branch":"feature","target_branch":"main"}"#,
-                "merge_branch"
+                "merge_branch",
             ),
             (
                 r#"{"type":"pause_workflow","reason":"manual review"}"#,
-                "pause_workflow"
+                "pause_workflow",
             ),
             (
                 r#"{"type":"complete_workflow","summary":"done"}"#,
-                "complete_workflow"
+                "complete_workflow",
             ),
             (
                 r#"{"type":"fail_workflow","reason":"error"}"#,
-                "fail_workflow"
+                "fail_workflow",
             ),
         ];
 
