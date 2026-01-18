@@ -6,6 +6,7 @@ import { Projects } from '@/pages/Projects';
 import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
 import { Workflows } from '@/pages/Workflows';
+import { WorkflowDebugPage } from '@/pages/WorkflowDebug';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
 import { usePostHog } from 'posthog-js/react';
@@ -181,6 +182,10 @@ function AppContent() {
               <Route
                 path="/projects/:projectId/workflows"
                 element={<Workflows />}
+              />
+              <Route
+                path="/workflows/:workflowId/debug"
+                element={<WorkflowDebugPage />}
               />
             </Route>
 
