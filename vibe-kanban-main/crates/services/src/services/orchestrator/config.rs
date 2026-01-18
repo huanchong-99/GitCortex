@@ -25,6 +25,14 @@ pub struct OrchestratorConfig {
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
 
+    /// 重试延迟（毫秒）
+    #[serde(default = "default_retry_delay")]
+    pub retry_delay_ms: u64,
+
+    /// 最大对话历史长度
+    #[serde(default = "default_max_history")]
+    pub max_conversation_history: usize,
+
     /// 系统提示词
     #[serde(default = "default_system_prompt")]
     pub system_prompt: String,
@@ -36,6 +44,14 @@ fn default_max_retries() -> u32 {
 
 fn default_timeout() -> u64 {
     120
+}
+
+fn default_retry_delay() -> u64 {
+    1000
+}
+
+fn default_max_history() -> usize {
+    50
 }
 
 fn default_system_prompt() -> String {
@@ -69,6 +85,8 @@ impl Default for OrchestratorConfig {
             model: "gpt-4o".to_string(),
             max_retries: default_max_retries(),
             timeout_secs: default_timeout(),
+            retry_delay_ms: default_retry_delay(),
+            max_conversation_history: default_max_history(),
             system_prompt: default_system_prompt(),
         }
     }

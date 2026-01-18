@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use tokio::sync::RwLock;
 
+use super::config::OrchestratorConfig;
 use super::types::*;
 
 /// Orchestrator 运行状态
@@ -100,15 +101,14 @@ impl OrchestratorState {
     }
 
     /// 添加消息到对话历史
-    pub fn add_message(&mut self, role: &str, content: &str) {
+    pub fn add_message(&mut self, role: &str, content: &str, config: &OrchestratorConfig) {
         self.conversation_history.push(LLMMessage {
             role: role.to_string(),
             content: content.to_string(),
         });
 
-        // 限制历史长度，避免上下文过长
-        const MAX_HISTORY: usize = 50;
-        if self.conversation_history.len() > MAX_HISTORY {
+        // 使用配置中的最大历史长度限制，避免上下文过长
+        if self.conversation_history.len() > config.max_conversation_history {
             // 保留系统消息和最近的消息
             let system_msgs: Vec<_> = self
                 .conversation_history
@@ -120,7 +120,7 @@ impl OrchestratorState {
                 .conversation_history
                 .iter()
                 .rev()
-                .take(MAX_HISTORY - system_msgs.len())
+                .take(config.max_conversation_history - system_msgs.len())
                 .cloned()
                 .collect();
 

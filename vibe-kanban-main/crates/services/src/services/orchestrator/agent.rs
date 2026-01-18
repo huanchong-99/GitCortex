@@ -77,7 +77,7 @@ impl OrchestratorAgent {
         // 初始化系统消息
         {
             let mut state = self.state.write().await;
-            state.add_message("system", &self.config.system_prompt);
+            state.add_message("system", &self.config.system_prompt, &self.config);
             state.run_state = OrchestratorRunState::Idle;
         }
 
@@ -394,7 +394,7 @@ impl OrchestratorAgent {
     /// 调用 LLM
     async fn call_llm(&self, prompt: &str) -> anyhow::Result<String> {
         let mut state = self.state.write().await;
-        state.add_message("user", prompt);
+        state.add_message("user", prompt, &self.config);
 
         let messages = state.conversation_history.clone();
         drop(state);
@@ -402,7 +402,7 @@ impl OrchestratorAgent {
         let response = self.llm_client.chat(messages).await?;
 
         let mut state = self.state.write().await;
-        state.add_message("assistant", &response.content);
+        state.add_message("assistant", &response.content, &self.config);
         if let Some(usage) = &response.usage {
             state.total_tokens_used += usage.total_tokens as i64;
         }

@@ -258,10 +258,11 @@ mod tests {
     #[tokio::test]
     async fn test_conversation_history() {
         let mut state = OrchestratorState::new("workflow-1".to_string());
+        let config = OrchestratorConfig::default();
 
-        state.add_message("system", "You are a helpful assistant");
-        state.add_message("user", "Hello");
-        state.add_message("assistant", "Hi there!");
+        state.add_message("system", "You are a helpful assistant", &config);
+        state.add_message("user", "Hello", &config);
+        state.add_message("assistant", "Hi there!", &config);
 
         assert_eq!(state.conversation_history.len(), 3);
         assert_eq!(state.conversation_history[0].role, "system");
@@ -271,17 +272,18 @@ mod tests {
     #[tokio::test]
     async fn test_conversation_history_pruning() {
         let mut state = OrchestratorState::new("workflow-1".to_string());
+        let config = OrchestratorConfig::default();
 
         // Add system message
-        state.add_message("system", "System prompt");
+        state.add_message("system", "System prompt", &config);
 
-        // Add 60 user messages (exceeds MAX_HISTORY of 50)
+        // Add 60 user messages (exceeds max_conversation_history of 50)
         for i in 0..60 {
-            state.add_message("user", &format!("Message {}", i));
-            state.add_message("assistant", &format!("Response {}", i));
+            state.add_message("user", &format!("Message {}", i), &config);
+            state.add_message("assistant", &format!("Response {}", i), &config);
         }
 
-        // History should be pruned to MAX_HISTORY, keeping system messages
+        // History should be pruned to max_conversation_history, keeping system messages
         assert!(state.conversation_history.len() <= 51); // 1 system + 50 recent
         assert_eq!(state.conversation_history[0].role, "system");
     }
@@ -1227,6 +1229,8 @@ mod tests {
             model: "gpt-4".to_string(),
             max_retries: 3,
             timeout_secs: 120,
+            retry_delay_ms: 1000,
+            max_conversation_history: 50,
             system_prompt: String::new(),
         };
 
@@ -1294,6 +1298,8 @@ mod tests {
             model: "gpt-4".to_string(),
             max_retries: 3,
             timeout_secs: 120,
+            retry_delay_ms: 1000,
+            max_conversation_history: 50,
             system_prompt: String::new(),
         };
 
