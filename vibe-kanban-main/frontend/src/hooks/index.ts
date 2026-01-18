@@ -33,3 +33,32 @@ export { useOrganizationInvitations } from './useOrganizationInvitations';
 export { useOrganizationMutations } from './useOrganizationMutations';
 export { useVariant } from './useVariant';
 export { useRetryProcess } from './useRetryProcess';
+export {
+  useWorkflows,
+  useWorkflow,
+  useCreateWorkflow,
+  useStartWorkflow,
+  useDeleteWorkflow,
+} from './useWorkflows';
+export type {
+  Workflow,
+  WorkflowConfig,
+  WorkflowTaskConfig,
+  WorkflowModelConfig,
+  WorkflowTerminalConfig,
+  WorkflowCommandConfig,
+  WorkflowOrchestratorConfig,
+  CreateWorkflowRequest,
+  StartWorkflowRequest,
+  WorkflowExecution,
+} from './useWorkflows';
+export {
+  useCliTypes,
+  useCliDetection,
+  useModelsForCli,
+} from './useCliTypes';
+export type {
+  CliType,
+  CliModel,
+  CliDetectionResult,
+} from './useCliTypes';
