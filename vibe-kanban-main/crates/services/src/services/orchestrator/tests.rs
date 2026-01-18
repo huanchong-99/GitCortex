@@ -857,4 +857,232 @@ mod tests {
             other => panic!("Expected TerminalMessage, got {:?}", other),
         }
     }
+
+    #[tokio::test]
+    async fn test_execute_instruction_complete_workflow_success() {
+        use db::DBService;
+        use db::models::Workflow;
+        use sqlx::sqlite::SqlitePoolOptions;
+        use std::path::PathBuf;
+        use std::sync::Arc;
+        use uuid::Uuid;
+
+        // Create in-memory database with migrations
+        let pool = SqlitePoolOptions::new()
+            .connect(":memory:")
+            .await
+            .unwrap();
+
+        // Run migrations
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let migration_dir = manifest_dir
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .join("db")
+            .join("migrations");
+
+        let migrator = sqlx::migrate::Migrator::new(migration_dir)
+            .await
+            .unwrap();
+        migrator.run(&pool).await.unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+
+        // Create workflow in database
+        let workflow_id = Uuid::new_v4().to_string();
+
+        // First, we need to insert a project (required by workflow)
+        let project_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+        )
+        .bind(&project_id)
+        .bind("test-project")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow
+        sqlx::query(
+            r#"
+            INSERT INTO workflow (
+                id, project_id, name, target_branch,
+                merge_terminal_cli_id, merge_terminal_model_id,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#
+        )
+        .bind(&workflow_id)
+        .bind(&project_id)
+        .bind("test-workflow")
+        .bind("main")
+        .bind("cli-claude-code")
+        .bind("model-claude-sonnet")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow_id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        ).await.unwrap();
+
+        // Subscribe to workflow topic
+        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{}", workflow_id)).await;
+
+        // Execute instruction
+        let instruction_json = r#"{"type":"complete_workflow","summary":"All tasks completed successfully"}"#;
+
+        tokio::spawn(async move {
+            let _ = agent.execute_instruction(&instruction_json).await;
+        });
+
+        // Verify workflow status updated
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let updated_workflow = Workflow::find_by_id(&pool, &workflow_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(updated_workflow.status, "completed");
+
+        // Verify status update event published
+        let timeout = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500),
+            workflow_rx.recv()
+        ).await;
+
+        assert!(timeout.is_ok(), "Should receive status update event");
+
+        let msg = timeout.unwrap().unwrap();
+        match msg {
+            BusMessage::StatusUpdate { workflow_id: wf_id, status } => {
+                assert_eq!(wf_id, workflow_id);
+                assert_eq!(status, "completed");
+            }
+            _ => panic!("Expected StatusUpdate, got {:?}", msg),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_instruction_fail_workflow() {
+        use db::DBService;
+        use db::models::Workflow;
+        use sqlx::sqlite::SqlitePoolOptions;
+        use std::path::PathBuf;
+        use std::sync::Arc;
+        use uuid::Uuid;
+
+        // Create in-memory database with migrations
+        let pool = SqlitePoolOptions::new()
+            .connect(":memory:")
+            .await
+            .unwrap();
+
+        // Run migrations
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let migration_dir = manifest_dir
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .join("db")
+            .join("migrations");
+
+        let migrator = sqlx::migrate::Migrator::new(migration_dir)
+            .await
+            .unwrap();
+        migrator.run(&pool).await.unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+
+        // Create workflow in database
+        let workflow_id = Uuid::new_v4().to_string();
+
+        // First, we need to insert a project (required by workflow)
+        let project_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+        )
+        .bind(&project_id)
+        .bind("test-project")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow
+        sqlx::query(
+            r#"
+            INSERT INTO workflow (
+                id, project_id, name, target_branch,
+                merge_terminal_cli_id, merge_terminal_model_id,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#
+        )
+        .bind(&workflow_id)
+        .bind(&project_id)
+        .bind("test-workflow")
+        .bind("main")
+        .bind("cli-claude-code")
+        .bind("model-claude-sonnet")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow_id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        ).await.unwrap();
+
+        // Execute instruction with failure
+        let instruction_json = r#"{"type":"fail_workflow","reason":"Critical error in task execution"}"#;
+
+        agent.execute_instruction(&instruction_json).await.unwrap();
+
+        // Verify workflow status is failed
+        let updated_workflow = Workflow::find_by_id(&pool, &workflow_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(updated_workflow.status, "failed");
+    }
 }

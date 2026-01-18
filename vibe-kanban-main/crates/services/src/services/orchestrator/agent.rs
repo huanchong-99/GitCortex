@@ -228,10 +228,68 @@ impl OrchestratorAgent {
                     tracing::debug!("Message sent to terminal {}", terminal_id);
                 }
                 OrchestratorInstruction::CompleteWorkflow { summary } => {
-                    tracing::info!("Workflow completed: {}", summary);
+                    tracing::info!("Completing workflow: {}", summary);
+
+                    // Get workflow ID from state
+                    let workflow_id = {
+                        let state = self.state.read().await;
+                        state.workflow_id.clone()
+                    };
+
+                    // Update workflow status to completed
+                    db::models::Workflow::update_status(
+                        &self.db.pool,
+                        &workflow_id,
+                        "completed"
+                    ).await
+                    .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {}", e))?;
+
+                    // Publish completion event
+                    self.message_bus.publish(
+                        &format!("workflow:{}", workflow_id),
+                        BusMessage::StatusUpdate {
+                            workflow_id: workflow_id.clone(),
+                            status: "completed".to_string(),
+                        }
+                    ).await
+                    .map_err(|e| anyhow::anyhow!("Failed to publish completion event: {}", e))?;
+
+                    // Transition to Idle
+                    self.state.write().await.run_state = OrchestratorRunState::Idle;
+
+                    tracing::info!("Workflow {} completed successfully", workflow_id);
                 }
                 OrchestratorInstruction::FailWorkflow { reason } => {
-                    tracing::error!("Workflow failed: {}", reason);
+                    tracing::error!("Failing workflow: {}", reason);
+
+                    // Get workflow ID from state
+                    let workflow_id = {
+                        let state = self.state.read().await;
+                        state.workflow_id.clone()
+                    };
+
+                    // Update workflow status to failed
+                    db::models::Workflow::update_status(
+                        &self.db.pool,
+                        &workflow_id,
+                        "failed"
+                    ).await
+                    .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {}", e))?;
+
+                    // Publish failure event
+                    self.message_bus.publish(
+                        &format!("workflow:{}", workflow_id),
+                        BusMessage::Error {
+                            workflow_id: workflow_id.clone(),
+                            error: reason.clone(),
+                        }
+                    ).await
+                    .map_err(|e| anyhow::anyhow!("Failed to publish failure event: {}", e))?;
+
+                    // Transition to Idle
+                    self.state.write().await.run_state = OrchestratorRunState::Idle;
+
+                    tracing::error!("Workflow {} failed: {}", workflow_id, reason);
                 }
                 _ => {}
             }
