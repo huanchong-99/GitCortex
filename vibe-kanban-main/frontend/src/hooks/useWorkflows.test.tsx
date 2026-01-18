@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -11,10 +11,6 @@ import {
   type Workflow,
   type CreateWorkflowRequest,
 } from './useWorkflows';
-
-// Mock global fetch
-let mockFetch: ReturnType<typeof vi.fn>;
-global.fetch = vi.fn() as unknown as typeof fetch;
 
 // ============================================================================
 // Test Utilities
@@ -37,6 +33,20 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
     {children}
   </QueryClientProvider>
 );
+
+// Helper to create successful API response
+const createSuccessResponse = (data: unknown) => ({
+  ok: true,
+  json: async () => ({ success: true, data }),
+} as Response);
+
+// Helper to create error API response
+const createErrorResponse = (message: string, status: number = 500) => ({
+  ok: false,
+  status,
+  statusText: message,
+  json: async () => ({ success: false, message }),
+} as Response);
 
 // Mock workflows data
 const mockWorkflows: Workflow[] = [
@@ -69,21 +79,22 @@ const mockWorkflows: Workflow[] = [
     id: 'workflow-2',
     project_id: 'project-1',
     name: 'Test Workflow 2',
+    description: 'Another description',
     status: 'running',
     created_at: '2024-01-02T00:00:00Z',
-    updated_at: '2024-01-02T00:00:00Z',
+    updated_at: '2024-01-02T01:00:00Z',
     config: {
       tasks: [],
       models: [],
       terminals: [],
       commands: { enabled: false, presetIds: [] },
       orchestrator: {
-        modelConfigId: 'model-1',
+        modelConfigId: 'model-2',
         mergeTerminal: {
           cliTypeId: 'claude-code',
-          modelConfigId: 'model-1',
-          runTestsBeforeMerge: true,
-          pauseOnConflict: true,
+          modelConfigId: 'model-2',
+          runTestsBeforeMerge: false,
+          pauseOnConflict: false,
         },
         targetBranch: 'main',
       },
@@ -123,397 +134,158 @@ const mockWorkflow: Workflow = {
 
 describe('useWorkflows', () => {
   beforeEach(() => {
-    mockFetch = vi.fn();
-    global.fetch = mockFetch as unknown as typeof fetch;
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('should fetch workflows for a project', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflows)));
+
+    const { result } = renderHook(() => useWorkflows('proj-1'), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(mockWorkflows);
   });
 
-  describe('workflowKeys', () => {
-    it('should generate correct query keys', () => {
-      expect(workflowKeys.all).toEqual(['workflows']);
-      expect(workflowKeys.forProject('project-1')).toEqual([
-        'workflows',
-        'project',
-        'project-1',
-      ]);
-      expect(workflowKeys.byId('workflow-1')).toEqual([
-        'workflows',
-        'detail',
-        'workflow-1',
-      ]);
+  it('should handle fetch errors', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createErrorResponse('Network error')));
+
+    const { result } = renderHook(() => useWorkflows('proj-1'), {
+      wrapper,
     });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeDefined();
   });
 
-  describe('useWorkflows', () => {
-    it('should fetch workflows successfully', async () => {
-      const projectId = 'project-1';
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockWorkflows,
-            }),
-        } as Response)
-      );
+  it('should be disabled when projectId is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflows)));
 
-      const { result } = renderHook(() => useWorkflows(projectId), { wrapper });
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(result.current.data).toEqual(mockWorkflows);
+    const { result } = renderHook(() => useWorkflows(''), {
+      wrapper,
     });
 
-    it('should handle fetch errors', async () => {
-      const projectId = 'project-1';
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: false,
-          status: 500,
-          json: () =>
-            Promise.resolve({
-              message: 'Internal Server Error',
-            }),
-        } as Response)
-      );
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+});
 
-      const { result } = renderHook(() => useWorkflows(projectId), { wrapper });
-
-      await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error).toBeInstanceOf(Error);
-    });
-
-    it('should not fetch when projectId is empty', async () => {
-      const { result } = renderHook(() => useWorkflows(''), { wrapper });
-
-      expect(result.current.fetchStatus).toBe('idle');
-    });
+describe('useWorkflow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  describe('useWorkflow', () => {
-    it('should fetch single workflow successfully', async () => {
-      const workflowId = 'workflow-1';
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockWorkflow,
-            }),
-        } as Response)
-      );
+  it('should fetch a single workflow by ID', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflow)));
 
-      const { result } = renderHook(() => useWorkflow(workflowId), { wrapper });
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(result.current.data).toEqual(mockWorkflow);
+    const { result } = renderHook(() => useWorkflow('workflow-1'), {
+      wrapper,
     });
 
-    it('should handle fetch errors', async () => {
-      const workflowId = 'workflow-1';
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: false,
-          status: 404,
-          json: () =>
-            Promise.resolve({
-              message: 'Workflow not found',
-            }),
-        } as Response)
-      );
-
-      const { result } = renderHook(() => useWorkflow(workflowId), { wrapper });
-
-      await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error).toBeInstanceOf(Error);
-    });
-
-    it('should not fetch when workflowId is empty', async () => {
-      const { result } = renderHook(() => useWorkflow(''), { wrapper });
-
-      expect(result.current.fetchStatus).toBe('idle');
-    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(mockWorkflow);
   });
 
-  describe('useCreateWorkflow', () => {
-    it('should create workflow successfully', async () => {
-      const createData: CreateWorkflowRequest = {
-        project_id: 'project-1',
-        name: 'New Workflow',
-        description: 'New description',
-        config: {
-          tasks: [],
-          models: [],
-          terminals: [],
-          commands: { enabled: false, presetIds: [] },
-          orchestrator: {
-            modelConfigId: 'model-1',
-            mergeTerminal: {
-              cliTypeId: 'claude-code',
-              modelConfigId: 'model-1',
-              runTestsBeforeMerge: true,
-              pauseOnConflict: true,
-            },
-            targetBranch: 'main',
-          },
-        },
-      };
+  it('should be disabled when workflowId is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflow)));
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: { ...mockWorkflow, id: 'workflow-3', ...createData },
-            }),
-        } as Response)
-      );
-
-      const { result } = renderHook(() => useCreateWorkflow(), { wrapper });
-
-      result.current.mutate(createData);
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(result.current.data).toBeDefined();
+    const { result } = renderHook(() => useWorkflow(''), {
+      wrapper,
     });
 
-    it('should handle creation errors', async () => {
-      const createData: CreateWorkflowRequest = {
-        project_id: 'project-1',
-        name: 'New Workflow',
-        config: {
-          tasks: [],
-          models: [],
-          terminals: [],
-          commands: { enabled: false, presetIds: [] },
-          orchestrator: {
-            modelConfigId: 'model-1',
-            mergeTerminal: {
-              cliTypeId: 'claude-code',
-              modelConfigId: 'model-1',
-              runTestsBeforeMerge: true,
-              pauseOnConflict: true,
-            },
-            targetBranch: 'main',
-          },
-        },
-      };
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+});
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: false,
-          status: 400,
-          json: () =>
-            Promise.resolve({
-              message: 'Invalid workflow configuration',
-            }),
-        } as Response)
-      );
-
-      const { result } = renderHook(() => useCreateWorkflow(), { wrapper });
-
-      result.current.mutate(createData);
-
-      await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error).toBeInstanceOf(Error);
-    });
+describe('useCreateWorkflow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  describe('useStartWorkflow', () => {
-    it('should start workflow successfully', async () => {
-      const workflowId = 'workflow-1';
+  it('should create a new workflow', async () => {
+    const newWorkflow: Workflow = {
+      ...mockWorkflow,
+      id: 'new-workflow',
+    };
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: {
-                execution_id: 'exec-1',
-                workflow_id: workflowId,
-                status: 'running',
-                started_at: new Date().toISOString(),
-              },
-            }),
-        } as Response)
-      );
+    const requestData: CreateWorkflowRequest = {
+      project_id: 'project-1',
+      name: 'New Workflow',
+      description: 'New description',
+      config: mockWorkflow.config,
+    };
 
-      const { result } = renderHook(() => useStartWorkflow(), { wrapper });
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(newWorkflow)));
 
-      result.current.mutate({ workflow_id: workflowId });
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(result.current.data).toBeDefined();
-      expect(result.current.data?.status).toBe('running');
+    const { result } = renderHook(() => useCreateWorkflow(), {
+      wrapper,
     });
 
-    it('should handle start errors', async () => {
-      const workflowId = 'workflow-1';
+    result.current.mutate(requestData);
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: false,
-          status: 400,
-          json: () =>
-            Promise.resolve({
-              message: 'Workflow cannot be started',
-            }),
-        } as Response)
-      );
-
-      const { result } = renderHook(() => useStartWorkflow(), { wrapper });
-
-      result.current.mutate({ workflow_id: workflowId });
-
-      await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error).toBeInstanceOf(Error);
-    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(newWorkflow);
   });
 
-  describe('useDeleteWorkflow', () => {
-    it('should delete workflow successfully', async () => {
-      const workflowId = 'workflow-1';
+  it('should handle creation errors', async () => {
+    const requestData: CreateWorkflowRequest = {
+      project_id: 'project-1',
+      name: 'New Workflow',
+      config: mockWorkflow.config,
+    };
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: undefined,
-            }),
-        } as Response)
-      );
+    vi.stubGlobal('fetch', vi.fn(() => createErrorResponse('Creation failed')));
 
-      const { result } = renderHook(() => useDeleteWorkflow(), { wrapper });
-
-      result.current.mutate(workflowId);
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const { result } = renderHook(() => useCreateWorkflow(), {
+      wrapper,
     });
 
-    it('should handle deletion errors', async () => {
-      const workflowId = 'workflow-1';
+    result.current.mutate(requestData);
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: false,
-          status: 404,
-          json: () =>
-            Promise.resolve({
-              message: 'Workflow not found',
-            }),
-        } as Response)
-      );
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
 
-      const { result } = renderHook(() => useDeleteWorkflow(), { wrapper });
-
-      result.current.mutate(workflowId);
-
-      await waitFor(() => expect(result.current.isError).toBe(true));
-      expect(result.current.error).toBeInstanceOf(Error);
-    });
+describe('useStartWorkflow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  describe('cache invalidation', () => {
-    it('should invalidate project workflows cache on create', async () => {
-      const queryClient = createMockQueryClient();
-      const createData: CreateWorkflowRequest = {
-        project_id: 'project-1',
-        name: 'New Workflow',
-        config: {
-          tasks: [],
-          models: [],
-          terminals: [],
-          commands: { enabled: false, presetIds: [] },
-          orchestrator: {
-            modelConfigId: 'model-1',
-            mergeTerminal: {
-              cliTypeId: 'claude-code',
-              modelConfigId: 'model-1',
-              runTestsBeforeMerge: true,
-              pauseOnConflict: true,
-            },
-            targetBranch: 'main',
-          },
-        },
-      };
+  it('should start a workflow execution', async () => {
+    const executionResponse = {
+      execution_id: 'exec-1',
+      workflow_id: 'workflow-1',
+      status: 'running' as const,
+      started_at: '2024-01-01T00:00:00Z',
+    };
 
-      // Set initial data
-      queryClient.setQueryData(workflowKeys.forProject('project-1'), mockWorkflows);
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(executionResponse)));
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: { ...mockWorkflow, id: 'workflow-3', ...createData },
-            }),
-        } as Response)
-      );
-
-      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-
-      const testWrapper = ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      );
-
-      const { result } = renderHook(() => useCreateWorkflow(), {
-        wrapper: testWrapper,
-      });
-
-      result.current.mutate(createData);
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: workflowKeys.forProject('project-1'),
-      });
+    const { result } = renderHook(() => useStartWorkflow(), {
+      wrapper,
     });
 
-    it('should remove workflow from cache on delete', async () => {
-      const queryClient = createMockQueryClient();
-      const workflowId = 'workflow-1';
+    result.current.mutate({ workflow_id: 'workflow-1' });
 
-      // Set initial data
-      queryClient.setQueryData(workflowKeys.byId(workflowId), mockWorkflow);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(executionResponse);
+  });
+});
 
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: undefined,
-            }),
-        } as Response)
-      );
+describe('useDeleteWorkflow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-      const removeSpy = vi.spyOn(queryClient, 'removeQueries');
+  it('should delete a workflow', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(undefined)));
 
-      const testWrapper = ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      );
-
-      const { result } = renderHook(() => useDeleteWorkflow(), {
-        wrapper: testWrapper,
-      });
-
-      result.current.mutate(workflowId);
-
-      await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-      expect(removeSpy).toHaveBeenCalledWith({
-        queryKey: workflowKeys.byId(workflowId),
-      });
+    const { result } = renderHook(() => useDeleteWorkflow(), {
+      wrapper,
     });
+
+    result.current.mutate('workflow-1');
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 });

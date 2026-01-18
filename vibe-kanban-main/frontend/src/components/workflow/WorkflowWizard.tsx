@@ -207,37 +207,33 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
       case WizardStep.Models:
         return (
           <Step3Models
-            config={config.models}
+            config={config}
             errors={errors}
-            onUpdate={(updates) => handleUpdateConfig({ models: updates })}
+            onUpdate={handleUpdateConfig}
           />
         );
       case WizardStep.Terminals:
         return (
           <Step4Terminals
-            config={config.terminals}
-            tasks={config.tasks}
-            models={config.models}
+            config={config}
             errors={errors}
-            onUpdate={(updates) => handleUpdateConfig({ terminals: updates })}
+            onUpdate={handleUpdateConfig}
           />
         );
       case WizardStep.Commands:
         return (
           <Step5Commands
-            config={config.commands}
+            config={config}
             errors={errors}
-            onUpdate={(updates) => handleUpdateConfig({ commands: { ...config.commands, ...updates } })}
+            onUpdate={handleUpdateConfig}
           />
         );
       case WizardStep.Advanced:
         return (
           <Step6Advanced
-            config={config.advanced}
-            models={config.models}
-            tasks={config.tasks}
+            config={config}
             errors={errors}
-            onUpdate={(updates) => handleUpdateConfig({ advanced: { ...config.advanced, ...updates } })}
+            onUpdate={handleUpdateConfig}
           />
         );
       default:

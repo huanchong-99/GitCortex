@@ -5,6 +5,7 @@ import i18n from '@/i18n';
 import { Projects } from '@/pages/Projects';
 import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
+import { Workflows } from '@/pages/Workflows';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
 import { usePostHog } from 'posthog-js/react';
@@ -176,6 +177,10 @@ function AppContent() {
               <Route
                 path="/projects/:projectId/tasks/:taskId/attempts/:attemptId"
                 element={<ProjectTasks />}
+              />
+              <Route
+                path="/projects/:projectId/workflows"
+                element={<Workflows />}
               />
             </Route>
 
