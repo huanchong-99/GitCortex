@@ -19,6 +19,7 @@ pub enum ScratchError {
 
 /// Data for a draft follow-up scratch
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct DraftFollowUpData {
     pub message: String,
     #[serde(default)]
@@ -27,6 +28,7 @@ pub struct DraftFollowUpData {
 
 /// Data for preview settings scratch (URL override and screen size)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct PreviewSettingsData {
     pub url: String,
     #[serde(default)]
@@ -39,6 +41,7 @@ pub struct PreviewSettingsData {
 
 /// Data for a draft workspace scratch (new workspace creation)
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct DraftWorkspaceData {
     pub message: String,
     #[serde(default)]
@@ -51,6 +54,7 @@ pub struct DraftWorkspaceData {
 
 /// Repository entry in a draft workspace
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct DraftWorkspaceRepo {
     pub repo_id: Uuid,
     pub target_branch: String,
@@ -101,6 +105,7 @@ struct ScratchRow {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Scratch {
     pub id: Uuid,
     pub payload: ScratchPayload,
@@ -136,12 +141,14 @@ impl TryFrom<ScratchRow> for Scratch {
 
 /// Request body for creating a scratch (id comes from URL path, type from payload)
 #[derive(Debug, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateScratch {
     pub payload: ScratchPayload,
 }
 
 /// Request body for updating a scratch
 #[derive(Debug, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateScratch {
     pub payload: ScratchPayload,
 }

@@ -11,6 +11,7 @@ use ts_rs::TS;
 ///
 /// Corresponds to database table: cli_type
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CliType {
     /// Primary key ID, format: cli-{name}
@@ -46,6 +47,7 @@ pub struct CliType {
 ///
 /// Corresponds to database table: model_config
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ModelConfig {
     /// Primary key ID, format: model-{cli}-{name}
@@ -82,6 +84,7 @@ pub struct ModelConfig {
 ///
 /// For frontend display of CLI installation status
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CliDetectionStatus {
     /// CLI type ID

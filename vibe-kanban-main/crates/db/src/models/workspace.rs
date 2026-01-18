@@ -29,6 +29,7 @@ pub enum WorkspaceError {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContainerInfo {
     pub workspace_id: Uuid,
     pub task_id: Uuid,
@@ -36,6 +37,7 @@ pub struct ContainerInfo {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Workspace {
     pub id: Uuid,
     pub task_id: Uuid,
@@ -51,6 +53,7 @@ pub struct Workspace {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceWithStatus {
     #[serde(flatten)]
     #[ts(flatten)]
@@ -78,18 +81,21 @@ pub struct CreatePrParams<'a> {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateFollowUpAttempt {
     pub prompt: String,
 }
 
 /// Context data for resume operations (simplified)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AttemptResumeContext {
     pub execution_history: String,
     pub cumulative_diffs: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceContext {
     pub workspace: Workspace,
     pub task: Task,

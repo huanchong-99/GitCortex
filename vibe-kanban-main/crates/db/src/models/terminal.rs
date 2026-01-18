@@ -41,6 +41,7 @@ impl Default for TerminalStatus {
 ///
 /// Corresponds to database table: terminal
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Terminal {
     /// Primary key ID (UUID as String)
@@ -117,6 +118,7 @@ pub enum TerminalLogType {
 ///
 /// Corresponds to database table: terminal_log
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct TerminalLog {
     /// Primary key ID
@@ -139,6 +141,7 @@ pub struct TerminalLog {
 ///
 /// Corresponds to database table: git_event
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct GitEvent {
     /// Primary key ID
@@ -179,6 +182,7 @@ pub struct GitEvent {
 ///
 /// For API response with complete terminal information
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct TerminalDetail {
     /// Terminal basic info
@@ -195,6 +199,7 @@ pub struct TerminalDetail {
 
 /// Create Terminal Request
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CreateTerminalRequest {
     pub cli_type_id: String,

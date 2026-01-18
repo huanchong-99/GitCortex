@@ -17,6 +17,7 @@ pub enum RepoError {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Repo {
     pub id: Uuid,
     pub path: PathBuf,
@@ -34,6 +35,7 @@ pub struct Repo {
 }
 
 #[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct UpdateRepo {
     #[serde(

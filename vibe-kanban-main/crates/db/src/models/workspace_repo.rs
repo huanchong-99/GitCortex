@@ -9,6 +9,7 @@ use uuid::Uuid;
 use super::repo::Repo;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceRepo {
     pub id: Uuid,
     pub workspace_id: Uuid,
@@ -21,12 +22,14 @@ pub struct WorkspaceRepo {
 }
 
 #[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateWorkspaceRepo {
     pub repo_id: Uuid,
     pub target_branch: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct RepoWithTargetBranch {
     #[serde(flatten)]

@@ -16,6 +16,7 @@ pub enum SessionError {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Session {
     pub id: Uuid,
     pub workspace_id: Uuid,
@@ -25,6 +26,7 @@ pub struct Session {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateSession {
     pub executor: Option<String>,
 }

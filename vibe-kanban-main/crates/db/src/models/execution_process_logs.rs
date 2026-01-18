@@ -6,6 +6,7 @@ use utils::log_msg::LogMsg;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutionProcessLogs {
     pub execution_id: Uuid,
     pub logs: String, // JSONL format

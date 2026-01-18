@@ -60,6 +60,7 @@ pub enum ExecutionProcessRunReason {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutionProcess {
     pub id: Uuid,
     pub session_id: Uuid,
@@ -79,6 +80,7 @@ pub struct ExecutionProcess {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateExecutionProcess {
     pub session_id: Uuid,
     pub executor_action: ExecutorAction,
@@ -86,6 +88,7 @@ pub struct CreateExecutionProcess {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 pub struct UpdateExecutionProcess {
     pub status: Option<ExecutionProcessStatus>,

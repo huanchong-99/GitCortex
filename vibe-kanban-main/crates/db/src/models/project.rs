@@ -18,6 +18,7 @@ pub enum ProjectError {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: Uuid,
     pub name: String,
@@ -30,6 +31,7 @@ pub struct Project {
 }
 
 #[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateProject {
     pub name: String,
     pub repositories: Vec<CreateProjectRepo>,
@@ -41,6 +43,7 @@ pub struct UpdateProject {
 }
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct SearchResult {
     pub path: String,
     pub is_file: bool,

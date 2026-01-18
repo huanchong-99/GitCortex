@@ -76,6 +76,7 @@ impl Default for WorkflowTaskStatus {
 ///
 /// Corresponds to database table: workflow
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Workflow {
     /// Primary key ID (UUID as String for compatibility)
@@ -226,6 +227,7 @@ impl Workflow {
 ///
 /// Corresponds to database table: workflow_task
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct WorkflowTask {
     /// Primary key ID (UUID as String)
@@ -269,6 +271,7 @@ pub struct WorkflowTask {
 ///
 /// Corresponds to database table: slash_command_preset
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct SlashCommandPreset {
     /// Primary key ID
@@ -298,6 +301,7 @@ pub struct SlashCommandPreset {
 ///
 /// Corresponds to database table: workflow_command
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct WorkflowCommand {
     /// Primary key ID
@@ -321,6 +325,7 @@ pub struct WorkflowCommand {
 
 /// Create Workflow Request
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct CreateWorkflowRequest {
     /// Project ID
@@ -345,6 +350,7 @@ pub struct CreateWorkflowRequest {
 
 /// Main Agent Configuration
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct OrchestratorConfig {
     pub api_type: String,
@@ -355,6 +361,7 @@ pub struct OrchestratorConfig {
 
 /// Terminal Configuration
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct TerminalConfig {
     pub cli_type_id: String,

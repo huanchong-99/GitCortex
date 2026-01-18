@@ -24,6 +24,7 @@ pub enum Merge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct DirectMerge {
     pub id: Uuid,
     pub workspace_id: Uuid,
@@ -35,6 +36,7 @@ pub struct DirectMerge {
 
 /// PR merge - represents a pull request merge
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct PrMerge {
     pub id: Uuid,
     pub workspace_id: Uuid,
@@ -45,6 +47,7 @@ pub struct PrMerge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct PullRequestInfo {
     pub number: i64,
     pub url: String,

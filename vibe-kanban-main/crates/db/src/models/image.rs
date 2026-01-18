@@ -5,6 +5,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Image {
     pub id: Uuid,
     pub file_path: String, // relative path within cache/images/
@@ -17,6 +18,7 @@ pub struct Image {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateImage {
     pub file_path: String,
     pub original_name: String,
@@ -26,6 +28,7 @@ pub struct CreateImage {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskImage {
     pub id: Uuid,
     pub task_id: Uuid,
@@ -34,6 +37,7 @@ pub struct TaskImage {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTaskImage {
     pub task_id: Uuid,
     pub image_id: Uuid,

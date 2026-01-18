@@ -5,6 +5,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Tag {
     pub id: Uuid,
     pub tag_name: String,
@@ -14,12 +15,14 @@ pub struct Tag {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTag {
     pub tag_name: String,
     pub content: String,
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateTag {
     pub tag_name: Option<String>,
     pub content: Option<String>,

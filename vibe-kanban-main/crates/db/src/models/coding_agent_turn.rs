@@ -5,6 +5,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CodingAgentTurn {
     pub id: Uuid,
     pub execution_process_id: Uuid,
@@ -17,6 +18,7 @@ pub struct CodingAgentTurn {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateCodingAgentTurn {
     pub execution_process_id: Uuid,
     pub prompt: Option<String>,

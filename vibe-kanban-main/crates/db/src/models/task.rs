@@ -23,6 +23,7 @@ pub enum TaskStatus {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: Uuid,
     pub project_id: Uuid, // Foreign key to Project
@@ -36,6 +37,7 @@ pub struct Task {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskWithAttemptStatus {
     #[serde(flatten)]
     #[ts(flatten)]
@@ -59,6 +61,7 @@ impl std::ops::DerefMut for TaskWithAttemptStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskRelationships {
     pub parent_task: Option<Task>, // The task that owns the parent workspace
     pub current_workspace: Workspace, // The workspace we're viewing
@@ -66,6 +69,7 @@ pub struct TaskRelationships {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTask {
     pub project_id: Uuid,
     pub title: String,
@@ -113,6 +117,7 @@ impl CreateTask {
 }
 
 #[derive(Debug, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateTask {
     pub title: Option<String>,
     pub description: Option<String>,

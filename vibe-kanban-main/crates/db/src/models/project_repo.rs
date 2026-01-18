@@ -20,6 +20,7 @@ pub enum ProjectRepoError {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectRepo {
     pub id: Uuid,
     pub project_id: Uuid,
@@ -27,6 +28,7 @@ pub struct ProjectRepo {
 }
 
 #[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateProjectRepo {
     pub display_name: String,
     pub git_repo_path: String,

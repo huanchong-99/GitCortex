@@ -5,6 +5,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecutionProcessRepoState {
     pub id: Uuid,
     pub execution_process_id: Uuid,
