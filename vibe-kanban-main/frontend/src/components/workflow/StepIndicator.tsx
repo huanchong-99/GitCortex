@@ -27,6 +27,7 @@ export function StepIndicator({ currentStep, completedSteps }: Props) {
                   !isCurrent && !isCompleted && 'border-muted text-low bg-secondary'
                 )}
               >
+                {/* Display step number (1-based) or checkmark if completed */}
                 {isCompleted ? <Check className="w-5 h-5" /> : index + 1}
               </div>
               <span
@@ -40,6 +41,7 @@ export function StepIndicator({ currentStep, completedSteps }: Props) {
             </div>
 
             {/* Connector Line */}
+            {/* Connector appears after each step. It's colored if this step is completed or if we're past it. */}
             {index < WIZARD_STEPS.length - 1 && (
               <div
                 className={cn(

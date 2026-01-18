@@ -34,7 +34,7 @@ describe('StepIndicator', () => {
   });
 
   it('should mark completed steps with check icon', () => {
-    render(
+    const { container } = render(
       <StepIndicator
         currentStep={WizardStep.Tasks}
         completedSteps={[WizardStep.Project, WizardStep.Basic]}
@@ -42,7 +42,24 @@ describe('StepIndicator', () => {
     );
 
     // Check that completed steps have checkmarks
-    const checkIcons = document.querySelectorAll('svg.lucide-check');
+    const checkIcons = container.querySelectorAll('svg.lucide-check');
     expect(checkIcons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should color connector lines based on step completion', () => {
+    const { container } = render(
+      <StepIndicator
+        currentStep={WizardStep.Tasks}
+        completedSteps={[WizardStep.Project, WizardStep.Basic]}
+      />
+    );
+
+    const connectors = container.querySelectorAll('.flex-1.h-0\\.5');
+    // First connector (after step 0) should be brand (completed)
+    expect(connectors[0]).toHaveClass('bg-brand');
+    // Second connector (after step 1) should be brand (completed)
+    expect(connectors[1]).toHaveClass('bg-brand');
+    // Third connector (after step 2) should be muted (not completed)
+    expect(connectors[2]).toHaveClass('bg-muted');
   });
 });
