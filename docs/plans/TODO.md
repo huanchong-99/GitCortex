@@ -7,11 +7,11 @@
 
 | 指标 | 值 |
 |------|-----|
-| 总任务数 | 33 |
-| 已完成 | 27 |
+| 总任务数 | 36 |
+| 已完成 | 30 |
 | 进行中 | 0 |
 | 未开始 | 6 |
-| **完成率** | **81.82%** |
+| **完成率** | **83.33%** |
 
 ---
 
@@ -105,15 +105,15 @@
 
 ---
 
-## Phase 7: 终端调试视图 ⬜
+## Phase 7: 终端调试视图 ✅
 
 **计划文件:** `08-phase-7-terminal-debug.md`
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 7.1 | 集成 xterm.js - 安装依赖，创建 TerminalEmulator.tsx | ⬜ | - |
-| 7.2 | 实现 PTY WebSocket 后端 - terminal_ws.rs 路由 | ⬜ | - |
-| 7.3 | 创建终端调试页面 - TerminalDebugView.tsx, WorkflowDebug.tsx | ⬜ | - |
+| 7.1 | 集成 xterm.js - 安装依赖，创建 TerminalEmulator.tsx | ✅ | 2026-01-19 |
+| 7.2 | 实现 PTY WebSocket 后端 - terminal_ws.rs 路由 | ✅ | 2026-01-19 |
+| 7.3 | 创建终端调试页面 - TerminalDebugView.tsx, WorkflowDebug.tsx | ✅ | 2026-01-19 |
 
 ---
 
@@ -155,3 +155,4 @@
 | 2026-01-18 | Phase 3 测试遗留问题修复 | Task 3.5 (新增) | 添加 MockLLMClient，完整测试实现 |
 | 2024-01-18 | Phase 5 Git Watcher 完成 | Task 5.1-5.3 | 3/3 任务完成 + 12个测试通过 + 使用文档 |
 | 2026-01-18 | Phase 6 Frontend 完成 | Task 6.1-6.5 | 5/5 任务完成 + 180个测试通过 + 路由集成 |
+| 2026-01-19 | Phase 7 Terminal Debug 完成 | Task 7.1-7.3 | 3/3 任务完成 + xterm.js 集成 + WebSocket 后端 + 调试页面 |
