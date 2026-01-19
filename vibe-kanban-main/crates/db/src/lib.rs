@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use sqlx::{
     Error, Pool, Sqlite, SqlitePool,
@@ -118,8 +118,21 @@ impl DBService {
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Delete);
 
+        // Configure connection pool for optimal performance
+        // - max_connections: 10 (SQLite performs best with limited connections)
+        // - min_connections: 2 (maintain baseline connectivity)
+        // - acquire_timeout: 30s (prevent indefinite blocking)
+        // - idle_timeout: 10min (release unused connections)
+        // - max_lifetime: 1hr (refresh connections periodically)
+        // - test_before_acquire: true (ensure connection health)
         let pool = if let Some(hook) = after_connect {
             SqlitePoolOptions::new()
+                .max_connections(10)
+                .min_connections(2)
+                .acquire_timeout(Duration::from_secs(30))
+                .idle_timeout(Duration::from_secs(600))
+                .max_lifetime(Duration::from_secs(3600))
+                .test_before_acquire(true)
                 .after_connect(move |conn, _meta| {
                     let hook = hook.clone();
                     Box::pin(async move {
@@ -130,7 +143,15 @@ impl DBService {
                 .connect_with(options)
                 .await?
         } else {
-            SqlitePool::connect_with(options).await?
+            SqlitePoolOptions::new()
+                .max_connections(10)
+                .min_connections(2)
+                .acquire_timeout(Duration::from_secs(30))
+                .idle_timeout(Duration::from_secs(600))
+                .max_lifetime(Duration::from_secs(3600))
+                .test_before_acquire(true)
+                .connect_with(options)
+                .await?
         };
 
         run_migrations(&pool).await?;

@@ -34,6 +34,46 @@ AI coding agents are increasingly writing the world's code and human engineers n
 
 You can watch a video overview [here](https://youtu.be/TFT3KnZOOAk).
 
+## Workflow Orchestration
+
+Vibe Kanban includes a powerful workflow orchestration system that enables you to coordinate multiple AI coding agents working in parallel or sequence. The workflow system provides:
+
+- **Parallel Task Execution**: Run multiple AI agents simultaneously on different branches
+- **Main Orchestrator**: Optional AI coordinator that manages task distribution and coordination
+- **Slash Commands**: Pre-built command patterns for common development workflows
+- **Merge Terminal**: Dedicated terminal for merging completed work
+- **Error Handling**: Optional error terminal for automated error recovery
+- **Terminal Debugging**: Real-time monitoring and intervention in running workflows
+
+### Quick Example
+
+```javascript
+// Create a workflow with parallel tasks
+const workflow = await fetch('http://localhost:3001/api/workflows', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    projectId: 'my-project',
+    name: 'Feature Development',
+    description: 'Implement authentication feature',
+    useSlashCommands: true,
+    orchestratorConfig: {
+      apiType: 'anthropic',
+      baseUrl: 'https://api.anthropic.com',
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      model: 'claude-sonnet-4-20250514'
+    },
+    mergeTerminalConfig: {
+      cliTypeId: 'claude-code',
+      modelConfigId: 'claude-3-5-sonnet'
+    },
+    targetBranch: 'main'
+  })
+});
+```
+
+For comprehensive documentation on workflows, including configuration options, best practices, and examples, see the [Workflow Guide](docs/workflow-guide.md).
+
 ## Installation
 
 Make sure you have authenticated with your favourite coding agent. A full list of supported coding agents can be found in the [docs](https://vibekanban.com/docs). Then in your terminal run:

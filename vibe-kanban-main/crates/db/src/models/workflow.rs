@@ -13,6 +13,7 @@ use sqlx::{FromRow, SqlitePool, Type};
 use strum_macros::{Display, EnumString};
 use ts_rs::TS;
 use uuid::Uuid;
+use tracing::{instrument, debug};
 
 // Import Terminal type for batch operations
 use super::terminal::Terminal;
@@ -424,8 +425,10 @@ impl Workflow {
     }
 
     /// Find workflows by project
+    #[instrument(skip(pool), fields(project_id))]
     pub async fn find_by_project(pool: &SqlitePool, project_id: &str) -> sqlx::Result<Vec<Self>> {
-        sqlx::query_as::<_, Workflow>(
+        let start = std::time::Instant::now();
+        let result = sqlx::query_as::<_, Workflow>(
             r#"
             SELECT * FROM workflow
             WHERE project_id = ?
@@ -434,7 +437,17 @@ impl Workflow {
         )
         .bind(project_id)
         .fetch_all(pool)
-        .await
+        .await;
+
+        let elapsed = start.elapsed();
+        debug!(
+            project_id = %project_id,
+            count = result.as_ref().map(|v| v.len()).unwrap_or(0),
+            duration_ms = elapsed.as_millis(),
+            "find_by_project query completed"
+        );
+
+        result
     }
 
     /// Update workflow status
