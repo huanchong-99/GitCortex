@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Instant};
+use ts_rs::TS;
 use crate::DeploymentImpl;
 use crate::error::ApiError;
 
@@ -66,9 +67,9 @@ pub fn validate_terminal_id(terminal_id: &str) -> anyhow::Result<()> {
 // ============================================================================
 
 /// WebSocket message types
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum WsMessage {
+pub enum WsMessage {
     /// Input from client (user keystrokes)
     Input { data: String },
     /// Output to client (terminal response)

@@ -1,44 +1,29 @@
+import type { WsMessage as SharedWsMessage } from 'shared/types';
+
 /**
  * WebSocket message types for terminal communication
  */
-export type WsMessage =
-    | WsOutputMessage
-    | WsErrorMessage
-    | WsInputMessage
-    | WsResizeMessage;
+export type WsMessage = SharedWsMessage;
 
 /**
  * Output message from server to client (terminal response)
  */
-export interface WsOutputMessage {
-    readonly type: 'output';
-    readonly data: string;
-}
+export type WsOutputMessage = Extract<WsMessage, { type: 'output' }>;
 
 /**
  * Error message from server to client
  */
-export interface WsErrorMessage {
-    readonly type: 'error';
-    readonly message: string;
-}
+export type WsErrorMessage = Extract<WsMessage, { type: 'error' }>;
 
 /**
  * Input message from client to server (keystrokes)
  */
-export interface WsInputMessage {
-    readonly type: 'input';
-    readonly data: string;
-}
+export type WsInputMessage = Extract<WsMessage, { type: 'input' }>;
 
 /**
  * Resize message from client to server
  */
-export interface WsResizeMessage {
-    readonly type: 'resize';
-    readonly cols: number;
-    readonly rows: number;
-}
+export type WsResizeMessage = Extract<WsMessage, { type: 'resize' }>;
 
 /**
  * Type guard for WsOutputMessage

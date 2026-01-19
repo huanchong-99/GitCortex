@@ -12,13 +12,13 @@ export type SharedTask = { id: string, organization_id: string, project_id: stri
 
 export type UserData = { user_id: string, first_name: string | null, last_name: string | null, username: string | null, };
 
-export type Project = { id: string, name: string, default_agent_working_dir: string | null, remote_project_id: string | null, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, defaultAgentWorkingDir: string | null, remoteProjectId: string | null, createdAt: Date, updatedAt: Date, };
 
 export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 
 export type UpdateProject = { name: string | null, };
 
-export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, 
+export type SearchResult = { path: string, isFile: boolean, matchType: SearchMatchType, 
 /**
  * Ranking score based on git history (higher = more recently/frequently edited)
  */
@@ -26,89 +26,89 @@ score: bigint, };
 
 export type SearchMatchType = "FileName" | "DirectoryName" | "FullPath";
 
-export type Repo = { id: string, path: string, name: string, display_name: string, setup_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean, dev_server_script: string | null, created_at: Date, updated_at: Date, };
+export type Repo = { id: string, path: string, name: string, displayName: string, setupScript: string | null, cleanupScript: string | null, copyFiles: string | null, parallelSetupScript: boolean, devServerScript: string | null, createdAt: Date, updatedAt: Date, };
 
-export type UpdateRepo = { display_name?: string | null, setup_script?: string | null, cleanup_script?: string | null, copy_files?: string | null, parallel_setup_script?: boolean | null, dev_server_script?: string | null, };
+export type UpdateRepo = { displayName?: string | null, setupScript?: string | null, cleanupScript?: string | null, copyFiles?: string | null, parallelSetupScript?: boolean | null, devServerScript?: string | null, };
 
-export type ProjectRepo = { id: string, project_id: string, repo_id: string, };
+export type ProjectRepo = { id: string, projectId: string, repoId: string, };
 
-export type CreateProjectRepo = { display_name: string, git_repo_path: string, };
+export type CreateProjectRepo = { displayName: string, gitRepoPath: string, };
 
-export type WorkspaceRepo = { id: string, workspace_id: string, repo_id: string, target_branch: string, created_at: Date, updated_at: Date, };
+export type WorkspaceRepo = { id: string, workspaceId: string, repoId: string, targetBranch: string, createdAt: Date, updatedAt: Date, };
 
-export type CreateWorkspaceRepo = { repo_id: string, target_branch: string, };
+export type CreateWorkspaceRepo = { repoId: string, targetBranch: string, };
 
-export type RepoWithTargetBranch = { target_branch: string, id: string, path: string, name: string, display_name: string, setup_script: string | null, cleanup_script: string | null, copy_files: string | null, parallel_setup_script: boolean, dev_server_script: string | null, created_at: Date, updated_at: Date, };
+export type RepoWithTargetBranch = { targetBranch: string, id: string, path: string, name: string, displayName: string, setupScript: string | null, cleanupScript: string | null, copyFiles: string | null, parallelSetupScript: boolean, devServerScript: string | null, createdAt: Date, updatedAt: Date, };
 
-export type Tag = { id: string, tag_name: string, content: string, created_at: string, updated_at: string, };
+export type Tag = { id: string, tagName: string, content: string, createdAt: string, updatedAt: string, };
 
-export type CreateTag = { tag_name: string, content: string, };
+export type CreateTag = { tagName: string, content: string, };
 
-export type UpdateTag = { tag_name: string | null, content: string | null, };
+export type UpdateTag = { tagName: string | null, content: string | null, };
 
 export type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelled";
 
-export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+export type Task = { id: string, projectId: string, title: string, description: string | null, status: TaskStatus, parentWorkspaceId: string | null, sharedTaskId: string | null, createdAt: string, updatedAt: string, };
 
-export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, last_attempt_failed: boolean, executor: string, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+export type TaskWithAttemptStatus = { hasInProgressAttempt: boolean, lastAttemptFailed: boolean, executor: string, id: string, projectId: string, title: string, description: string | null, status: TaskStatus, parentWorkspaceId: string | null, sharedTaskId: string | null, createdAt: string, updatedAt: string, };
 
-export type TaskRelationships = { parent_task: Task | null, current_workspace: Workspace, children: Array<Task>, };
+export type TaskRelationships = { parentTask: Task | null, currentWorkspace: Workspace, children: Array<Task>, };
 
-export type CreateTask = { project_id: string, title: string, description: string | null, status: TaskStatus | null, parent_workspace_id: string | null, image_ids: Array<string> | null, shared_task_id: string | null, };
+export type CreateTask = { projectId: string, title: string, description: string | null, status: TaskStatus | null, parentWorkspaceId: string | null, imageIds: Array<string> | null, sharedTaskId: string | null, };
 
-export type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, parent_workspace_id: string | null, image_ids: Array<string> | null, };
+export type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, parentWorkspaceId: string | null, imageIds: Array<string> | null, };
 
 export type DraftFollowUpData = { message: string, variant: string | null, };
 
-export type DraftWorkspaceData = { message: string, project_id: string | null, repos: Array<DraftWorkspaceRepo>, selected_profile: ExecutorProfileId | null, };
+export type DraftWorkspaceData = { message: string, projectId: string | null, repos: Array<DraftWorkspaceRepo>, selectedProfile: ExecutorProfileId | null, };
 
-export type DraftWorkspaceRepo = { repo_id: string, target_branch: string, };
+export type DraftWorkspaceRepo = { repoId: string, targetBranch: string, };
 
-export type PreviewSettingsData = { url: string, screen_size: string | null, responsive_width: number | null, responsive_height: number | null, };
+export type PreviewSettingsData = { url: string, screenSize: string | null, responsiveWidth: number | null, responsiveHeight: number | null, };
 
 export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "DRAFT_WORKSPACE", "data": DraftWorkspaceData } | { "type": "PREVIEW_SETTINGS", "data": PreviewSettingsData };
 
 export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP", DRAFT_WORKSPACE = "DRAFT_WORKSPACE", PREVIEW_SETTINGS = "PREVIEW_SETTINGS" }
 
-export type Scratch = { id: string, payload: ScratchPayload, created_at: string, updated_at: string, };
+export type Scratch = { id: string, payload: ScratchPayload, createdAt: string, updatedAt: string, };
 
 export type CreateScratch = { payload: ScratchPayload, };
 
 export type UpdateScratch = { payload: ScratchPayload, };
 
-export type Image = { id: string, file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, created_at: string, updated_at: string, };
+export type Image = { id: string, filePath: string, originalName: string, mimeType: string | null, sizeBytes: bigint, hash: string, createdAt: string, updatedAt: string, };
 
-export type CreateImage = { file_path: string, original_name: string, mime_type: string | null, size_bytes: bigint, hash: string, };
+export type CreateImage = { filePath: string, originalName: string, mimeType: string | null, sizeBytes: bigint, hash: string, };
 
-export type Workspace = { id: string, task_id: string, container_ref: string | null, branch: string, agent_working_dir: string | null, setup_completed_at: string | null, created_at: string, updated_at: string, archived: boolean, pinned: boolean, name: string | null, };
+export type Workspace = { id: string, taskId: string, containerRef: string | null, branch: string, agentWorkingDir: string | null, setupCompletedAt: string | null, createdAt: string, updatedAt: string, archived: boolean, pinned: boolean, name: string | null, };
 
-export type WorkspaceWithStatus = { is_running: boolean, is_errored: boolean, id: string, task_id: string, container_ref: string | null, branch: string, agent_working_dir: string | null, setup_completed_at: string | null, created_at: string, updated_at: string, archived: boolean, pinned: boolean, name: string | null, };
+export type WorkspaceWithStatus = { isRunning: boolean, isErrored: boolean, id: string, taskId: string, containerRef: string | null, branch: string, agentWorkingDir: string | null, setupCompletedAt: string | null, createdAt: string, updatedAt: string, archived: boolean, pinned: boolean, name: string | null, };
 
-export type Session = { id: string, workspace_id: string, executor: string | null, created_at: string, updated_at: string, };
+export type Session = { id: string, workspaceId: string, executor: string | null, createdAt: string, updatedAt: string, };
 
-export type ExecutionProcess = { id: string, session_id: string, run_reason: ExecutionProcessRunReason, executor_action: ExecutorAction, status: ExecutionProcessStatus, exit_code: bigint | null, 
+export type ExecutionProcess = { id: string, sessionId: string, runReason: ExecutionProcessRunReason, executorAction: ExecutorAction, status: ExecutionProcessStatus, exitCode: bigint | null, 
 /**
  * dropped: true if this process is excluded from the current
  * history view (due to restore/trimming). Hidden from logs/timeline;
  * still listed in the Processes tab.
  */
-dropped: boolean, started_at: string, completed_at: string | null, created_at: string, updated_at: string, };
+dropped: boolean, startedAt: string, completedAt: string | null, createdAt: string, updatedAt: string, };
 
 export enum ExecutionProcessStatus { running = "running", completed = "completed", failed = "failed", killed = "killed" }
 
 export type ExecutionProcessRunReason = "setupscript" | "cleanupscript" | "codingagent" | "devserver";
 
-export type ExecutionProcessRepoState = { id: string, execution_process_id: string, repo_id: string, before_head_commit: string | null, after_head_commit: string | null, merge_commit: string | null, created_at: Date, updated_at: Date, };
+export type ExecutionProcessRepoState = { id: string, executionProcessId: string, repoId: string, beforeHeadCommit: string | null, afterHeadCommit: string | null, mergeCommit: string | null, createdAt: Date, updatedAt: Date, };
 
 export type Merge = { "type": "direct" } & DirectMerge | { "type": "pr" } & PrMerge;
 
-export type DirectMerge = { id: string, workspace_id: string, repo_id: string, merge_commit: string, target_branch_name: string, created_at: string, };
+export type DirectMerge = { id: string, workspaceId: string, repoId: string, mergeCommit: string, targetBranchName: string, createdAt: string, };
 
-export type PrMerge = { id: string, workspace_id: string, repo_id: string, created_at: string, target_branch_name: string, pr_info: PullRequestInfo, };
+export type PrMerge = { id: string, workspaceId: string, repoId: string, createdAt: string, targetBranchName: string, prInfo: PullRequestInfo, };
 
 export type MergeStatus = "open" | "merged" | "closed" | "unknown";
 
-export type PullRequestInfo = { number: bigint, url: string, status: MergeStatus, merged_at: string | null, merge_commit_sha: string | null, };
+export type PullRequestInfo = { number: bigint, url: string, status: MergeStatus, mergedAt: string | null, mergeCommitSha: string | null, };
 
 export type ApprovalStatus = { "status": "pending" } | { "status": "approved" } | { "status": "denied", reason?: string, } | { "status": "timed_out" };
 
@@ -217,6 +217,8 @@ export type CheckEditorAvailabilityQuery = { editor_type: EditorType, };
 export type CheckEditorAvailabilityResponse = { available: boolean, };
 
 export type CheckAgentAvailabilityQuery = { executor: BaseCodingAgent, };
+
+export type WsMessage = { "type": "input", data: string, } | { "type": "output", data: string, } | { "type": "resize", cols: number, rows: number, } | { "type": "error", message: string, };
 
 export type CurrentUserResponse = { user_id: string, };
 
