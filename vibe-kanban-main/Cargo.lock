@@ -5104,6 +5104,7 @@ dependencies = [
  "local-deployment",
  "mime_guess",
  "nix 0.29.0",
+ "once_cell",
  "os_info",
  "rand 0.8.5",
  "regex",

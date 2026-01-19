@@ -3,6 +3,9 @@ pub mod mcp;
 pub mod middleware;
 pub mod routes;
 
+#[cfg(test)]
+pub mod tests;
+
 // #[cfg(feature = "cloud")]
 // type DeploymentImpl = vibe_kanban_cloud::deployment::CloudDeployment;
 // #[cfg(not(feature = "cloud"))]

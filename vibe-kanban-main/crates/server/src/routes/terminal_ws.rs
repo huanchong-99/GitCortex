@@ -2,18 +2,22 @@
 
 use axum::{
     extract::{Path, State, WebSocketUpgrade, ws::{Message, WebSocket}},
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse, Response},
     routing::get,
     Router,
 };
 use db::models::Terminal;
 use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Instant};
 use crate::DeploymentImpl;
+use crate::error::ApiError;
 
 // ============================================================================
 // Constants
@@ -27,6 +31,35 @@ const WS_IDLE_TIMEOUT_SECS: u64 = 300;
 
 /// Heartbeat interval for keep-alive (30 seconds)
 const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+// ============================================================================
+// UUID Validation
+// ============================================================================
+
+/// UUID v4 regex pattern (case-insensitive)
+/// Matches format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+/// where x is a hexadecimal digit (0-9, a-f, case-insensitive)
+static UUID_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap()
+});
+
+/// Validates that terminal_id is a properly formatted UUID
+///
+/// # Arguments
+/// * `terminal_id` - The terminal ID string to validate
+///
+/// # Returns
+/// * `Ok(())` if the terminal_id is a valid UUID format
+/// * `Err(anyhow::Error)` if the terminal_id is invalid
+pub fn validate_terminal_id(terminal_id: &str) -> anyhow::Result<()> {
+    if UUID_REGEX.is_match(terminal_id) {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Invalid terminal_id format: expected UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+        ))
+    }
+}
 
 // ============================================================================
 // WebSocket Message Types
@@ -65,6 +98,12 @@ async fn terminal_ws_handler(
     Path(terminal_id): Path<String>,
     State(deployment): State<DeploymentImpl>,
 ) -> impl IntoResponse {
+    // Validate terminal_id format before proceeding
+    if let Err(e) = validate_terminal_id(&terminal_id) {
+        tracing::warn!("Invalid terminal_id format: {} - {}", terminal_id, e);
+        return ApiError::BadRequest(format!("Invalid terminal_id format: {}", e)).into_response();
+    }
+
     ws.on_upgrade(move |socket| handle_terminal_socket(socket, terminal_id, deployment))
 }
 
