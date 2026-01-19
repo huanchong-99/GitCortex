@@ -1,5 +1,9 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { handleApiResponse } from '@/lib/api';
+import {
+  useErrorNotification,
+  type ErrorNotificationOptions,
+} from './useErrorNotification';
 
 // ============================================================================
 // CLI Types
@@ -85,10 +89,18 @@ const cliTypesApi = {
  * Hook to fetch all available CLI types
  * @returns Query result with CLI types array
  */
-export function useCliTypes(): UseQueryResult<CliType[], Error> {
+export function useCliTypes(
+  options: ErrorNotificationOptions = {}
+): UseQueryResult<CliType[], Error> {
+  const { notifyError } = useErrorNotification({
+    ...options,
+    context: options.context ?? 'CliTypes',
+  });
+
   return useQuery({
     queryKey: cliTypesKeys.all,
     queryFn: () => cliTypesApi.getAll(),
+    onError: (error) => notifyError(error),
     staleTime: 1000 * 60 * 60, // 1 hour - CLI types don't change often
   });
 }
@@ -97,10 +109,18 @@ export function useCliTypes(): UseQueryResult<CliType[], Error> {
  * Hook to detect CLI installation status
  * @returns Query result with CLI detection results
  */
-export function useCliDetection(): UseQueryResult<CliDetectionResult[], Error> {
+export function useCliDetection(
+  options: ErrorNotificationOptions = {}
+): UseQueryResult<CliDetectionResult[], Error> {
+  const { notifyError } = useErrorNotification({
+    ...options,
+    context: options.context ?? 'CliDetection',
+  });
+
   return useQuery({
     queryKey: cliTypesKeys.detection,
     queryFn: () => cliTypesApi.detectInstallation(),
+    onError: (error) => notifyError(error),
     staleTime: 1000 * 60 * 5, // 5 minutes - installation status can change
     refetchOnWindowFocus: true, // Re-check when user returns to tab
   });
@@ -111,11 +131,20 @@ export function useCliDetection(): UseQueryResult<CliDetectionResult[], Error> {
  * @param cliTypeId - The CLI type ID to fetch models for
  * @returns Query result with models array
  */
-export function useModelsForCli(cliTypeId: string): UseQueryResult<CliModel[], Error> {
+export function useModelsForCli(
+  cliTypeId: string,
+  options: ErrorNotificationOptions = {}
+): UseQueryResult<CliModel[], Error> {
+  const { notifyError } = useErrorNotification({
+    ...options,
+    context: options.context ?? 'CliModels',
+  });
+
   return useQuery({
     queryKey: cliTypesKeys.models(cliTypeId),
     queryFn: () => cliTypesApi.getModels(cliTypeId),
     enabled: !!cliTypeId,
+    onError: (error) => notifyError(error),
     staleTime: 1000 * 60 * 30, // 30 minutes - available models don't change often
   });
 }

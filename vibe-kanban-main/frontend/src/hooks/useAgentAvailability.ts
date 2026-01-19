@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { BaseCodingAgent } from 'shared/types';
 import { configApi } from '../lib/api';
+import {
+  useErrorNotification,
+  type ErrorNotificationOptions,
+} from './useErrorNotification';
 
 export type AgentAvailabilityState =
   | { status: 'checking' }
@@ -10,10 +14,15 @@ export type AgentAvailabilityState =
   | null;
 
 export function useAgentAvailability(
-  agent: BaseCodingAgent | null | undefined
+  agent: BaseCodingAgent | null | undefined,
+  options: ErrorNotificationOptions = {}
 ): AgentAvailabilityState {
   const [availability, setAvailability] =
     useState<AgentAvailabilityState>(null);
+  const { notifyError } = useErrorNotification({
+    ...options,
+    context: options.context ?? 'AgentAvailability',
+  });
 
   useEffect(() => {
     if (!agent) {
@@ -39,7 +48,7 @@ export function useAgentAvailability(
             break;
         }
       } catch (error) {
-        console.error('Failed to check agent availability:', error);
+        notifyError(error);
         setAvailability(null);
       }
     };

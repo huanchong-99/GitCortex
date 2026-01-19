@@ -156,46 +156,50 @@ describe('TerminalEmulator', () => {
     });
 
     it('should validate terminalId format', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onError = vi.fn();
 
       render(
         <TerminalEmulator
           terminalId="invalid@id!"
           wsUrl="ws://localhost:8080"
+          onError={onError}
         />
       );
 
-      expect(consoleSpy).toHaveBeenCalledWith('Invalid terminalId');
-      consoleSpy.mockRestore();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Invalid terminalId' })
+      );
     });
 
     it('should reject empty terminalId', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onError = vi.fn();
 
       render(
         <TerminalEmulator
           terminalId=""
           wsUrl="ws://localhost:8080"
+          onError={onError}
         />
       );
 
-      expect(consoleSpy).toHaveBeenCalledWith('Invalid terminalId');
-      consoleSpy.mockRestore();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Invalid terminalId' })
+      );
     });
 
     it('should accept valid terminalId with alphanumeric characters and hyphens', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onError = vi.fn();
 
       render(
         <TerminalEmulator
           terminalId="test-terminal-123"
           wsUrl="ws://localhost:8080"
+          onError={onError}
         />
       );
 
-      // Should not log error for valid terminalId
-      expect(consoleSpy).not.toHaveBeenCalledWith('Invalid terminalId');
-      consoleSpy.mockRestore();
+      // Should not emit error for valid terminalId
+      expect(onError).not.toHaveBeenCalled();
     });
   });
 
@@ -219,12 +223,13 @@ describe('TerminalEmulator', () => {
 
   describe('Error Handling', () => {
     it('should handle malformed WebSocket messages', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onError = vi.fn();
 
       render(
         <TerminalEmulator
           terminalId="test-terminal-1"
           wsUrl="ws://localhost:8080"
+          onError={onError}
         />
       );
 
@@ -232,22 +237,22 @@ describe('TerminalEmulator', () => {
       // In a real scenario, the WebSocket would receive invalid JSON
       // The component should catch and log the error without crashing
 
-      consoleSpy.mockRestore();
+      expect(onError).toBeDefined();
     });
 
     it('should handle WebSocket errors gracefully', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onError = vi.fn();
 
       render(
         <TerminalEmulator
           terminalId="test-terminal-1"
           wsUrl="ws://localhost:8080"
+          onError={onError}
         />
       );
 
-      // Error handler is set up and will log errors
-      expect(consoleSpy).toBeDefined();
-      consoleSpy.mockRestore();
+      // Error handler is set up and safe to call
+      expect(onError).toBeDefined();
     });
   });
 

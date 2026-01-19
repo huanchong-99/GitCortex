@@ -16,9 +16,14 @@ import {
 interface WorkflowWizardProps {
   onComplete: (config: WizardConfig) => void;
   onCancel: () => void;
+  onError?: (error: Error) => void;
 }
 
-export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
+export function WorkflowWizard({
+  onComplete,
+  onCancel,
+  onError,
+}: WorkflowWizardProps) {
   const [state, setState] = useState<WizardState>({
     currentStep: WizardStep.Project,
     config: getDefaultWizardConfig(),
@@ -156,9 +161,12 @@ export function WorkflowWizard({ onComplete, onCancel }: WorkflowWizardProps) {
       // Reset submitting state after successful completion
       setState({ ...state, isSubmitting: false });
     } catch (error) {
-      console.error('Failed to create workflow:', error);
-      const errorMessage = error instanceof Error ? error.message : '创建工作流失败，请重试';
-      setSubmitError(errorMessage);
+      const errorObj =
+        error instanceof Error
+          ? error
+          : new Error('???????????');
+      onError?.(errorObj);
+      setSubmitError(errorObj.message);
       setState({ ...state, isSubmitting: false });
     }
   };

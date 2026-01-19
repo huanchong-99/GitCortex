@@ -9,6 +9,7 @@ interface Props {
   wsUrl?: string;
   onData?: (data: string) => void;
   onResize?: (cols: number, rows: number) => void;
+  onError?: (error: Error) => void;
 }
 
 export interface TerminalEmulatorRef {
@@ -17,7 +18,7 @@ export interface TerminalEmulatorRef {
 }
 
 export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
-  ({ terminalId, wsUrl, onData, onResize }, ref) => {
+  ({ terminalId, wsUrl, onData, onResize, onError }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const terminalRef = useRef<Terminal | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
@@ -48,6 +49,15 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
       }
     }, [onResize]);
+
+    const notifyError = useCallback(
+      (message: string, error?: unknown) => {
+        const err =
+          error instanceof Error ? error : new Error(message);
+        onError?.(err);
+      },
+      [onError]
+    );
 
     // Initialize terminal
     useEffect(() => {
@@ -102,7 +112,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
 
       // Basic validation
       if (!terminalId || !/^[a-zA-Z0-9-]+$/.test(terminalId)) {
-        console.error('Invalid terminalId');
+        notifyError('Invalid terminalId');
         return;
       }
 
@@ -127,17 +137,17 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
             terminalRef.current?.write(message.data);
           } else if (isWsErrorMessage(message)) {
             // Handle error message properly
-            console.error('Terminal WebSocket error message:', message.message);
+            notifyError('Terminal WebSocket error message', new Error(message.message));
           } else {
             console.warn('Unknown WebSocket message type:', message);
           }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          notifyError('Failed to parse WebSocket message', error);
         }
       };
 
       ws.onerror = (error) => {
-        console.error('Terminal WebSocket error:', error);
+        notifyError('Terminal WebSocket error', error);
       };
 
       ws.onclose = () => {
@@ -149,7 +159,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       return () => {
         ws.close();
       };
-    }, [wsUrl, terminalId]);
+    }, [wsUrl, terminalId, notifyError]);
 
     return (
       <div
