@@ -51,6 +51,8 @@ fn configure_user(repo_path: &Path, name: &str, email: &str) {
     let mut cfg = repo.config().unwrap();
     cfg.set_str("user.name", name).unwrap();
     cfg.set_str("user.email", email).unwrap();
+    cfg.set_str("core.autocrlf", "false").unwrap();
+    cfg.set_str("core.eol", "lf").unwrap();
 }
 
 fn init_repo_main(root: &TempDir) -> PathBuf {
@@ -194,6 +196,8 @@ fn diff_added_binary_file_has_no_content() {
     // write binary with null byte
     let mut f = fs::File::create(repo_path.join("bin.dat")).unwrap();
     f.write_all(&[0u8, 1, 2, 3]).unwrap();
+    f.sync_all().unwrap();
+    drop(f);
     let _ = s.commit(&repo_path, "add binary").unwrap();
 
     let s = GitService::new();

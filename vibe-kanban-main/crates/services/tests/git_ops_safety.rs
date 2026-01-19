@@ -58,6 +58,8 @@ fn configure_user(repo: &Repository) {
     let mut cfg = repo.config().unwrap();
     cfg.set_str("user.name", "Test User").unwrap();
     cfg.set_str("user.email", "test@example.com").unwrap();
+    cfg.set_str("core.autocrlf", "false").unwrap();
+    cfg.set_str("core.eol", "lf").unwrap();
 }
 
 fn push_ref(repo: &Repository, local: &str, remote: &str) {

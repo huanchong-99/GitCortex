@@ -10,9 +10,10 @@ pub fn make_path_relative(path: &str, worktree_path: &str) -> String {
 
     let path_obj = normalize_macos_private_alias(Path::new(&path));
     let worktree_path_obj = normalize_macos_private_alias(Path::new(worktree_path));
+    let is_posix_absolute = path.starts_with('/') || path.starts_with('\\');
 
     // If path is already relative, return as is
-    if path_obj.is_relative() {
+    if path_obj.is_relative() && !is_posix_absolute {
         return path.to_string();
     }
 

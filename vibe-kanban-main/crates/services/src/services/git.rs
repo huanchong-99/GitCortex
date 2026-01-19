@@ -561,7 +561,7 @@ impl GitService {
 
     /// Helper function to convert blob to string content
     fn blob_to_string(blob: &git2::Blob) -> Option<String> {
-        if blob.is_binary() {
+        if blob.is_binary() || blob.content().contains(&0) {
             None // Skip binary files
         } else {
             std::str::from_utf8(blob.content())

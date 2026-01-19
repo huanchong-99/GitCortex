@@ -32,7 +32,7 @@ impl ProcessManager {
     /// # Examples
     ///
     /// ```no_run
-    /// use vibe_kanban_main::services::terminal::ProcessManager;
+    /// use services::services::terminal::ProcessManager;
     ///
     /// let manager = ProcessManager::new();
     /// ```
@@ -67,7 +67,7 @@ impl ProcessManager {
     ///
     /// ```no_run
     /// use tokio::process::Command;
-    /// use vibe_kanban_main::services::terminal::ProcessManager;
+    /// use services::services::terminal::ProcessManager;
     /// use std::path::Path;
     ///
     /// # #[tokio::main]
@@ -129,7 +129,7 @@ impl ProcessManager {
     /// # Examples
     ///
     /// ```no_run
-    /// use vibe_kanban_main::services::terminal::ProcessManager;
+    /// use services::services::terminal::ProcessManager;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> anyhow::Result<()> {
@@ -178,7 +178,7 @@ impl ProcessManager {
     /// # Examples
     ///
     /// ```no_run
-    /// use vibe_kanban_main::services::terminal::ProcessManager;
+    /// use services::services::terminal::ProcessManager;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -203,7 +203,7 @@ impl ProcessManager {
     /// # Examples
     ///
     /// ```no_run
-    /// use vibe_kanban_main::services::terminal::ProcessManager;
+    /// use services::services::terminal::ProcessManager;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -227,7 +227,7 @@ impl ProcessManager {
     /// # Examples
     ///
     /// ```no_run
-    /// use vibe_kanban_main::services::terminal::ProcessManager;
+    /// use services::services::terminal::ProcessManager;
     ///
     /// # #[tokio::main]
     /// # async fn main() {
