@@ -10,8 +10,23 @@ use db::models::Terminal;
 use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::time::{timeout, Instant};
 use crate::DeploymentImpl;
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/// Connection timeout for initial WebSocket setup (30 seconds)
+const WS_CONNECT_TIMEOUT_SECS: u64 = 30;
+
+/// Idle timeout - close connection if no activity (5 minutes)
+const WS_IDLE_TIMEOUT_SECS: u64 = 300;
+
+/// Heartbeat interval for keep-alive (30 seconds)
+const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 // ============================================================================
 // WebSocket Message Types
@@ -64,10 +79,15 @@ async fn handle_terminal_socket(
     // Split the WebSocket into sender and receiver
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    // Get terminal from database
-    let terminal = match Terminal::find_by_id(&deployment.db().pool, &terminal_id).await {
-        Ok(Some(t)) => t,
-        Ok(None) => {
+    // Get terminal from database with timeout
+    let terminal_result = timeout(
+        Duration::from_secs(WS_CONNECT_TIMEOUT_SECS),
+        Terminal::find_by_id(&deployment.db().pool, &terminal_id)
+    ).await;
+
+    let terminal = match terminal_result {
+        Ok(Ok(Some(t))) => t,
+        Ok(Ok(None)) => {
             let msg = WsMessage::Error {
                 message: "Terminal not found".to_string(),
             };
@@ -77,10 +97,21 @@ async fn handle_terminal_socket(
             let _ = ws_sender.close().await;
             return;
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             tracing::error!("Database error fetching terminal: {}", e);
             let msg = WsMessage::Error {
                 message: format!("Database error: {}", e),
+            };
+            let _ = ws_sender
+                .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
+                .await;
+            let _ = ws_sender.close().await;
+            return;
+        }
+        Err(_) => {
+            tracing::error!("Connection timeout while fetching terminal {}", terminal_id);
+            let msg = WsMessage::Error {
+                message: format!("Connection timeout after {}s", WS_CONNECT_TIMEOUT_SECS),
             };
             let _ = ws_sender
                 .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
@@ -100,8 +131,14 @@ async fn handle_terminal_socket(
     // Create channel for bi-directional communication
     let (_tx, mut rx) = mpsc::channel::<String>(100);
 
-    // Clone terminal_id for use in recv_task
+    // Clone terminal_id for use in tasks
     let terminal_id_clone = terminal_id.clone();
+    let terminal_id_heartbeat = terminal_id.clone();
+
+    // Track last activity time for idle timeout
+    let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
+    let last_activity_recv = last_activity.clone();
+    let last_activity_heartbeat = last_activity.clone();
 
     // Spawn send task: receive from channel and send to WebSocket
     let send_task = tokio::spawn(async move {
@@ -122,79 +159,133 @@ async fn handle_terminal_socket(
         }
     });
 
-    // Spawn receive task: receive from WebSocket and process
+    // Spawn heartbeat task: check for idle timeout and send pings
+    let heartbeat_task = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+        loop {
+            interval.tick().await;
+
+            let last = *last_activity_heartbeat.read().await;
+            let idle_duration = last.elapsed();
+
+            if idle_duration > Duration::from_secs(WS_IDLE_TIMEOUT_SECS) {
+                tracing::warn!(
+                    "Terminal {} idle timeout after {}s",
+                    terminal_id_heartbeat,
+                    idle_duration.as_secs()
+                );
+                break;
+            }
+
+            tracing::trace!(
+                "Terminal {} heartbeat check, idle for {}s",
+                terminal_id_heartbeat,
+                idle_duration.as_secs()
+            );
+        }
+    });
+
+    // Spawn receive task: receive from WebSocket and process with timeout
     let recv_task = tokio::spawn(async move {
-        while let Some(result) = ws_receiver.next().await {
-            match result {
-                Ok(msg) => match msg {
-                    Message::Text(text) => {
-                        if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
-                            match ws_msg {
-                                WsMessage::Input { data } => {
-                                    // TODO: Send input to PTY
-                                    // For now, just log it
-                                    tracing::debug!(
-                                        "Terminal {} input: {} bytes",
-                                        terminal_id_clone,
-                                        data.len()
-                                    );
-                                }
-                                WsMessage::Resize { cols, rows } => {
-                                    // TODO: Resize PTY
-                                    tracing::debug!(
-                                        "Terminal {} resize: {}x{}",
-                                        terminal_id_clone,
-                                        cols,
-                                        rows
-                                    );
-                                }
-                                WsMessage::Output { .. } => {
+        loop {
+            // Use timeout for each message receive
+            let recv_result = timeout(
+                Duration::from_secs(WS_IDLE_TIMEOUT_SECS),
+                ws_receiver.next()
+            ).await;
+
+            match recv_result {
+                Ok(Some(result)) => {
+                    // Update last activity time
+                    *last_activity_recv.write().await = Instant::now();
+
+                    match result {
+                        Ok(msg) => match msg {
+                            Message::Text(text) => {
+                                if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
+                                    match ws_msg {
+                                        WsMessage::Input { data } => {
+                                            // TODO: Send input to PTY
+                                            // For now, just log it
+                                            tracing::debug!(
+                                                "Terminal {} input: {} bytes",
+                                                terminal_id_clone,
+                                                data.len()
+                                            );
+                                        }
+                                        WsMessage::Resize { cols, rows } => {
+                                            // TODO: Resize PTY
+                                            tracing::debug!(
+                                                "Terminal {} resize: {}x{}",
+                                                terminal_id_clone,
+                                                cols,
+                                                rows
+                                            );
+                                        }
+                                        WsMessage::Output { .. } => {
+                                            tracing::warn!(
+                                                "Client sent unexpected Output message"
+                                            );
+                                        }
+                                        WsMessage::Error { .. } => {
+                                            tracing::warn!("Client sent unexpected Error message");
+                                        }
+                                    }
+                                } else {
                                     tracing::warn!(
-                                        "Client sent unexpected Output message"
+                                        "Failed to parse WebSocket message: {}",
+                                        text
                                     );
-                                }
-                                WsMessage::Error { .. } => {
-                                    tracing::warn!("Client sent unexpected Error message");
                                 }
                             }
-                        } else {
-                            tracing::warn!(
-                                "Failed to parse WebSocket message: {}",
-                                text
-                            );
+                            Message::Close(_) => {
+                                tracing::info!("Client requested close");
+                                break;
+                            }
+                            Message::Ping(data) => {
+                                // Respond to ping with pong
+                                // Note: Axum handles this automatically in most cases
+                                tracing::trace!("Received ping: {} bytes", data.len());
+                            }
+                            Message::Pong(data) => {
+                                tracing::trace!("Received pong: {} bytes", data.len());
+                            }
+                            Message::Binary(data) => {
+                                tracing::warn!("Received unexpected binary data: {} bytes", data.len());
+                            }
+                        },
+                        Err(e) => {
+                            tracing::error!("WebSocket error: {}", e);
+                            break;
                         }
                     }
-                    Message::Close(_) => {
-                        tracing::info!("Client requested close");
-                        break;
-                    }
-                    Message::Ping(data) => {
-                        // Respond to ping with pong
-                        // Note: Axum handles this automatically in most cases
-                        tracing::trace!("Received ping: {} bytes", data.len());
-                    }
-                    Message::Pong(data) => {
-                        tracing::trace!("Received pong: {} bytes", data.len());
-                    }
-                    Message::Binary(data) => {
-                        tracing::warn!("Received unexpected binary data: {} bytes", data.len());
-                    }
-                },
-                Err(e) => {
-                    tracing::error!("WebSocket error: {}", e);
+                }
+                Ok(None) => {
+                    tracing::debug!("WebSocket stream ended");
+                    break;
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "Terminal {} receive timeout after {}s of inactivity",
+                        terminal_id_clone,
+                        WS_IDLE_TIMEOUT_SECS
+                    );
                     break;
                 }
             }
         }
     });
 
-    // Wait for either task to complete
+    // Wait for any task to complete
     tokio::select! {
         _ = send_task => {
             tracing::debug!("Send task completed for terminal {}", terminal_id);
         }
         _ = recv_task => {
             tracing::debug!("Receive task completed for terminal {}", terminal_id);
+        }
+        _ = heartbeat_task => {
+            tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
         }
     }
 
@@ -204,6 +295,17 @@ async fn handle_terminal_socket(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_timeout_constants() {
+        // Verify timeout constants are reasonable values
+        assert_eq!(WS_CONNECT_TIMEOUT_SECS, 30);
+        assert_eq!(WS_IDLE_TIMEOUT_SECS, 300); // 5 minutes
+        assert_eq!(WS_HEARTBEAT_INTERVAL_SECS, 30);
+
+        // Heartbeat should be more frequent than idle timeout
+        assert!(WS_HEARTBEAT_INTERVAL_SECS < WS_IDLE_TIMEOUT_SECS);
+    }
 
     #[test]
     fn test_ws_message_serialization() {
