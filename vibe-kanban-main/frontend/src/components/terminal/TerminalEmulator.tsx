@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { isWsOutputMessage, isWsErrorMessage } from '@/types/websocket';
 
 interface Props {
   terminalId: string;
@@ -120,8 +121,15 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          if (message.type === 'output' && typeof message.data === 'string') {
+
+          // Use type guards for safe message handling
+          if (isWsOutputMessage(message)) {
             terminalRef.current?.write(message.data);
+          } else if (isWsErrorMessage(message)) {
+            // Handle error message properly
+            console.error('Terminal WebSocket error message:', message.message);
+          } else {
+            console.warn('Unknown WebSocket message type:', message);
           }
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
