@@ -4,6 +4,15 @@ import { cn } from '@/lib/utils';
 import { StepIndicator } from './StepIndicator';
 import { WizardStep, WizardState, WizardConfig, getDefaultWizardConfig } from './types';
 import {
+  validateStep0Project,
+  validateStep1Basic,
+  validateStep2Tasks,
+  validateStep3Models,
+  validateStep4Terminals,
+  validateStep5Commands,
+  validateStep6Advanced,
+} from './validators';
+import {
   Step0Project,
   Step1Basic,
   Step2Tasks,
@@ -18,6 +27,16 @@ interface WorkflowWizardProps {
   onCancel: () => void;
   onError?: (error: Error) => void;
 }
+
+const stepValidators: Record<WizardStep, (config: WizardConfig) => Record<string, string>> = {
+  [WizardStep.Project]: validateStep0Project,
+  [WizardStep.Basic]: validateStep1Basic,
+  [WizardStep.Tasks]: validateStep2Tasks,
+  [WizardStep.Models]: validateStep3Models,
+  [WizardStep.Terminals]: validateStep4Terminals,
+  [WizardStep.Commands]: validateStep5Commands,
+  [WizardStep.Advanced]: validateStep6Advanced,
+};
 
 export function WorkflowWizard({
   onComplete,
@@ -37,78 +56,7 @@ export function WorkflowWizard({
 
   // Validation functions for each step
   const validateStep = (step: WizardStep, config: WizardConfig): Record<string, string> => {
-    const newErrors: Record<string, string> = {};
-
-    switch (step) {
-      case WizardStep.Project:
-        if (!config.project.workingDirectory?.trim()) {
-          newErrors.workingDirectory = '请选择项目文件夹';
-        }
-        break;
-
-      case WizardStep.Basic:
-        if (!config.basic.name?.trim()) {
-          newErrors.name = '请输入工作流名称';
-        }
-        if (config.basic.taskCount < 1) {
-          newErrors.taskCount = '任务数量必须至少为 1';
-        }
-        break;
-
-      case WizardStep.Tasks:
-        if (!config.tasks || config.tasks.length === 0) {
-          newErrors.tasks = '请至少添加一个任务';
-        } else {
-          config.tasks.forEach((task, index) => {
-            if (!task.name?.trim()) {
-              newErrors[`task-${index}-name`] = '请输入任务名称';
-            }
-            if (!task.description?.trim()) {
-              newErrors[`task-${index}-description`] = '请输入任务描述';
-            }
-          });
-        }
-        break;
-
-      case WizardStep.Models:
-        if (config.models.length === 0) {
-          newErrors.models = '请至少添加一个模型配置';
-        }
-        break;
-
-      case WizardStep.Terminals:
-        if (!config.terminals || config.terminals.length === 0) {
-          newErrors.terminals = '请至少添加一个终端配置';
-        } else {
-          config.terminals.forEach((terminal, index) => {
-            if (!terminal.cliTypeId?.trim()) {
-              newErrors[`terminal-${index}-cli`] = '请选择 CLI 类型';
-            }
-            if (!terminal.modelConfigId?.trim()) {
-              newErrors[`terminal-${index}-model`] = '请选择模型配置';
-            }
-          });
-        }
-        break;
-
-      case WizardStep.Commands:
-        // Commands step is optional, no validation required
-        break;
-
-      case WizardStep.Advanced:
-        if (!config.advanced.orchestrator.modelConfigId?.trim()) {
-          newErrors.orchestratorModel = '请选择主 Agent 模型';
-        }
-        if (!config.advanced.mergeTerminal.cliTypeId?.trim()) {
-          newErrors.mergeCli = '请选择合并终端 CLI 类型';
-        }
-        if (!config.advanced.mergeTerminal.modelConfigId?.trim()) {
-          newErrors.mergeModel = '请选择合并终端模型';
-        }
-        break;
-    }
-
-    return newErrors;
+    return stepValidators[step](config);
   };
 
   const handleNext = () => {
