@@ -3,16 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { StepIndicator } from './StepIndicator';
 import { WizardStep, WizardConfig, getDefaultWizardConfig } from './types';
-import {
-  validateStep0Project,
-  validateStep1Basic,
-  validateStep2Tasks,
-  validateStep3Models,
-  validateStep4Terminals,
-  validateStep5Commands,
-  validateStep6Advanced,
-} from './validators';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
+import { useWizardValidation } from './hooks/useWizardValidation';
 import {
   Step0Project,
   Step1Basic,
@@ -29,16 +21,6 @@ interface WorkflowWizardProps {
   onError?: (error: Error) => void;
 }
 
-const stepValidators: Record<WizardStep, (config: WizardConfig) => Record<string, string>> = {
-  [WizardStep.Project]: validateStep0Project,
-  [WizardStep.Basic]: validateStep1Basic,
-  [WizardStep.Tasks]: validateStep2Tasks,
-  [WizardStep.Models]: validateStep3Models,
-  [WizardStep.Terminals]: validateStep4Terminals,
-  [WizardStep.Commands]: validateStep5Commands,
-  [WizardStep.Advanced]: validateStep6Advanced,
-};
-
 export function WorkflowWizard({
   onComplete,
   onCancel,
@@ -47,29 +29,22 @@ export function WorkflowWizard({
   const [state, setState] = useState<{
     config: WizardConfig;
     isSubmitting: boolean;
-    errors: Record<string, string>;
   }>({
     config: getDefaultWizardConfig(),
     isSubmitting: false,
-    errors: {},
   });
   const navigation = useWizardNavigation();
   const [completedSteps, setCompletedSteps] = useState<WizardStep[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { config, isSubmitting, errors } = state;
+  const { config, isSubmitting } = state;
   const { currentStep } = navigation;
-
-  // Validation functions for each step
-  const validateStep = (step: WizardStep, config: WizardConfig): Record<string, string> => {
-    return stepValidators[step](config);
-  };
+  const validation = useWizardValidation(currentStep);
+  const { errors } = validation;
 
   const handleNext = () => {
-    const newErrors = validateStep(currentStep, config);
-
+    const newErrors = validation.validate(config);
     if (Object.keys(newErrors).length > 0) {
-      setState({ ...state, errors: newErrors });
       return;
     }
 
@@ -83,25 +58,23 @@ export function WorkflowWizard({
     if (navigation.canGoNext()) {
       navigation.next();
     }
-    setState({ ...state, errors: {} });
+    validation.clearErrors();
   };
 
   const handleBack = () => {
     if (navigation.canGoPrevious()) {
       navigation.previous();
-      setState({ ...state, errors: {} });
+      validation.clearErrors();
     }
   };
 
   const handleSubmit = async () => {
-    const newErrors = validateStep(currentStep, config);
-
+    const newErrors = validation.validate(config);
     if (Object.keys(newErrors).length > 0) {
-      setState({ ...state, errors: newErrors });
       return;
     }
 
-    setState({ ...state, isSubmitting: true, errors: {} });
+    setState({ ...state, isSubmitting: true });
     setSubmitError(null);
 
     try {
