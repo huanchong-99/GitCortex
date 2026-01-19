@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { StepIndicator } from './StepIndicator';
-import { WizardStep, WizardState, WizardConfig, getDefaultWizardConfig } from './types';
+import { WizardStep, WizardConfig, getDefaultWizardConfig } from './types';
 import {
   validateStep0Project,
   validateStep1Basic,
@@ -12,6 +12,7 @@ import {
   validateStep5Commands,
   validateStep6Advanced,
 } from './validators';
+import { useWizardNavigation } from './hooks/useWizardNavigation';
 import {
   Step0Project,
   Step1Basic,
@@ -43,16 +44,21 @@ export function WorkflowWizard({
   onCancel,
   onError,
 }: WorkflowWizardProps) {
-  const [state, setState] = useState<WizardState>({
-    currentStep: WizardStep.Project,
+  const [state, setState] = useState<{
+    config: WizardConfig;
+    isSubmitting: boolean;
+    errors: Record<string, string>;
+  }>({
     config: getDefaultWizardConfig(),
     isSubmitting: false,
     errors: {},
   });
+  const navigation = useWizardNavigation();
   const [completedSteps, setCompletedSteps] = useState<WizardStep[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { currentStep, config, isSubmitting, errors } = state;
+  const { config, isSubmitting, errors } = state;
+  const { currentStep } = navigation;
 
   // Validation functions for each step
   const validateStep = (step: WizardStep, config: WizardConfig): Record<string, string> => {
@@ -74,22 +80,16 @@ export function WorkflowWizard({
     }
     setCompletedSteps(newCompletedSteps);
 
-    if (currentStep < WizardStep.Advanced) {
-      setState({
-        ...state,
-        currentStep: currentStep + 1,
-        errors: {},
-      });
+    if (navigation.canGoNext()) {
+      navigation.next();
     }
+    setState({ ...state, errors: {} });
   };
 
   const handleBack = () => {
-    if (currentStep > WizardStep.Project) {
-      setState({
-        ...state,
-        currentStep: currentStep - 1,
-        errors: {},
-      });
+    if (navigation.canGoPrevious()) {
+      navigation.previous();
+      setState({ ...state, errors: {} });
     }
   };
 
