@@ -158,3 +158,29 @@ impl DBService {
         Ok(pool)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::Row;
+
+    #[tokio::test]
+    async fn workflow_project_created_index_exists() -> Result<(), sqlx::Error> {
+        let pool = SqlitePool::connect("sqlite::memory:").await?;
+        run_migrations(&pool).await?;
+
+        let index_names: Vec<String> = sqlx::query("PRAGMA index_list('workflow')")
+            .fetch_all(&pool)
+            .await?
+            .iter()
+            .map(|row| row.get::<String, _>("name"))
+            .collect();
+
+        assert!(
+            index_names.contains(&"idx_workflow_project_created".to_string()),
+            "Expected idx_workflow_project_created in workflow indexes: {index_names:?}"
+        );
+
+        Ok(())
+    }
+}

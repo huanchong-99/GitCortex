@@ -24,6 +24,7 @@ base64 = "0.21"
 [dev-dependencies]
 serial_test = "0.3.0"
 criterion = "0.5"
+tokio = { workspace = true }
 
 [[bench]]
 name = "workflow_bench"
