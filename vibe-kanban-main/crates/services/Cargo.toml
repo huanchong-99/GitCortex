@@ -41,6 +41,7 @@ futures-util = "0.3"
 json-patch = "2.0"
 backon = "1.5.1"
 base64 = "0.22"
+governor = { version = "0.8", features = ["std"] }
 thiserror = { workspace = true }
 futures = "0.3.31"
 tokio-stream = "0.1.17"

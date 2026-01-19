@@ -7,7 +7,8 @@ mod tests {
     use crate::services::orchestrator::{
         BusMessage, CommitMetadata, LLMMessage, MessageBus, MockLLMClient, OrchestratorAgent,
         OrchestratorConfig, OrchestratorInstruction, OrchestratorRunState, OrchestratorState,
-        TerminalCompletionEvent, TerminalCompletionStatus, create_llm_client,
+        TerminalCompletionEvent, TerminalCompletionStatus, constants::DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+        create_llm_client,
     };
     use std::sync::Arc;
     use tokio::sync::RwLock;
@@ -1230,6 +1231,7 @@ mod tests {
             max_retries: 3,
             timeout_secs: 120,
             retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
             max_conversation_history: 50,
             system_prompt: String::new(),
         };
@@ -1299,6 +1301,7 @@ mod tests {
             max_retries: 3,
             timeout_secs: 120,
             retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
             max_conversation_history: 50,
             system_prompt: String::new(),
         };

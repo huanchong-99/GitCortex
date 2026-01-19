@@ -1,9 +1,16 @@
 //! LLM 客户端抽象
 
-use std::time::Duration;
 use std::future::Future;
+use std::num::NonZeroU32;
+use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
+use governor::{
+    clock::DefaultClock,
+    state::{InMemoryState, NotKeyed},
+    Quota, RateLimiter,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
@@ -54,6 +61,38 @@ where
     }
 
     Err(last_error.unwrap())
+}
+
+pub struct RateLimitedClient<T> {
+    inner: T,
+    rate_limiter: Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
+}
+
+impl<T> RateLimitedClient<T> {
+    pub fn new(inner: T, requests_per_second: u32) -> anyhow::Result<Self> {
+        let rate = NonZeroU32::new(requests_per_second)
+            .ok_or_else(|| anyhow::anyhow!("Rate limit must be greater than 0"))?;
+        let quota = Quota::per_second(rate);
+        let rate_limiter = Arc::new(RateLimiter::direct(quota));
+
+        Ok(Self {
+            inner,
+            rate_limiter,
+        })
+    }
+}
+
+#[async_trait]
+impl<T> LLMClient for RateLimitedClient<T>
+where
+    T: LLMClient,
+{
+    async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
+        self.rate_limiter
+            .check()
+            .map_err(|_| anyhow::anyhow!("rate limit exceeded"))?;
+        self.inner.chat(messages).await
+    }
 }
 
 pub struct OpenAICompatibleClient {
@@ -268,5 +307,47 @@ pub fn build_terminal_completion_prompt(
 
 pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
     config.validate().map_err(|e| anyhow::anyhow!(e))?;
-    Ok(Box::new(OpenAICompatibleClient::new(config)))
+    let client = OpenAICompatibleClient::new(config);
+    let client = RateLimitedClient::new(client, config.rate_limit_requests_per_second)?;
+    Ok(Box::new(client))
+}
+
+#[cfg(test)]
+mod rate_limit_tests {
+    use super::*;
+    use tokio::time::sleep;
+
+    fn test_messages() -> Vec<LLMMessage> {
+        vec![LLMMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+        }]
+    }
+
+    #[tokio::test]
+    async fn rate_limiter_blocks_excessive_requests() {
+        let client = RateLimitedClient::new(MockLLMClient::new(), 2).expect("rate limit");
+        let messages = test_messages();
+
+        assert!(client.chat(messages.clone()).await.is_ok());
+        assert!(client.chat(messages.clone()).await.is_ok());
+
+        let result = client.chat(messages.clone()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("rate limit"));
+    }
+
+    #[tokio::test]
+    async fn rate_limiter_refills_after_duration() {
+        let client = RateLimitedClient::new(MockLLMClient::new(), 2).expect("rate limit");
+        let messages = test_messages();
+
+        client.chat(messages.clone()).await.expect("first");
+        client.chat(messages.clone()).await.expect("second");
+
+        sleep(Duration::from_millis(1100)).await;
+
+        let result = client.chat(messages.clone()).await;
+        assert!(result.is_ok());
+    }
 }

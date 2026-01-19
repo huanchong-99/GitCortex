@@ -31,6 +31,10 @@ pub struct OrchestratorConfig {
     #[serde(default = "default_retry_delay")]
     pub retry_delay_ms: u64,
 
+    /// 每秒请求数限制
+    #[serde(default = "default_rate_limit_requests_per_second")]
+    pub rate_limit_requests_per_second: u32,
+
     /// 最大对话历史长度
     #[serde(default = "default_max_history")]
     pub max_conversation_history: usize,
@@ -50,6 +54,10 @@ fn default_timeout() -> u64 {
 
 fn default_retry_delay() -> u64 {
     DEFAULT_RETRY_DELAY_MS
+}
+
+fn default_rate_limit_requests_per_second() -> u32 {
+    DEFAULT_LLM_RATE_LIMIT_PER_SECOND
 }
 
 fn default_max_history() -> usize {
@@ -88,6 +96,7 @@ impl Default for OrchestratorConfig {
             max_retries: default_max_retries(),
             timeout_secs: default_timeout(),
             retry_delay_ms: default_retry_delay(),
+            rate_limit_requests_per_second: default_rate_limit_requests_per_second(),
             max_conversation_history: default_max_history(),
             system_prompt: default_system_prompt(),
         }
@@ -121,6 +130,9 @@ impl OrchestratorConfig {
         }
         if self.model.is_empty() {
             return Err("Model is required".to_string());
+        }
+        if self.rate_limit_requests_per_second == 0 {
+            return Err("Rate limit must be greater than 0".to_string());
         }
         Ok(())
     }

@@ -18,6 +18,7 @@ pub const DEFAULT_MAX_CONVERSATION_HISTORY: usize = 50;
 pub const DEFAULT_LLM_TIMEOUT_SECS: u64 = 120;
 pub const DEFAULT_MAX_RETRIES: u32 = 3;
 pub const DEFAULT_RETRY_DELAY_MS: u64 = 1000;
+pub const DEFAULT_LLM_RATE_LIMIT_PER_SECOND: u32 = 10;
 
 /// Terminal status values
 pub const TERMINAL_STATUS_PENDING: &str = "pending";
