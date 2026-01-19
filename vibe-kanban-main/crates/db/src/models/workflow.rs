@@ -733,9 +733,17 @@ impl WorkflowCommand {
 #[cfg(test)]
 mod encryption_tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_api_key_encryption_decryption() {
+        // Clean up first to ensure no pollution
+        unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY"); }
+
+        // Double-check it's really gone
+        assert!(std::env::var("GITCORTEX_ENCRYPTION_KEY").is_err(), "Environment variable must not exist before starting test");
+
         // Setup encryption key
         unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012"); }
 
@@ -778,16 +786,19 @@ mod encryption_tests {
         // Test decryption
         let decrypted_key = workflow.get_api_key().unwrap().unwrap();
         assert_eq!(decrypted_key, original_key);
+
+        // Clean up environment variable to fix test isolation
+        unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY"); }
     }
 
     #[test]
+    #[serial]
     fn test_api_key_encryption_missing_env_key() {
-        // Clear environment variable and ensure it's not set
-        unsafe {
-            std::env::remove_var("GITCORTEX_ENCRYPTION_KEY");
-            // Double-check it's really gone
-            assert!(std::env::var("GITCORTEX_ENCRYPTION_KEY").is_err());
-        }
+        // Clear environment variable first
+        unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY"); }
+
+        // Double-check it's really gone
+        assert!(std::env::var("GITCORTEX_ENCRYPTION_KEY").is_err());
 
         let mut workflow = Workflow {
             id: "test-workflow".to_string(),
@@ -821,7 +832,11 @@ mod encryption_tests {
     }
 
     #[test]
+    #[serial]
     fn test_api_key_encryption_invalid_key_length() {
+        // Clean up first to ensure no pollution
+        unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY"); }
+
         // Set invalid key (too short)
         unsafe {
             std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "short");
@@ -857,9 +872,13 @@ mod encryption_tests {
         let result = workflow.set_api_key("sk-test");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("32 bytes"));
+
+        // Clean up environment variable to fix test isolation
+        unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY"); }
     }
 
     #[test]
+    #[serial]
     fn test_api_key_none_when_not_set() {
         unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012"); }
 
@@ -893,6 +912,7 @@ mod encryption_tests {
     }
 
     #[test]
+    #[serial]
     fn test_api_key_serialization_skips_encrypted() {
         unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012"); }
 
@@ -929,5 +949,9 @@ mod encryption_tests {
         // Encrypted field should not be in JSON (due to #[serde(skip_serializing)])
         assert!(!json.contains("orchestrator_api_key"));
         assert!(!json.contains("sk-test"));
+
+        // Clean up environment variable to fix test isolation
+        unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY"); }
     }
 }
+
