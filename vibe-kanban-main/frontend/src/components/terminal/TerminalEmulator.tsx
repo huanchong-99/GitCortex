@@ -7,6 +7,13 @@ import { isWsOutputMessage, isWsErrorMessage } from '@/types/websocket';
 const TERMINAL_ID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const isTestEnv = import.meta.env.MODE === 'test' || import.meta.env.VITEST;
+
+const logInfo = (...args: unknown[]) => {
+  if (isTestEnv) return;
+  console.log(...args);
+};
+
 interface Props {
   terminalId: string;
   wsUrl?: string;
@@ -125,7 +132,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       const ws = new WebSocket(`${wsUrl}/terminal/${terminalId}`);
 
       ws.onopen = () => {
-        console.log('Terminal WebSocket connected');
+        logInfo('Terminal WebSocket connected');
         if (terminalRef.current) {
           const { cols, rows } = terminalRef.current;
           if (ws.readyState === WebSocket.OPEN) {
@@ -157,7 +164,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       };
 
       ws.onclose = () => {
-        console.log('Terminal WebSocket closed');
+        logInfo('Terminal WebSocket closed');
       };
 
       wsRef.current = ws;

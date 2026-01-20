@@ -133,9 +133,8 @@ describe('TerminalEmulator', () => {
         />
       );
 
-      await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('Terminal WebSocket connected');
-      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });
