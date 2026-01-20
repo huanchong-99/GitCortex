@@ -8,10 +8,10 @@ describe('Step3Models', () => {
   const mockOnUpdate = vi.fn();
   const mockConfirm = vi.fn<[string], boolean>();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockOnUpdate.mockClear();
     vi.spyOn(globalThis, 'confirm').mockImplementation(mockConfirm);
-    void setTestLanguage();
+    await setTestLanguage();
   });
 
   afterEach(() => {
@@ -71,7 +71,8 @@ describe('Step3Models', () => {
     expect(screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') })).toBeInTheDocument();
   });
 
-  it('should open dialog when add model button is clicked', () => {
+  it('should open dialog when add model button is clicked', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     renderWithI18n(
       <Step3Models
         config={defaultConfig}
@@ -84,6 +85,10 @@ describe('Step3Models', () => {
 
     expect(screen.getByRole('heading', { name: i18n.t('workflow:step3.dialog.addTitle') })).toBeInTheDocument();
     expect(screen.getByLabelText(i18n.t('workflow:step3.fields.displayName.label'))).toBeInTheDocument();
+    await waitFor(() => {
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+    warnSpy.mockRestore();
 
   });
 

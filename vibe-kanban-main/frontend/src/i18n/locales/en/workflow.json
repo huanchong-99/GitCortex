@@ -104,7 +104,8 @@
     "deleteLabel": "Delete",
     "dialog": {
       "addTitle": "Add model",
-      "editTitle": "Edit model"
+      "editTitle": "Edit model",
+      "description": "Provide model details and verify access."
     },
     "fields": {
       "displayName": {

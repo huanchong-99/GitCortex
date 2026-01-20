@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '../../ui-new/primitives/Dialog';
 import { IconButton } from '../../ui-new/primitives/IconButton';
 import { cn } from '@/lib/utils';
@@ -292,6 +293,9 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             <DialogTitle>
               {editingModel ? t('step3.dialog.editTitle') : t('step3.dialog.addTitle')}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              {t('step3.dialog.description')}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-base py-base">

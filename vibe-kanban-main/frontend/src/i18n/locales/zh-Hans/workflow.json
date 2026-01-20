@@ -104,7 +104,8 @@
     "deleteLabel": "删除",
     "dialog": {
       "addTitle": "添加模型",
-      "editTitle": "编辑模型"
+      "editTitle": "编辑模型",
+      "description": "填写模型信息并验证连接。"
     },
     "fields": {
       "displayName": {
