@@ -29,7 +29,11 @@ const createUseWorkflowResult = (
 const wrapper = ({ children }: { children: ReactNode }) => (
   <I18nextProvider i18n={i18n}>
     <QueryClientProvider client={new QueryClient()}>
-      <BrowserRouter>{children}</BrowserRouter>
+      <BrowserRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        {children}
+      </BrowserRouter>
     </QueryClientProvider>
   </I18nextProvider>
 );
@@ -60,16 +64,19 @@ const baseWorkflow: Workflow = {
 };
 
 describe('WorkflowDebugPage', () => {
-  beforeEach(() => {
-    void setTestLanguage();
+  beforeEach(async () => {
+    await setTestLanguage();
   });
 
   describe('Loading State', () => {
     it('should show loading message when data is loading', () => {
       useWorkflow.mockReturnValue(createUseWorkflowResult({ isLoading: true }));
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       render(<WorkflowDebugPage />, { wrapper });
       expect(screen.getByText(i18n.t('workflow:workflowDebug.loading'))).toBeInTheDocument();
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 
