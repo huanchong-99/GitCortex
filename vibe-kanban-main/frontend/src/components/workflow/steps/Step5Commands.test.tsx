@@ -19,45 +19,60 @@ describe('Step5Commands', () => {
     onUpdate: vi.fn(),
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockFetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([]),
     });
-    void setTestLanguage();
+    await setTestLanguage();
   });
 
   describe('Rendering', () => {
-    it('should render enable/disable radio buttons', () => {
+    it('should render enable/disable radio buttons', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       renderWithI18n(<Step5Commands {...defaultProps} />);
 
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
       expect(screen.getByText(i18n.t('workflow:step5.title'))).toBeInTheDocument();
       expect(screen.getByText(i18n.t('workflow:step5.enableLabel'))).toBeInTheDocument();
       expect(screen.getByText(i18n.t('workflow:step5.disableLabel'))).toBeInTheDocument();
+      expect(errorSpy).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
 
-    it('should show enabled radio checked when config.enabled is true', () => {
+    it('should show enabled radio checked when config.enabled is true', async () => {
       renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
       const enabledRadio = screen.getByRole('radio', {
         name: i18n.t('workflow:step5.enableLabel'),
       });
       expect(enabledRadio).toBeChecked();
     });
 
-    it('should show disabled radio checked when config.enabled is false', () => {
+    it('should show disabled radio checked when config.enabled is false', async () => {
       renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: false }} />);
 
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
       const disabledRadio = screen.getByRole('radio', {
         name: i18n.t('workflow:step5.disableLabel'),
       });
       expect(disabledRadio).toBeChecked();
     });
 
-    it('should not show command list when disabled', () => {
+    it('should not show command list when disabled', async () => {
       renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: false }} />);
 
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
       expect(
         screen.queryByText(i18n.t('workflow:step5.selectedTitle'))
       ).not.toBeInTheDocument();
@@ -112,10 +127,13 @@ describe('Step5Commands', () => {
   });
 
   describe('User Interactions', () => {
-    it('should call onUpdate when enabling commands', () => {
+    it('should call onUpdate when enabling commands', async () => {
       const onUpdate = vi.fn();
       renderWithI18n(<Step5Commands {...defaultProps} onUpdate={onUpdate} />);
 
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
       const enabledRadio = screen.getByRole('radio', {
         name: i18n.t('workflow:step5.enableLabel'),
       });
@@ -124,7 +142,7 @@ describe('Step5Commands', () => {
       expect(onUpdate).toHaveBeenCalledWith({ enabled: true });
     });
 
-    it('should call onUpdate when disabling commands', () => {
+    it('should call onUpdate when disabling commands', async () => {
       const onUpdate = vi.fn();
       renderWithI18n(
         <Step5Commands
@@ -134,6 +152,9 @@ describe('Step5Commands', () => {
         />
       );
 
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
       const disabledRadio = screen.getByRole('radio', {
         name: i18n.t('workflow:step5.disableLabel'),
       });

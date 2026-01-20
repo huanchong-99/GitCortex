@@ -71,11 +71,11 @@ describe('Step4Terminals', () => {
     },
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockOnUpdate.mockClear();
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as typeof fetch;
-    void setTestLanguage();
+    await setTestLanguage();
   });
 
   it('should render terminal configuration UI', () => {
@@ -124,7 +124,8 @@ describe('Step4Terminals', () => {
     expect(screen.getByText(i18n.t('workflow:step4.terminalCount', { count: 2 }))).toBeInTheDocument();
   });
 
-  it('should show CLI installation status', () => {
+  it('should show CLI installation status', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockFetch.mockResolvedValueOnce(
       createFetchResponse({
         'claude-code': true,
@@ -142,9 +143,14 @@ describe('Step4Terminals', () => {
       />
     );
 
-    expect(screen.getByText(i18n.t('workflow:step4.cliStatusTitle'))).toBeInTheDocument();
-    expect(screen.getByText('Claude Code')).toBeInTheDocument();
-    expect(screen.getByText('Gemini CLI')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(i18n.t('workflow:step4.cliStatusTitle'))).toBeInTheDocument();
+      expect(screen.getByText('Claude Code')).toBeInTheDocument();
+      expect(screen.getByText('Gemini CLI')).toBeInTheDocument();
+      expect(screen.getAllByText(i18n.t('workflow:step4.installGuide'))).toHaveLength(3);
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it('should show install guide links for uninstalled CLIs', async () => {
