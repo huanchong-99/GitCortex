@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
-import { handleApiResponse } from '@/lib/api';
+import { handleApiResponse, logApiError } from '@/lib/api';
 
 // ============================================================================
 // Workflow Types
@@ -209,7 +209,7 @@ export function useCreateWorkflow() {
       );
     },
     onError: (error) => {
-      console.error('Failed to create workflow:', error);
+      logApiError('Failed to create workflow:', error);
     },
   });
 }
@@ -230,7 +230,7 @@ export function useStartWorkflow() {
       });
     },
     onError: (error) => {
-      console.error('Failed to start workflow:', error);
+      logApiError('Failed to start workflow:', error);
     },
   });
 }
@@ -255,7 +255,7 @@ export function useDeleteWorkflow() {
       });
     },
     onError: (error) => {
-      console.error('Failed to delete workflow:', error);
+      logApiError('Failed to delete workflow:', error);
     },
   });
 }

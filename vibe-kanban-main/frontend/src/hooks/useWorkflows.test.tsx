@@ -235,6 +235,7 @@ describe('useCreateWorkflow', () => {
     };
 
     vi.stubGlobal('fetch', vi.fn(() => createErrorResponse('Creation failed')));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { result } = renderHook(() => useCreateWorkflow(), {
       wrapper,
@@ -243,6 +244,8 @@ describe('useCreateWorkflow', () => {
     result.current.mutate(requestData);
 
     await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });
 
