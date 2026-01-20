@@ -84,6 +84,9 @@ const resources = {
   },
 };
 
+const isTestEnv = import.meta.env.MODE === 'test' || import.meta.env.VITEST;
+const isDev = import.meta.env.DEV && !isTestEnv;
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -97,7 +100,7 @@ i18n
       default: ['en'],
     },
     defaultNS: 'common',
-    debug: import.meta.env.DEV,
+    debug: isDev,
     // Include 'zh' + Traditional Chinese locales for browser detection
     supportedLngs: [...SUPPORTED_I18N_CODES, 'zh', 'zh-TW', 'zh-HK', 'zh-MO'],
     nonExplicitSupportedLngs: true, // Accept zh -> zh-Hans mapping
@@ -118,7 +121,7 @@ i18n
   });
 
 // Debug logging in development
-if (import.meta.env.DEV) {
+if (isDev) {
   console.log('i18n initialized:', i18n.isInitialized);
   console.log('i18n language:', i18n.language);
   console.log('i18n namespaces:', i18n.options.ns);
