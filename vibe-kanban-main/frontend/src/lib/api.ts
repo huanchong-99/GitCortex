@@ -124,6 +124,13 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
   });
 };
 
+const isTestEnv = import.meta.env.MODE === 'test' || import.meta.env.VITEST;
+
+export const logApiError = (...args: unknown[]) => {
+  if (isTestEnv) return;
+  console.error(...args);
+};
+
 export type Ok<T> = { success: true; data: T };
 export type Err<E> = { success: false; error: E | undefined; message?: string };
 
@@ -183,7 +190,7 @@ export const handleApiResponse = async <T, E = T>(
       errorMessage = response.statusText || errorMessage;
     }
 
-    console.error('[API Error]', {
+    logApiError('[API Error]', {
       message: errorMessage,
       status: response.status,
       response,
@@ -202,7 +209,7 @@ export const handleApiResponse = async <T, E = T>(
   if (!result.success) {
     // Check for error_data first (structured errors), then fall back to message
     if (result.error_data) {
-      console.error('[API Error with data]', {
+      logApiError('[API Error with data]', {
         error_data: result.error_data,
         message: result.message,
         status: response.status,
@@ -219,7 +226,7 @@ export const handleApiResponse = async <T, E = T>(
       );
     }
 
-    console.error('[API Error]', {
+    logApiError('[API Error]', {
       message: result.message || 'API request failed',
       status: response.status,
       response,
@@ -1014,7 +1021,7 @@ export const mcpServersApi = {
     });
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('[API Error] Failed to save MCP servers', {
+      logApiError('[API Error] Failed to save MCP servers', {
         message: errorData.message,
         status: response.status,
         response,
