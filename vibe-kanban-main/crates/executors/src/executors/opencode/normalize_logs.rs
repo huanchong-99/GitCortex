@@ -109,7 +109,7 @@ struct StreamingText {
     content: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum UpdateMode {
     Append,
     Set,
@@ -178,19 +178,19 @@ impl LogState {
             SdkEvent::SessionStatus(event) => {
                 self.handle_session_status(event.status);
             }
-            SdkEvent::SessionIdle => {}
+            SdkEvent::SessionIdle
+            | SdkEvent::PermissionReplied
+            | SdkEvent::MessageRemoved
+            | SdkEvent::MessagePartRemoved
+            | SdkEvent::CommandExecuted
+            | SdkEvent::SessionDiff
+            | SdkEvent::TuiSessionSelect => {}
             SdkEvent::SessionCompacted => {
                 self.add_normalized_entry(system_message("Session compacted".to_string()));
             }
             SdkEvent::PermissionAsked(event) => {
                 self.handle_permission_asked(event, worktree_path, msg_store);
             }
-            SdkEvent::PermissionReplied
-            | SdkEvent::MessageRemoved
-            | SdkEvent::MessagePartRemoved
-            | SdkEvent::CommandExecuted
-            | SdkEvent::SessionDiff
-            | SdkEvent::TuiSessionSelect => {}
             SdkEvent::SessionError(event) => {
                 let (error_type, message) = match event.error {
                     Some(err) if err.kind() == "ProviderAuthError" => (
@@ -357,7 +357,7 @@ impl LogState {
                 );
             }
             Part::Tool(part) => {
-                let part = *part;
+                let part = part.as_ref();
                 if part.call_id.trim().is_empty() {
                     tracing::debug!(
                         "Skipping tool part with empty call_id for message_id {}",
@@ -399,8 +399,7 @@ impl LogState {
             let tool_name = self
                 .tool_states
                 .get(tool_call_id)
-                .map(|t| t.tool_name().to_string())
-                .unwrap_or_else(|| "tool".to_string());
+                .map_or_else(|| "tool".to_string(), |t| t.tool_name().to_string());
 
             let idx = self.entry_index.next();
             self.add_normalized_entry_with_index(
@@ -680,7 +679,7 @@ impl ToolCallState {
         }
     }
 
-    fn update_from_part(&mut self, part: ToolPart) {
+    fn update_from_part(&mut self, part: &ToolPart) {
         self.set_tool_name(part.tool.clone());
 
         let (input, output, metadata, error) = match &part.state {
@@ -751,7 +750,10 @@ impl ToolCallState {
                     *err = Some(e);
                 }
                 if let Some(m) = metadata {
-                    *exit_code = m.get("exit").and_then(Value::as_i64).map(|c| c as i32);
+                    *exit_code = m
+                        .get("exit")
+                        .and_then(Value::as_i64)
+                        .and_then(|c| i32::try_from(c).ok());
                 }
             }
             ToolData::Read { file_path } => {
@@ -1022,8 +1024,7 @@ impl ToolCallState {
     fn build_content(&self, action_type: &ActionType) -> String {
         let content = match action_type {
             ActionType::CommandRun { command, .. } => command.clone(),
-            ActionType::FileRead { path } => path.clone(),
-            ActionType::FileEdit { path, .. } => path.clone(),
+            ActionType::FileRead { path } | ActionType::FileEdit { path, .. } => path.clone(),
             ActionType::Search { query } => query.clone(),
             ActionType::WebFetch { url } => url.clone(),
             ActionType::TodoManagement { .. } => "TODO list updated".to_string(),
@@ -1032,10 +1033,10 @@ impl ToolCallState {
         .trim()
         .to_string();
 
-        if !content.is_empty() {
-            content
-        } else {
+        if content.is_empty() {
             self.title.as_deref().unwrap_or(&self.tool_name).to_string()
+        } else {
+            content
         }
     }
 

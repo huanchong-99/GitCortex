@@ -2,7 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::constants::*;
+use super::constants::{
+    DEFAULT_LLM_RATE_LIMIT_PER_SECOND, DEFAULT_LLM_TIMEOUT_SECS,
+    DEFAULT_MAX_CONVERSATION_HISTORY, DEFAULT_MAX_RETRIES, DEFAULT_RETRY_DELAY_MS,
+};
 
 /// Orchestrator 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

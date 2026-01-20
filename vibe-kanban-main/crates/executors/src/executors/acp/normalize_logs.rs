@@ -1,9 +1,11 @@
 use std::{
     collections::HashMap,
+    fmt::Write,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock},
+    sync::Arc,
 };
 
+use once_cell::sync::Lazy;
 use agent_client_protocol::{self as acp, SessionNotification};
 use futures::StreamExt;
 use regex::Regex;
@@ -22,6 +24,7 @@ use crate::{
     },
 };
 
+#[allow(clippy::items_after_statements)]
 pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
     // stderr normalization
     let entry_index = EntryIndexProvider::start_from(&msg_store);
@@ -133,11 +136,11 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                 content: e.content.clone(),
                                 status: serde_json::to_value(&e.status)
                                     .ok()
-                                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                                    .and_then(|v| v.as_str().map(ToString::to_string))
                                     .unwrap_or_else(|| "unknown".to_string()),
                                 priority: serde_json::to_value(&e.priority)
                                     .ok()
-                                    .and_then(|v| v.as_str().map(|s| s.to_string())),
+                                    .and_then(|v| v.as_str().map(ToString::to_string)),
                             })
                             .collect();
 
@@ -160,7 +163,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     AcpEvent::AvailableCommands(cmds) => {
                         let mut body = String::from("Available commands:\n");
                         for c in &cmds {
-                            body.push_str(&format!("- {}\n", c.name));
+                            let _ = writeln!(body, "- {}", c.name);
                         }
                         let idx = entry_index.next();
                         let entry = NormalizedEntry {
@@ -207,7 +210,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             update.fields.title = tool_states
                                 .get(&update.tool_call_id.0.to_string())
                                 .map(|s| s.title.clone())
-                                .or_else(|| Some("".to_string()));
+                                .or_else(|| Some(String::new()));
                         }
                         tracing::trace!("Got tool call update: {:?}", update);
                         if let Ok(tc) = agent_client_protocol::ToolCall::try_from(update.clone()) {
@@ -280,7 +283,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 entry_type: NormalizedEntryType::ToolUse {
                     tool_name: tool_data.title.clone(),
                     action_type: action,
-                    status: convert_tool_status(&tool_data.status),
+                    status: convert_tool_status(tool_data.status),
                 },
                 content: get_tool_content(tool_data),
                 metadata: serde_json::to_value(ToolCallMetadata {
@@ -379,8 +382,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                         .raw_input
                         .as_ref()
                         .and_then(|v| serde_json::from_value::<SearchArgs>(v.clone()).ok())
-                        .map(|a| a.query)
-                        .unwrap_or_else(|| tc.title.clone());
+                        .map_or_else(|| tc.title.clone(), |a| a.query);
                     ActionType::Search { query }
                 }
                 agent_client_protocol::ToolKind::Fetch => {
@@ -469,14 +471,14 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
             for c in &tc.content {
                 if let agent_client_protocol::ToolCallContent::Diff(diff) = c {
                     let path = diff.path.to_string_lossy().to_string();
-                    let rel = if !path.is_empty() {
-                        path
-                    } else {
+                    let rel = if path.is_empty() {
                         tc.path
                             .clone()
                             .unwrap_or_default()
                             .to_string_lossy()
                             .to_string()
+                    } else {
+                        path
                     };
                     let old_text = diff.old_text.as_deref().unwrap_or("");
                     if old_text.is_empty() {
@@ -545,8 +547,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     } else {
                         tc.path
                             .as_ref()
-                            .map(|p| p.display().to_string())
-                            .unwrap_or_else(|| tc.title.clone())
+                            .map_or_else(|| tc.title.clone(), |p| p.display().to_string())
                     }
                 }
                 _ => tc.title.clone(),
@@ -569,8 +570,8 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
 
         fn extract_url_from_text(text: &str) -> Option<String> {
             // Simple URL extractor
-            static URL_RE: LazyLock<Regex> =
-                LazyLock::new(|| Regex::new(r#"https?://[^\s"')]+"#).expect("valid regex"));
+            static URL_RE: Lazy<Regex> =
+                Lazy::new(|| Regex::new(r#"https?://[^\s"')]+"#).expect("valid regex"));
             URL_RE.find(text).map(|m| m.as_str().to_string())
         }
 
@@ -591,7 +592,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
             if out.is_empty() { None } else { Some(out) }
         }
 
-        fn convert_tool_status(status: &agent_client_protocol::ToolCallStatus) -> LogToolStatus {
+        fn convert_tool_status(
+            status: agent_client_protocol::ToolCallStatus,
+        ) -> LogToolStatus {
             match status {
                 agent_client_protocol::ToolCallStatus::Pending
                 | agent_client_protocol::ToolCallStatus::InProgress => LogToolStatus::Created,
@@ -621,13 +624,13 @@ struct PartialToolCallData {
 impl PartialToolCallData {
     fn extend(&mut self, tc: &agent_client_protocol::ToolCall, worktree_path: &Path) {
         self.id = tc.tool_call_id.clone();
-        if tc.kind != Default::default() {
+        if tc.kind != agent_client_protocol::ToolKind::default() {
             self.kind = tc.kind;
         }
         if !tc.title.is_empty() {
-            self.title = tc.title.clone();
+            self.title.clone_from(&tc.title);
         }
-        if tc.status != Default::default() {
+        if tc.status != agent_client_protocol::ToolCallStatus::default() {
             self.status = tc.status;
         }
         if !tc.locations.is_empty() {
@@ -639,13 +642,13 @@ impl PartialToolCallData {
             });
         }
         if !tc.content.is_empty() {
-            self.content = tc.content.clone();
+            self.content.clone_from(&tc.content);
         }
         if tc.raw_input.is_some() {
-            self.raw_input = tc.raw_input.clone();
+            self.raw_input.clone_from(&tc.raw_input);
         }
         if tc.raw_output.is_some() {
-            self.raw_output = tc.raw_output.clone();
+            self.raw_output.clone_from(&tc.raw_output);
         }
     }
 }
@@ -657,7 +660,7 @@ impl Default for PartialToolCallData {
             index: 0,
             kind: agent_client_protocol::ToolKind::default(),
             title: String::new(),
-            status: Default::default(),
+            status: agent_client_protocol::ToolCallStatus::default(),
             path: None,
             content: Vec::new(),
             raw_input: None,

@@ -53,7 +53,7 @@ impl OAuthCredentials {
     }
 
     pub async fn load(&self) -> std::io::Result<()> {
-        let creds = self.backend.load().await?.map(Credentials::from);
+        let creds = self.backend.load()?.map(Credentials::from);
         *self.inner.write().await = creds;
         Ok(())
     }
@@ -62,13 +62,13 @@ impl OAuthCredentials {
         let stored = StoredCredentials {
             refresh_token: creds.refresh_token.clone(),
         };
-        self.backend.save(&stored).await?;
+        self.backend.save(&stored)?;
         *self.inner.write().await = Some(creds.clone());
         Ok(())
     }
 
     pub async fn clear(&self) -> std::io::Result<()> {
-        self.backend.clear().await?;
+        self.backend.clear()?;
         *self.inner.write().await = None;
         Ok(())
     }
@@ -79,9 +79,9 @@ impl OAuthCredentials {
 }
 
 trait StoreBackend {
-    async fn load(&self) -> std::io::Result<Option<StoredCredentials>>;
-    async fn save(&self, creds: &StoredCredentials) -> std::io::Result<()>;
-    async fn clear(&self) -> std::io::Result<()>;
+    fn load(&self) -> std::io::Result<Option<StoredCredentials>>;
+    fn save(&self, creds: &StoredCredentials) -> std::io::Result<()>;
+    fn clear(&self) -> std::io::Result<()>;
 }
 
 enum Backend {
@@ -116,27 +116,27 @@ impl Backend {
 }
 
 impl StoreBackend for Backend {
-    async fn load(&self) -> std::io::Result<Option<StoredCredentials>> {
+    fn load(&self) -> std::io::Result<Option<StoredCredentials>> {
         match self {
-            Backend::File(b) => b.load().await,
+            Backend::File(b) => b.load(),
             #[cfg(target_os = "macos")]
-            Backend::Keychain(b) => b.load().await,
+            Backend::Keychain(b) => b.load(),
         }
     }
 
-    async fn save(&self, creds: &StoredCredentials) -> std::io::Result<()> {
+    fn save(&self, creds: &StoredCredentials) -> std::io::Result<()> {
         match self {
-            Backend::File(b) => b.save(creds).await,
+            Backend::File(b) => b.save(creds),
             #[cfg(target_os = "macos")]
-            Backend::Keychain(b) => b.save(creds).await,
+            Backend::Keychain(b) => b.save(creds),
         }
     }
 
-    async fn clear(&self) -> std::io::Result<()> {
+    fn clear(&self) -> std::io::Result<()> {
         match self {
-            Backend::File(b) => b.clear().await,
+            Backend::File(b) => b.clear(),
             #[cfg(target_os = "macos")]
-            Backend::Keychain(b) => b.clear().await,
+            Backend::Keychain(b) => b.clear(),
         }
     }
 }
@@ -146,7 +146,7 @@ struct FileBackend {
 }
 
 impl FileBackend {
-    async fn load(&self) -> std::io::Result<Option<StoredCredentials>> {
+    fn load(&self) -> std::io::Result<Option<StoredCredentials>> {
         if !self.path.exists() {
             return Ok(None);
         }
@@ -167,7 +167,7 @@ impl FileBackend {
         serde_json::from_slice::<StoredCredentials>(bytes)
     }
 
-    async fn save(&self, creds: &StoredCredentials) -> std::io::Result<()> {
+    fn save(&self, creds: &StoredCredentials) -> std::io::Result<()> {
         let tmp = self.path.with_extension("tmp");
 
         let file = {
@@ -191,9 +191,12 @@ impl FileBackend {
         Ok(())
     }
 
-    async fn clear(&self) -> std::io::Result<()> {
-        let _ = std::fs::remove_file(&self.path);
-        Ok(())
+    fn clear(&self) -> std::io::Result<()> {
+        match std::fs::remove_file(&self.path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -206,7 +209,7 @@ impl KeychainBackend {
     const ACCOUNT_NAME: &'static str = "default";
     const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
 
-    async fn load(&self) -> std::io::Result<Option<StoredCredentials>> {
+    fn load(&self) -> std::io::Result<Option<StoredCredentials>> {
         use security_framework::passwords::get_generic_password;
 
         match get_generic_password(Self::SERVICE_NAME, Self::ACCOUNT_NAME) {
@@ -225,7 +228,7 @@ impl KeychainBackend {
         }
     }
 
-    async fn save(&self, creds: &StoredCredentials) -> std::io::Result<()> {
+    fn save(&self, creds: &StoredCredentials) -> std::io::Result<()> {
         use security_framework::passwords::set_generic_password;
 
         let bytes = serde_json::to_vec_pretty(creds).map_err(std::io::Error::other)?;
@@ -233,7 +236,7 @@ impl KeychainBackend {
             .map_err(std::io::Error::other)
     }
 
-    async fn clear(&self) -> std::io::Result<()> {
+    fn clear(&self) -> std::io::Result<()> {
         use security_framework::passwords::delete_generic_password;
 
         match delete_generic_password(Self::SERVICE_NAME, Self::ACCOUNT_NAME) {

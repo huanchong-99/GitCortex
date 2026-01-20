@@ -5,6 +5,7 @@ pub use v2::{EditorConfig, EditorType, GitHubConfig, NotificationConfig, SoundFi
 
 use crate::services::config::versions::v2;
 
+#[allow(clippy::struct_excessive_bools, clippy::struct_field_names)]
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Config {
     pub config_version: String,

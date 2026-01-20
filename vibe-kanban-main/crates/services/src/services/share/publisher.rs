@@ -184,7 +184,7 @@ impl SharePublisher {
             let missing_ids: Vec<Uuid> = chunk
                 .iter()
                 .filter(|id| !existing_set.contains(id))
-                .cloned()
+                .copied()
                 .collect();
 
             if !missing_ids.is_empty() {

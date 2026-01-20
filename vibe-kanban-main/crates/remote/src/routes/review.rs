@@ -64,8 +64,6 @@ pub enum ReviewError {
     R2Error(#[from] R2Error),
     #[error("rate limit exceeded")]
     RateLimited,
-    #[error("unable to determine client IP")]
-    MissingClientIp,
     #[error("database error: {0}")]
     Database(#[from] crate::db::reviews::ReviewError),
     #[error("review worker not configured")]
@@ -94,9 +92,6 @@ impl IntoResponse for ReviewError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "Rate limit exceeded. Try again later.",
             ),
-            ReviewError::MissingClientIp => {
-                (StatusCode::BAD_REQUEST, "Unable to determine client IP")
-            }
             ReviewError::Database(crate::db::reviews::ReviewError::NotFound) => {
                 (StatusCode::NOT_FOUND, "Review not found")
             }
@@ -132,19 +127,19 @@ fn normalize_github_url(url: &str) -> String {
     if url.starts_with("https://") || url.starts_with("http://") {
         url.to_string()
     } else {
-        format!("https://{}", url)
+        format!("https://{url}")
     }
 }
 
 /// Extract client IP from headers, with fallbacks for local development
-fn extract_client_ip(headers: &HeaderMap) -> Option<IpAddr> {
+fn extract_client_ip(headers: &HeaderMap) -> IpAddr {
     // Try Cloudflare header first (production)
     if let Some(ip) = headers
         .get("CF-Connecting-IP")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse().ok())
     {
-        return Some(ip);
+        return ip;
     }
 
     // Fallback to X-Forwarded-For (common proxy header)
@@ -154,7 +149,7 @@ fn extract_client_ip(headers: &HeaderMap) -> Option<IpAddr> {
         .and_then(|s| s.split(',').next()) // Take first IP in chain
         .and_then(|s| s.trim().parse().ok())
     {
-        return Some(ip);
+        return ip;
     }
 
     // Fallback to X-Real-IP
@@ -163,11 +158,11 @@ fn extract_client_ip(headers: &HeaderMap) -> Option<IpAddr> {
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse().ok())
     {
-        return Some(ip);
+        return ip;
     }
 
     // For local development, use localhost
-    Some(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
+    IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)
 }
 
 /// Check rate limits for the given IP address.
@@ -201,7 +196,7 @@ pub async fn init_review_upload(
     let review_id = Uuid::new_v4();
 
     // 2. Extract IP (required for rate limiting)
-    let ip = extract_client_ip(&headers).ok_or(ReviewError::MissingClientIp)?;
+    let ip = extract_client_ip(&headers);
 
     // 3. Check rate limits
     let repo = ReviewRepository::new(state.pool());
@@ -314,7 +309,7 @@ pub async fn get_review_status(
     let _review = repo.get_by_id(review_id).await?;
 
     // Proxy to worker
-    proxy_to_worker(&state, &format!("/review/{}/status", review_id)).await
+    proxy_to_worker(&state, &format!("/review/{review_id}/status")).await
 }
 
 /// GET /review/:id/metadata - Get PR metadata from database
@@ -345,7 +340,7 @@ pub async fn get_review(
     let _review = repo.get_by_id(review_id).await?;
 
     // Proxy to worker
-    proxy_to_worker(&state, &format!("/review/{}", review_id)).await
+    proxy_to_worker(&state, &format!("/review/{review_id}")).await
 }
 
 /// GET /review/:id/file/:file_hash - Get file content from worker
@@ -360,7 +355,11 @@ pub async fn get_review_file(
     let _review = repo.get_by_id(review_id).await?;
 
     // Proxy to worker
-    proxy_to_worker(&state, &format!("/review/{}/file/{}", review_id, file_hash)).await
+    proxy_to_worker(
+        &state,
+        &format!("/review/{review_id}/file/{file_hash}"),
+    )
+    .await
 }
 
 /// GET /review/:id/diff - Get diff for review from worker
@@ -375,7 +374,7 @@ pub async fn get_review_diff(
     let _review = repo.get_by_id(review_id).await?;
 
     // Proxy to worker
-    proxy_to_worker(&state, &format!("/review/{}/diff", review_id)).await
+    proxy_to_worker(&state, &format!("/review/{review_id}/diff")).await
 }
 
 /// POST /review/:id/success - Called by worker when review completes successfully
@@ -394,7 +393,7 @@ pub async fn review_success(
     repo.mark_completed(review_id).await?;
 
     // Build review URL
-    let review_url = format!("{}/review/{}", state.server_public_base_url, review_id);
+    let review_url = format!("{}/review/{review_id}", state.server_public_base_url);
 
     // Check if this is a webhook-triggered review
     if review.is_webhook_review() {
@@ -403,15 +402,17 @@ pub async fn review_success(
             let comment = format!(
                 "## Review Complete\n\n\
                 Your review story is ready!\n\n\
-                **[View Story]({})**\n\n\
-                Comment **!reviewfast** on this PR to re-generate the story.",
-                review_url
+                **[View Story]({review_url})**\n\n\
+                Comment **!reviewfast** on this PR to re-generate the story."
             );
 
             let installation_id = review.github_installation_id.unwrap_or(0);
             let pr_owner = review.pr_owner.as_deref().unwrap_or("");
             let pr_repo = review.pr_repo.as_deref().unwrap_or("");
-            let pr_number = review.pr_number.unwrap_or(0) as u64;
+            let pr_number = review
+                .pr_number
+                .and_then(|value| u64::try_from(value).ok())
+                .unwrap_or(0);
 
             if let Err(e) = github_app
                 .post_pr_comment(installation_id, pr_owner, pr_repo, pr_number, &comment)
@@ -457,14 +458,16 @@ pub async fn review_failed(
             let comment = format!(
                 "## Vibe Kanban Review Failed\n\n\
                 Unfortunately, the code review could not be completed.\n\n\
-                Review ID: `{}`",
-                review_id
+                Review ID: `{review_id}`"
             );
 
             let installation_id = review.github_installation_id.unwrap_or(0);
             let pr_owner = review.pr_owner.as_deref().unwrap_or("");
             let pr_repo = review.pr_repo.as_deref().unwrap_or("");
-            let pr_number = review.pr_number.unwrap_or(0) as u64;
+            let pr_number = review
+                .pr_number
+                .and_then(|value| u64::try_from(value).ok())
+                .unwrap_or(0);
 
             if let Err(e) = github_app
                 .post_pr_comment(installation_id, pr_owner, pr_repo, pr_number, &comment)

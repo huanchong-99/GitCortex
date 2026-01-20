@@ -365,7 +365,7 @@ impl WorkspaceManager {
             }
         };
 
-        for entry in entries.filter_map(|e| e.ok()) {
+        for entry in entries.filter_map(Result::ok) {
             let path = entry.path();
             if path.is_dir()
                 && let Err(e) = WorktreeManager::cleanup_suspected_worktree(&path).await

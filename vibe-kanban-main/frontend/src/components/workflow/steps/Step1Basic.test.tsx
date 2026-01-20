@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import { Step1Basic } from './Step1Basic';
 import type { BasicConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('Step1Basic', () => {
   const mockOnChange = vi.fn();
@@ -14,10 +15,11 @@ describe('Step1Basic', () => {
 
   beforeEach(() => {
     mockOnChange.mockClear();
+    void setTestLanguage();
   });
 
   it('should render basic configuration form', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -25,24 +27,26 @@ describe('Step1Basic', () => {
       />
     );
 
-    expect(screen.getByText('工作流名称')).toBeInTheDocument();
-    expect(screen.getByText('本次启动几个并行任务？')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step1.nameLabel'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step1.taskCountLabel'))).toBeInTheDocument();
   });
 
   it('should display error when name is empty', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
-        errors={{ name: '请输入工作流名称' }}
+        errors={{ name: 'validation.basic.nameRequired' }}
       />
     );
 
-    expect(screen.getByText('请输入工作流名称')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:validation.basic.nameRequired'))
+    ).toBeInTheDocument();
   });
 
   it('should allow selecting task count', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -50,7 +54,9 @@ describe('Step1Basic', () => {
       />
     );
 
-    const twoTasksButton = screen.getByText('2 个任务');
+    const twoTasksButton = screen.getByText(
+      i18n.t('workflow:step1.taskCountOption', { count: 2 })
+    );
     fireEvent.click(twoTasksButton);
 
     expect(mockOnChange).toHaveBeenCalledWith(
@@ -59,7 +65,7 @@ describe('Step1Basic', () => {
   });
 
   it('should allow switching between import modes', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -67,7 +73,7 @@ describe('Step1Basic', () => {
       />
     );
 
-    const importRadio = screen.getByText('从看板导入（选择已有任务卡片）');
+    const importRadio = screen.getByText(i18n.t('workflow:step1.importKanban'));
     fireEvent.click(importRadio);
 
     expect(mockOnChange).toHaveBeenCalledWith(
@@ -76,7 +82,7 @@ describe('Step1Basic', () => {
   });
 
   it('should render description textarea', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -84,11 +90,13 @@ describe('Step1Basic', () => {
       />
     );
 
-    expect(screen.getByText('工作流描述（可选）')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step1.descriptionLabel'))
+    ).toBeInTheDocument();
   });
 
   it('should render task count selection buttons', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -96,14 +104,22 @@ describe('Step1Basic', () => {
       />
     );
 
-    expect(screen.getByText('1 个任务')).toBeInTheDocument();
-    expect(screen.getByText('2 个任务')).toBeInTheDocument();
-    expect(screen.getByText('3 个任务')).toBeInTheDocument();
-    expect(screen.getByText('4 个任务')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step1.taskCountOption', { count: 1 }))
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step1.taskCountOption', { count: 2 }))
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step1.taskCountOption', { count: 3 }))
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step1.taskCountOption', { count: 4 }))
+    ).toBeInTheDocument();
   });
 
   it('should render custom task count input', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -111,11 +127,13 @@ describe('Step1Basic', () => {
       />
     );
 
-    expect(screen.getByPlaceholderText('5-10')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(i18n.t('workflow:step1.customCountPlaceholder'))
+    ).toBeInTheDocument();
   });
 
   it('should handle workflow name input change', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -123,7 +141,9 @@ describe('Step1Basic', () => {
       />
     );
 
-    const nameInput = screen.getByPlaceholderText('例如：重构用户认证系统');
+    const nameInput = screen.getByPlaceholderText(
+      i18n.t('workflow:step1.namePlaceholder')
+    );
     fireEvent.change(nameInput, { target: { value: 'Test Workflow' } });
 
     expect(mockOnChange).toHaveBeenCalledWith(
@@ -132,7 +152,7 @@ describe('Step1Basic', () => {
   });
 
   it('should handle description input change', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -140,7 +160,9 @@ describe('Step1Basic', () => {
       />
     );
 
-    const descriptionInput = screen.getByPlaceholderText('简要描述工作流的目标和范围...');
+    const descriptionInput = screen.getByPlaceholderText(
+      i18n.t('workflow:step1.descriptionPlaceholder')
+    );
     fireEvent.change(descriptionInput, { target: { value: 'Test description' } });
 
     expect(mockOnChange).toHaveBeenCalledWith(
@@ -149,15 +171,17 @@ describe('Step1Basic', () => {
   });
 
   it('should display error for taskCount', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
-        errors={{ taskCount: '请选择任务数量' }}
+        errors={{ taskCount: 'validation.basic.taskCountMin' }}
       />
     );
 
-    expect(screen.getByText('请选择任务数量')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:validation.basic.taskCountMin'))
+    ).toBeInTheDocument();
   });
 
   it('should highlight selected task count button', () => {
@@ -166,7 +190,7 @@ describe('Step1Basic', () => {
       taskCount: 2,
     };
 
-    render(
+    renderWithI18n(
       <Step1Basic
         config={configWithTwoTasks}
         onChange={mockOnChange}
@@ -174,12 +198,14 @@ describe('Step1Basic', () => {
       />
     );
 
-    const twoTasksButton = screen.getByText('2 个任务');
+    const twoTasksButton = screen.getByText(
+      i18n.t('workflow:step1.taskCountOption', { count: 2 })
+    );
     expect(twoTasksButton.closest('button')).toHaveClass('border-brand');
   });
 
   it('should allow custom task count input', () => {
-    render(
+    renderWithI18n(
       <Step1Basic
         config={defaultConfig}
         onChange={mockOnChange}
@@ -187,7 +213,9 @@ describe('Step1Basic', () => {
       />
     );
 
-    const customInput = screen.getByPlaceholderText('5-10');
+    const customInput = screen.getByPlaceholderText(
+      i18n.t('workflow:step1.customCountPlaceholder')
+    );
     fireEvent.change(customInput, { target: { value: '7' } });
 
     expect(mockOnChange).toHaveBeenCalledWith(

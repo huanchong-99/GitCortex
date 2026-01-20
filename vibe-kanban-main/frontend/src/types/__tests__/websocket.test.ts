@@ -22,6 +22,11 @@ describe('WebSocket Type Guards', () => {
             expect(isWsOutputMessage(msg)).toBe(false);
         });
 
+        it('should return false for non-string output data', () => {
+            const msg = { type: 'output', data: 123 };
+            expect(isWsOutputMessage(msg)).toBe(false);
+        });
+
         it('should return false for non-object', () => {
             expect(isWsOutputMessage(null)).toBe(false);
             expect(isWsOutputMessage('string')).toBe(false);
@@ -42,6 +47,11 @@ describe('WebSocket Type Guards', () => {
 
         it('should return false for missing message field', () => {
             const msg = { type: 'error' }; // missing message
+            expect(isWsErrorMessage(msg)).toBe(false);
+        });
+
+        it('should return false for non-string error message', () => {
+            const msg = { type: 'error', message: 123 };
             expect(isWsErrorMessage(msg)).toBe(false);
         });
 

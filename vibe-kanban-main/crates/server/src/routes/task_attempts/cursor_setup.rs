@@ -33,11 +33,10 @@ pub async fn run_cursor_setup(
         let latest_action = latest_process
             .executor_action()
             .map_err(|e| ApiError::Workspace(WorkspaceError::ValidationError(e.to_string())))?;
-        get_setup_helper_action()
-            .await?
+        get_setup_helper_action()?
             .append_action(latest_action.to_owned())
     } else {
-        get_setup_helper_action().await?
+        get_setup_helper_action()?
     };
     deployment
         .container()
@@ -73,7 +72,7 @@ pub async fn run_cursor_setup(
     Ok(execution_process)
 }
 
-async fn get_setup_helper_action() -> Result<ExecutorAction, ApiError> {
+fn get_setup_helper_action() -> Result<ExecutorAction, ApiError> {
     #[cfg(unix)]
     {
         use shlex::try_quote;

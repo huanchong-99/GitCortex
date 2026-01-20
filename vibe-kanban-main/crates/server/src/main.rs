@@ -1,3 +1,14 @@
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+
 use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
 use server::{DeploymentImpl, routes};
@@ -36,8 +47,7 @@ async fn main() -> Result<(), VibeKanbanError> {
 
     let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
     let filter_string = format!(
-        "warn,server={level},services={level},db={level},executors={level},deployment={level},local_deployment={level},utils={level}",
-        level = log_level
+        "warn,server={log_level},services={log_level},db={log_level},executors={log_level},deployment={log_level},local_deployment={log_level},utils={log_level}"
     );
     let env_filter = EnvFilter::try_new(filter_string).expect("Failed to create tracing filter");
     tracing_subscriber::registry()
@@ -67,7 +77,7 @@ async fn main() -> Result<(), VibeKanbanError> {
         .backfill_repo_names()
         .await
         .map_err(DeploymentError::from)?;
-    deployment.spawn_pr_monitor_service().await;
+    deployment.spawn_pr_monitor_service();
     deployment
         .track_if_analytics_allowed("session_start", serde_json::json!({}))
         .await;
@@ -123,7 +133,7 @@ async fn main() -> Result<(), VibeKanbanError> {
     if !cfg!(debug_assertions) {
         tracing::info!("Opening browser...");
         tokio::spawn(async move {
-            if let Err(e) = open_browser(&format!("http://127.0.0.1:{actual_port}")).await {
+            if let Err(e) = open_browser(&format!("http://127.0.0.1:{actual_port}")) {
                 tracing::warn!(
                     "Failed to open browser automatically: {}. Please open http://127.0.0.1:{} manually.",
                     e,

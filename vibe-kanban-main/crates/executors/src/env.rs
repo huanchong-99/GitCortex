@@ -29,12 +29,14 @@ impl ExecutionEnv {
     }
 
     /// Return a new env with overrides applied. Overrides take precedence.
+    #[must_use]
     pub fn with_overrides(mut self, overrides: &HashMap<String, String>) -> Self {
         self.merge(overrides);
         self
     }
 
     /// Return a new env with profile env from CmdOverrides merged in.
+    #[must_use]
     pub fn with_profile(self, cmd: &CmdOverrides) -> Self {
         if let Some(ref profile_env) = cmd.env {
             self.with_overrides(profile_env)

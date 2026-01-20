@@ -1,4 +1,4 @@
-//! Orchestrator Agent 主逻辑
+//! Orchestrator agent loop and event handling.
 
 use std::sync::Arc;
 
@@ -8,13 +8,18 @@ use tokio::sync::RwLock;
 
 use super::{
     config::OrchestratorConfig,
-    constants::*,
-    llm::{LLMClient, create_llm_client, build_terminal_completion_prompt},
+    constants::{
+        TERMINAL_STATUS_COMPLETED, TERMINAL_STATUS_FAILED, TERMINAL_STATUS_REVIEW_PASSED,
+        TERMINAL_STATUS_REVIEW_REJECTED, WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
+        WORKFLOW_TOPIC_PREFIX,
+    },
+    llm::{LLMClient, build_terminal_completion_prompt, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
-    types::*,
+    types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus},
 };
 
+/// Coordinates workflow execution, message handling, and LLM interactions.
 pub struct OrchestratorAgent {
     config: OrchestratorConfig,
     state: SharedOrchestratorState,
@@ -24,7 +29,8 @@ pub struct OrchestratorAgent {
 }
 
 impl OrchestratorAgent {
-    pub async fn new(
+    /// Builds a new orchestrator agent with a configured LLM client.
+    pub fn new(
         config: OrchestratorConfig,
         workflow_id: String,
         message_bus: SharedMessageBus,
@@ -44,7 +50,7 @@ impl OrchestratorAgent {
 
     /// Create a new agent with a custom LLM client (for testing)
     #[cfg(test)]
-    pub async fn with_llm_client(
+    pub fn with_llm_client(
         config: OrchestratorConfig,
         workflow_id: String,
         message_bus: SharedMessageBus,
@@ -62,7 +68,7 @@ impl OrchestratorAgent {
         })
     }
 
-    /// 启动 Agent 事件循环
+    /// Runs the orchestrator event loop until shutdown.
     pub async fn run(&self) -> anyhow::Result<()> {
         let workflow_id = {
             let state = self.state.read().await;
@@ -71,7 +77,7 @@ impl OrchestratorAgent {
 
         let mut rx = self
             .message_bus
-            .subscribe(&format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id))
+            .subscribe(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"))
             .await;
         tracing::info!("Orchestrator started for workflow: {}", workflow_id);
 
@@ -94,7 +100,7 @@ impl OrchestratorAgent {
         Ok(())
     }
 
-    /// 处理消息
+    /// Dispatches incoming bus messages and returns true if shutdown is requested.
     async fn handle_message(&self, message: BusMessage) -> anyhow::Result<bool> {
         match message {
             BusMessage::TerminalCompleted(event) => {
@@ -117,7 +123,7 @@ impl OrchestratorAgent {
         Ok(false)
     }
 
-    /// 处理终端完成事件
+    /// Handles terminal completion events.
     async fn handle_terminal_completed(
         &self,
         event: TerminalCompletionEvent,
@@ -140,7 +146,7 @@ impl OrchestratorAgent {
         }
 
         // 构建提示并调用 LLM
-        let prompt = self.build_completion_prompt(&event).await;
+        let prompt = Self::build_completion_prompt(&event);
         let response = self.call_llm(&prompt).await?;
 
         // 解析并执行指令
@@ -155,7 +161,7 @@ impl OrchestratorAgent {
         Ok(())
     }
 
-    /// 处理 Git 事件
+    /// Handles Git events emitted by the watcher.
     pub async fn handle_git_event(
         &self,
         workflow_id: &str,
@@ -241,20 +247,20 @@ impl OrchestratorAgent {
         ).await?;
 
         // 2. Publish completion event
+        let workflow_id = self.state.read().await.workflow_id.clone();
         let event = BusMessage::TerminalCompleted(TerminalCompletionEvent {
             terminal_id: terminal_id.to_string(),
             task_id: task_id.to_string(),
-            workflow_id: self.state.read().await.workflow_id.clone(),
+            workflow_id: workflow_id.clone(),
             status: TerminalCompletionStatus::Completed,
             commit_hash: Some(commit_hash.to_string()),
             commit_message: Some(commit_message.to_string()),
             metadata: None,
         });
 
-        self.message_bus.publish(
-            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
-            event
-        ).await?;
+        self.message_bus
+            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .await?;
 
         // 3. Awaken orchestrator to process the event
         self.awaken().await;
@@ -282,15 +288,15 @@ impl OrchestratorAgent {
         ).await?;
 
         // 2. Publish review passed event
+        let workflow_id = self.state.read().await.workflow_id.clone();
         let event = BusMessage::StatusUpdate {
-            workflow_id: self.state.read().await.workflow_id.clone(),
+            workflow_id: workflow_id.clone(),
             status: TERMINAL_STATUS_REVIEW_PASSED.to_string(),
         };
 
-        self.message_bus.publish(
-            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
-            event
-        ).await?;
+        self.message_bus
+            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .await?;
 
         // 3. Awaken orchestrator to process the event
         self.awaken().await;
@@ -319,15 +325,15 @@ impl OrchestratorAgent {
         ).await?;
 
         // 2. Publish review rejected event
+        let workflow_id = self.state.read().await.workflow_id.clone();
         let event = BusMessage::StatusUpdate {
-            workflow_id: self.state.read().await.workflow_id.clone(),
+            workflow_id: workflow_id.clone(),
             status: TERMINAL_STATUS_REVIEW_REJECTED.to_string(),
         };
 
-        self.message_bus.publish(
-            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
-            event
-        ).await?;
+        self.message_bus
+            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .await?;
 
         // 3. Awaken orchestrator to process the event
         self.awaken().await;
@@ -355,15 +361,15 @@ impl OrchestratorAgent {
         ).await?;
 
         // 2. Publish failure event
+        let workflow_id = self.state.read().await.workflow_id.clone();
         let event = BusMessage::Error {
-            workflow_id: self.state.read().await.workflow_id.clone(),
+            workflow_id: workflow_id.clone(),
             error: error_message.to_string(),
         };
 
-        self.message_bus.publish(
-            &format!("{}{}", WORKFLOW_TOPIC_PREFIX, self.state.read().await.workflow_id),
-            event
-        ).await?;
+        self.message_bus
+            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .await?;
 
         // 3. Awaken orchestrator to process the event
         self.awaken().await;
@@ -384,8 +390,8 @@ impl OrchestratorAgent {
         // any messages we published to the message bus
     }
 
-    /// 构建完成提示
-    async fn build_completion_prompt(&self, event: &TerminalCompletionEvent) -> String {
+    /// Builds the prompt for a terminal completion event.
+    fn build_completion_prompt(event: &TerminalCompletionEvent) -> String {
         let commit_hash = event.commit_hash.as_deref().unwrap_or("N/A");
         let commit_message = event.commit_message.as_deref().unwrap_or("No message");
 
@@ -397,7 +403,7 @@ impl OrchestratorAgent {
         )
     }
 
-    /// 调用 LLM
+    /// Calls the LLM with the current conversation history.
     async fn call_llm(&self, prompt: &str) -> anyhow::Result<String> {
         let mut state = self.state.write().await;
         state.add_message("user", prompt, &self.config);
@@ -410,13 +416,13 @@ impl OrchestratorAgent {
         let mut state = self.state.write().await;
         state.add_message("assistant", &response.content, &self.config);
         if let Some(usage) = &response.usage {
-            state.total_tokens_used += usage.total_tokens as i64;
+            state.total_tokens_used += i64::from(usage.total_tokens);
         }
 
         Ok(response.content)
     }
 
-    /// 执行指令
+    /// Executes orchestrator instructions returned by the LLM.
     pub async fn execute_instruction(&self, response: &str) -> anyhow::Result<()> {
         // 尝试解析 JSON 指令
         if let Ok(instruction) = serde_json::from_str::<OrchestratorInstruction>(response) {
@@ -428,20 +434,22 @@ impl OrchestratorAgent {
                     tracing::info!("Sending to terminal {}: {}", terminal_id, message);
 
                     // 1. Get terminal from database
-                    let terminal = db::models::Terminal::find_by_id(&self.db.pool, &terminal_id).await
-                        .map_err(|e| anyhow::anyhow!("Failed to get terminal: {}", e))?
-                        .ok_or_else(|| anyhow::anyhow!("Terminal {} not found", terminal_id))?;
+                    let terminal =
+                        db::models::Terminal::find_by_id(&self.db.pool, &terminal_id)
+                            .await
+                            .map_err(|e| anyhow::anyhow!("Failed to get terminal: {e}"))?
+                            .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
 
                     // 2. Get PTY session ID
-                    let pty_session_id = terminal.pty_session_id
-                        .ok_or_else(|| anyhow::anyhow!("Terminal {} has no PTY session", terminal_id))?;
+                    let pty_session_id = terminal.pty_session_id.ok_or_else(|| {
+                        anyhow::anyhow!("Terminal {terminal_id} has no PTY session")
+                    })?;
 
                     // 3. Send message via message bus
-                    self.message_bus.publish(
-                        &pty_session_id,
-                        BusMessage::TerminalMessage { message }
-                    ).await
-                    .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))?;
+                    self.message_bus
+                        .publish(&pty_session_id, BusMessage::TerminalMessage { message })
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to send message: {e}"))?;
 
                     tracing::debug!("Message sent to terminal {}", terminal_id);
                 }
@@ -459,18 +467,20 @@ impl OrchestratorAgent {
                         &self.db.pool,
                         &workflow_id,
                         WORKFLOW_STATUS_COMPLETED
-                    ).await
-                    .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {}", e))?;
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {e}"))?;
 
                     // Publish completion event
                     self.message_bus.publish(
-                        &format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id),
+                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
                         BusMessage::StatusUpdate {
                             workflow_id: workflow_id.clone(),
                             status: WORKFLOW_STATUS_COMPLETED.to_string(),
                         }
-                    ).await
-                    .map_err(|e| anyhow::anyhow!("Failed to publish completion event: {}", e))?;
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to publish completion event: {e}"))?;
 
                     // Transition to Idle
                     self.state.write().await.run_state = OrchestratorRunState::Idle;
@@ -491,18 +501,20 @@ impl OrchestratorAgent {
                         &self.db.pool,
                         &workflow_id,
                         WORKFLOW_STATUS_FAILED
-                    ).await
-                    .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {}", e))?;
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {e}"))?;
 
                     // Publish failure event
                     self.message_bus.publish(
-                        &format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id),
+                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
                         BusMessage::Error {
                             workflow_id: workflow_id.clone(),
                             error: reason.clone(),
                         }
-                    ).await
-                    .map_err(|e| anyhow::anyhow!("Failed to publish failure event: {}", e))?;
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to publish failure event: {e}"))?;
 
                     // Transition to Idle
                     self.state.write().await.run_state = OrchestratorRunState::Idle;

@@ -2,10 +2,11 @@ use std::{
     collections::HashMap,
     fs,
     str::FromStr,
-    sync::{LazyLock, RwLock},
+    sync::RwLock,
 };
 
 use convert_case::{Case, Casing};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as DeError};
 use thiserror::Error;
 use ts_rs::TS;
@@ -14,6 +15,7 @@ use crate::executors::{
     AvailabilityInfo, BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor,
 };
 
+#[allow(clippy::doc_comment_double_space_linebreaks)]
 /// Return the canonical form for variant keys.
 /// – "DEFAULT" is kept as-is  
 /// – everything else is converted to SCREAMING_SNAKE_CASE
@@ -51,8 +53,8 @@ pub enum ProfileError {
     NoAvailableExecutorProfile,
 }
 
-static EXECUTOR_PROFILES_CACHE: LazyLock<RwLock<ExecutorConfigs>> =
-    LazyLock::new(|| RwLock::new(ExecutorConfigs::load()));
+static EXECUTOR_PROFILES_CACHE: Lazy<RwLock<ExecutorConfigs>> =
+    Lazy::new(|| RwLock::new(ExecutorConfigs::load()));
 
 // New format default profiles (v3 - flattened)
 const DEFAULT_PROFILES_JSON: &str = include_str!("../default_profiles.json");
@@ -143,10 +145,10 @@ impl ExecutorConfig {
     /// Add or update a variant configuration
     pub fn set_variant(
         &mut self,
-        variant_name: String,
+        variant_name: &str,
         config: CodingAgent,
     ) -> Result<(), &'static str> {
-        let key = canonical_variant_key(&variant_name);
+        let key = canonical_variant_key(variant_name);
         if key == "DEFAULT" {
             return Err(
                 "Cannot override 'DEFAULT' variant using set_variant, use set_default instead",
@@ -215,12 +217,9 @@ impl ExecutorConfigs {
         defaults.canonicalise();
 
         // Try to load user overrides
-        let content = match fs::read_to_string(&profiles_path) {
-            Ok(content) => content,
-            Err(_) => {
-                tracing::info!("No user profiles.json found, using defaults only");
-                return defaults;
-            }
+        let Ok(content) = fs::read_to_string(&profiles_path) else {
+            tracing::info!("No user profiles.json found, using defaults only");
+            return defaults;
         };
 
         // Parse user overrides
@@ -413,7 +412,7 @@ impl ExecutorConfigs {
                     .expect("No default variant found")
             })
     }
-    pub async fn get_recommended_executor_profile(
+    pub fn get_recommended_executor_profile(
         &self,
     ) -> Result<ExecutorProfileId, ProfileError> {
         let mut agents_with_info: Vec<(BaseCodingAgent, AvailabilityInfo)> = Vec::new();
@@ -444,25 +443,19 @@ impl ExecutorConfigs {
                         last_auth_timestamp: time_b,
                     },
                 ) => time_b.cmp(time_a),
-                // LoginDetected > InstallationFound
-                (AvailabilityInfo::LoginDetected { .. }, AvailabilityInfo::InstallationFound) => {
+                // LoginDetected > InstallationFound/NotFound, InstallationFound > NotFound
+                (
+                    AvailabilityInfo::LoginDetected { .. },
+                    AvailabilityInfo::InstallationFound | AvailabilityInfo::NotFound,
+                )
+                | (AvailabilityInfo::InstallationFound, AvailabilityInfo::NotFound) => {
                     std::cmp::Ordering::Less
                 }
-                (AvailabilityInfo::InstallationFound, AvailabilityInfo::LoginDetected { .. }) => {
-                    std::cmp::Ordering::Greater
-                }
-                // LoginDetected > NotFound
-                (AvailabilityInfo::LoginDetected { .. }, AvailabilityInfo::NotFound) => {
-                    std::cmp::Ordering::Less
-                }
-                (AvailabilityInfo::NotFound, AvailabilityInfo::LoginDetected { .. }) => {
-                    std::cmp::Ordering::Greater
-                }
-                // InstallationFound > NotFound
-                (AvailabilityInfo::InstallationFound, AvailabilityInfo::NotFound) => {
-                    std::cmp::Ordering::Less
-                }
-                (AvailabilityInfo::NotFound, AvailabilityInfo::InstallationFound) => {
+                (
+                    AvailabilityInfo::InstallationFound | AvailabilityInfo::NotFound,
+                    AvailabilityInfo::LoginDetected { .. },
+                )
+                | (AvailabilityInfo::NotFound, AvailabilityInfo::InstallationFound) => {
                     std::cmp::Ordering::Greater
                 }
                 // Same state - equal

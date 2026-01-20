@@ -95,7 +95,7 @@ impl TerminalLauncher {
                 terminal_id,
                 process_handle: None,
                 success: false,
-                error: Some(format!("Model switch failed: {}", e)),
+                error: Some(format!("Model switch failed: {e}")),
             };
         }
 
@@ -116,7 +116,7 @@ impl TerminalLauncher {
                         terminal_id,
                         process_handle: None,
                         success: false,
-                        error: Some(format!("Database error: {}", e)),
+                        error: Some(format!("Database error: {e}")),
                     };
                 }
             };
@@ -133,10 +133,11 @@ impl TerminalLauncher {
             Ok(handle) => {
                 // Update terminal status in database
                 let _ = Terminal::set_started(&self.db.pool, &terminal_id).await;
+                let pid = i32::try_from(handle.pid).ok();
                 let _ = Terminal::update_process(
                     &self.db.pool,
                     &terminal_id,
-                    Some(handle.pid as i32),
+                    pid,
                     Some(&handle.session_id),
                 )
                 .await;
@@ -156,7 +157,7 @@ impl TerminalLauncher {
                     terminal_id,
                     process_handle: None,
                     success: false,
-                    error: Some(format!("Process spawn failed: {}", e)),
+                    error: Some(format!("Process spawn failed: {e}")),
                 }
             }
         }
@@ -198,7 +199,11 @@ impl TerminalLauncher {
 
         for terminal in terminals {
             if let Some(pid) = terminal.process_id {
-                self.process_manager.kill(pid as u32).await?;
+                if let Ok(pid_u32) = u32::try_from(pid) {
+                    self.process_manager.kill(pid_u32)?;
+                } else {
+                    tracing::warn!("Skipping invalid process id {pid} for terminal {}", terminal.id);
+                }
             }
             Terminal::update_status(&self.db.pool, &terminal.id, "cancelled").await?;
         }
@@ -241,7 +246,7 @@ mod tests {
     #[tokio::test]
     async fn test_launcher_new() {
         let (launcher, _) = setup_launcher().await;
-        assert!(launcher.working_dir.to_str().unwrap().len() > 0);
+        assert!(!launcher.working_dir.to_str().unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -249,14 +254,12 @@ mod tests {
         let (launcher, _) = setup_launcher().await;
         let _cmd = launcher.build_launch_command("claude-code");
         // Verify command was built without panic
-        assert!(true);
     }
 
     #[tokio::test]
     async fn test_build_launch_command_gemini() {
         let (launcher, _) = setup_launcher().await;
         let _cmd = launcher.build_launch_command("gemini-cli");
-        assert!(true);
     }
 
     #[tokio::test]

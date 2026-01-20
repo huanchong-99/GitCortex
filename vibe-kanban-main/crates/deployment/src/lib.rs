@@ -1,3 +1,14 @@
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+
 use std::sync::Arc;
 
 use anyhow::Error as AnyhowError;
@@ -123,7 +134,7 @@ pub trait Deployment: Clone + Send + Sync + 'static {
         Ok(())
     }
 
-    async fn spawn_pr_monitor_service(&self) -> tokio::task::JoinHandle<()> {
+    fn spawn_pr_monitor_service(&self) -> tokio::task::JoinHandle<()> {
         let db = self.db().clone();
         let analytics = self
             .analytics()
@@ -133,7 +144,7 @@ pub trait Deployment: Clone + Send + Sync + 'static {
                 analytics_service: analytics_service.clone(),
             });
         let publisher = self.share_publisher().ok();
-        PrMonitorService::spawn(db, analytics, publisher).await
+        PrMonitorService::spawn(db, analytics, publisher)
     }
 
     async fn track_if_analytics_allowed(&self, event_name: &str, properties: Value) {

@@ -129,8 +129,8 @@ pub enum UnifiedPrComment {
 impl UnifiedPrComment {
     pub fn created_at(&self) -> DateTime<Utc> {
         match self {
-            UnifiedPrComment::General { created_at, .. } => *created_at,
-            UnifiedPrComment::Review { created_at, .. } => *created_at,
+            UnifiedPrComment::General { created_at, .. }
+            | UnifiedPrComment::Review { created_at, .. } => *created_at,
         }
     }
 }

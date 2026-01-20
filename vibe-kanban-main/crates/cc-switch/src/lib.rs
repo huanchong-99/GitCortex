@@ -1,3 +1,14 @@
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+
 //! CC-Switch Core
 //!
 //! CLI 配置切换核心库，支持 Claude Code、Codex、Gemini CLI 等。
@@ -59,7 +70,7 @@ pub enum CliType {
 
 impl CliType {
     /// 从字符串解析 CLI 类型
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "claude-code" | "claude" => Some(Self::ClaudeCode),
             "codex" => Some(Self::Codex),
@@ -107,5 +118,13 @@ impl CliType {
     /// 是否支持配置切换
     pub fn supports_config_switch(&self) -> bool {
         matches!(self, Self::ClaudeCode | Self::Codex | Self::Gemini)
+    }
+}
+
+impl std::str::FromStr for CliType {
+    type Err = ();
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Self::parse(s).ok_or(())
     }
 }

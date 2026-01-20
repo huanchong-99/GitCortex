@@ -23,6 +23,9 @@ const toError = (error: unknown, context?: string): Error => {
   return new Error(context ? `${context}: Unknown error` : 'Unknown error');
 };
 
+/**
+ * Normalizes errors and dispatches them through the optional onError handler.
+ */
 export function useErrorNotification(
   options: ErrorNotificationOptions = {}
 ): ErrorNotificationHandle {

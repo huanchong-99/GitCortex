@@ -97,7 +97,7 @@ async fn which(executable: &str) -> Option<PathBuf> {
     tokio::task::spawn_blocking(move || which::which(executable))
         .await
         .ok()
-        .and_then(|result| result.ok())
+        .and_then(std::result::Result::ok)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -248,7 +248,6 @@ async fn get_fresh_path() -> Option<String> {
 
     paths
         .into_iter()
-        .map(OsString::from)
         .reduce(|a, b| merge_paths(&a, &b))
         .map(|merged| merged.to_string_lossy().into_owned())
 }
@@ -268,7 +267,11 @@ fn get_fresh_path_blocking() -> Option<String> {
         os::windows::ffi::{OsStrExt, OsStringExt},
     };
 
-    use winreg::{HKEY, RegKey, enums::*};
+    use winreg::{
+        HKEY,
+        RegKey,
+        enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ},
+    };
 
     // Expand %VARS% for registry PATH entries
     fn expand_env_vars(input: &OsStr) -> OsString {
@@ -316,7 +319,6 @@ fn get_fresh_path_blocking() -> Option<String> {
 
     paths
         .into_iter()
-        .map(OsString::from)
         .reduce(|a, b| merge_paths(&a, &b))
         .map(|merged| merged.to_string_lossy().into_owned())
 }

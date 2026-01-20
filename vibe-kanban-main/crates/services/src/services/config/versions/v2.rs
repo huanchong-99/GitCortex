@@ -35,6 +35,7 @@ impl From<v1::EditorType> for EditorType {
     }
 }
 
+#[allow(clippy::struct_excessive_bools, clippy::struct_field_names)]
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Config {
     pub config_version: String,
@@ -68,8 +69,7 @@ impl Config {
 
         // Map old executors to new profiles
         let profile: &str = match old_config.executor {
-            v1::ExecutorConfig::Claude => "claude-code",
-            v1::ExecutorConfig::ClaudeCodeRouter => "claude-code",
+            v1::ExecutorConfig::Claude | v1::ExecutorConfig::ClaudeCodeRouter => "claude-code",
             v1::ExecutorConfig::ClaudePlan => "claude-code-plan",
             v1::ExecutorConfig::Amp => "amp",
             v1::ExecutorConfig::Gemini => "gemini",
@@ -195,7 +195,7 @@ impl GitHubConfig {
         self.pat
             .as_deref()
             .or(self.oauth_token.as_deref())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
     }
 }
 
@@ -227,20 +227,19 @@ impl SoundFile {
     }
 
     // load the sound file from the embedded assets or cache
-    pub async fn serve(&self) -> Result<rust_embed::EmbeddedFile, Error> {
-        match SoundAssets::get(self.to_filename()) {
-            Some(content) => Ok(content),
-            None => {
-                tracing::error!("Sound file not found: {}", self.to_filename());
-                Err(anyhow::anyhow!(
-                    "Sound file not found: {}",
-                    self.to_filename()
-                ))
-            }
+    pub fn serve(&self) -> Result<rust_embed::EmbeddedFile, Error> {
+        if let Some(content) = SoundAssets::get(self.to_filename()) {
+            Ok(content)
+        } else {
+            tracing::error!("Sound file not found: {}", self.to_filename());
+            Err(anyhow::anyhow!(
+                "Sound file not found: {}",
+                self.to_filename()
+            ))
         }
     }
     /// Get or create a cached sound file with the embedded sound data
-    pub async fn get_path(&self) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn get_path(&self) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
         use std::io::Write;
 
         let filename = self.to_filename();

@@ -27,9 +27,8 @@ use super::{
 };
 
 /// Search mode for different use cases
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, Default)]
 #[serde(rename_all = "lowercase")]
-#[derive(Default)]
 pub enum SearchMode {
     #[default]
     TaskForm, // Default: exclude ignored files (clean results)
@@ -151,7 +150,7 @@ impl FileSearchCache {
             && head_info.oid == cached.head_sha
         {
             // Cache hit - perform fast search with mode-based filtering
-            return Ok(self.search_in_cache(&cached, query, mode).await);
+            return Ok(self.search_in_cache(&cached, query, mode));
         }
 
         // Cache miss - trigger background refresh and return error
@@ -163,7 +162,7 @@ impl FileSearchCache {
     }
 
     /// Pre-warm cache for given repositories
-    pub async fn warm_repos(&self, repo_paths: Vec<PathBuf>) -> Result<(), String> {
+    pub fn warm_repos(&self, repo_paths: Vec<PathBuf>) -> Result<(), String> {
         for repo_path in repo_paths {
             if let Err(e) = self.build_queue.send(repo_path.clone()) {
                 error!(
@@ -213,12 +212,11 @@ impl FileSearchCache {
 
         // Warm the cache
         self.warm_repos(repo_paths.clone())
-            .await
             .map_err(|e| format!("Failed to warm cache: {e}"))?;
 
         // Setup watchers for active projects
         for repo_path in &repo_paths {
-            if let Err(e) = self.setup_watcher(repo_path).await {
+            if let Err(e) = self.setup_watcher(repo_path) {
                 warn!("Failed to setup watcher for {:?}: {}", repo_path, e);
             }
         }
@@ -228,7 +226,7 @@ impl FileSearchCache {
     }
 
     /// Search within cached index with mode-based filtering
-    async fn search_in_cache(
+    fn search_in_cache(
         &self,
         cached: &CachedRepo,
         query: &str,
@@ -289,9 +287,9 @@ impl FileSearchCache {
         }
 
         // Try cache first
-        match self.search(repo_path, query, mode.clone()).await {
+        match self.search(repo_path, query, mode).await {
             Ok(results) => Ok(results),
-            Err(CacheError::Miss) | Err(CacheError::BuildError(_)) => {
+            Err(CacheError::Miss | CacheError::BuildError(_)) => {
                 // Fall back to filesystem search
                 self.search_files_no_cache(repo_path, query, mode).await
             }
@@ -306,7 +304,7 @@ impl FileSearchCache {
         mode: SearchMode,
     ) -> Result<Vec<SearchResult>, String> {
         if !repo_path.exists() {
-            return Err(format!("Path not found: {:?}", repo_path));
+            return Err(format!("Path not found: {}", repo_path.display()));
         }
 
         let mut results = Vec::new();
@@ -343,9 +341,8 @@ impl FileSearchCache {
         };
 
         for result in walker {
-            let entry = match result {
-                Ok(e) => e,
-                Err(_) => continue,
+            let Ok(entry) = result else {
+                continue;
             };
             let path = entry.path();
 
@@ -354,9 +351,8 @@ impl FileSearchCache {
                 continue;
             }
 
-            let relative_path = match path.strip_prefix(repo_path) {
-                Ok(p) => p,
-                Err(_) => continue,
+            let Ok(relative_path) = path.strip_prefix(repo_path) else {
+                continue;
             };
             let relative_path_str = relative_path.to_string_lossy().to_lowercase();
 
@@ -607,7 +603,7 @@ impl FileSearchCache {
     }
 
     /// Setup file watcher for repository
-    pub async fn setup_watcher(&self, repo_path: &Path) -> Result<(), String> {
+    pub fn setup_watcher(&self, repo_path: &Path) -> Result<(), String> {
         let repo_path_buf = repo_path.to_path_buf();
 
         if self.watchers.contains_key(&repo_path_buf) {

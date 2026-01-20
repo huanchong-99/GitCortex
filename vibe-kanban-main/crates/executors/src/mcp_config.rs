@@ -2,8 +2,9 @@
 //!
 //! These helpers abstract over JSON vs TOML formats used by different agents.
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::fs;
@@ -12,7 +13,7 @@ use ts_rs::TS;
 use crate::executors::{CodingAgent, ExecutorError};
 
 static DEFAULT_MCP_JSON: &str = include_str!("../default_mcp.json");
-pub static PRECONFIGURED_MCP_SERVERS: LazyLock<Value> = LazyLock::new(|| {
+pub static PRECONFIGURED_MCP_SERVERS: Lazy<Value> = Lazy::new(|| {
     serde_json::from_str::<Value>(DEFAULT_MCP_JSON).expect("Failed to parse default MCP JSON")
 });
 
@@ -120,7 +121,7 @@ fn transform_http_servers<F>(mut servers: ServerMap, mut f: F) -> ServerMap
 where
     F: FnMut(Map<String, Value>) -> Map<String, Value>,
 {
-    for (_k, v) in servers.iter_mut() {
+    for v in servers.values_mut() {
         if let Value::Object(s) = v
             && is_http_server(s)
         {
@@ -167,14 +168,14 @@ fn adapt_cursor(servers: ServerMap, meta: Option<Value>) -> Value {
             .unwrap_or_else(|| Value::String(String::new()));
         let headers = s
             .remove("headers")
-            .unwrap_or_else(|| Value::Object(Default::default()));
+            .unwrap_or_else(|| Value::Object(Map::default()));
         Map::from_iter([("url".to_string(), url), ("headers".to_string(), headers)])
     });
     attach_meta(servers, meta)
 }
 
 fn adapt_codex(mut servers: ServerMap, mut meta: Option<Value>) -> Value {
-    servers.retain(|_, v| v.as_object().map(is_stdio).unwrap_or(false));
+    servers.retain(|_, v| v.as_object().is_some_and(is_stdio));
 
     if let Some(Value::Object(ref mut m)) = meta {
         m.retain(|k, _| servers.contains_key(k));
@@ -209,7 +210,7 @@ fn adapt_opencode(servers: ServerMap, meta: Option<Value>) -> Value {
         ])
     });
 
-    for (_k, v) in servers.iter_mut() {
+    for v in servers.values_mut() {
         if let Value::Object(s) = v
             && is_stdio(s)
         {
@@ -250,7 +251,7 @@ fn adapt_opencode(servers: ServerMap, meta: Option<Value>) -> Value {
 }
 
 fn adapt_copilot(mut servers: ServerMap, meta: Option<Value>) -> Value {
-    for (_, value) in servers.iter_mut() {
+    for value in servers.values_mut() {
         if let Value::Object(s) = value
             && !s.contains_key("tools")
         {
@@ -272,13 +273,13 @@ enum Adapter {
     Copilot,
 }
 
-fn apply_adapter(adapter: Adapter, canonical: Value) -> Value {
+fn apply_adapter(adapter: &Adapter, canonical: &Value) -> Value {
     let (servers_only, meta) = match canonical.as_object() {
         Some(map) => extract_meta(map.clone()),
         None => (ServerMap::new(), None),
     };
 
-    match adapter {
+    match *adapter {
         Adapter::Passthrough => adapt_passthrough(servers_only, meta),
         Adapter::Gemini => adapt_gemini(servers_only, meta),
         Adapter::Cursor => adapt_cursor(servers_only, meta),
@@ -290,7 +291,7 @@ fn apply_adapter(adapter: Adapter, canonical: Value) -> Value {
 
 impl CodingAgent {
     pub fn preconfigured_mcp(&self) -> Value {
-        use Adapter::*;
+        use Adapter::{Codex, Copilot, Cursor, Gemini, Opencode, Passthrough};
 
         let adapter = match self {
             CodingAgent::ClaudeCode(_) | CodingAgent::Amp(_) | CodingAgent::Droid(_) => Passthrough,
@@ -303,7 +304,7 @@ impl CodingAgent {
             CodingAgent::QaMock(_) => Passthrough, // QA mock doesn't need MCP
         };
 
-        let canonical = PRECONFIGURED_MCP_SERVERS.clone();
-        apply_adapter(adapter, canonical)
+        let canonical = &PRECONFIGURED_MCP_SERVERS;
+        apply_adapter(&adapter, canonical)
     }
 }

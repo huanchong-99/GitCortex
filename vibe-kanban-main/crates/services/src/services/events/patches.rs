@@ -12,7 +12,10 @@ fn escape_pointer_segment(s: &str) -> String {
 
 /// Helper functions for creating task-specific patches
 pub mod task_patch {
-    use super::*;
+    use super::{
+        AddOperation, Patch, PatchOperation, RemoveOperation, ReplaceOperation, TaskWithAttemptStatus,
+        Uuid, escape_pointer_segment,
+    };
 
     fn task_path(task_id: Uuid) -> String {
         format!("/tasks/{}", escape_pointer_segment(&task_id.to_string()))
@@ -50,7 +53,10 @@ pub mod task_patch {
 
 /// Helper functions for creating project-specific patches
 pub mod project_patch {
-    use super::*;
+    use super::{
+        AddOperation, Patch, PatchOperation, Project, RemoveOperation, ReplaceOperation, Uuid,
+        escape_pointer_segment,
+    };
 
     fn project_path(project_id: Uuid) -> String {
         format!(
@@ -91,7 +97,10 @@ pub mod project_patch {
 
 /// Helper functions for creating execution process-specific patches
 pub mod execution_process_patch {
-    use super::*;
+    use super::{
+        AddOperation, ExecutionProcess, Patch, PatchOperation, RemoveOperation, ReplaceOperation,
+        Uuid, escape_pointer_segment,
+    };
 
     fn execution_process_path(process_id: Uuid) -> String {
         format!(
@@ -134,7 +143,10 @@ pub mod execution_process_patch {
 
 /// Helper functions for creating workspace-specific patches
 pub mod workspace_patch {
-    use super::*;
+    use super::{
+        AddOperation, Patch, PatchOperation, RemoveOperation, ReplaceOperation, Uuid,
+        WorkspaceWithStatus, escape_pointer_segment,
+    };
 
     fn workspace_path(workspace_id: Uuid) -> String {
         format!(
@@ -175,7 +187,9 @@ pub mod workspace_patch {
 /// Helper functions for creating scratch-specific patches.
 /// All patches use path "/scratch" - filtering is done by matching id and payload type in the value.
 pub mod scratch_patch {
-    use super::*;
+    use super::{
+        AddOperation, Patch, PatchOperation, ReplaceOperation, Scratch, Uuid,
+    };
 
     const SCRATCH_PATH: &str = "/scratch";
 

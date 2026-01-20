@@ -195,7 +195,7 @@ impl AppServerClient {
                         .raw(),
                     )
                     .await?;
-                let (decision, feedback) = self.review_decision(&status).await?;
+                let (decision, feedback) = self.review_decision(&status);
                 let response = ApplyPatchApprovalResponse { decision };
                 send_server_response(peer, request_id, response).await?;
                 if let Some(message) = feedback {
@@ -230,7 +230,7 @@ impl AppServerClient {
                     )
                     .await?;
 
-                let (decision, feedback) = self.review_decision(&status).await?;
+                let (decision, feedback) = self.review_decision(&status);
                 let response = ExecCommandApprovalResponse { decision };
                 send_server_response(peer, request_id, response).await?;
                 if let Some(message) = feedback {
@@ -301,32 +301,27 @@ impl AppServerClient {
         self.rpc().next_request_id()
     }
 
-    async fn review_decision(
-        &self,
-        status: &ApprovalStatus,
-    ) -> Result<(ReviewDecision, Option<String>), ExecutorError> {
+    fn review_decision(&self, status: &ApprovalStatus) -> (ReviewDecision, Option<String>) {
         if self.auto_approve {
-            return Ok((ReviewDecision::ApprovedForSession, None));
+            return (ReviewDecision::ApprovedForSession, None);
         }
 
-        let outcome = match status {
+        match status {
             ApprovalStatus::Approved => (ReviewDecision::Approved, None),
             ApprovalStatus::Denied { reason } => {
                 let feedback = reason
                     .as_ref()
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
+                    .map(ToString::to_string);
                 if feedback.is_some() {
                     (ReviewDecision::Abort, feedback)
                 } else {
                     (ReviewDecision::Denied, None)
                 }
             }
-            ApprovalStatus::TimedOut => (ReviewDecision::Denied, None),
-            ApprovalStatus::Pending => (ReviewDecision::Denied, None),
-        };
-        Ok(outcome)
+            ApprovalStatus::TimedOut | ApprovalStatus::Pending => (ReviewDecision::Denied, None),
+        }
     }
 
     async fn enqueue_feedback(&self, message: String) {
@@ -360,11 +355,11 @@ impl AppServerClient {
             if trimmed.is_empty() {
                 continue;
             }
-            self.spawn_feedback_message(conversation_id, trimmed.to_string());
+            self.spawn_feedback_message(conversation_id, trimmed);
         }
     }
 
-    fn spawn_feedback_message(&self, conversation_id: ConversationId, feedback: String) {
+    fn spawn_feedback_message(&self, conversation_id: ConversationId, feedback: &str) {
         let peer = self.rpc().clone();
         let request = ClientRequest::SendUserMessage {
             request_id: peer.next_request_id(),

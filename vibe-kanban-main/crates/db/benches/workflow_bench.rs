@@ -2,9 +2,10 @@
 //!
 //! Run with: cargo bench --bench workflow_bench
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use db::models::workflow::{Workflow, WorkflowStatus};
 use sqlx::SqlitePool;
+use sqlx::Row;
 use uuid::Uuid;
 use chrono::Utc;
 
@@ -110,11 +111,11 @@ fn bench_find_by_id(c: &mut Criterion) {
         .bind(&workflow.merge_terminal_cli_id)
         .bind(&workflow.merge_terminal_model_id)
         .bind(&workflow.target_branch)
-        .bind(&workflow.ready_at)
-        .bind(&workflow.started_at)
-        .bind(&workflow.completed_at)
-        .bind(&workflow.created_at)
-        .bind(&workflow.updated_at)
+        .bind(workflow.ready_at)
+        .bind(workflow.started_at)
+        .bind(workflow.completed_at)
+        .bind(workflow.created_at)
+        .bind(workflow.updated_at)
         .execute(&pool)
         .await
         .unwrap();
@@ -122,7 +123,7 @@ fn bench_find_by_id(c: &mut Criterion) {
         pool
     });
 
-    let workflow_id = rt.block_on(async {
+    let workflow_id: String = rt.block_on(async {
         // Get the workflow ID we just created
         let row = sqlx::query("SELECT id FROM workflow LIMIT 1")
             .fetch_one(&pool)
@@ -132,13 +133,13 @@ fn bench_find_by_id(c: &mut Criterion) {
     });
 
     c.bench_function("find_by_id", |b| {
-        b.to_async(&rt).iter(|| {
+        b.iter(|| {
             let pool = pool.clone();
             let id = workflow_id.clone();
-            async move {
+            rt.block_on(async move {
                 let result = Workflow::find_by_id(&pool, black_box(&id)).await;
-                black_box(result);
-            }
+                let _ = black_box(result);
+            });
         })
     });
 }
@@ -228,11 +229,11 @@ fn bench_find_by_project(c: &mut Criterion) {
                 .bind(&workflow.merge_terminal_cli_id)
                 .bind(&workflow.merge_terminal_model_id)
                 .bind(&workflow.target_branch)
-                .bind(&workflow.ready_at)
-                .bind(&workflow.started_at)
-                .bind(&workflow.completed_at)
-                .bind(&workflow.created_at)
-                .bind(&workflow.updated_at)
+                .bind(workflow.ready_at)
+                .bind(workflow.started_at)
+                .bind(workflow.completed_at)
+                .bind(workflow.created_at)
+                .bind(workflow.updated_at)
                 .execute(&pool)
                 .await
                 .unwrap();
@@ -241,14 +242,14 @@ fn bench_find_by_project(c: &mut Criterion) {
             pool
         });
 
-        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &_size| {
-            b.to_async(&rt).iter(|| {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
+            b.iter(|| {
                 let pool = pool.clone();
-                async move {
+                rt.block_on(async move {
                     let result = Workflow::find_by_project(&pool, black_box("project-0")).await;
-                    black_box(result);
-                }
-            })
+                    let _ = black_box(result);
+                });
+            });
         });
     }
 
@@ -341,11 +342,11 @@ fn bench_find_by_project_with_status(c: &mut Criterion) {
             .bind(&workflow.merge_terminal_cli_id)
             .bind(&workflow.merge_terminal_model_id)
             .bind(&workflow.target_branch)
-            .bind(&workflow.ready_at)
-            .bind(&workflow.started_at)
-            .bind(&workflow.completed_at)
-            .bind(&workflow.created_at)
-            .bind(&workflow.updated_at)
+            .bind(workflow.ready_at)
+            .bind(workflow.started_at)
+            .bind(workflow.completed_at)
+            .bind(workflow.created_at)
+            .bind(workflow.updated_at)
             .execute(&pool)
             .await
             .unwrap();
@@ -355,22 +356,22 @@ fn bench_find_by_project_with_status(c: &mut Criterion) {
     });
 
     c.bench_function("find_by_project_with_status", |b| {
-        b.to_async(&rt).iter(|| {
+        b.iter(|| {
             let pool = pool.clone();
-            async move {
+            rt.block_on(async move {
                 // Query with status filter (uses partial index)
                 let result = sqlx::query_as::<_, Workflow>(
-                    r#"
+                    r"
                     SELECT * FROM workflow
                     WHERE project_id = ? AND status IN ('created', 'ready', 'running')
                     ORDER BY created_at DESC
-                    "#
+                    "
                 )
                 .bind(black_box("test-project"))
                 .fetch_all(&pool)
                 .await;
-                black_box(result);
-            }
+                let _ = black_box(result);
+            });
         })
     });
 }

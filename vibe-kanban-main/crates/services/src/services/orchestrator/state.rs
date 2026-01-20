@@ -1,26 +1,26 @@
-//! Orchestrator 状态管理
+//! Orchestrator state tracking and transitions.
 
 use std::collections::HashMap;
 
 use tokio::sync::RwLock;
 
 use super::config::OrchestratorConfig;
-use super::types::*;
+use super::types::{LLMMessage, TerminalCompletionEvent};
 
-/// Orchestrator 运行状态
+/// Execution state for the orchestrator event loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrchestratorRunState {
-    /// 空闲（等待事件）
+    /// Idle and waiting for events.
     Idle,
-    /// 处理中
+    /// Processing events or instructions.
     Processing,
-    /// 已暂停
+    /// Paused pending user or system action.
     Paused,
-    /// 已停止
+    /// Stopped and no longer processing.
     Stopped,
 }
 
-/// 任务执行状态
+/// Tracks per-task terminal execution progress.
 #[derive(Debug, Clone)]
 pub struct TaskExecutionState {
     pub task_id: String,
@@ -31,27 +31,27 @@ pub struct TaskExecutionState {
     pub is_completed: bool,
 }
 
-/// Orchestrator 状态
+/// In-memory orchestrator state for a workflow.
 pub struct OrchestratorState {
-    /// 运行状态
+    /// Current run state for the event loop.
     pub run_state: OrchestratorRunState,
 
-    /// 工作流 ID
+    /// Workflow identifier.
     pub workflow_id: String,
 
-    /// 任务执行状态
+    /// Per-task execution state.
     pub task_states: HashMap<String, TaskExecutionState>,
 
-    /// 对话历史（用于 LLM 上下文）
+    /// Conversation history for LLM context.
     pub conversation_history: Vec<LLMMessage>,
 
-    /// 待处理事件队列
+    /// Pending terminal completion events.
     pub pending_events: Vec<TerminalCompletionEvent>,
 
-    /// Token 使用统计
+    /// Total tokens consumed by the LLM.
     pub total_tokens_used: i64,
 
-    /// 错误计数
+    /// Total error count for this workflow run.
     pub error_count: u32,
 }
 
@@ -68,7 +68,7 @@ impl OrchestratorState {
         }
     }
 
-    /// 初始化任务状态
+    /// Initializes execution state for a task.
     pub fn init_task(&mut self, task_id: String, terminal_count: usize) {
         self.task_states.insert(
             task_id.clone(),
@@ -83,7 +83,7 @@ impl OrchestratorState {
         );
     }
 
-    /// 标记终端完成
+    /// Records a terminal completion for a task.
     pub fn mark_terminal_completed(&mut self, task_id: &str, terminal_id: &str, success: bool) {
         if let Some(state) = self.task_states.get_mut(task_id) {
             if success {
@@ -100,7 +100,7 @@ impl OrchestratorState {
         }
     }
 
-    /// 添加消息到对话历史
+    /// Appends a message and trims history based on config.
     pub fn add_message(&mut self, role: &str, content: &str, config: &OrchestratorConfig) {
         self.conversation_history.push(LLMMessage {
             role: role.to_string(),
@@ -129,38 +129,38 @@ impl OrchestratorState {
         }
     }
 
-    /// 检查所有任务是否完成
+    /// Returns true if all tasks are completed.
     pub fn all_tasks_completed(&self) -> bool {
         self.task_states.values().all(|s| s.is_completed)
     }
 
-    /// 检查是否有失败的任务
+    /// Returns true if any task has failed terminals.
     pub fn has_failed_tasks(&self) -> bool {
         self.task_states
             .values()
             .any(|s| !s.failed_terminals.is_empty())
     }
 
-    /// 状态转移验证和执行
+    /// Validates and performs a run-state transition.
     pub fn transition_to(
         &mut self,
         new_state: OrchestratorRunState,
     ) -> anyhow::Result<()> {
-        let valid_transitions = match (self.run_state, new_state) {
-            (OrchestratorRunState::Idle, OrchestratorRunState::Processing) => true,
-            (OrchestratorRunState::Idle, OrchestratorRunState::Paused) => true,
-            (OrchestratorRunState::Idle, OrchestratorRunState::Stopped) => true,
-            (OrchestratorRunState::Processing, OrchestratorRunState::Idle) => true,
-            (OrchestratorRunState::Processing, OrchestratorRunState::Paused) => true,
-            (OrchestratorRunState::Processing, OrchestratorRunState::Stopped) => true,
-            (OrchestratorRunState::Paused, OrchestratorRunState::Processing) => true,
-            (OrchestratorRunState::Paused, OrchestratorRunState::Idle) => true,
-            (OrchestratorRunState::Paused, OrchestratorRunState::Stopped) => true,
-            (from, to) => {
-                tracing::error!("Invalid state transition: {:?} → {:?}", from, to);
-                false
-            }
-        };
+        let valid_transitions = matches!(
+            (self.run_state, new_state),
+            (OrchestratorRunState::Idle | OrchestratorRunState::Paused, OrchestratorRunState::Processing)
+                | (OrchestratorRunState::Idle | OrchestratorRunState::Processing, OrchestratorRunState::Paused)
+                | (OrchestratorRunState::Idle | OrchestratorRunState::Processing | OrchestratorRunState::Paused, OrchestratorRunState::Stopped)
+                | (OrchestratorRunState::Processing | OrchestratorRunState::Paused, OrchestratorRunState::Idle)
+        );
+
+        if !valid_transitions {
+            tracing::error!(
+                "Invalid state transition: {:?} ??{:?}",
+                self.run_state,
+                new_state
+            );
+        }
 
         if valid_transitions {
             tracing::debug!("State transition: {:?} → {:?}", self.run_state, new_state);
@@ -175,7 +175,7 @@ impl OrchestratorState {
     }
 }
 
-/// 线程安全的状态包装
+/// Thread-safe shared orchestrator state.
 pub type SharedOrchestratorState = std::sync::Arc<RwLock<OrchestratorState>>;
 
 #[cfg(test)]

@@ -309,7 +309,7 @@ impl Merge {
         // Get the latest PR for each workspace by using a subquery to find the max created_at
         // Only consider PR merges (not direct merges)
         let rows = sqlx::query_as::<_, PrStatusRow>(
-            r#"SELECT
+            r"SELECT
                 m.workspace_id,
                 m.pr_status
             FROM merges m
@@ -321,7 +321,7 @@ impl Merge {
             ) latest ON m.workspace_id = latest.workspace_id
                 AND m.created_at = latest.max_created_at
             INNER JOIN workspaces w ON m.workspace_id = w.id
-            WHERE m.merge_type = 'pr' AND w.archived = $1"#,
+            WHERE m.merge_type = 'pr' AND w.archived = $1",
         )
         .bind(archived)
         .fetch_all(pool)

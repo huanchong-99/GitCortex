@@ -177,8 +177,7 @@ impl Repo {
         let id = Uuid::new_v4();
         let repo_name = path
             .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| id.to_string());
+            .map_or_else(|| id.to_string(), |name| name.to_string_lossy().to_string());
 
         // Use INSERT OR IGNORE + SELECT to handle race conditions atomically
         sqlx::query_as!(

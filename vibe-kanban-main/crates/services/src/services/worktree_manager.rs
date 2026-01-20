@@ -2,9 +2,10 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock, Mutex},
+    sync::{Arc, Mutex},
 };
 
+use once_cell::sync::Lazy;
 use git2::{Error as GitError, Repository};
 use thiserror::Error;
 use tracing::{debug, info, trace};
@@ -13,8 +14,8 @@ use utils::{path::normalize_macos_private_alias, shell::resolve_executable_path}
 use super::git::{GitService, GitServiceError};
 
 // Global synchronization for worktree creation to prevent race conditions
-static WORKTREE_CREATION_LOCKS: LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static WORKTREE_CREATION_LOCKS: Lazy<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Clone)]
 pub struct WorktreeCleanup {
@@ -199,7 +200,7 @@ impl WorktreeManager {
         let worktree_metadata_path = Self::get_worktree_metadata_path(git_repo_path)?;
         let worktree_metadata_folders = match fs::read_dir(&worktree_metadata_path) {
             Ok(read_dir) => read_dir
-                .filter_map(|entry| entry.ok())
+                .filter_map(Result::ok)
                 .collect::<Vec<fs::DirEntry>>(),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => {
@@ -441,7 +442,7 @@ impl WorktreeManager {
 
         // Try to determine the git repo path if not provided
         let resolved_repo_path = if let Some(repo_path) = &worktree.git_repo_path {
-            Some(repo_path.to_path_buf())
+            Some(repo_path.clone())
         } else {
             Self::infer_git_repo_path(&worktree.worktree_path).await
         };

@@ -111,7 +111,7 @@ impl acp::Client for AcpClient {
                 warn!("Failed to request tool approval: {}", err);
                 return Err(acp::Error::new(
                     ErrorCode::INTERNAL_ERROR.code,
-                    format!("Approval request failed: {}", err),
+                    format!("Approval request failed: {err}"),
                 ));
             }
         };

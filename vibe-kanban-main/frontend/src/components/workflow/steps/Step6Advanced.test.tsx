@@ -1,10 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import { Step6Advanced } from './Step6Advanced';
 import type { WizardConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('Step6Advanced', () => {
-  const mockOnUpdate = vi.fn();
+  const mockOnUpdate = vi.fn<(updates: Partial<WizardConfig>) => void>();
+  const getLastUpdate = (): Partial<WizardConfig> => {
+    const calls = mockOnUpdate.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[calls.length - 1][0];
+  };
+  const getLastAdvanced = () => {
+    const lastCall = getLastUpdate();
+    if (!lastCall.advanced) {
+      throw new Error('Expected advanced config to be defined.');
+    }
+    return lastCall.advanced;
+  };
 
   const defaultConfig: WizardConfig = {
     project: {
@@ -62,11 +75,12 @@ describe('Step6Advanced', () => {
 
   beforeEach(() => {
     mockOnUpdate.mockClear();
+    void setTestLanguage();
   });
 
   describe('Orchestrator Configuration', () => {
     it('should render orchestrator model selection', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -74,12 +88,13 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.getByText(/主 Agent 配置/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/主 Agent 配置/i)).toBeInTheDocument();
+      const label = i18n.t('workflow:step6.orchestrator.label');
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
     });
 
     it('should display available models in orchestrator dropdown', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -87,7 +102,7 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/主 Agent 配置/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.orchestrator.label'));
       expect(select).toBeInTheDocument();
 
       const options = screen.getAllByText(/Claude 3\.5|GPT-4/);
@@ -95,7 +110,7 @@ describe('Step6Advanced', () => {
     });
 
     it('should update orchestrator model when selection changes', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -103,36 +118,31 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/主 Agent 配置/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.orchestrator.label'));
       fireEvent.change(select, { target: { value: 'model-1' } });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            orchestrator: expect.objectContaining({
-              modelConfigId: 'model-1',
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.orchestrator.modelConfigId).toBe('model-1');
     });
 
     it('should show validation error for orchestrator model', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
-          errors={{ orchestratorModel: '请选择主 Agent 模型' }}
+          errors={{ orchestratorModel: 'validation.advanced.orchestratorModelRequired' }}
         />
       );
 
-      expect(screen.getByText('请选择主 Agent 模型')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:validation.advanced.orchestratorModelRequired'))
+      ).toBeInTheDocument();
     });
   });
 
   describe('Error Terminal Configuration', () => {
     it('should render error terminal toggle', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -140,11 +150,13 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.getByLabelText(/启用错误恢复终端/i)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(i18n.t('workflow:step6.errorTerminal.enableLabel'))
+      ).toBeInTheDocument();
     });
 
     it('should not show error terminal options when disabled', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -152,12 +164,16 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.queryByLabelText(/错误恢复 CLI/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/错误恢复模型/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(i18n.t('workflow:step6.errorTerminal.cliLabel'))
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(i18n.t('workflow:step6.errorTerminal.modelLabel'))
+      ).not.toBeInTheDocument();
     });
 
     it('should show error terminal options when enabled', () => {
-      const configWithErrorTerminalEnabled = {
+      const configWithErrorTerminalEnabled: WizardConfig = {
         ...defaultConfig,
         advanced: {
           ...defaultConfig.advanced,
@@ -165,7 +181,7 @@ describe('Step6Advanced', () => {
         },
       };
 
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithErrorTerminalEnabled}
           onUpdate={mockOnUpdate}
@@ -173,12 +189,16 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.getByLabelText(/错误恢复 CLI/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/错误恢复模型/i)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(i18n.t('workflow:step6.errorTerminal.cliLabel'))
+      ).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(i18n.t('workflow:step6.errorTerminal.modelLabel'))
+      ).toBeInTheDocument();
     });
 
     it('should enable error terminal when checkbox is checked', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -186,22 +206,17 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const checkbox = screen.getByLabelText(/启用错误恢复终端/i);
+      const checkbox = screen.getByLabelText(
+        i18n.t('workflow:step6.errorTerminal.enableLabel')
+      );
       fireEvent.click(checkbox);
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            errorTerminal: expect.objectContaining({
-              enabled: true,
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.errorTerminal.enabled).toBe(true);
     });
 
     it('should clear error terminal config when disabled', () => {
-      const configWithErrorTerminalEnabled = {
+      const configWithErrorTerminalEnabled: WizardConfig = {
         ...defaultConfig,
         advanced: {
           ...defaultConfig.advanced,
@@ -213,7 +228,7 @@ describe('Step6Advanced', () => {
         },
       };
 
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithErrorTerminalEnabled}
           onUpdate={mockOnUpdate}
@@ -221,24 +236,19 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const checkbox = screen.getByLabelText(/启用错误恢复终端/i);
+      const checkbox = screen.getByLabelText(
+        i18n.t('workflow:step6.errorTerminal.enableLabel')
+      );
       fireEvent.click(checkbox);
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            errorTerminal: expect.objectContaining({
-              enabled: false,
-              cliTypeId: undefined,
-              modelConfigId: undefined,
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.errorTerminal.enabled).toBe(false);
+      expect(advanced.errorTerminal.cliTypeId).toBeUndefined();
+      expect(advanced.errorTerminal.modelConfigId).toBeUndefined();
     });
 
     it('should update error terminal CLI selection', () => {
-      const configWithErrorTerminalEnabled = {
+      const configWithErrorTerminalEnabled: WizardConfig = {
         ...configWithModels,
         advanced: {
           ...configWithModels.advanced,
@@ -246,7 +256,7 @@ describe('Step6Advanced', () => {
         },
       };
 
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithErrorTerminalEnabled}
           onUpdate={mockOnUpdate}
@@ -254,22 +264,15 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/错误恢复 CLI/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.errorTerminal.cliLabel'));
       fireEvent.change(select, { target: { value: 'claude-code' } });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            errorTerminal: expect.objectContaining({
-              cliTypeId: 'claude-code',
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.errorTerminal.cliTypeId).toBe('claude-code');
     });
 
     it('should update error terminal model selection', () => {
-      const configWithErrorTerminalEnabled = {
+      const configWithErrorTerminalEnabled: WizardConfig = {
         ...configWithModels,
         advanced: {
           ...configWithModels.advanced,
@@ -277,7 +280,7 @@ describe('Step6Advanced', () => {
         },
       };
 
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithErrorTerminalEnabled}
           onUpdate={mockOnUpdate}
@@ -285,22 +288,15 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/错误恢复模型/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.errorTerminal.modelLabel'));
       fireEvent.change(select, { target: { value: 'model-1' } });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            errorTerminal: expect.objectContaining({
-              modelConfigId: 'model-1',
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.errorTerminal.modelConfigId).toBe('model-1');
     });
 
     it('should show validation errors for error terminal fields', () => {
-      const configWithErrorTerminalEnabled = {
+      const configWithErrorTerminalEnabled: WizardConfig = {
         ...configWithModels,
         advanced: {
           ...configWithModels.advanced,
@@ -308,27 +304,29 @@ describe('Step6Advanced', () => {
         },
       };
 
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithErrorTerminalEnabled}
           onUpdate={mockOnUpdate}
           errors={{
-            errorTerminalCli: '请选择 CLI 类型',
-            errorTerminalModel: '请选择模型',
+            errorTerminalCli: 'validation.terminals.cliRequired',
+            errorTerminalModel: 'validation.terminals.modelRequired',
           }}
         />
       );
 
-      // Error messages appear in multiple places (option elements, FieldError components)
-      // Check that error messages are present at least once (in FieldError)
-      expect(screen.getAllByText('请选择 CLI 类型').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('请选择模型').length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText(i18n.t('workflow:validation.terminals.cliRequired')).length
+      ).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText(i18n.t('workflow:validation.terminals.modelRequired')).length
+      ).toBeGreaterThanOrEqual(1);
     });
   });
 
   describe('Merge Terminal Configuration', () => {
     it('should render merge terminal configuration', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -336,13 +334,13 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.getByText(/合并终端配置/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/合并 CLI/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/合并模型/i)).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step6.mergeTerminal.title'))).toBeInTheDocument();
+      expect(screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.cliLabel'))).toBeInTheDocument();
+      expect(screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.modelLabel'))).toBeInTheDocument();
     });
 
     it('should update merge terminal CLI selection', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -350,22 +348,15 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/合并 CLI/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.cliLabel'));
       fireEvent.change(select, { target: { value: 'gemini-cli' } });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            mergeTerminal: expect.objectContaining({
-              cliTypeId: 'gemini-cli',
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.mergeTerminal.cliTypeId).toBe('gemini-cli');
     });
 
     it('should update merge terminal model selection', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -373,22 +364,15 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/合并模型/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.modelLabel'));
       fireEvent.change(select, { target: { value: 'model-2' } });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            mergeTerminal: expect.objectContaining({
-              modelConfigId: 'model-2',
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.mergeTerminal.modelConfigId).toBe('model-2');
     });
 
     it('should have runTestsBeforeMerge checked by default', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -396,12 +380,12 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const checkbox = screen.getByLabelText(/合并前运行测试/i);
+      const checkbox = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.runTestsLabel'));
       expect(checkbox).toBeChecked();
     });
 
     it('should have pauseOnConflict checked by default', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -409,12 +393,14 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const checkbox = screen.getByLabelText(/冲突时暂停/i);
+      const checkbox = screen.getByLabelText(
+        i18n.t('workflow:step6.mergeTerminal.pauseOnConflictLabel')
+      );
       expect(checkbox).toBeChecked();
     });
 
     it('should update runTestsBeforeMerge when checkbox is toggled', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -422,22 +408,15 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const checkbox = screen.getByLabelText(/合并前运行测试/i);
+      const checkbox = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.runTestsLabel'));
       fireEvent.click(checkbox);
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            mergeTerminal: expect.objectContaining({
-              runTestsBeforeMerge: false,
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.mergeTerminal.runTestsBeforeMerge).toBe(false);
     });
 
     it('should update pauseOnConflict when checkbox is toggled', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -445,42 +424,39 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const checkbox = screen.getByLabelText(/冲突时暂停/i);
+      const checkbox = screen.getByLabelText(
+        i18n.t('workflow:step6.mergeTerminal.pauseOnConflictLabel')
+      );
       fireEvent.click(checkbox);
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            mergeTerminal: expect.objectContaining({
-              pauseOnConflict: false,
-            }),
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.mergeTerminal.pauseOnConflict).toBe(false);
     });
 
     it('should show validation errors for merge terminal fields', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
           errors={{
-            mergeTerminalCli: '请选择 CLI 类型',
-            mergeTerminalModel: '请选择模型',
+            mergeCli: 'validation.advanced.mergeCliRequired',
+            mergeModel: 'validation.advanced.mergeModelRequired',
           }}
         />
       );
 
-      // Error messages appear in multiple places (option elements, FieldError components)
-      // Check that error messages are present at least once (in FieldError)
-      expect(screen.getAllByText('请选择 CLI 类型').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('请选择模型').length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText(i18n.t('workflow:validation.advanced.mergeCliRequired')).length
+      ).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText(i18n.t('workflow:validation.advanced.mergeModelRequired')).length
+      ).toBeGreaterThanOrEqual(1);
     });
   });
 
   describe('Target Branch', () => {
     it('should render target branch input', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -488,11 +464,13 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.getByLabelText(/目标分支/i)).toBeInTheDocument();
+      expect(
+        screen.getByLabelText(i18n.t('workflow:step6.targetBranch.label'))
+      ).toBeInTheDocument();
     });
 
     it('should display current target branch value', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -500,12 +478,12 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const input = screen.getByLabelText(/目标分支/i);
+      const input = screen.getByLabelText(i18n.t('workflow:step6.targetBranch.label'));
       expect(input).toHaveValue('main');
     });
 
     it('should update target branch when input changes', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -513,34 +491,31 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const input = screen.getByLabelText(/目标分支/i);
+      const input = screen.getByLabelText(i18n.t('workflow:step6.targetBranch.label'));
       fireEvent.change(input, { target: { value: 'develop' } });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          advanced: expect.objectContaining({
-            targetBranch: 'develop',
-          }),
-        })
-      );
+      const advanced = getLastAdvanced();
+      expect(advanced.targetBranch).toBe('develop');
     });
 
     it('should show validation error for target branch', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
-          errors={{ targetBranch: '请输入目标分支' }}
+          errors={{ targetBranch: 'validation.advanced.targetBranchRequired' }}
         />
       );
 
-      expect(screen.getByText('请输入目标分支')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:validation.advanced.targetBranchRequired'))
+      ).toBeInTheDocument();
     });
   });
 
   describe('Git Commit Format', () => {
     it('should render collapsible Git commit format section', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -548,11 +523,13 @@ describe('Step6Advanced', () => {
         />
       );
 
-      expect(screen.getByText(/Git 提交格式/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:step6.gitCommit.title'))
+      ).toBeInTheDocument();
     });
 
     it('should display Git commit format template', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -560,8 +537,7 @@ describe('Step6Advanced', () => {
         />
       );
 
-      // Expand the section
-      const toggleButton = screen.getByText(/Git 提交格式/i).closest('button');
+      const toggleButton = screen.getByText(i18n.t('workflow:step6.gitCommit.title')).closest('button');
       if (toggleButton) {
         fireEvent.click(toggleButton);
       }
@@ -574,7 +550,7 @@ describe('Step6Advanced', () => {
 
   describe('Helper Functions', () => {
     it('should use updateOrchestrator helper function', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -582,7 +558,7 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/主 Agent 配置/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.orchestrator.label'));
       fireEvent.change(select, { target: { value: 'model-1' } });
 
       const calls = mockOnUpdate.mock.calls;
@@ -595,7 +571,7 @@ describe('Step6Advanced', () => {
     });
 
     it('should use updateErrorTerminal helper function', () => {
-      const configWithErrorTerminalEnabled = {
+      const configWithErrorTerminalEnabled: WizardConfig = {
         ...configWithModels,
         advanced: {
           ...configWithModels.advanced,
@@ -603,7 +579,7 @@ describe('Step6Advanced', () => {
         },
       };
 
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithErrorTerminalEnabled}
           onUpdate={mockOnUpdate}
@@ -611,7 +587,7 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/错误恢复 CLI/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.errorTerminal.cliLabel'));
       fireEvent.change(select, { target: { value: 'claude-code' } });
 
       const calls = mockOnUpdate.mock.calls;
@@ -624,7 +600,7 @@ describe('Step6Advanced', () => {
     });
 
     it('should use updateMergeTerminal helper function', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -632,7 +608,7 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const select = screen.getByLabelText(/合并 CLI/i);
+      const select = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.cliLabel'));
       fireEvent.change(select, { target: { value: 'codex' } });
 
       const calls = mockOnUpdate.mock.calls;
@@ -647,7 +623,7 @@ describe('Step6Advanced', () => {
 
   describe('Empty Models State', () => {
     it('should show placeholder options when no models available', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={defaultConfig}
           onUpdate={mockOnUpdate}
@@ -655,11 +631,10 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const orchestratorSelect = screen.getByLabelText(/主 Agent 配置/i);
-      const mergeCliSelect = screen.getByLabelText(/合并 CLI/i);
-      const mergeModelSelect = screen.getByLabelText(/合并模型/i);
+      const orchestratorSelect = screen.getByLabelText(i18n.t('workflow:step6.orchestrator.label'));
+      const mergeCliSelect = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.cliLabel'));
+      const mergeModelSelect = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.modelLabel'));
 
-      // Check for "请选择" placeholder text
       expect(orchestratorSelect).toHaveValue('');
       expect(mergeCliSelect).toHaveValue('');
       expect(mergeModelSelect).toHaveValue('');
@@ -668,7 +643,7 @@ describe('Step6Advanced', () => {
 
   describe('CLI Type Options', () => {
     it('should display all CLI type options', () => {
-      render(
+      renderWithI18n(
         <Step6Advanced
           config={configWithModels}
           onUpdate={mockOnUpdate}
@@ -676,10 +651,9 @@ describe('Step6Advanced', () => {
         />
       );
 
-      const mergeCliSelect = screen.getByLabelText(/合并 CLI/i);
+      const mergeCliSelect = screen.getByLabelText(i18n.t('workflow:step6.mergeTerminal.cliLabel'));
       fireEvent.change(mergeCliSelect, { target: { value: '' } });
 
-      // Open the dropdown to see all options
       const options = screen.getAllByText(/Claude Code|Gemini CLI|Codex/);
       expect(options.length).toBeGreaterThanOrEqual(3);
     });

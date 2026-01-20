@@ -222,7 +222,7 @@ impl RemoteClient {
         };
         self.post_public("/v1/tokens/refresh", Some(&request))
             .await
-            .map_err(|e| self.map_api_error(e))
+            .map_err(Self::map_api_error)
     }
 
     /// Returns the base URL for the client.
@@ -242,7 +242,7 @@ impl RemoteClient {
     ) -> Result<HandoffInitResponse, RemoteClientError> {
         self.post_public("/v1/oauth/web/init", Some(request))
             .await
-            .map_err(|e| self.map_api_error(e))
+            .map_err(Self::map_api_error)
     }
 
     /// Redeems an application code for an access token.
@@ -252,7 +252,7 @@ impl RemoteClient {
     ) -> Result<HandoffRedeemResponse, RemoteClientError> {
         self.post_public("/v1/oauth/web/redeem", Some(request))
             .await
-            .map_err(|e| self.map_api_error(e))
+            .map_err(Self::map_api_error)
     }
 
     /// Gets an invitation by token (public, no auth required).
@@ -291,7 +291,7 @@ impl RemoteClient {
                 req = req.json(b);
             }
 
-            let res = req.send().await.map_err(map_reqwest_error)?;
+            let res = req.send().await.map_err(|e| map_reqwest_error(&e))?;
 
             match res.status() {
                 s if s.is_success() => Ok(res),
@@ -316,7 +316,7 @@ impl RemoteClient {
                 "Remote call failed, retrying after {:.2}s: {}",
                 dur.as_secs_f64(),
                 e
-            )
+            );
         })
         .await
     }
@@ -388,7 +388,7 @@ impl RemoteClient {
         Ok(())
     }
 
-    fn map_api_error(&self, err: RemoteClientError) -> RemoteClientError {
+    fn map_api_error(err: RemoteClientError) -> RemoteClientError {
         if let RemoteClientError::Http { body, .. } = &err
             && let Ok(api_err) = serde_json::from_str::<ApiErrorResponse>(body)
         {
@@ -606,7 +606,7 @@ pub struct CreateRemoteProjectPayload {
     pub metadata: Option<Value>,
 }
 
-fn map_reqwest_error(e: reqwest::Error) -> RemoteClientError {
+fn map_reqwest_error(e: &reqwest::Error) -> RemoteClientError {
     if e.is_timeout() {
         RemoteClientError::Timeout
     } else {

@@ -76,26 +76,29 @@ impl CommandBuilder {
         }
     }
 
+    #[must_use]
     pub fn params<I>(mut self, params: I) -> Self
     where
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        self.params = Some(params.into_iter().map(|p| p.into()).collect());
+        self.params = Some(params.into_iter().map(Into::into).collect());
         self
     }
 
+    #[must_use]
     pub fn override_base<S: Into<String>>(mut self, base: S) -> Self {
         self.base = base.into();
         self
     }
 
+    #[must_use]
     pub fn extend_params<I>(mut self, more: I) -> Self
     where
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        let extra: Vec<String> = more.into_iter().map(|p| p.into()).collect();
+        let extra: Vec<String> = more.into_iter().map(Into::into).collect();
         match &mut self.params {
             Some(p) => p.extend(extra),
             None => self.params = Some(extra),

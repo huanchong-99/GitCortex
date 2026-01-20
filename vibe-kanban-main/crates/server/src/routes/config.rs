@@ -77,7 +77,7 @@ pub struct UserSystemInfo {
     #[serde(flatten)]
     pub profiles: ExecutorConfigs,
     pub environment: Environment,
-    /// Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
+    /// Capabilities supported per executor (e.g., { "CLAUDE_CODE": [`SESSION_FORK`] })
     pub capabilities: HashMap<String, Vec<BaseAgentCapability>>,
 }
 
@@ -126,8 +126,8 @@ async fn update_config(
     // Get old config state before updating
     let old_config = deployment.config().read().await.clone();
 
-    match save_config_to_file(&new_config, &config_path).await {
-        Ok(_) => {
+    match save_config_to_file(&new_config, &config_path) {
+        Ok(()) => {
             let mut config = deployment.config().write().await;
             *config = new_config.clone();
             drop(config);
@@ -137,7 +137,7 @@ async fn update_config(
 
             ResponseJson(ApiResponse::success(new_config))
         }
-        Err(e) => ResponseJson(ApiResponse::error(&format!("Failed to save config: {}", e))),
+        Err(e) => ResponseJson(ApiResponse::error(&format!("Failed to save config: {e}"))),
     }
 }
 
@@ -186,7 +186,7 @@ async fn handle_config_events(deployment: &DeploymentImpl, old: &Config, new: &C
 }
 
 async fn get_sound(Path(sound): Path<SoundFile>) -> Result<Response, ApiError> {
-    let sound = sound.serve().await.map_err(DeploymentError::Other)?;
+    let sound = sound.serve().map_err(DeploymentError::Other)?;
     let response = Response::builder()
         .status(http::StatusCode::OK)
         .header(
@@ -232,13 +232,10 @@ async fn get_mcp_servers(
     }
 
     // Resolve supplied config path or agent default
-    let config_path = match coding_agent.default_mcp_config_path() {
-        Some(path) => path,
-        None => {
-            return Ok(ResponseJson(ApiResponse::error(
-                "Could not determine config file path",
-            )));
-        }
+    let Some(config_path) = coding_agent.default_mcp_config_path() else {
+        return Ok(ResponseJson(ApiResponse::error(
+            "Could not determine config file path",
+        )));
     };
 
     let mut mcpc = coding_agent.get_mcp_config();
@@ -270,21 +267,18 @@ async fn update_mcp_servers(
     }
 
     // Resolve supplied config path or agent default
-    let config_path = match agent.default_mcp_config_path() {
-        Some(path) => path.to_path_buf(),
-        None => {
-            return Ok(ResponseJson(ApiResponse::error(
-                "Could not determine config file path",
-            )));
-        }
+    let Some(config_path) = agent.default_mcp_config_path() else {
+        return Ok(ResponseJson(ApiResponse::error(
+            "Could not determine config file path",
+        )));
     };
+    let config_path = config_path.clone();
 
     let mcpc = agent.get_mcp_config();
     match update_mcp_servers_in_config(&config_path, &mcpc, payload.servers).await {
         Ok(message) => Ok(ResponseJson(ApiResponse::success(message))),
         Err(e) => Ok(ResponseJson(ApiResponse::error(&format!(
-            "Failed to update MCP servers: {}",
-            e
+            "Failed to update MCP servers: {e}"
         )))),
     }
 }
@@ -313,11 +307,12 @@ async fn update_mcp_servers_in_config(
     let new_count = new_servers.len();
     let message = match (old_servers, new_count) {
         (0, 0) => "No MCP servers configured".to_string(),
-        (0, n) => format!("Added {} MCP server(s)", n),
-        (old, new) if old == new => format!("Updated MCP server configuration ({} server(s))", new),
+        (0, n) => format!("Added {n} MCP server(s)"),
+        (old, new) if old == new => {
+            format!("Updated MCP server configuration ({new} server(s))")
+        }
         (old, new) => format!(
-            "Updated MCP server configuration (was {}, now {})",
-            old, new
+            "Updated MCP server configuration (was {old}, now {new})"
         ),
     };
 
@@ -361,7 +356,7 @@ fn set_mcp_servers_in_config_path(
             current
                 .as_object_mut()
                 .unwrap()
-                .insert(part.to_string(), serde_json::json!({}));
+                .insert(part.clone(), serde_json::json!({}));
         }
         current = current.get_mut(part).unwrap();
         if !current.is_object() {
@@ -374,7 +369,7 @@ fn set_mcp_servers_in_config_path(
     current
         .as_object_mut()
         .unwrap()
-        .insert(final_attr.to_string(), serde_json::to_value(servers)?);
+        .insert(final_attr.clone(), serde_json::to_value(servers)?);
 
     Ok(())
 }
@@ -414,7 +409,7 @@ async fn update_profiles(
         Ok(executor_profiles) => {
             // Save the profiles to file
             match executor_profiles.save_overrides() {
-                Ok(_) => {
+                Ok(()) => {
                     tracing::info!("Executor profiles saved successfully");
                     // Reload the cached profiles
                     ExecutorConfigs::reload();
@@ -425,15 +420,13 @@ async fn update_profiles(
                 Err(e) => {
                     tracing::error!("Failed to save executor profiles: {}", e);
                     ResponseJson(ApiResponse::error(&format!(
-                        "Failed to save executor profiles: {}",
-                        e
+                        "Failed to save executor profiles: {e}"
                     )))
                 }
             }
         }
         Err(e) => ResponseJson(ApiResponse::error(&format!(
-            "Invalid executor profiles format: {}",
-            e
+            "Invalid executor profiles format: {e}"
         ))),
     }
 }

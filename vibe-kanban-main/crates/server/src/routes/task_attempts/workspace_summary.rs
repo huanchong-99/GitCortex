@@ -139,8 +139,7 @@ pub async fn get_workspace_summaries(
             let id = ws.id;
             let latest = latest_processes.get(&id);
             let has_pending = latest
-                .map(|p| pending_approval_eps.contains(&p.execution_process_id))
-                .unwrap_or(false);
+                .is_some_and(|p| pending_approval_eps.contains(&p.execution_process_id));
             let stats = diff_stats.get(&id);
 
             WorkspaceSummary {
@@ -195,9 +194,8 @@ async fn compute_workspace_diff_stats(
         })
         .await;
 
-        let base_commit = match base_commit_result {
-            Ok(Ok(commit)) => commit,
-            _ => continue,
+        let Ok(Ok(base_commit)) = base_commit_result else {
+            continue;
         };
 
         // Get diffs

@@ -25,8 +25,7 @@ mod tests {
         for invalid_id in invalid_ids {
             assert!(
                 validate_terminal_id(invalid_id).is_err(),
-                "Expected validation to fail for: {}",
-                invalid_id
+                "Expected validation to fail for: {invalid_id}"
             );
         }
     }
@@ -46,8 +45,7 @@ mod tests {
         for valid_id in valid_ids {
             assert!(
                 validate_terminal_id(valid_id).is_ok(),
-                "Expected validation to pass for: {}",
-                valid_id
+                "Expected validation to pass for: {valid_id}"
             );
         }
     }

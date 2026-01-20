@@ -212,7 +212,7 @@ impl StandardCodingAgentExecutor for Codex {
             .and_then(|home| std::fs::metadata(home.join("auth.json")).ok())
             .and_then(|m| m.modified().ok())
             .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64)
+            .and_then(|d| i64::try_from(d.as_secs()).ok())
         {
             return AvailabilityInfo::LoginDetected {
                 last_auth_timestamp: timestamp,
@@ -221,12 +221,10 @@ impl StandardCodingAgentExecutor for Codex {
 
         let mcp_config_found = self
             .default_mcp_config_path()
-            .map(|p| p.exists())
-            .unwrap_or(false);
+            .is_some_and(|p| p.exists());
 
         let installation_indicator_found = codex_home()
-            .map(|home| home.join("version.json").exists())
-            .unwrap_or(false);
+            .is_some_and(|home| home.join("version.json").exists());
 
         if mcp_config_found || installation_indicator_found {
             AvailabilityInfo::InstallationFound
@@ -271,10 +269,12 @@ impl Codex {
 
     fn build_new_conversation_params(&self, cwd: &Path) -> NewConversationParams {
         let sandbox = match self.sandbox.as_ref() {
-            None | Some(SandboxMode::Auto) => Some(CodexSandboxMode::WorkspaceWrite), // match the Auto preset in codex
             Some(SandboxMode::ReadOnly) => Some(CodexSandboxMode::ReadOnly),
-            Some(SandboxMode::WorkspaceWrite) => Some(CodexSandboxMode::WorkspaceWrite),
             Some(SandboxMode::DangerFullAccess) => Some(CodexSandboxMode::DangerFullAccess),
+            // match the Auto preset in codex
+            None | Some(SandboxMode::Auto | SandboxMode::WorkspaceWrite) => {
+                Some(CodexSandboxMode::WorkspaceWrite)
+            }
         };
 
         let approval_policy = match self.ask_for_approval.as_ref() {
@@ -376,7 +376,7 @@ impl Codex {
         let (exit_signal_tx, exit_signal_rx) = tokio::sync::oneshot::channel();
 
         let params = self.build_new_conversation_params(current_dir);
-        let resume_session = resume_session.map(|s| s.to_string());
+        let resume_session = resume_session.map(ToString::to_string);
         let auto_approve = matches!(
             (&self.sandbox, &self.ask_for_approval),
             (Some(SandboxMode::DangerFullAccess), None)

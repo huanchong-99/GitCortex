@@ -91,7 +91,7 @@ impl Approvals {
 
         if let Some(store) = self.msg_store_by_id(&request.execution_process_id).await {
             // Find the matching tool use entry by name and input
-            let matching_tool = find_matching_tool_use(store.clone(), &request.tool_call_id);
+            let matching_tool = find_matching_tool_use(&store, &request.tool_call_id);
 
             if let Some((idx, matching_tool)) = matching_tool {
                 let approval_entry = matching_tool
@@ -215,7 +215,7 @@ impl Approvals {
                 biased;
 
                 resolved = waiter.clone() => resolved,
-                _ = tokio::time::sleep_until(deadline) => ApprovalStatus::TimedOut,
+                () = tokio::time::sleep_until(deadline) => ApprovalStatus::TimedOut,
             };
 
             let is_timeout = matches!(&status, ApprovalStatus::TimedOut);
@@ -296,10 +296,7 @@ pub(crate) async fn ensure_task_in_review(pool: &SqlitePool, execution_process_i
 
 /// Find a matching tool use entry that hasn't been assigned to an approval yet
 /// Matches by tool call id from tool metadata
-fn find_matching_tool_use(
-    store: Arc<MsgStore>,
-    tool_call_id: &str,
-) -> Option<(usize, NormalizedEntry)> {
+fn find_matching_tool_use(store: &MsgStore, tool_call_id: &str) -> Option<(usize, NormalizedEntry)> {
     let history = store.get_history();
 
     // Single loop through history
@@ -386,11 +383,11 @@ mod tests {
         );
 
         let (idx_foo, _) =
-            find_matching_tool_use(store.clone(), "foo-id").expect("Should match foo.rs");
+            find_matching_tool_use(&store, "foo-id").expect("Should match foo.rs");
         let (idx_bar, _) =
-            find_matching_tool_use(store.clone(), "bar-id").expect("Should match bar.rs");
+            find_matching_tool_use(&store, "bar-id").expect("Should match bar.rs");
         let (idx_baz, _) =
-            find_matching_tool_use(store.clone(), "baz-id").expect("Should match baz.rs");
+            find_matching_tool_use(&store, "baz-id").expect("Should match baz.rs");
 
         assert_eq!(idx_foo, 0, "foo.rs should match first entry");
         assert_eq!(idx_bar, 1, "bar.rs should match second entry");
@@ -412,13 +409,13 @@ mod tests {
         );
 
         assert!(
-            find_matching_tool_use(store.clone(), "pending-id").is_none(),
+            find_matching_tool_use(&store, "pending-id").is_none(),
             "Should not match tools in PendingApproval state"
         );
 
         // Test 3: Wrong tool id returns None
         assert!(
-            find_matching_tool_use(store.clone(), "wrong-id").is_none(),
+            find_matching_tool_use(&store, "wrong-id").is_none(),
             "Should not match different tool ids"
         );
     }

@@ -114,7 +114,7 @@ pub async fn refresh_token(
     let user_repo = UserRepository::new(state.pool());
     let user = user_repo.fetch_user(token_details.user_id).await?;
 
-    let tokens = jwt_service.generate_tokens(&session, &user, provider_token_details)?;
+    let tokens = jwt_service.generate_tokens(&session, &user, &provider_token_details)?;
 
     let old_token_id = token_details.refresh_token_id;
     let new_token_id = tokens.refresh_token_id;
@@ -123,7 +123,7 @@ pub async fn refresh_token(
         .rotate_tokens(session.id, old_token_id, new_token_id)
         .await
     {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(AuthSessionError::TokenReuseDetected) => {
             let revoked_count = session_repo
                 .revoke_all_user_sessions(token_details.user_id)
@@ -149,7 +149,9 @@ pub async fn refresh_token(
 impl IntoResponse for TokenRefreshError {
     fn into_response(self) -> Response {
         let (status, error_code) = match self {
-            TokenRefreshError::InvalidToken => (StatusCode::UNAUTHORIZED, "invalid_token"),
+            TokenRefreshError::InvalidToken | TokenRefreshError::Jwt(_) => {
+                (StatusCode::UNAUTHORIZED, "invalid_token")
+            }
             TokenRefreshError::TokenExpired => (StatusCode::UNAUTHORIZED, "token_expired"),
             TokenRefreshError::SessionRevoked => (StatusCode::UNAUTHORIZED, "session_revoked"),
             TokenRefreshError::TokenReuseDetected => {
@@ -168,7 +170,6 @@ impl IntoResponse for TokenRefreshError {
                     "provider_validation_unavailable",
                 )
             }
-            TokenRefreshError::Jwt(_) => (StatusCode::UNAUTHORIZED, "invalid_token"),
             TokenRefreshError::Identity(_) => (StatusCode::UNAUTHORIZED, "identity_error"),
             TokenRefreshError::Database(ref err) => {
                 tracing::error!(error = %err, "Database error during token refresh");

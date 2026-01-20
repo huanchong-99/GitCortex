@@ -197,7 +197,9 @@ impl ProjectService {
             db::models::project_repo::ProjectRepoError::Database(e) => {
                 ProjectServiceError::Database(e)
             }
-            _ => ProjectServiceError::RepositoryNotFound,
+            db::models::project_repo::ProjectRepoError::NotFound => {
+                ProjectServiceError::RepositoryNotFound
+            }
         })?;
 
         tracing::info!(
@@ -225,13 +227,13 @@ impl ProjectService {
         ProjectRepo::remove_repo_from_project(pool, project_id, repo_id)
             .await
             .map_err(|e| match e {
-                db::models::project_repo::ProjectRepoError::NotFound => {
-                    ProjectServiceError::RepositoryNotFound
-                }
                 db::models::project_repo::ProjectRepoError::Database(e) => {
                     ProjectServiceError::Database(e)
                 }
-                _ => ProjectServiceError::RepositoryNotFound,
+                db::models::project_repo::ProjectRepoError::NotFound
+                | db::models::project_repo::ProjectRepoError::AlreadyExists => {
+                    ProjectServiceError::RepositoryNotFound
+                }
             })?;
 
         if let Err(e) = Repo::delete_orphaned(pool).await {
@@ -275,7 +277,7 @@ impl ProjectService {
             .map(|repo| {
                 let repo_name = repo.name.clone();
                 let repo_path = repo.path.clone();
-                let mode = query.mode.clone();
+                let mode = query.mode;
                 let query_str = query_str.to_string();
                 async move {
                     let results = cache

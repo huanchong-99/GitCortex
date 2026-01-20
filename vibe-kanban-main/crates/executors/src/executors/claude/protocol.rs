@@ -139,10 +139,7 @@ impl ProtocolPeer {
                 input,
                 tool_use_id,
             } => {
-                match client
-                    .on_hook_callback(callback_id, input, tool_use_id)
-                    .await
-                {
+                match client.on_hook_callback(&callback_id, input, tool_use_id) {
                     Ok(hook_output) => {
                         if let Err(e) = self.send_hook_response(request_id, hook_output).await {
                             tracing::error!("Failed to send hook callback result: {e}");

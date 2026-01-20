@@ -1,10 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { Step0Project } from './Step0Project';
 import type { ProjectConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('Step0Project', () => {
-  const mockOnChange = vi.fn();
+  const mockOnChange = vi.fn<(updates: Partial<ProjectConfig>) => void>();
 
   const defaultConfig: ProjectConfig = {
     workingDirectory: '',
@@ -16,7 +17,7 @@ describe('Step0Project', () => {
 
   beforeEach(() => {
     mockOnChange.mockClear();
-    // Mock fetch to avoid actual API calls
+    void setTestLanguage();
     globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -26,7 +27,7 @@ describe('Step0Project', () => {
   });
 
   it('should render folder selection UI', () => {
-    render(
+    renderWithI18n(
       <Step0Project
         config={defaultConfig}
         onChange={mockOnChange}
@@ -34,21 +35,23 @@ describe('Step0Project', () => {
       />
     );
 
-    expect(screen.getByText('选择项目工作目录')).toBeInTheDocument();
-    expect(screen.getByText('点击浏览选择文件夹...')).toBeInTheDocument();
-    expect(screen.getByText('浏览')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step0.fieldLabel'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step0.placeholder'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step0.browse'))).toBeInTheDocument();
   });
 
   it('should show error when working directory is empty', () => {
-    render(
+    renderWithI18n(
       <Step0Project
         config={defaultConfig}
         onChange={mockOnChange}
-        errors={{ workingDirectory: '请选择工作目录' }}
+        errors={{ workingDirectory: 'validation.project.workingDirectoryRequired' }}
       />
     );
 
-    expect(screen.getByText('请选择工作目录')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:validation.project.workingDirectoryRequired'))
+    ).toBeInTheDocument();
   });
 
   it('should display git repo status when directory is selected', () => {
@@ -61,7 +64,7 @@ describe('Step0Project', () => {
       },
     };
 
-    render(
+    renderWithI18n(
       <Step0Project
         config={configWithGit}
         onChange={mockOnChange}
@@ -69,8 +72,12 @@ describe('Step0Project', () => {
       />
     );
 
-    expect(screen.getByText('检测到 Git 仓库')).toBeInTheDocument();
-    expect(screen.getByText(/当前分支:/)).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step0.status.gitDetected'))
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(i18n.t('workflow:step0.branchLabel')))
+    ).toBeInTheDocument();
   });
 
   it('should show init git option when not a git repo', () => {
@@ -82,7 +89,7 @@ describe('Step0Project', () => {
       },
     };
 
-    render(
+    renderWithI18n(
       <Step0Project
         config={configWithoutGit}
         onChange={mockOnChange}
@@ -90,8 +97,10 @@ describe('Step0Project', () => {
       />
     );
 
-    expect(screen.getByText('未检测到 Git 仓库')).toBeInTheDocument();
-    expect(screen.getByText('初始化 Git 仓库')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step0.status.gitNotDetected'))
+    ).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step0.initGit'))).toBeInTheDocument();
   });
 
   it('should display remote URL when available', () => {
@@ -105,7 +114,7 @@ describe('Step0Project', () => {
       },
     };
 
-    render(
+    renderWithI18n(
       <Step0Project
         config={configWithRemote}
         onChange={mockOnChange}
@@ -113,7 +122,9 @@ describe('Step0Project', () => {
       />
     );
 
-    expect(screen.getByText(/远程仓库:/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(i18n.t('workflow:step0.remoteLabel')))
+    ).toBeInTheDocument();
     expect(screen.getByText('https://github.com/user/repo.git')).toBeInTheDocument();
   });
 
@@ -128,7 +139,7 @@ describe('Step0Project', () => {
       },
     };
 
-    render(
+    renderWithI18n(
       <Step0Project
         config={configWithDirty}
         onChange={mockOnChange}
@@ -136,8 +147,11 @@ describe('Step0Project', () => {
       />
     );
 
-    expect(screen.getByText(/有未提交的更改/)).toBeInTheDocument();
-    expect(screen.getByText(/3 个文件/)).toBeInTheDocument();
+    const dirtyText = `${i18n.t('workflow:step0.dirtyLabel')} (${i18n.t(
+      'workflow:step0.dirtyFiles',
+      { count: 3 }
+    )})`;
+    expect(screen.getByText(dirtyText)).toBeInTheDocument();
   });
 
   it('should have refresh button enabled when not loading', () => {
@@ -150,7 +164,7 @@ describe('Step0Project', () => {
       },
     };
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <Step0Project
         config={configWithGit}
         onChange={mockOnChange}
@@ -158,7 +172,9 @@ describe('Step0Project', () => {
       />
     );
 
-    const refreshButton = container.querySelector('button[aria-label="刷新 Git 状态"]');
+    const refreshButton = container.querySelector(
+      `button[aria-label="${i18n.t('workflow:step0.refreshLabel')}"]`
+    );
     expect(refreshButton).toBeInTheDocument();
     expect(refreshButton).not.toBeDisabled();
   });
@@ -173,20 +189,19 @@ describe('Step0Project', () => {
       },
     };
 
-    // Mock fetch to simulate loading
-    globalThis.fetch = vi.fn(() =>
-      new Promise((resolve) => {
-        // Never resolve to keep loading state
-        setTimeout(() => {
-          resolve({
-            ok: true,
-            json: () => Promise.resolve({}),
-          } as Response);
-        }, 10000);
-      })
+    globalThis.fetch = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              ok: true,
+              json: () => Promise.resolve({}),
+            } as Response);
+          }, 10000);
+        })
     );
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <Step0Project
         config={configWithGit}
         onChange={mockOnChange}
@@ -194,33 +209,44 @@ describe('Step0Project', () => {
       />
     );
 
-    // Trigger a status check by clicking refresh
-    const refreshButton = container.querySelector('button[aria-label="刷新 Git 状态"]');
+    const refreshButton = container.querySelector(
+      `button[aria-label="${i18n.t('workflow:step0.refreshLabel')}"]`
+    );
     if (refreshButton) {
       fireEvent.click(refreshButton);
     }
 
-    // Check if it has disabled attribute (after async operations)
-    // Note: This test checks the structure, actual loading state would need
-    // different testing approach with fake timers
     expect(refreshButton).toBeInTheDocument();
   });
 
-  it('should handle undefined gitStatus safely', () => {
-    const configWithoutGitStatus: ProjectConfig = {
+  it('should call onError when git status fetch fails', async () => {
+    const onError = vi.fn();
+    const configWithGit: ProjectConfig = {
       workingDirectory: '/path/to/project',
-      gitStatus: undefined as any,
+      gitStatus: {
+        isGitRepo: true,
+        currentBranch: 'main',
+        isDirty: false,
+      },
     };
 
-    render(
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network fail'));
+
+    renderWithI18n(
       <Step0Project
-        config={configWithoutGitStatus}
+        config={configWithGit}
         onChange={mockOnChange}
         errors={{}}
+        onError={onError}
       />
     );
 
-    expect(screen.getByText('未检测到 Git 仓库')).toBeInTheDocument();
-  });
+    fireEvent.click(
+      screen.getByLabelText(i18n.t('workflow:step0.refreshLabel'))
+    );
 
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    });
+  });
 });

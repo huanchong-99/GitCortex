@@ -67,7 +67,7 @@ impl OAuthTokenValidator {
                         }
                     }
                     OAuthTokenValidationError::ValidationUnavailable(_) => (),
-                };
+                }
                 Err(err)
             }
         }

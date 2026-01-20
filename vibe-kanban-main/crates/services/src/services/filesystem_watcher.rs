@@ -71,7 +71,7 @@ fn build_gitignore_set(root: &Path) -> Result<Gitignore, FilesystemWatcherError>
         .hidden(false) // we *want* to see .gitignore
         .git_ignore(true) // Respect gitignore to skip heavy directories
         .filter_entry(|entry| {
-            let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+            let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
 
             // Skip .git directory
             if is_dir
@@ -93,7 +93,7 @@ fn build_gitignore_set(root: &Path) -> Result<Gitignore, FilesystemWatcherError>
             // everything that is not a directory and is named .gitignore
             match result {
                 Ok(dir_entry) => {
-                    if !dir_entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                    if !dir_entry.file_type().is_some_and(|ft| ft.is_dir()) {
                         builder.add(dir_entry.path());
                     }
                     Ok(())
@@ -124,12 +124,9 @@ fn path_allowed(path: &Path, gi: &Gitignore, canonical_root: &Path) -> bool {
     let canonical_path = canonicalize_lossy(path);
 
     // Convert absolute path to relative path from the gitignore root
-    let relative_path = match canonical_path.strip_prefix(canonical_root) {
-        Ok(rel_path) => rel_path,
-        Err(_) => {
-            // Path is outside the watched root, don't ignore it
-            return true;
-        }
+    let Ok(relative_path) = canonical_path.strip_prefix(canonical_root) else {
+        // Path is outside the watched root, don't ignore it
+        return true;
     };
 
     // Check if path is inside any of the always-skip directories
@@ -305,7 +302,7 @@ fn collect_watch_directories(root: &Path, gi: &Gitignore) -> Vec<WatchTarget> {
         .hidden(false)
         .git_ignore(true) // Respect gitignore to skip node_modules, target, etc.
         .filter_entry(|entry| {
-            let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+            let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
             if !is_dir {
                 return false;
             }
@@ -319,9 +316,9 @@ fn collect_watch_directories(root: &Path, gi: &Gitignore) -> Vec<WatchTarget> {
             true
         })
         .build()
-        .filter_map(|result| result.ok())
-        .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
-        .map(|entry| entry.into_path())
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_dir()))
+        .map(ignore::DirEntry::into_path)
         .collect();
 
     allowed_dirs.sort();
@@ -455,8 +452,8 @@ fn remove_directory_watch(
     });
 }
 
-pub fn async_watcher(root: PathBuf) -> Result<WatcherComponents, FilesystemWatcherError> {
-    let canonical_root = canonicalize_lossy(&root);
+pub fn async_watcher(root: &Path) -> Result<WatcherComponents, FilesystemWatcherError> {
+    let canonical_root = canonicalize_lossy(root);
     let gi_set = Arc::new(build_gitignore_set(&canonical_root)?);
     // NOTE: changes to .gitignore aren’t picked up until the watcher is rebuilt.
     // Recomputing on every change would require rebuilding the full watcher fleet.

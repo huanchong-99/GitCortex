@@ -38,7 +38,7 @@ impl NotificationService {
 
     /// Play a system sound notification across platforms
     async fn play_sound_notification(sound_file: &SoundFile) {
-        let file_path = match sound_file.get_path().await {
+        let file_path = match sound_file.get_path() {
             Ok(path) => path,
             Err(e) => {
                 tracing::error!("Failed to create cached sound file: {}", e);
@@ -97,16 +97,16 @@ impl NotificationService {
     /// Send a cross-platform push notification
     async fn send_push_notification(title: &str, message: &str) {
         if cfg!(target_os = "macos") {
-            Self::send_macos_notification(title, message).await;
+            Self::send_macos_notification(title, message);
         } else if cfg!(target_os = "linux") && !utils::is_wsl2() {
-            Self::send_linux_notification(title, message).await;
+            Self::send_linux_notification(title, message);
         } else if cfg!(target_os = "windows") || (cfg!(target_os = "linux") && utils::is_wsl2()) {
             Self::send_windows_notification(title, message).await;
         }
     }
 
     /// Send macOS notification using osascript
-    async fn send_macos_notification(title: &str, message: &str) {
+    fn send_macos_notification(title: &str, message: &str) {
         let script = format!(
             r#"display notification "{message}" with title "{title}" sound name "Glass""#,
             message = message.replace('"', r#"\""#),
@@ -120,13 +120,13 @@ impl NotificationService {
     }
 
     /// Send Linux notification using notify-rust
-    async fn send_linux_notification(title: &str, message: &str) {
+    fn send_linux_notification(title: &str, message: &str) {
         use notify_rust::Notification;
 
         let title = title.to_string();
         let message = message.to_string();
 
-        let _handle = tokio::task::spawn_blocking(move || {
+        let handle = tokio::task::spawn_blocking(move || {
             if let Err(e) = Notification::new()
                 .summary(&title)
                 .body(&message)
@@ -136,12 +136,12 @@ impl NotificationService {
                 tracing::error!("Failed to send Linux notification: {}", e);
             }
         });
-        drop(_handle); // Don't await, fire-and-forget
+        drop(handle); // Don't await, fire-and-forget
     }
 
     /// Send Windows/WSL notification using PowerShell toast script
     async fn send_windows_notification(title: &str, message: &str) {
-        let script_path = match utils::get_powershell_script().await {
+        let script_path = match utils::get_powershell_script() {
             Ok(path) => path,
             Err(e) => {
                 tracing::error!("Failed to get PowerShell script: {}", e);

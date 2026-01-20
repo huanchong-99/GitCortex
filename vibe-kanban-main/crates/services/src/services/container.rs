@@ -170,7 +170,7 @@ pub trait ContainerService {
         ctx: &ExecutionContext,
     ) {
         match Task::update_status(&self.db().pool, ctx.task.id, TaskStatus::InReview).await {
-            Ok(_) => {
+            Ok(()) => {
                 if let Some(publisher) = share_publisher
                     && let Err(err) = publisher.update_shared_task_by_id(ctx.task.id).await
                 {
@@ -277,7 +277,7 @@ pub trait ContainerService {
                 && let Ok(Some(task)) = workspace.parent_task(&self.db().pool).await
             {
                 match Task::update_status(&self.db().pool, task.id, TaskStatus::InReview).await {
-                    Ok(_) => {
+                    Ok(()) => {
                         if let Some(publisher) = self.share_publisher()
                             && let Err(err) = publisher.update_shared_task_by_id(task.id).await
                         {
@@ -486,9 +486,8 @@ pub trait ContainerService {
 
     async fn try_stop(&self, workspace: &Workspace, include_dev_server: bool) {
         // stop execution processes for this workspace's sessions
-        let sessions = match Session::find_by_workspace_id(&self.db().pool, workspace.id).await {
-            Ok(s) => s,
-            Err(_) => return,
+        let Ok(sessions) = Session::find_by_workspace_id(&self.db().pool, workspace.id).await else {
+            return;
         };
 
         for session in sessions {
@@ -591,38 +590,38 @@ pub trait ContainerService {
                     })
                     .boxed(),
             );
-        } else {
-            // Fallback: load from DB and create direct stream
-            let log_records =
-                match ExecutionProcessLogs::find_by_execution_id(&self.db().pool, *id).await {
-                    Ok(records) if !records.is_empty() => records,
-                    Ok(_) => return None, // No logs exist
-                    Err(e) => {
-                        tracing::error!("Failed to fetch logs for execution {}: {}", id, e);
-                        return None;
-                    }
-                };
+        }
 
-            let messages = match ExecutionProcessLogs::parse_logs(&log_records) {
-                Ok(msgs) => msgs,
+        // Fallback: load from DB and create direct stream
+        let log_records =
+            match ExecutionProcessLogs::find_by_execution_id(&self.db().pool, *id).await {
+                Ok(records) if !records.is_empty() => records,
+                Ok(_) => return None, // No logs exist
                 Err(e) => {
-                    tracing::error!("Failed to parse logs for execution {}: {}", id, e);
+                    tracing::error!("Failed to fetch logs for execution {}: {}", id, e);
                     return None;
                 }
             };
 
-            // Direct stream from parsed messages
-            let stream = futures::stream::iter(
-                messages
-                    .into_iter()
-                    .filter(|m| matches!(m, LogMsg::Stdout(_) | LogMsg::Stderr(_)))
-                    .chain(std::iter::once(LogMsg::Finished))
-                    .map(Ok::<_, std::io::Error>),
-            )
-            .boxed();
+        let messages = match ExecutionProcessLogs::parse_logs(&log_records) {
+            Ok(msgs) => msgs,
+            Err(e) => {
+                tracing::error!("Failed to parse logs for execution {}: {}", id, e);
+                return None;
+            }
+        };
 
-            Some(stream)
-        }
+        // Direct stream from parsed messages
+        let stream = futures::stream::iter(
+            messages
+                .into_iter()
+                .filter(|m| matches!(m, LogMsg::Stdout(_) | LogMsg::Stderr(_)))
+                .chain(std::iter::once(LogMsg::Finished))
+                .map(Ok::<_, std::io::Error>),
+        )
+        .boxed();
+
+        Some(stream)
     }
 
     async fn stream_normalized_logs(
@@ -716,9 +715,7 @@ pub trait ContainerService {
 
             let current_dir = self.workspace_to_current_dir(&workspace);
 
-            let executor_action = if let Ok(executor_action) = process.executor_action() {
-                executor_action
-            } else {
+            let Ok(executor_action) = process.executor_action() else {
                 tracing::error!(
                     "Failed to parse executor action: {:?}",
                     process.executor_action()
@@ -864,7 +861,7 @@ pub trait ContainerService {
                         LogMsg::Finished => {
                             break;
                         }
-                        LogMsg::JsonPatch(_) | LogMsg::Ready => continue,
+                        LogMsg::JsonPatch(_) | LogMsg::Ready => {}
                     }
                 }
             }
@@ -1114,7 +1111,7 @@ pub trait ContainerService {
                     )
                     .await;
                 }
-            };
+            }
             return Err(start_error);
         }
 
@@ -1135,7 +1132,7 @@ pub trait ContainerService {
                     &request.executor_profile_id,
                     request.effective_dir(&workspace_root),
                 )),
-                _ => None,
+                ExecutorActionType::ScriptRequest(_) => None,
             }
         {
             #[cfg(feature = "qa-mode")]
@@ -1164,9 +1161,7 @@ pub trait ContainerService {
 
     async fn try_start_next_action(&self, ctx: &ExecutionContext) -> Result<(), ContainerError> {
         let action = ctx.execution_process.executor_action()?;
-        let next_action = if let Some(next_action) = action.next_action() {
-            next_action
-        } else {
+        let Some(next_action) = action.next_action() else {
             tracing::debug!("No next action configured");
             return Ok(());
         };

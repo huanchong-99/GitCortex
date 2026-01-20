@@ -106,9 +106,7 @@ impl FilesystemService {
 
         #[cfg(not(feature = "qa-mode"))]
         {
-            let base_path = path
-                .map(PathBuf::from)
-                .unwrap_or_else(Self::get_home_directory);
+            let base_path = path.map_or_else(Self::get_home_directory, PathBuf::from);
             Self::verify_directory(&base_path)?;
             self.list_git_repos_with_timeout(
                 vec![base_path],
@@ -134,12 +132,9 @@ impl FilesystemService {
             tokio::time::sleep(std::time::Duration::from_millis(timeout_ms)).await;
             cancel_after_delay.cancel();
         });
-        let service = self.clone();
         let cancel_for_scan = cancel_token.clone();
         let mut scan_handle = tokio::spawn(async move {
-            service
-                .list_git_repos_inner(paths, max_depth, Some(&cancel_for_scan))
-                .await
+            Self::list_git_repos_inner(&paths, max_depth, Some(&cancel_for_scan))
         });
 
         let hard_timeout = tokio::time::sleep(std::time::Duration::from_millis(hard_timeout_ms));
@@ -148,13 +143,12 @@ impl FilesystemService {
         tokio::select! {
             res = &mut scan_handle => {
                 match res {
-                    Ok(Ok(repos)) => Ok(repos),
-                    Ok(Err(err)) => Err(err),
+                    Ok(repos) => Ok(repos),
                     Err(join_err) => Err(FilesystemError::Io(
-                        std::io::Error::other(join_err.to_string())))
+                        std::io::Error::other(join_err.to_string()))),
                 }
-                }
-            _ = &mut hard_timeout => {
+            }
+            () = &mut hard_timeout => {
                 scan_handle.abort();
                 tracing::warn!("list_git_repos_with_timeout: hard timeout reached after {}ms", hard_timeout_ms);
                 Err(FilesystemError::Io(std::io::Error::new(
@@ -202,15 +196,13 @@ impl FilesystemService {
     }
 
     #[cfg(not(feature = "qa-mode"))]
-    async fn list_git_repos_inner(
-        &self,
-        path: Vec<PathBuf>,
+    fn list_git_repos_inner(
+        path: &[PathBuf],
         max_depth: Option<usize>,
         cancel: Option<&CancellationToken>,
-    ) -> Result<Vec<DirectoryEntry>, FilesystemError> {
-        let base_dir = match path.first() {
-            Some(dir) => dir,
-            None => return Ok(vec![]),
+    ) -> Vec<DirectoryEntry> {
+        let Some(base_dir) = path.first() else {
+            return vec![];
         };
         let skip_dirs = Self::get_directories_to_skip();
         let vibe_kanban_temp_dir = utils::path::get_vibe_kanban_temp_dir();
@@ -285,7 +277,7 @@ impl FilesystemService {
             })
             .collect();
         git_repos.sort_by_key(|entry| entry.last_modified.unwrap_or(0));
-        Ok(git_repos)
+        git_repos
     }
 
     fn get_home_directory() -> PathBuf {
@@ -295,8 +287,7 @@ impl FilesystemService {
             .unwrap_or_else(|| {
                 if cfg!(windows) {
                     std::env::var("USERPROFILE")
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|_| PathBuf::from("C:\\"))
+                        .map_or_else(|_| PathBuf::from("C:\\"), PathBuf::from)
                 } else {
                     PathBuf::from("/")
                 }
@@ -313,13 +304,11 @@ impl FilesystemService {
         Ok(())
     }
 
-    pub async fn list_directory(
+    pub fn list_directory(
         &self,
         path: Option<String>,
     ) -> Result<DirectoryListResponse, FilesystemError> {
-        let path = path
-            .map(PathBuf::from)
-            .unwrap_or_else(Self::get_home_directory);
+        let path = path.map_or_else(Self::get_home_directory, PathBuf::from);
         Self::verify_directory(&path)?;
 
         let entries = fs::read_dir(&path)?;

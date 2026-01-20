@@ -89,7 +89,7 @@ impl GitCli {
         branch: &str,
         create_branch: bool,
     ) -> Result<(), GitCliError> {
-        self.ensure_available()?;
+        Self::ensure_available()?;
 
         let mut args: Vec<OsString> = vec!["worktree".into(), "add".into()];
         if create_branch {
@@ -114,7 +114,7 @@ impl GitCli {
         worktree_path: &Path,
         force: bool,
     ) -> Result<(), GitCliError> {
-        self.ensure_available()?;
+        Self::ensure_available()?;
         let mut args: Vec<OsString> = vec!["worktree".into(), "remove".into()];
         if force {
             args.push("--force".into());
@@ -131,7 +131,7 @@ impl GitCli {
         old_path: &Path,
         new_path: &Path,
     ) -> Result<(), GitCliError> {
-        self.ensure_available()?;
+        Self::ensure_available()?;
         self.git(
             repo_path,
             [
@@ -169,7 +169,7 @@ impl GitCli {
         &self,
         worktree_path: &Path,
         base_commit: &Commit,
-        opts: StatusDiffOptions,
+        opts: &StatusDiffOptions,
     ) -> Result<Vec<StatusDiffEntry>, GitCliError> {
         // Create a temp index file
         let tmp_dir = tempfile::TempDir::new()
@@ -181,7 +181,7 @@ impl GitCli {
         )];
 
         // Use a temp index from HEAD to accurately track renames in untracked files
-        let _ = self.git_with_env(worktree_path, ["read-tree", "HEAD"], &envs)?;
+        let _ = Self::git_with_env(worktree_path, ["read-tree", "HEAD"], &envs)?;
 
         // Stage changed and untracked files explicitly, which is faster than `git add -A` for large repos.
         // Use raw paths from `get_worktree_status` to avoid lossy UTF-8 conversions for odd filenames.
@@ -210,7 +210,7 @@ impl GitCli {
                 OsString::from("--pathspec-from-file=-"),
                 OsString::from("--pathspec-file-nul"),
             ];
-            self.git_with_stdin(worktree_path, args, Some(&envs), &input)?;
+            Self::git_with_stdin(worktree_path, args, Some(&envs), &input)?;
         }
         // git diff --cached
         let mut args: Vec<OsString> = vec![
@@ -223,7 +223,7 @@ impl GitCli {
             OsString::from(base_commit.to_string()),
         ];
         args = Self::apply_pathspec_filter(args, opts.path_filter.as_ref());
-        let out = self.git_with_env(worktree_path, args, &envs)?;
+        let out = Self::git_with_env(worktree_path, args, &envs)?;
         Ok(Self::parse_name_status(&out))
     }
 
@@ -238,7 +238,7 @@ impl GitCli {
             "-z",
             "--untracked-files=normal",
         ]);
-        let out = self.git_impl(worktree_path, args, None, None)?;
+        let out = Self::git_impl(worktree_path, args, None, None)?;
         let mut entries = Vec::new();
         let mut uncommitted_tracked = 0usize;
         let mut untracked = 0usize;
@@ -322,7 +322,7 @@ impl GitCli {
                 // Extract branch name from refs/heads/branch-name
                 current_branch = branch_ref
                     .strip_prefix("refs/heads/")
-                    .map(|name| name.to_string());
+                    .map(ToString::to_string);
             }
         }
 
@@ -357,9 +357,9 @@ impl GitCli {
             OsString::from(refspec),
         ];
 
-        match self.git_with_env(repo_path, args, &envs) {
+        match Self::git_with_env(repo_path, args, &envs) {
             Ok(_) => Ok(()),
-            Err(GitCliError::CommandFailed(msg)) => Err(self.classify_cli_error(msg)),
+            Err(GitCliError::CommandFailed(msg)) => Err(Self::classify_cli_error(msg)),
             Err(err) => Err(err),
         }
     }
@@ -385,9 +385,9 @@ impl GitCli {
             OsString::from(refspec),
         ];
 
-        match self.git_with_env(repo_path, args, &envs) {
+        match Self::git_with_env(repo_path, args, &envs) {
             Ok(_) => Ok(()),
-            Err(GitCliError::CommandFailed(msg)) => Err(self.classify_cli_error(msg)),
+            Err(GitCliError::CommandFailed(msg)) => Err(Self::classify_cli_error(msg)),
             Err(err) => Err(err),
         }
     }
@@ -408,9 +408,9 @@ impl GitCli {
             OsString::from(format!("refs/heads/{branch_name}")),
         ];
 
-        match self.git_with_env(repo_path, args, &envs) {
+        match Self::git_with_env(repo_path, args, &envs) {
             Ok(output) => Ok(!output.trim().is_empty()),
-            Err(GitCliError::CommandFailed(msg)) => Err(self.classify_cli_error(msg)),
+            Err(GitCliError::CommandFailed(msg)) => Err(Self::classify_cli_error(msg)),
             Err(err) => Err(err),
         }
     }
@@ -658,7 +658,7 @@ impl GitCli {
 
 // Private methods
 impl GitCli {
-    fn classify_cli_error(&self, msg: String) -> GitCliError {
+    fn classify_cli_error(msg: String) -> GitCliError {
         let lower = msg.to_ascii_lowercase();
         if lower.contains("authentication failed")
             || lower.contains("could not read username")
@@ -677,7 +677,7 @@ impl GitCli {
     }
 
     /// Ensure `git` is available on PATH
-    fn ensure_available(&self) -> Result<(), GitCliError> {
+    fn ensure_available() -> Result<(), GitCliError> {
         let git = resolve_executable_path_blocking("git").ok_or(GitCliError::NotAvailable)?;
         let out = Command::new(&git)
             .arg("--version")
@@ -704,7 +704,6 @@ impl GitCli {
     ///   `AsRef<OsStr>` so typical call sites can still pass `&str` literals or
     ///   owned `String`s without friction.
     fn git_impl<I, S>(
-        &self,
         repo_path: &Path,
         args: I,
         envs: Option<&[(OsString, OsString)]>,
@@ -714,7 +713,7 @@ impl GitCli {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        self.ensure_available()?;
+        Self::ensure_available()?;
         let git = resolve_executable_path_blocking("git").ok_or(GitCliError::NotAvailable)?;
         let mut cmd = Command::new(&git);
         cmd.arg("-C").arg(repo_path);
@@ -785,12 +784,11 @@ impl GitCli {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        let out = self.git_impl(repo_path, args, None, None)?;
+        let out = Self::git_impl(repo_path, args, None, None)?;
         Ok(String::from_utf8_lossy(&out).to_string())
     }
 
     fn git_with_env<I, S>(
-        &self,
         repo_path: &Path,
         args: I,
         envs: &[(OsString, OsString)],
@@ -799,12 +797,11 @@ impl GitCli {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        let out = self.git_impl(repo_path, args, Some(envs), None)?;
+        let out = Self::git_impl(repo_path, args, Some(envs), None)?;
         Ok(String::from_utf8_lossy(&out).to_string())
     }
 
     fn git_with_stdin<I, S>(
-        &self,
         repo_path: &Path,
         args: I,
         envs: Option<&[(OsString, OsString)]>,
@@ -814,7 +811,7 @@ impl GitCli {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        let out = self.git_impl(repo_path, args, envs, Some(stdin))?;
+        let out = Self::git_impl(repo_path, args, envs, Some(stdin))?;
         Ok(String::from_utf8_lossy(&out).to_string())
     }
 

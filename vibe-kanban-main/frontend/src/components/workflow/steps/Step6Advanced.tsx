@@ -4,6 +4,7 @@ import { CollapsibleSection } from '../../ui-new/primitives/CollapsibleSection';
 import { cn } from '@/lib/utils';
 import { CLI_TYPES, GIT_COMMIT_FORMAT } from '../constants';
 import type { WizardConfig, AdvancedConfig } from '../types';
+import { useTranslation } from 'react-i18next';
 
 interface Step6AdvancedProps {
   config: WizardConfig;
@@ -11,14 +12,17 @@ interface Step6AdvancedProps {
   onUpdate: (updates: Partial<WizardConfig>) => void;
 }
 
+/**
+ * Step 6: Configures orchestrator, error recovery, and merge settings.
+ */
 export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
   config,
   errors,
   onUpdate,
 }) => {
+  const { t } = useTranslation('workflow');
   const advancedConfig = config.advanced;
 
-  // Helper function to update orchestrator config
   const updateOrchestrator = (updates: Partial<AdvancedConfig['orchestrator']>) => {
     onUpdate({
       advanced: {
@@ -31,7 +35,6 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
     });
   };
 
-  // Helper function to update error terminal config
   const updateErrorTerminal = (updates: Partial<AdvancedConfig['errorTerminal']>) => {
     onUpdate({
       advanced: {
@@ -44,7 +47,6 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
     });
   };
 
-  // Helper function to update merge terminal config
   const updateMergeTerminal = (updates: Partial<AdvancedConfig['mergeTerminal']>) => {
     onUpdate({
       advanced: {
@@ -104,166 +106,172 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
 
   return (
     <div className="flex flex-col gap-base">
-      {/* Orchestrator Configuration */}
       <Field>
-        <FieldLabel htmlFor="orchestratorModel">主 Agent 配置</FieldLabel>
+        <FieldLabel htmlFor="orchestratorModel">{t('step6.orchestrator.label')}</FieldLabel>
         <div className="text-sm text-low mb-half">
-          选择用于协调多任务并行执行的主 AI 模型
+          {t('step6.orchestrator.description')}
         </div>
         <select
           id="orchestratorModel"
           value={advancedConfig.orchestrator.modelConfigId}
-          onChange={(e) => handleOrchestratorModelChange(e.target.value)}
+          onChange={(e) => {
+            handleOrchestratorModelChange(e.target.value);
+          }}
           className={cn(
             'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
             'focus:outline-none focus:ring-1 focus:ring-brand',
             errors.orchestratorModel && 'border-error'
           )}
         >
-          <option value="">请选择模型</option>
+          <option value="">{t('step6.orchestrator.placeholder')}</option>
           {config.models.map((model) => (
             <option key={model.id} value={model.id}>
               {model.displayName}
             </option>
           ))}
         </select>
-        {errors.orchestratorModel && <FieldError>{errors.orchestratorModel}</FieldError>}
+        {errors.orchestratorModel && <FieldError>{t(errors.orchestratorModel)}</FieldError>}
       </Field>
 
-      {/* Error Terminal Configuration */}
       <Field>
         <div className="flex items-center gap-base mb-half">
           <input
             type="checkbox"
             id="errorTerminalEnabled"
             checked={advancedConfig.errorTerminal.enabled}
-            onChange={(e) => handleErrorTerminalEnabledChange(e.target.checked)}
+            onChange={(e) => {
+              handleErrorTerminalEnabledChange(e.target.checked);
+            }}
             className="size-icon-sm accent-brand"
           />
           <FieldLabel htmlFor="errorTerminalEnabled" className="mb-0">
-            启用错误恢复终端（可选）
+            {t('step6.errorTerminal.enableLabel')}
           </FieldLabel>
         </div>
         <div className="text-sm text-low mb-base">
-          当任务执行失败时，自动使用独立的终端进行错误恢复
+          {t('step6.errorTerminal.description')}
         </div>
 
         {advancedConfig.errorTerminal.enabled && (
           <div className="flex flex-col gap-base p-base border rounded-sm bg-panel">
-            {/* CLI Selection */}
             <Field>
-              <FieldLabel htmlFor="errorTerminalCli">错误恢复 CLI</FieldLabel>
+              <FieldLabel htmlFor="errorTerminalCli">{t('step6.errorTerminal.cliLabel')}</FieldLabel>
               <select
                 id="errorTerminalCli"
-                value={advancedConfig.errorTerminal.cliTypeId || ''}
-                onChange={(e) => handleErrorTerminalCliChange(e.target.value)}
+                value={advancedConfig.errorTerminal.cliTypeId ?? ''}
+                onChange={(e) => {
+                  handleErrorTerminalCliChange(e.target.value);
+                }}
                 className={cn(
                   'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                   'focus:outline-none focus:ring-1 focus:ring-brand',
                   errors.errorTerminalCli && 'border-error'
                 )}
               >
-                <option value="">请选择 CLI 类型</option>
+                <option value="">{t('step6.errorTerminal.cliPlaceholder')}</option>
                 {Object.values(CLI_TYPES).map((cli) => (
                   <option key={cli.id} value={cli.id}>
                     {cli.label} - {cli.description}
                   </option>
                 ))}
               </select>
-              {errors.errorTerminalCli && <FieldError>{errors.errorTerminalCli}</FieldError>}
+              {errors.errorTerminalCli && <FieldError>{t(errors.errorTerminalCli)}</FieldError>}
             </Field>
 
-            {/* Model Selection */}
             <Field>
-              <FieldLabel htmlFor="errorTerminalModel">错误恢复模型</FieldLabel>
+              <FieldLabel htmlFor="errorTerminalModel">{t('step6.errorTerminal.modelLabel')}</FieldLabel>
               <select
                 id="errorTerminalModel"
-                value={advancedConfig.errorTerminal.modelConfigId || ''}
-                onChange={(e) => handleErrorTerminalModelChange(e.target.value)}
+                value={advancedConfig.errorTerminal.modelConfigId ?? ''}
+                onChange={(e) => {
+                  handleErrorTerminalModelChange(e.target.value);
+                }}
                 className={cn(
                   'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                   'focus:outline-none focus:ring-1 focus:ring-brand',
                   errors.errorTerminalModel && 'border-error'
                 )}
               >
-                <option value="">请选择模型</option>
+                <option value="">{t('step6.errorTerminal.modelPlaceholder')}</option>
                 {config.models.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.displayName}
                   </option>
                 ))}
               </select>
-              {errors.errorTerminalModel && <FieldError>{errors.errorTerminalModel}</FieldError>}
+              {errors.errorTerminalModel && <FieldError>{t(errors.errorTerminalModel)}</FieldError>}
             </Field>
           </div>
         )}
       </Field>
 
-      {/* Merge Terminal Configuration */}
       <Field>
-        <FieldLabel>合并终端配置</FieldLabel>
+        <FieldLabel>{t('step6.mergeTerminal.title')}</FieldLabel>
         <div className="text-sm text-low mb-base">
-          配置用于自动合并任务分支的终端和模型
+          {t('step6.mergeTerminal.description')}
         </div>
 
         <div className="flex flex-col gap-base p-base border rounded-sm bg-panel">
-          {/* CLI Selection */}
           <Field>
-            <FieldLabel htmlFor="mergeTerminalCli">合并 CLI</FieldLabel>
+            <FieldLabel htmlFor="mergeTerminalCli">{t('step6.mergeTerminal.cliLabel')}</FieldLabel>
             <select
               id="mergeTerminalCli"
               value={advancedConfig.mergeTerminal.cliTypeId}
-              onChange={(e) => handleMergeTerminalCliChange(e.target.value)}
+              onChange={(e) => {
+                handleMergeTerminalCliChange(e.target.value);
+              }}
               className={cn(
                 'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                 'focus:outline-none focus:ring-1 focus:ring-brand',
-                errors.mergeTerminalCli && 'border-error'
+                errors.mergeCli && 'border-error'
               )}
             >
-              <option value="">请选择 CLI 类型</option>
+              <option value="">{t('step6.mergeTerminal.cliPlaceholder')}</option>
               {Object.values(CLI_TYPES).map((cli) => (
                 <option key={cli.id} value={cli.id}>
                   {cli.label} - {cli.description}
                 </option>
               ))}
             </select>
-            {errors.mergeTerminalCli && <FieldError>{errors.mergeTerminalCli}</FieldError>}
+            {errors.mergeCli && <FieldError>{t(errors.mergeCli)}</FieldError>}
           </Field>
 
-          {/* Model Selection */}
           <Field>
-            <FieldLabel htmlFor="mergeTerminalModel">合并模型</FieldLabel>
+            <FieldLabel htmlFor="mergeTerminalModel">{t('step6.mergeTerminal.modelLabel')}</FieldLabel>
             <select
               id="mergeTerminalModel"
               value={advancedConfig.mergeTerminal.modelConfigId}
-              onChange={(e) => handleMergeTerminalModelChange(e.target.value)}
+              onChange={(e) => {
+                handleMergeTerminalModelChange(e.target.value);
+              }}
               className={cn(
                 'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                 'focus:outline-none focus:ring-1 focus:ring-brand',
-                errors.mergeTerminalModel && 'border-error'
+                errors.mergeModel && 'border-error'
               )}
             >
-              <option value="">请选择模型</option>
+              <option value="">{t('step6.mergeTerminal.modelPlaceholder')}</option>
               {config.models.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.displayName}
                 </option>
               ))}
             </select>
-            {errors.mergeTerminalModel && <FieldError>{errors.mergeTerminalModel}</FieldError>}
+            {errors.mergeModel && <FieldError>{t(errors.mergeModel)}</FieldError>}
           </Field>
 
-          {/* Checkboxes */}
           <div className="flex flex-col gap-base">
             <label className="flex items-center gap-base cursor-pointer">
               <input
                 type="checkbox"
                 checked={advancedConfig.mergeTerminal.runTestsBeforeMerge}
-                onChange={(e) => handleRunTestsBeforeMergeChange(e.target.checked)}
+                onChange={(e) => {
+                  handleRunTestsBeforeMergeChange(e.target.checked);
+                }}
                 className="size-icon-sm accent-brand"
               />
               <span className="text-base text-normal">
-                合并前运行测试
+                {t('step6.mergeTerminal.runTestsLabel')}
               </span>
             </label>
 
@@ -271,26 +279,29 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
               <input
                 type="checkbox"
                 checked={advancedConfig.mergeTerminal.pauseOnConflict}
-                onChange={(e) => handlePauseOnConflictChange(e.target.checked)}
+                onChange={(e) => {
+                  handlePauseOnConflictChange(e.target.checked);
+                }}
                 className="size-icon-sm accent-brand"
               />
               <span className="text-base text-normal">
-                冲突时暂停
+                {t('step6.mergeTerminal.pauseOnConflictLabel')}
               </span>
             </label>
           </div>
         </div>
       </Field>
 
-      {/* Target Branch */}
       <Field>
-        <FieldLabel htmlFor="targetBranch">目标分支</FieldLabel>
+        <FieldLabel htmlFor="targetBranch">{t('step6.targetBranch.label')}</FieldLabel>
         <input
           id="targetBranch"
           type="text"
           value={advancedConfig.targetBranch}
-          onChange={(e) => handleTargetBranchChange(e.target.value)}
-          placeholder="例如：main"
+          onChange={(e) => {
+            handleTargetBranchChange(e.target.value);
+          }}
+          placeholder={t('step6.targetBranch.placeholder')}
           className={cn(
             'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
             'placeholder:text-low placeholder:opacity-80',
@@ -298,19 +309,18 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
             errors.targetBranch && 'border-error'
           )}
         />
-        {errors.targetBranch && <FieldError>{errors.targetBranch}</FieldError>}
+        {errors.targetBranch && <FieldError>{t(errors.targetBranch)}</FieldError>}
       </Field>
 
-      {/* Git Commit Format */}
       <Field>
         <CollapsibleSection
           persistKey="wizard-git-commit-format"
-          title="Git 提交格式（系统强制执行）"
+          title={t('step6.gitCommit.title')}
           defaultExpanded={false}
         >
           <div className="mt-base">
             <div className="text-sm text-low mb-base">
-              所有提交将遵循以下格式，由系统自动生成
+              {t('step6.gitCommit.description')}
             </div>
             <pre className="bg-secondary border rounded-sm p-base text-sm font-mono text-normal overflow-x-auto">
               {GIT_COMMIT_FORMAT}

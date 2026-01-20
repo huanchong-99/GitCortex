@@ -143,9 +143,9 @@ impl ClaudeAgentClient {
         }
     }
 
-    pub async fn on_hook_callback(
+    pub fn on_hook_callback(
         &self,
-        callback_id: String,
+        callback_id: &str,
         _input: serde_json::Value,
         _tool_use_id: Option<String>,
     ) -> Result<serde_json::Value, ExecutorError> {
@@ -158,7 +158,7 @@ impl ClaudeAgentClient {
                 }
             }))
         } else {
-            match callback_id.as_str() {
+            match callback_id {
                 AUTO_APPROVE_CALLBACK_ID => Ok(serde_json::json!({
                     "hookSpecificOutput": {
                         "hookEventName": "PreToolUse",

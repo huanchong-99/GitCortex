@@ -34,48 +34,45 @@ pub fn make_path_relative(path: &str, worktree_path: &str) -> String {
     let canonical_path = std::fs::canonicalize(&path_obj);
     let canonical_worktree = std::fs::canonicalize(&worktree_path_obj);
 
-    match (canonical_path, canonical_worktree) {
-        (Ok(canon_path), Ok(canon_worktree)) => {
-            tracing::debug!(
-                "Trying canonical path resolution: '{}' -> '{}', '{}' -> '{}'",
-                path,
-                canon_path.display(),
-                worktree_path,
-                canon_worktree.display()
-            );
+    if let (Ok(canon_path), Ok(canon_worktree)) = (canonical_path, canonical_worktree) {
+        tracing::debug!(
+            "Trying canonical path resolution: '{}' -> '{}', '{}' -> '{}'",
+            path,
+            canon_path.display(),
+            worktree_path,
+            canon_worktree.display()
+        );
 
-            match canon_path.strip_prefix(&canon_worktree) {
-                Ok(relative_path) => {
-                    let result = relative_path.to_string_lossy().to_string();
-                    tracing::debug!(
-                        "Successfully made relative with canonical paths: '{}' -> '{}'",
-                        path,
-                        result
-                    );
-                    if result.is_empty() {
-                        return ".".to_string();
-                    }
+        match canon_path.strip_prefix(&canon_worktree) {
+            Ok(relative_path) => {
+                let result = relative_path.to_string_lossy().to_string();
+                tracing::debug!(
+                    "Successfully made relative with canonical paths: '{}' -> '{}'",
+                    path,
                     result
+                );
+                if result.is_empty() {
+                    return ".".to_string();
                 }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to make canonical path relative: '{}' relative to '{}', error: {}, returning original",
-                        canon_path.display(),
-                        canon_worktree.display(),
-                        e
-                    );
-                    path.to_string()
-                }
+                result
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to make canonical path relative: '{}' relative to '{}', error: {}, returning original",
+                    canon_path.display(),
+                    canon_worktree.display(),
+                    e
+                );
+                path.to_string()
             }
         }
-        _ => {
-            tracing::debug!(
-                "Could not canonicalize paths (paths may not exist): '{}', '{}', returning original",
-                path,
-                worktree_path
-            );
-            path.to_string()
-        }
+    } else {
+        tracing::debug!(
+            "Could not canonicalize paths (paths may not exist): '{}', '{}', returning original",
+            path,
+            worktree_path
+        );
+        path.to_string()
     }
 }
 

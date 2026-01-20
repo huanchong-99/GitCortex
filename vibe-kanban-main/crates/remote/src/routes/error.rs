@@ -38,7 +38,8 @@ pub(crate) fn task_error_response(error: SharedTaskError, context: &str) -> Resp
             StatusCode::FORBIDDEN,
             Json(json!({ "error": "only the assignee can modify this task" })),
         ),
-        SharedTaskError::Conflict(message) => {
+        SharedTaskError::Conflict(message)
+        | SharedTaskError::Project(ProjectError::Conflict(message)) => {
             (StatusCode::CONFLICT, Json(json!({ "error": message })))
         }
         SharedTaskError::PayloadTooLarge => (
@@ -47,9 +48,6 @@ pub(crate) fn task_error_response(error: SharedTaskError, context: &str) -> Resp
                 "error": "title and description cannot exceed 50 KiB combined"
             })),
         ),
-        SharedTaskError::Project(ProjectError::Conflict(message)) => {
-            (StatusCode::CONFLICT, Json(json!({ "error": message })))
-        }
         SharedTaskError::Project(err) => {
             tracing::error!(?err, "{context}", context = context);
             (
@@ -87,10 +85,7 @@ pub(crate) fn identity_error_response(error: IdentityError, message: &str) -> Re
         IdentityError::InvitationError(msg) => {
             (StatusCode::BAD_REQUEST, Json(json!({ "error": msg })))
         }
-        IdentityError::CannotDeleteOrganization(msg) => {
-            (StatusCode::CONFLICT, Json(json!({ "error": msg })))
-        }
-        IdentityError::OrganizationConflict(msg) => {
+        IdentityError::CannotDeleteOrganization(msg) | IdentityError::OrganizationConflict(msg) => {
             (StatusCode::CONFLICT, Json(json!({ "error": msg })))
         }
         IdentityError::Database(err) => {

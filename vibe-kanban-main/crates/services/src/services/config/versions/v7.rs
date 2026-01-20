@@ -27,6 +27,7 @@ pub enum ThemeMode {
     System,
 }
 
+#[allow(clippy::struct_excessive_bools, clippy::struct_field_names)]
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Config {
     pub config_version: String,

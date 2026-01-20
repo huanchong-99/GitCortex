@@ -1,9 +1,9 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Check, X } from 'lucide-react';
-import { CLI_TYPES } from './constants';
+import { CLI_TYPES, type CliTypeId } from './constants';
+import { useTranslation } from 'react-i18next';
 
-/** Terminal runtime status */
 export type TerminalStatus =
   | 'not_started'
   | 'starting'
@@ -12,7 +12,6 @@ export type TerminalStatus =
   | 'completed'
   | 'failed';
 
-/** Runtime terminal data with status */
 export interface Terminal {
   id: string;
   workflowTaskId?: string;
@@ -25,25 +24,28 @@ export interface Terminal {
   ptySessionId?: string | null;
 }
 
-/** Status styles for each terminal state */
+const STATUS_DOT = (
+  <span aria-hidden="true" className="inline-block size-2 rounded-full bg-current" />
+);
+
 const STATUS_STYLES: Record<
   TerminalStatus,
   { icon: React.ReactNode; className: string }
 > = {
   not_started: {
-    icon: <span className="text-lg">○</span>,
+    icon: STATUS_DOT,
     className: 'text-low',
   },
   starting: {
-    icon: <span className="text-lg">◐</span>,
+    icon: STATUS_DOT,
     className: 'text-yellow-500',
   },
   waiting: {
-    icon: <span className="text-lg">◑</span>,
+    icon: STATUS_DOT,
     className: 'text-blue-500',
   },
   working: {
-    icon: <span className="text-lg">●</span>,
+    icon: STATUS_DOT,
     className: 'text-green-500',
   },
   completed: {
@@ -61,9 +63,18 @@ interface TerminalCardProps {
   onClick?: () => void;
 }
 
+/**
+ * Renders a terminal summary card with status and role details.
+ */
 export function TerminalCard({ terminal, onClick }: TerminalCardProps) {
+  const { t } = useTranslation('workflow');
   const statusStyle = STATUS_STYLES[terminal.status];
-  const cliType = CLI_TYPES[terminal.cliTypeId as keyof typeof CLI_TYPES];
+  const cliType = Object.prototype.hasOwnProperty.call(CLI_TYPES, terminal.cliTypeId)
+    ? CLI_TYPES[terminal.cliTypeId as CliTypeId]
+    : undefined;
+  const orderLabel = t('terminalCard.orderLabel', { index: terminal.orderIndex + 1 });
+  const roleValue = terminal.role?.trim();
+  const roleLabel = roleValue ? roleValue : t('terminalCard.defaultRole');
 
   return (
     <div
@@ -74,21 +85,15 @@ export function TerminalCard({ terminal, onClick }: TerminalCardProps) {
         'bg-secondary border-border'
       )}
     >
-      {/* Status Icon */}
       <div className={cn('flex items-center justify-center', statusStyle.className)}>
         {statusStyle.icon}
       </div>
 
-      {/* Terminal Order Index */}
-      <div className="text-xs text-low">T{terminal.orderIndex + 1}</div>
+      <div className="text-xs text-low">{orderLabel}</div>
 
-      {/* Role Name or 'Terminal' */}
-      <div className="text-sm font-medium text-high">
-        {terminal.role || 'Terminal'}
-      </div>
+      <div className="text-sm font-medium text-high">{roleLabel}</div>
 
-      {/* CLI Type ID */}
-      <div className="text-xs text-low">{cliType?.label || terminal.cliTypeId}</div>
+      <div className="text-xs text-low">{cliType ? cliType.label : terminal.cliTypeId}</div>
     </div>
   );
 }

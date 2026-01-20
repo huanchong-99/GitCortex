@@ -57,7 +57,7 @@ impl PlainTextBuffer {
     }
 
     /// Ingest a new text chunk into the buffer.
-    pub fn ingest(&mut self, text_chunk: String) {
+    pub fn ingest(&mut self, text_chunk: &str) {
         debug_assert!(!text_chunk.is_empty());
 
         // Add a new lines or grow the current partial line
@@ -70,7 +70,7 @@ impl PlainTextBuffer {
         };
 
         // Process chunk
-        let combined_text = current_partial + &text_chunk;
+        let combined_text = current_partial + text_chunk;
         let size = combined_text.len();
 
         // Append new lines
@@ -136,7 +136,7 @@ impl PlainTextBuffer {
 
     /// Recompute cached total length from current lines.
     pub fn recompute_len(&mut self) {
-        self.total_len = self.lines.iter().map(|s| s.len()).sum();
+        self.total_len = self.lines.iter().map(String::len).sum();
     }
 
     /// Get the current parial line.
@@ -205,7 +205,8 @@ impl PlainTextLogProcessor {
             {
                 let lines = self.buffer.flush();
                 if !lines.is_empty() {
-                    return vec![self.create_patch(lines)];
+                    let content = lines.concat();
+                    return vec![self.create_patch(content)];
                 }
                 self.current_entry_index = None;
             }
@@ -224,7 +225,7 @@ impl PlainTextLogProcessor {
         }
 
         // Let the buffer handle text buffering
-        self.buffer.ingest(formatted_chunk);
+        self.buffer.ingest(&formatted_chunk);
 
         if let Some(transform_lines) = self.transform_lines.as_mut() {
             transform_lines(self.buffer.lines_mut());
@@ -249,7 +250,8 @@ impl PlainTextLogProcessor {
                 Some(MessageBoundary::Split(line_idx)) => {
                     let lines = self.buffer.drain_lines(line_idx);
                     if !lines.is_empty() {
-                        patches.push(self.create_patch(lines));
+                        let content = lines.concat();
+                        patches.push(self.create_patch(content));
                         // Move to next entry after split
                         self.current_entry_index = None;
                     }
@@ -275,7 +277,8 @@ impl PlainTextLogProcessor {
                 if lines.is_empty() {
                     break;
                 }
-                patches.push(self.create_patch(lines));
+                let content = lines.concat();
+                patches.push(self.create_patch(content));
                 // Move to next entry after size split
                 self.current_entry_index = None;
             }
@@ -284,14 +287,14 @@ impl PlainTextLogProcessor {
         // Send partial udpdates
         if !self.buffer.is_empty() {
             // Stream updates without consuming buffer
-            patches.push(self.create_patch(self.buffer.lines().to_vec()));
+            let content = self.buffer.lines().concat();
+            patches.push(self.create_patch(content));
         }
         patches
     }
 
     /// Create patch
-    fn create_patch(&mut self, lines: Vec<String>) -> Patch {
-        let content = lines.concat();
+    fn create_patch(&mut self, content: String) -> Patch {
         let entry = (self.normalized_entry_producer)(content);
 
         let added = self.current_entry_index.is_some();
@@ -304,10 +307,10 @@ impl PlainTextLogProcessor {
             idx
         };
 
-        if !added {
-            ConversationPatch::add_normalized_entry(index, entry)
-        } else {
+        if added {
             ConversationPatch::replace(index, entry)
+        } else {
+            ConversationPatch::add_normalized_entry(index, entry)
         }
     }
 }
@@ -368,7 +371,7 @@ mod tests {
     fn test_plain_buffer_flush() {
         let mut buffer = PlainTextBuffer::new();
 
-        buffer.ingest("line1\npartial".to_string());
+        buffer.ingest("line1\npartial");
         assert_eq!(buffer.lines().len(), 2);
 
         let lines = buffer.flush();
@@ -380,7 +383,7 @@ mod tests {
     fn test_plain_buffer_len() {
         let mut buffer = PlainTextBuffer::new();
 
-        buffer.ingest("abc\ndef\n".to_string());
+        buffer.ingest("abc\ndef\n");
         assert_eq!(buffer.total_len(), 8); // "abc\n" + "def\n"
 
         buffer.drain_lines(1);
@@ -391,7 +394,7 @@ mod tests {
     fn test_drain_until_size() {
         let mut buffer = PlainTextBuffer::new();
 
-        buffer.ingest("short\nlonger line\nvery long line here\n".to_string());
+        buffer.ingest("short\nlonger line\nvery long line here\n");
 
         // Drain until we have at least 10 bytes
         let drained = buffer.drain_size(10);
@@ -405,7 +408,7 @@ mod tests {
             NormalizedEntry {
                 timestamp: None, // Avoid creating artificial timestamps during normalization
                 entry_type: NormalizedEntryType::SystemMessage,
-                content: content.to_string(),
+                content,
                 metadata: None,
             }
         };
@@ -441,7 +444,7 @@ mod tests {
                 NormalizedEntry {
                     timestamp: None,
                     entry_type: NormalizedEntryType::SystemMessage,
-                    content: content.to_string(),
+                    content,
                     metadata: None,
                 }
             }
@@ -472,7 +475,7 @@ mod tests {
             .transform_lines(Box::new(|lines: &mut Vec<String>| {
                 // Drop a specific leading banner line if present
                 if !lines.is_empty()
-                    && lines.first().map(|s| s.as_str()) == Some("BANNER LINE TO DROP\n")
+                    && lines.first().map(String::as_str) == Some("BANNER LINE TO DROP\n")
                 {
                     lines.remove(0);
                 }

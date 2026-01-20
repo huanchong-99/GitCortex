@@ -180,7 +180,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                         entry_type: NormalizedEntryType::ErrorMessage {
                             error_type: NormalizedEntryError::SetupRequired,
                         },
-                        content: content.to_string(),
+                        content: content.clone(),
                         metadata: None,
                     };
                     let id = entry_index_provider_stderr.next();
@@ -211,30 +211,28 @@ impl StandardCodingAgentExecutor for CursorAgent {
 
             let worktree_str = current_dir.to_string_lossy().to_string();
 
-            use std::collections::HashMap;
             // Track tool call_id -> entry index
             let mut call_index_map: HashMap<String, usize> = HashMap::new();
 
             while let Some(Ok(line)) = lines.next().await {
                 // Parse line as CursorJson
-                let cursor_json: CursorJson = match serde_json::from_str(&line) {
-                    Ok(cursor_json) => cursor_json,
-                    Err(_) => {
-                        // Handle non-JSON output as raw system message
-                        if !line.is_empty() {
-                            let entry = NormalizedEntry {
-                                timestamp: None,
-                                entry_type: NormalizedEntryType::SystemMessage,
-                                content: line.to_string(),
-                                metadata: None,
-                            };
+                let cursor_json: CursorJson = if let Ok(cursor_json) = serde_json::from_str(&line) {
+                    cursor_json
+                } else {
+                    // Handle non-JSON output as raw system message
+                    if !line.is_empty() {
+                        let entry = NormalizedEntry {
+                            timestamp: None,
+                            entry_type: NormalizedEntryType::SystemMessage,
+                            content: line.clone(),
+                            metadata: None,
+                        };
 
-                            let patch_id = entry_index_provider.next();
-                            let patch = ConversationPatch::add_normalized_entry(patch_id, entry);
-                            msg_store.push_patch(patch);
-                        }
-                        continue;
+                        let patch_id = entry_index_provider.next();
+                        let patch = ConversationPatch::add_normalized_entry(patch_id, entry);
+                        msg_store.push_patch(patch);
                     }
+                    continue;
                 };
 
                 // Push session_id if present
@@ -271,7 +269,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                         }
                     }
 
-                    CursorJson::User { .. } => {}
+                    CursorJson::User { .. } | CursorJson::Result { .. } => {}
 
                     CursorJson::Assistant { message, .. } => {
                         if let Some(chunk) = message.concat_text() {
@@ -283,7 +281,8 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 metadata: None,
                             };
                             if let Some(id) = current_assistant_message_index {
-                                msg_store.push_patch(ConversationPatch::replace(id, replace_entry))
+                                msg_store
+                                    .push_patch(ConversationPatch::replace(id, replace_entry));
                             } else {
                                 let id = entry_index_provider.next();
                                 current_assistant_message_index = Some(id);
@@ -291,7 +290,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                     id,
                                     replace_entry,
                                 ));
-                            };
+                            }
                         }
                     }
                     CursorJson::Thinking { text, .. } => {
@@ -325,8 +324,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                         // Only process "started" subtype (completed contains results we currently ignore)
                         if subtype
                             .as_deref()
-                            .map(|s| s.eq_ignore_ascii_case("started"))
-                            .unwrap_or(false)
+                            .is_some_and(|s| s.eq_ignore_ascii_case("started"))
                         {
                             let tool_name = tool_call.get_name().to_string();
                             let (action_type, content) =
@@ -350,8 +348,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 .push_patch(ConversationPatch::add_normalized_entry(id, entry));
                         } else if subtype
                             .as_deref()
-                            .map(|s| s.eq_ignore_ascii_case("completed"))
-                            .unwrap_or(false)
+                            .is_some_and(|s| s.eq_ignore_ascii_case("completed"))
                             && let Some(cid) = call_id.as_ref()
                             && let Some(&idx) = call_index_map.get(cid)
                         {
@@ -467,10 +464,6 @@ impl StandardCodingAgentExecutor for CursorAgent {
                         }
                     }
 
-                    CursorJson::Result { .. } => {
-                        // no-op; metadata-only events not surfaced
-                    }
-
                     CursorJson::Unknown => {
                         let entry = NormalizedEntry {
                             timestamp: None,
@@ -498,8 +491,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
 
         let config_files_found = self
             .default_mcp_config_path()
-            .map(|p| p.exists())
-            .unwrap_or(false);
+            .is_some_and(|p| p.exists());
 
         if config_files_found {
             AvailabilityInfo::InstallationFound
@@ -581,13 +573,12 @@ pub enum CursorJson {
 impl CursorJson {
     pub fn extract_session_id(&self) -> Option<String> {
         match self {
-            CursorJson::System { .. } => None, // session might not have been initialized yet
-            CursorJson::User { session_id, .. } => session_id.clone(),
-            CursorJson::Assistant { session_id, .. } => session_id.clone(),
-            CursorJson::Thinking { session_id, .. } => session_id.clone(),
-            CursorJson::ToolCall { session_id, .. } => session_id.clone(),
-            CursorJson::Result { session_id, .. } => session_id.clone(),
-            CursorJson::Unknown => None,
+            CursorJson::User { session_id, .. }
+            | CursorJson::Assistant { session_id, .. }
+            | CursorJson::Thinking { session_id, .. }
+            | CursorJson::ToolCall { session_id, .. }
+            | CursorJson::Result { session_id, .. } => session_id.clone(),
+            CursorJson::System { .. } | CursorJson::Unknown => None, // session might not have been initialized yet
         }
     }
 }
@@ -710,7 +701,7 @@ impl CursorToolCall {
             CursorToolCall::Todo { .. } => "todo",
             CursorToolCall::Mcp { .. } => "mcp",
             CursorToolCall::Unknown { data } => {
-                data.keys().next().map(|s| s.as_str()).unwrap_or("unknown")
+                data.keys().next().map_or("unknown", String::as_str)
             }
         }
     }
@@ -796,7 +787,7 @@ impl CursorToolCall {
                         path: path.clone(),
                         changes: vec![FileChange::Delete],
                     },
-                    path.to_string(),
+                    path.clone(),
                 )
             }
             CursorToolCall::Shell { args, .. } => {
@@ -806,7 +797,7 @@ impl CursorToolCall {
                         command: cmd.clone(),
                         result: None,
                     },
-                    cmd.to_string(),
+                    cmd.clone(),
                 )
             }
             CursorToolCall::Grep { args, .. } => {
@@ -815,7 +806,7 @@ impl CursorToolCall {
                     ActionType::Search {
                         query: pattern.clone(),
                     },
-                    pattern.to_string(),
+                    pattern.clone(),
                 )
             }
             CursorToolCall::SemSearch { args, .. } => {
@@ -824,7 +815,7 @@ impl CursorToolCall {
                     ActionType::Search {
                         query: query.clone(),
                     },
-                    query.to_string(),
+                    query.clone(),
                 )
             }
             CursorToolCall::Glob { args, .. } => {
@@ -1226,7 +1217,7 @@ mod tests {
             append_prompt: AppendPrompt::default(),
             force: None,
             model: None,
-            cmd: Default::default(),
+            cmd: CmdOverrides::default(),
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");
@@ -1279,7 +1270,7 @@ mod tests {
         match parsed {
             CursorToolCall::Shell { args, result } => {
                 assert_eq!(args.command, "wc -l drill.md");
-                assert_eq!(args.working_directory, Some("".to_string()));
+                assert_eq!(args.working_directory.as_deref(), Some(""));
                 assert_eq!(args.timeout, Some(0));
                 assert_eq!(result, None);
             }

@@ -10,12 +10,13 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 /// Terminal Status Enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display, Default)]
 #[sqlx(type_name = "terminal_status", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
 pub enum TerminalStatus {
     /// Not started
+    #[default]
     NotStarted,
     /// Starting
     Starting,
@@ -29,12 +30,6 @@ pub enum TerminalStatus {
     Failed,
     /// Cancelled
     Cancelled,
-}
-
-impl Default for TerminalStatus {
-    fn default() -> Self {
-        Self::NotStarted
-    }
 }
 
 /// Terminal
@@ -214,14 +209,14 @@ impl Terminal {
     /// Create terminal
     pub async fn create(pool: &SqlitePool, terminal: &Terminal) -> sqlx::Result<Self> {
         sqlx::query_as::<_, Terminal>(
-            r#"
+            r"
             INSERT INTO terminal (
                 id, workflow_task_id, cli_type_id, model_config_id,
                 custom_base_url, custom_api_key, role, role_description,
                 order_index, status, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             RETURNING *
-            "#
+            "
         )
         .bind(&terminal.id)
         .bind(&terminal.workflow_task_id)
@@ -242,7 +237,7 @@ impl Terminal {
     /// Find terminal by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, Terminal>(
-            r#"SELECT * FROM terminal WHERE id = ?"#
+            r"SELECT * FROM terminal WHERE id = ?"
         )
         .bind(id)
         .fetch_optional(pool)
@@ -252,11 +247,11 @@ impl Terminal {
     /// Find terminals by task
     pub async fn find_by_task(pool: &SqlitePool, workflow_task_id: &str) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, Terminal>(
-            r#"
+            r"
             SELECT * FROM terminal
             WHERE workflow_task_id = ?
             ORDER BY order_index ASC
-            "#
+            "
         )
         .bind(workflow_task_id)
         .fetch_all(pool)
@@ -266,12 +261,12 @@ impl Terminal {
     /// Find terminals by workflow (across tasks)
     pub async fn find_by_workflow(pool: &SqlitePool, workflow_id: &str) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, Terminal>(
-            r#"
+            r"
             SELECT t.* FROM terminal t
             INNER JOIN workflow_task wt ON t.workflow_task_id = wt.id
             WHERE wt.workflow_id = ?
             ORDER BY wt.order_index ASC, t.order_index ASC
-            "#
+            "
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -282,11 +277,11 @@ impl Terminal {
     pub async fn update_status(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE terminal
             SET status = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(status)
         .bind(now)
@@ -305,11 +300,11 @@ impl Terminal {
     ) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE terminal
             SET process_id = ?, pty_session_id = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(process_id)
         .bind(pty_session_id)
@@ -329,11 +324,11 @@ impl Terminal {
     ) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE terminal
             SET last_commit_hash = ?, last_commit_message = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(commit_hash)
         .bind(commit_message)
@@ -348,11 +343,11 @@ impl Terminal {
     pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE terminal
             SET status = 'waiting', started_at = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(now)
         .bind(now)
@@ -366,11 +361,11 @@ impl Terminal {
     pub async fn set_completed(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE terminal
             SET status = ?, completed_at = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(status)
         .bind(now)
@@ -393,11 +388,11 @@ impl TerminalLog {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
         sqlx::query_as::<_, TerminalLog>(
-            r#"
+            r"
             INSERT INTO terminal_log (id, terminal_id, log_type, content, created_at)
             VALUES (?1, ?2, ?3, ?4, ?5)
             RETURNING *
-            "#
+            "
         )
         .bind(&id)
         .bind(terminal_id)
@@ -416,12 +411,12 @@ impl TerminalLog {
     ) -> sqlx::Result<Vec<Self>> {
         let limit = limit.unwrap_or(1000);
         sqlx::query_as::<_, TerminalLog>(
-            r#"
+            r"
             SELECT * FROM terminal_log
             WHERE terminal_id = ?
             ORDER BY created_at DESC
             LIMIT ?
-            "#
+            "
         )
         .bind(terminal_id)
         .bind(limit)
@@ -444,13 +439,13 @@ impl GitEvent {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
         sqlx::query_as::<_, GitEvent>(
-            r#"
+            r"
             INSERT INTO git_event (
                 id, workflow_id, terminal_id, commit_hash, branch,
                 commit_message, metadata, process_status, created_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)
             RETURNING *
-            "#
+            "
         )
         .bind(&id)
         .bind(workflow_id)
@@ -467,11 +462,11 @@ impl GitEvent {
     /// Find pending git events
     pub async fn find_pending(pool: &SqlitePool, workflow_id: &str) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, GitEvent>(
-            r#"
+            r"
             SELECT * FROM git_event
             WHERE workflow_id = ? AND process_status = 'pending'
             ORDER BY created_at ASC
-            "#
+            "
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -487,11 +482,11 @@ impl GitEvent {
     ) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE git_event
             SET process_status = ?, agent_response = ?, processed_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(status)
         .bind(agent_response)

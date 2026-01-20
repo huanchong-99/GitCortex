@@ -70,7 +70,7 @@ impl Server {
             pool.clone(),
             registry.clone(),
             jwt.clone(),
-            auth_config.public_base_url().to_string(),
+            auth_config.public_base_url(),
         ));
 
         let oauth_token_validator =
@@ -100,28 +100,25 @@ impl Server {
             .build()
             .context("failed to create HTTP client")?;
 
-        let github_app = match &config.github_app {
-            Some(github_config) => {
-                match GitHubAppService::new(github_config, http_client.clone()) {
-                    Ok(service) => {
-                        tracing::info!(
-                            app_slug = %github_config.app_slug,
-                            "GitHub App service initialized"
-                        );
-                        Some(Arc::new(service))
-                    }
-                    Err(e) => {
-                        tracing::error!(?e, "Failed to initialize GitHub App service");
-                        None
-                    }
+        let github_app = if let Some(github_config) = &config.github_app {
+            match GitHubAppService::new(github_config, http_client.clone()) {
+                Ok(service) => {
+                    tracing::info!(
+                        app_slug = %github_config.app_slug,
+                        "GitHub App service initialized"
+                    );
+                    Some(Arc::new(service))
+                }
+                Err(e) => {
+                    tracing::error!(?e, "Failed to initialize GitHub App service");
+                    None
                 }
             }
-            None => {
-                tracing::info!(
-                    "GitHub App not configured. Set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_WEBHOOK_SECRET, and GITHUB_APP_SLUG to enable."
-                );
-                None
-            }
+        } else {
+            tracing::info!(
+                "GitHub App not configured. Set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_WEBHOOK_SECRET, and GITHUB_APP_SLUG to enable."
+            );
+            None
         };
 
         let state = AppState::new(

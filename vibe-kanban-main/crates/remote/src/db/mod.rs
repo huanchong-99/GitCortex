@@ -36,7 +36,7 @@ pub(crate) async fn ensure_electric_role_password(
 
     // PostgreSQL doesn't support parameter binding for ALTER ROLE PASSWORD
     // We need to escape the password properly and embed it directly in the SQL
-    let escaped_password = password.replace("'", "''");
+    let escaped_password = password.replace('\'', "''");
     let sql = format!("ALTER ROLE electric_sync WITH PASSWORD '{escaped_password}'");
 
     sqlx::query(&sql).execute(pool).await?;

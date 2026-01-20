@@ -329,19 +329,19 @@ impl AuthorizationProvider for GitHubOAuthProvider {
                             {
                                 let now = chrono::Utc::now().timestamp();
                                 let wait_seconds = (reset_time - now).clamp(0, 5);
+                                let wait_seconds = u64::try_from(wait_seconds).unwrap_or(0);
                                 tokio::time::sleep(tokio::time::Duration::from_secs(
-                                    wait_seconds as u64,
+                                    wait_seconds,
                                 ))
                                 .await;
                                 continue;
                             }
                         }
                         return Err(TokenValidationError::temporary("rate limited by GitHub"));
-                    } else {
-                        return Err(TokenValidationError::temporary(
-                            "access forbidden during validation",
-                        ));
                     }
+                    return Err(TokenValidationError::temporary(
+                        "access forbidden during validation",
+                    ));
                 }
                 status => {
                     if status.is_server_error() && attempt <= max_retries {

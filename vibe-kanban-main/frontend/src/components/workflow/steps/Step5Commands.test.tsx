@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { Step5Commands } from './Step5Commands';
 import type { CommandConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
-// Mock fetch API
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
@@ -21,77 +21,92 @@ describe('Step5Commands', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock successful API response
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [],
+      json: () => Promise.resolve([]),
     });
+    void setTestLanguage();
   });
 
   describe('Rendering', () => {
     it('should render enable/disable radio buttons', () => {
-      render(<Step5Commands {...defaultProps} />);
+      renderWithI18n(<Step5Commands {...defaultProps} />);
 
-      expect(screen.getByText('启用斜杠命令')).toBeInTheDocument();
-      expect(screen.getByText('不启用')).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step5.title'))).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step5.enableLabel'))).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step5.disableLabel'))).toBeInTheDocument();
     });
 
     it('should show enabled radio checked when config.enabled is true', () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
-      const enabledRadio = screen.getByRole('radio', { name: /启用斜杠命令/ });
+      const enabledRadio = screen.getByRole('radio', {
+        name: i18n.t('workflow:step5.enableLabel'),
+      });
       expect(enabledRadio).toBeChecked();
     });
 
     it('should show disabled radio checked when config.enabled is false', () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: false }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: false }} />);
 
-      const disabledRadio = screen.getByRole('radio', { name: /不启用/ });
+      const disabledRadio = screen.getByRole('radio', {
+        name: i18n.t('workflow:step5.disableLabel'),
+      });
       expect(disabledRadio).toBeChecked();
     });
 
     it('should not show command list when disabled', () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: false }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: false }} />);
 
-      expect(screen.queryByText('已选命令 (按执行顺序排列)')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(i18n.t('workflow:step5.selectedTitle'))
+      ).not.toBeInTheDocument();
     });
 
     it('should show command list when enabled', async () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
       await waitFor(() => {
-        expect(screen.getByText('已选命令 (按执行顺序排列)')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.selectedTitle'))).toBeInTheDocument();
       });
     });
 
     it('should show empty state when no commands selected', async () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true, presetIds: [] }} />);
+      renderWithI18n(
+        <Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true, presetIds: [] }} />
+      );
 
       await waitFor(() => {
-        expect(screen.getByText(/暂未选择任何命令/)).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.selectedEmpty'))).toBeInTheDocument();
       });
     });
 
     it('should show system presets section', async () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
       await waitFor(() => {
-        expect(screen.getByText('系统预设')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.systemPresetsTitle'))).toBeInTheDocument();
       });
     });
 
     it('should show user presets section', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => [
-          { id: 'user-1', name: 'user-preset', displayName: 'User Preset', description: 'User preset', isSystem: false },
-        ],
+        json: () => Promise.resolve([
+          {
+            id: 'user-1',
+            name: 'user-preset',
+            displayName: 'User Preset',
+            description: 'User preset',
+            isSystem: false,
+          },
+        ]),
       });
 
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
       await waitFor(() => {
-        expect(screen.getByText('用户预设')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.userPresetsTitle'))).toBeInTheDocument();
       });
     });
   });
@@ -99,9 +114,11 @@ describe('Step5Commands', () => {
   describe('User Interactions', () => {
     it('should call onUpdate when enabling commands', () => {
       const onUpdate = vi.fn();
-      render(<Step5Commands {...defaultProps} onUpdate={onUpdate} />);
+      renderWithI18n(<Step5Commands {...defaultProps} onUpdate={onUpdate} />);
 
-      const enabledRadio = screen.getByRole('radio', { name: /启用斜杠命令/ });
+      const enabledRadio = screen.getByRole('radio', {
+        name: i18n.t('workflow:step5.enableLabel'),
+      });
       fireEvent.click(enabledRadio);
 
       expect(onUpdate).toHaveBeenCalledWith({ enabled: true });
@@ -109,9 +126,17 @@ describe('Step5Commands', () => {
 
     it('should call onUpdate when disabling commands', () => {
       const onUpdate = vi.fn();
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} onUpdate={onUpdate} />);
+      renderWithI18n(
+        <Step5Commands
+          {...defaultProps}
+          config={{ ...mockConfig, enabled: true }}
+          onUpdate={onUpdate}
+        />
+      );
 
-      const disabledRadio = screen.getByRole('radio', { name: /不启用/ });
+      const disabledRadio = screen.getByRole('radio', {
+        name: i18n.t('workflow:step5.disableLabel'),
+      });
       fireEvent.click(disabledRadio);
 
       expect(onUpdate).toHaveBeenCalledWith({ enabled: false, presetIds: [] });
@@ -119,14 +144,19 @@ describe('Step5Commands', () => {
 
     it('should add preset when clicking add button', async () => {
       const onUpdate = vi.fn();
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} onUpdate={onUpdate} />);
+      renderWithI18n(
+        <Step5Commands
+          {...defaultProps}
+          config={{ ...mockConfig, enabled: true }}
+          onUpdate={onUpdate}
+        />
+      );
 
       await waitFor(() => {
-        expect(screen.getByText('编写代码')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.presets.writeCode.name'))).toBeInTheDocument();
       });
 
-      // Find the add button in the first system preset (write-code)
-      const addButtons = screen.getAllByLabelText('添加');
+      const addButtons = screen.getAllByLabelText(i18n.t('workflow:step5.add'));
       fireEvent.click(addButtons[0]);
 
       expect(onUpdate).toHaveBeenCalledWith({ presetIds: ['write-code'] });
@@ -134,7 +164,7 @@ describe('Step5Commands', () => {
 
     it('should remove preset when clicking remove button', async () => {
       const onUpdate = vi.fn();
-      render(
+      renderWithI18n(
         <Step5Commands
           {...defaultProps}
           config={{ ...mockConfig, enabled: true, presetIds: ['write-code', 'review'] }}
@@ -143,10 +173,10 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText('编写代码')).toHaveLength(2); // One in selected, one in available
+        expect(screen.getAllByText(i18n.t('workflow:step5.presets.writeCode.name'))).toHaveLength(2);
       });
 
-      const removeButtons = screen.getAllByLabelText('移除');
+      const removeButtons = screen.getAllByLabelText(i18n.t('workflow:step5.remove'));
       fireEvent.click(removeButtons[0]);
 
       expect(onUpdate).toHaveBeenCalledWith({ presetIds: ['review'] });
@@ -154,7 +184,7 @@ describe('Step5Commands', () => {
 
     it('should clear all presets when clicking Clear All button', async () => {
       const onUpdate = vi.fn();
-      render(
+      renderWithI18n(
         <Step5Commands
           {...defaultProps}
           config={{ ...mockConfig, enabled: true, presetIds: ['write-code', 'review'] }}
@@ -163,18 +193,17 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('清除全部')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.clearAll'))).toBeInTheDocument();
       });
 
-      const clearButton = screen.getByText('清除全部');
-      fireEvent.click(clearButton);
+      fireEvent.click(screen.getByText(i18n.t('workflow:step5.clearAll')));
 
       expect(onUpdate).toHaveBeenCalledWith({ presetIds: [] });
     });
 
     it('should reset to defaults when clicking Reset Default button', async () => {
       const onUpdate = vi.fn();
-      render(
+      renderWithI18n(
         <Step5Commands
           {...defaultProps}
           config={{ ...mockConfig, enabled: true, presetIds: ['write-code', 'review', 'test'] }}
@@ -183,18 +212,17 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('重置默认')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.resetDefault'))).toBeInTheDocument();
       });
 
-      const resetButton = screen.getByText('重置默认');
-      fireEvent.click(resetButton);
+      fireEvent.click(screen.getByText(i18n.t('workflow:step5.resetDefault')));
 
       expect(onUpdate).toHaveBeenCalledWith({ presetIds: ['write-code', 'review'] });
     });
 
     it('should move preset up when clicking move up button', async () => {
       const onUpdate = vi.fn();
-      render(
+      renderWithI18n(
         <Step5Commands
           {...defaultProps}
           config={{ ...mockConfig, enabled: true, presetIds: ['write-code', 'review', 'test'] }}
@@ -203,18 +231,18 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText('代码审查')).toHaveLength(2); // One in selected, one in available
+        expect(screen.getAllByText(i18n.t('workflow:step5.presets.review.name'))).toHaveLength(2);
       });
 
-      const moveUpButtons = screen.getAllByLabelText('上移');
-      fireEvent.click(moveUpButtons[1]); // Move 'review' up
+      const moveUpButtons = screen.getAllByLabelText(i18n.t('workflow:step5.moveUp'));
+      fireEvent.click(moveUpButtons[1]);
 
       expect(onUpdate).toHaveBeenCalledWith({ presetIds: ['review', 'write-code', 'test'] });
     });
 
     it('should move preset down when clicking move down button', async () => {
       const onUpdate = vi.fn();
-      render(
+      renderWithI18n(
         <Step5Commands
           {...defaultProps}
           config={{ ...mockConfig, enabled: true, presetIds: ['write-code', 'review', 'test'] }}
@@ -223,18 +251,18 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText('编写代码')).toHaveLength(2); // One in selected, one in available
+        expect(screen.getAllByText(i18n.t('workflow:step5.presets.writeCode.name'))).toHaveLength(2);
       });
 
-      const moveDownButtons = screen.getAllByLabelText('下移');
-      fireEvent.click(moveDownButtons[0]); // Move 'write-code' down
+      const moveDownButtons = screen.getAllByLabelText(i18n.t('workflow:step5.moveDown'));
+      fireEvent.click(moveDownButtons[0]);
 
       expect(onUpdate).toHaveBeenCalledWith({ presetIds: ['review', 'write-code', 'test'] });
     });
 
     it('should not add duplicate presets', async () => {
       const onUpdate = vi.fn();
-      render(
+      renderWithI18n(
         <Step5Commands
           {...defaultProps}
           config={{ ...mockConfig, enabled: true, presetIds: ['write-code'] }}
@@ -243,34 +271,33 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText('编写代码')).toHaveLength(2); // One in selected, one in available
+        expect(screen.getAllByText(i18n.t('workflow:step5.presets.writeCode.name'))).toHaveLength(2);
       });
 
-      const addButtons = screen.getAllByLabelText('添加');
+      const addButtons = screen.getAllByLabelText(i18n.t('workflow:step5.add'));
       fireEvent.click(addButtons[0]);
 
-      // Should not add duplicate - onUpdate should not be called
       expect(onUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe('System Presets', () => {
     it('should have 5 system presets', async () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
       await waitFor(() => {
-        expect(screen.getByText('编写代码')).toBeInTheDocument();
-        expect(screen.getByText('代码审查')).toBeInTheDocument();
-        expect(screen.getByText('修复问题')).toBeInTheDocument();
-        expect(screen.getByText('运行测试')).toBeInTheDocument();
-        expect(screen.getByText('代码重构')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.presets.writeCode.name'))).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.presets.review.name'))).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.presets.fixIssues.name'))).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.presets.test.name'))).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.presets.refactor.name'))).toBeInTheDocument();
       });
     });
   });
 
   describe('API Integration', () => {
     it('should fetch user presets on mount', async () => {
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith('/api/workflows/presets/commands');
@@ -280,11 +307,27 @@ describe('Step5Commands', () => {
     it('should handle API errors gracefully', async () => {
       mockFetch.mockRejectedValue(new Error('API Error'));
 
-      render(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
+      renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
-      // Should still render system presets even if API fails
       await waitFor(() => {
-        expect(screen.getByText('系统预设')).toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:step5.systemPresetsTitle'))).toBeInTheDocument();
+      });
+    });
+
+    it('should call onError when presets fetch fails', async () => {
+      const onError = vi.fn();
+      mockFetch.mockRejectedValueOnce(new Error('API Error'));
+
+      renderWithI18n(
+        <Step5Commands
+          {...defaultProps}
+          config={{ ...mockConfig, enabled: true }}
+          onError={onError}
+        />
+      );
+
+      await waitFor(() => {
+        expect(onError).toHaveBeenCalledWith(expect.any(Error));
       });
     });
   });

@@ -83,7 +83,7 @@ pub async fn write_claude_config(config: &ClaudeConfig) -> Result<()> {
 
 /// 写入 Claude 配置到指定路径
 pub async fn write_claude_config_to(path: &Path, config: &ClaudeConfig) -> Result<()> {
-    ensure_parent_dir_exists(&path.to_path_buf()).await?;
+    ensure_parent_dir_exists(path).await?;
     atomic_write_json(path, config).await
 }
 
@@ -100,7 +100,7 @@ pub async fn update_claude_model(
 ) -> Result<()> {
     let mut config = read_claude_config().await?;
 
-    config.env.base_url = base_url.map(|s| s.to_string());
+    config.env.base_url = base_url.map(ToString::to_string);
     config.env.auth_token = Some(api_key.to_string());
     config.env.model = Some(model.to_string());
 

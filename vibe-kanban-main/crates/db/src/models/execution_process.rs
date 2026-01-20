@@ -557,7 +557,10 @@ impl ExecutionProcess {
         )
         .execute(pool)
         .await?;
-        Ok(result.rows_affected() as i64)
+        let affected = i64::try_from(result.rows_affected()).map_err(|_| {
+            sqlx::Error::Protocol("rows_affected overflowed i64".into())
+        })?;
+        Ok(affected)
     }
 
     /// Find the previous process's after_head_commit before the given boundary process
@@ -596,13 +599,11 @@ impl ExecutionProcess {
         &self,
         pool: &SqlitePool,
     ) -> Result<Option<(Workspace, Session)>, sqlx::Error> {
-        let session = match Session::find_by_id(pool, self.session_id).await? {
-            Some(s) => s,
-            None => return Ok(None),
+        let Some(session) = Session::find_by_id(pool, self.session_id).await? else {
+            return Ok(None);
         };
-        let workspace = match Workspace::find_by_id(pool, session.workspace_id).await? {
-            Some(w) => w,
-            None => return Ok(None),
+        let Some(workspace) = Workspace::find_by_id(pool, session.workspace_id).await? else {
+            return Ok(None);
         };
         Ok(Some((workspace, session)))
     }
@@ -692,7 +693,7 @@ impl ExecutionProcess {
             ExecutorActionType::ReviewRequest(request) => {
                 Ok(Some(request.executor_profile_id.clone()))
             }
-            _ => Err(ExecutionProcessError::ValidationError(
+            ExecutorActionType::ScriptRequest(_) => Err(ExecutionProcessError::ValidationError(
                 "Couldn't find profile from initial request".to_string(),
             )),
         }

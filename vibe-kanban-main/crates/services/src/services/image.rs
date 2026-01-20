@@ -97,7 +97,7 @@ impl ImageService {
                 file_path: new_filename,
                 original_name: original_filename.to_string(),
                 mime_type,
-                size_bytes: file_size as i64,
+                size_bytes: i64::try_from(file_size).unwrap_or(i64::MAX),
                 hash,
             },
         )
@@ -121,7 +121,7 @@ impl ImageService {
 
         for image in orphaned_images {
             match self.delete_image(image.id).await {
-                Ok(_) => {
+                Ok(()) => {
                     deleted_count += 1;
                     tracing::debug!("Deleted orphaned image: {}", image.id);
                 }

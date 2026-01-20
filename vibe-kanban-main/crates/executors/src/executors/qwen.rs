@@ -116,12 +116,10 @@ impl StandardCodingAgentExecutor for QwenCode {
     fn get_availability_info(&self) -> AvailabilityInfo {
         let mcp_config_found = self
             .default_mcp_config_path()
-            .map(|p| p.exists())
-            .unwrap_or(false);
+            .is_some_and(|p| p.exists());
 
         let installation_indicator_found = dirs::home_dir()
-            .map(|home| home.join(".qwen").join("installation_id").exists())
-            .unwrap_or(false);
+            .is_some_and(|home| home.join(".qwen").join("installation_id").exists());
 
         if mcp_config_found || installation_indicator_found {
             AvailabilityInfo::InstallationFound

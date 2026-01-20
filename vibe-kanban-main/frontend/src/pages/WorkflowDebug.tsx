@@ -8,8 +8,8 @@ import { ArrowLeft, Play, Pause, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
+import { useTranslation } from 'react-i18next';
 
-// Map workflow status to pipeline view status
 function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'completed' | 'failed' {
   switch (status) {
     case 'draft':
@@ -26,20 +26,21 @@ function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'com
 }
 
 export function WorkflowDebugPage() {
+  const { t } = useTranslation('workflow');
   const { workflowId } = useParams<{ workflowId: string }>();
-  const { data, isLoading, error } = useWorkflow(workflowId!);
+  const { data, isLoading, error } = useWorkflow(workflowId ?? '');
 
   if (isLoading) {
-    return <div className="p-8 text-center">加载中...</div>;
+    return <div className="p-8 text-center">{t('workflowDebug.loading')}</div>;
   }
 
-  if (error || !data) {
-    return <div className="p-8 text-center text-red-500">加载失败</div>;
+  if (error !== null || !data) {
+    return <div className="p-8 text-center text-red-500">{t('workflowDebug.error')}</div>;
   }
 
   const wsUrl = `ws://${window.location.host}`;
+  const defaultRoleLabel = t('terminalCard.defaultRole');
 
-  // Transform workflow config to task format
   const tasks: WorkflowTask[] = data.config.tasks.map((taskConfig) => ({
     id: taskConfig.id,
     name: taskConfig.name,
@@ -51,7 +52,9 @@ export function WorkflowDebugPage() {
           id: termConfig.id,
           cliTypeId: termConfig.cliTypeId,
           modelConfigId: termConfig.modelConfigId,
-          role: termConfig.role || `Terminal ${termConfig.orderIndex + 1}`,
+          role: termConfig.role?.trim()
+            ? termConfig.role
+            : `${defaultRoleLabel} ${termConfig.orderIndex + 1}`,
           orderIndex: termConfig.orderIndex,
           status: 'not_started' as const,
         })
@@ -62,46 +65,44 @@ export function WorkflowDebugPage() {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Header */}
       <header className="border-b p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link to="/workflows">
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" /> 返回
+              <ArrowLeft className="w-4 h-4 mr-2" /> {t('workflowDebug.back')}
             </Button>
           </Link>
           <div>
             <h1 className="font-semibold">{data.name}</h1>
             <p className="text-sm text-muted-foreground">
-              状态: {data.status}
+              {t('workflowDebug.statusLabel', { status: data.status })}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           {data.status === 'draft' && (
             <Button size="sm">
-              <Play className="w-4 h-4 mr-2" /> 开始
+              <Play className="w-4 h-4 mr-2" /> {t('workflowDebug.start')}
             </Button>
           )}
           {data.status === 'running' && (
             <>
               <Button variant="outline" size="sm">
-                <Pause className="w-4 h-4 mr-2" /> 暂停
+                <Pause className="w-4 h-4 mr-2" /> {t('workflowDebug.pause')}
               </Button>
               <Button variant="destructive" size="sm">
-                <Square className="w-4 h-4 mr-2" /> 停止
+                <Square className="w-4 h-4 mr-2" /> {t('workflowDebug.stop')}
               </Button>
             </>
           )}
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <Tabs defaultValue="pipeline" className="h-full flex flex-col">
           <TabsList className="mx-4 mt-4">
-            <TabsTrigger value="pipeline">流水线视图</TabsTrigger>
-            <TabsTrigger value="terminals">终端调试</TabsTrigger>
+            <TabsTrigger value="pipeline">{t('workflowDebug.tabs.pipeline')}</TabsTrigger>
+            <TabsTrigger value="terminals">{t('workflowDebug.tabs.terminals')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pipeline" className="flex-1 p-4 overflow-auto">

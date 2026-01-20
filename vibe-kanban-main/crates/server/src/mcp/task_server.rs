@@ -122,10 +122,10 @@ pub struct TaskSummary {
 }
 
 impl TaskSummary {
-    fn from_task_with_status(task: TaskWithAttemptStatus) -> Self {
+    fn from_task_with_status(task: &TaskWithAttemptStatus) -> Self {
         Self {
             id: task.id.to_string(),
-            title: task.title.to_string(),
+            title: task.title.clone(),
             status: task.status.to_string(),
             created_at: task.created_at.to_rfc3339(),
             updated_at: task.updated_at.to_rfc3339(),
@@ -366,26 +366,26 @@ struct ApiResponseEnvelope<T> {
 }
 
 impl TaskServer {
-    fn success<T: Serialize>(data: &T) -> Result<CallToolResult, ErrorData> {
-        Ok(CallToolResult::success(vec![Content::text(
+    fn success<T: Serialize>(data: &T) -> CallToolResult {
+        CallToolResult::success(vec![Content::text(
             serde_json::to_string_pretty(data)
                 .unwrap_or_else(|_| "Failed to serialize response".to_string()),
-        )]))
+        )])
     }
 
-    fn err_value(v: serde_json::Value) -> Result<CallToolResult, ErrorData> {
-        Ok(CallToolResult::error(vec![Content::text(
-            serde_json::to_string_pretty(&v)
+    fn err_value(v: &serde_json::Value) -> CallToolResult {
+        CallToolResult::error(vec![Content::text(
+            serde_json::to_string_pretty(v)
                 .unwrap_or_else(|_| "Failed to serialize error".to_string()),
-        )]))
+        )])
     }
 
-    fn err<S: Into<String>>(msg: S, details: Option<S>) -> Result<CallToolResult, ErrorData> {
+    fn err<S: Into<String>>(msg: S, details: Option<S>) -> CallToolResult {
         let mut v = serde_json::json!({"success": false, "error": msg.into()});
         if let Some(d) = details {
             v["details"] = serde_json::json!(d.into());
-        };
-        Self::err_value(v)
+        }
+        Self::err_value(&v)
     }
 
     async fn send_json<T: DeserializeOwned>(
@@ -395,55 +395,57 @@ impl TaskServer {
         let resp = rb
             .send()
             .await
-            .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())).unwrap())?;
+            .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())))?;
 
         if !resp.status().is_success() {
             let status = resp.status();
-            return Err(
-                Self::err(format!("VK API returned error status: {}", status), None).unwrap(),
-            );
+            return Err(Self::err(
+                format!("VK API returned error status: {status}"),
+                None,
+            ));
         }
 
         let api_response = resp.json::<ApiResponseEnvelope<T>>().await.map_err(|e| {
-            Self::err("Failed to parse VK API response", Some(&e.to_string())).unwrap()
+            Self::err("Failed to parse VK API response", Some(&e.to_string()))
         })?;
 
         if !api_response.success {
             let msg = api_response.message.as_deref().unwrap_or("Unknown error");
-            return Err(Self::err("VK API returned error", Some(msg)).unwrap());
+            return Err(Self::err("VK API returned error", Some(msg)));
         }
 
         api_response
             .data
-            .ok_or_else(|| Self::err("VK API response missing data field", None).unwrap())
+            .ok_or_else(|| Self::err("VK API response missing data field", None))
     }
 
     async fn send_empty_json(&self, rb: reqwest::RequestBuilder) -> Result<(), CallToolResult> {
-        let resp = rb
-            .send()
-            .await
-            .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())).unwrap())?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            return Err(
-                Self::err(format!("VK API returned error status: {}", status), None).unwrap(),
-            );
-        }
-
         #[derive(Deserialize)]
         struct EmptyApiResponse {
             success: bool,
             message: Option<String>,
         }
 
+        let resp = rb
+            .send()
+            .await
+            .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            return Err(Self::err(
+                format!("VK API returned error status: {status}"),
+                None,
+            ));
+        }
+
         let api_response = resp.json::<EmptyApiResponse>().await.map_err(|e| {
-            Self::err("Failed to parse VK API response", Some(&e.to_string())).unwrap()
+            Self::err("Failed to parse VK API response", Some(&e.to_string()))
         })?;
 
         if !api_response.success {
             let msg = api_response.message.as_deref().unwrap_or("Unknown error");
-            return Err(Self::err("VK API returned error", Some(msg)).unwrap());
+            return Err(Self::err("VK API returned error", Some(msg)));
         }
 
         Ok(())
@@ -462,9 +464,8 @@ impl TaskServer {
     /// Unknown tags are left as-is (not expanded, not an error).
     async fn expand_tags(&self, text: &str) -> String {
         // Pattern matches @tagname where tagname is non-whitespace, non-@ characters
-        let tag_pattern = match Regex::new(r"@([^\s@]+)") {
-            Ok(re) => re,
-            Err(_) => return text.to_string(),
+        let Ok(tag_pattern) = Regex::new(r"@([^\s@]+)") else {
+            return text.to_string();
         };
 
         // Find all unique tag names referenced in the text
@@ -499,10 +500,10 @@ impl TaskServer {
 
         // Replace each @tagname with its content (if found)
         let result = tag_pattern.replace_all(text, |caps: &regex::Captures| {
-            let tag_name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            let tag_name = caps.get(1).map_or("", |m| m.as_str());
             match tag_map.get(tag_name) {
                 Some(content) => (*content).to_string(),
-                None => caps.get(0).map(|m| m.as_str()).unwrap_or("").to_string(),
+                None => caps.get(0).map_or("", |m| m.as_str()).to_string(),
             }
         });
 
@@ -519,7 +520,7 @@ impl TaskServer {
         // Context was fetched at startup and cached
         // This tool is only registered if context exists, so unwrap is safe
         let context = self.context.as_ref().expect("VK context should exist");
-        TaskServer::success(context)
+        Ok(TaskServer::success(context))
     }
 
     #[tool(
@@ -557,9 +558,9 @@ impl TaskServer {
             Err(e) => return Ok(e),
         };
 
-        TaskServer::success(&CreateTaskResponse {
+        Ok(TaskServer::success(&CreateTaskResponse {
             task_id: task.id.to_string(),
-        })
+        }))
     }
 
     #[tool(description = "List all the available projects")]
@@ -580,7 +581,7 @@ impl TaskServer {
             projects: project_summaries,
         };
 
-        TaskServer::success(&response)
+        Ok(TaskServer::success(&response))
     }
 
     #[tool(description = "List all repositories for a project. `project_id` is required!")]
@@ -588,7 +589,7 @@ impl TaskServer {
         &self,
         Parameters(ListReposRequest { project_id }): Parameters<ListReposRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let url = self.url(&format!("/api/projects/{}/repositories", project_id));
+        let url = self.url(&format!("/api/projects/{project_id}/repositories"));
         let repos: Vec<Repo> = match self.send_json(self.client.get(&url)).await {
             Ok(rs) => rs,
             Err(e) => return Ok(e),
@@ -608,7 +609,7 @@ impl TaskServer {
             project_id: project_id.to_string(),
         };
 
-        TaskServer::success(&response)
+        Ok(TaskServer::success(&response))
     }
 
     #[tool(
@@ -626,24 +627,25 @@ impl TaskServer {
             match TaskStatus::from_str(status_str) {
                 Ok(s) => Some(s),
                 Err(_) => {
-                    return Self::err(
+                    return Ok(Self::err(
                         "Invalid status filter. Valid values: 'todo', 'inprogress', 'inreview', 'done', 'cancelled'".to_string(),
-                        Some(status_str.to_string()),
-                    );
+                        Some(status_str.clone()),
+                    ));
                 }
             }
         } else {
             None
         };
 
-        let url = self.url(&format!("/api/tasks?project_id={}", project_id));
+        let url = self.url(&format!("/api/tasks?project_id={project_id}"));
         let all_tasks: Vec<TaskWithAttemptStatus> =
             match self.send_json(self.client.get(&url)).await {
                 Ok(t) => t,
                 Err(e) => return Ok(e),
             };
 
-        let task_limit = limit.unwrap_or(50).max(0) as usize;
+        let task_limit = limit.unwrap_or(50).max(0);
+        let task_limit_usize = usize::try_from(task_limit).unwrap_or(0);
         let filtered = all_tasks.into_iter().filter(|t| {
             if let Some(ref want) = status_filter {
                 &t.status == want
@@ -651,10 +653,10 @@ impl TaskServer {
                 true
             }
         });
-        let limited: Vec<TaskWithAttemptStatus> = filtered.take(task_limit).collect();
+        let limited: Vec<TaskWithAttemptStatus> = filtered.take(task_limit_usize).collect();
 
         let task_summaries: Vec<TaskSummary> = limited
-            .into_iter()
+            .iter()
             .map(TaskSummary::from_task_with_status)
             .collect();
 
@@ -664,11 +666,11 @@ impl TaskServer {
             project_id: project_id.to_string(),
             applied_filters: ListTasksFilters {
                 status: status.clone(),
-                limit: task_limit as i32,
+                limit: task_limit,
             },
         };
 
-        TaskServer::success(&response)
+        Ok(TaskServer::success(&response))
     }
 
     #[tool(
@@ -684,26 +686,23 @@ impl TaskServer {
         }): Parameters<StartWorkspaceSessionRequest>,
     ) -> Result<CallToolResult, ErrorData> {
         if repos.is_empty() {
-            return Self::err(
+            return Ok(Self::err(
                 "At least one repository must be specified.".to_string(),
                 None::<String>,
-            );
+            ));
         }
 
         let executor_trimmed = executor.trim();
         if executor_trimmed.is_empty() {
-            return Self::err("Executor must not be empty.".to_string(), None::<String>);
+            return Ok(Self::err("Executor must not be empty.".to_string(), None::<String>));
         }
 
         let normalized_executor = executor_trimmed.replace('-', "_").to_ascii_uppercase();
-        let base_executor = match BaseCodingAgent::from_str(&normalized_executor) {
-            Ok(exec) => exec,
-            Err(_) => {
-                return Self::err(
-                    format!("Unknown executor '{executor_trimmed}'."),
-                    None::<String>,
-                );
-            }
+        let Ok(base_executor) = BaseCodingAgent::from_str(&normalized_executor) else {
+            return Ok(Self::err(
+                format!("Unknown executor '{executor_trimmed}'."),
+                None::<String>,
+            ));
         };
 
         let variant = variant.and_then(|v| {
@@ -746,7 +745,7 @@ impl TaskServer {
             workspace_id: workspace.id.to_string(),
         };
 
-        TaskServer::success(&response)
+        Ok(TaskServer::success(&response))
     }
 
     #[tool(
@@ -765,10 +764,10 @@ impl TaskServer {
             match TaskStatus::from_str(status_str) {
                 Ok(s) => Some(s),
                 Err(_) => {
-                    return Self::err(
+                    return Ok(Self::err(
                         "Invalid status filter. Valid values: 'todo', 'inprogress', 'inreview', 'done', 'cancelled'".to_string(),
-                        Some(status_str.to_string()),
-                    );
+                        Some(status_str.clone()),
+                    ));
                 }
             }
         } else {
@@ -788,7 +787,7 @@ impl TaskServer {
             parent_workspace_id: None,
             image_ids: None,
         };
-        let url = self.url(&format!("/api/tasks/{}", task_id));
+        let url = self.url(&format!("/api/tasks/{task_id}"));
         let updated_task: Task = match self.send_json(self.client.put(&url).json(&payload)).await {
             Ok(t) => t,
             Err(e) => return Ok(e),
@@ -796,7 +795,7 @@ impl TaskServer {
 
         let details = TaskDetails::from_task(updated_task);
         let repsonse = UpdateTaskResponse { task: details };
-        TaskServer::success(&repsonse)
+        Ok(TaskServer::success(&repsonse))
     }
 
     #[tool(
@@ -806,7 +805,7 @@ impl TaskServer {
         &self,
         Parameters(DeleteTaskRequest { task_id }): Parameters<DeleteTaskRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let url = self.url(&format!("/api/tasks/{}", task_id));
+        let url = self.url(&format!("/api/tasks/{task_id}"));
         if let Err(e) = self.send_empty_json(self.client.delete(&url)).await {
             return Ok(e);
         }
@@ -815,7 +814,7 @@ impl TaskServer {
             deleted_task_id: Some(task_id.to_string()),
         };
 
-        TaskServer::success(&response)
+        Ok(TaskServer::success(&response))
     }
 
     #[tool(
@@ -825,7 +824,7 @@ impl TaskServer {
         &self,
         Parameters(GetTaskRequest { task_id }): Parameters<GetTaskRequest>,
     ) -> Result<CallToolResult, ErrorData> {
-        let url = self.url(&format!("/api/tasks/{}", task_id));
+        let url = self.url(&format!("/api/tasks/{task_id}"));
         let task: Task = match self.send_json(self.client.get(&url)).await {
             Ok(t) => t,
             Err(e) => return Ok(e),
@@ -834,7 +833,7 @@ impl TaskServer {
         let details = TaskDetails::from_task(task);
         let response = GetTaskResponse { task: details };
 
-        TaskServer::success(&response)
+        Ok(TaskServer::success(&response))
     }
 }
 
@@ -844,7 +843,7 @@ impl ServerHandler for TaskServer {
         let mut instruction = "A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. You can get project ids by using `list projects`. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`.. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_workspace_session', 'get_task', 'update_task', 'delete_task', 'list_repos'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string();
         if self.context.is_some() {
             let context_instruction = "Use 'get_context' to fetch project/task/workspace metadata for the active Vibe Kanban workspace session when available.";
-            instruction = format!("{} {}", context_instruction, instruction);
+            instruction = format!("{context_instruction} {instruction}");
         }
 
         ServerInfo {

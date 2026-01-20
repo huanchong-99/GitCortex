@@ -31,7 +31,7 @@ pub struct SessionHandler;
 
 impl SessionHandler {
     pub fn extract_session_id_from_rollout_path(
-        rollout_path: PathBuf,
+        rollout_path: &Path,
     ) -> Result<String, SessionError> {
         // Extracts the session UUID from the end of the rollout file path.
         // Pattern: rollout-{timestamp}-{uuid}.jsonl
@@ -208,8 +208,10 @@ impl SessionHandler {
                     .is_some_and(|filename| {
                         filename.contains(session_id)
                             && filename.starts_with("rollout-")
-                            && filename.ends_with(".jsonl")
                     })
+                && path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("jsonl"))
             {
                 return Ok(path);
             }

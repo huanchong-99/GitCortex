@@ -555,7 +555,7 @@ pub async fn push_task_attempt_branch(
         .git()
         .push_to_remote(&worktree_path, &workspace.branch, false)
     {
-        Ok(_) => Ok(ResponseJson(ApiResponse::success(()))),
+        Ok(()) => Ok(ResponseJson(ApiResponse::success(()))),
         Err(GitServiceError::GitCLI(GitCliError::PushRejected(_))) => Ok(ResponseJson(
             ApiResponse::error_with_data(PushError::ForcePushRequired),
         )),
@@ -909,12 +909,12 @@ pub async fn change_target_branch(
     {
         return Ok(ResponseJson(ApiResponse::error(
             format!(
-                "Branch '{}' does not exist in repository '{}'",
-                new_target_branch, repo.name
+                "Branch '{new_target_branch}' does not exist in repository '{}'",
+                repo.name
             )
             .as_str(),
         )));
-    };
+    }
 
     WorkspaceRepo::update_target_branch(pool, workspace.id, repo_id, &new_target_branch).await?;
 
@@ -1106,28 +1106,21 @@ pub async fn rebase_task_attempt(
         .new_base_branch
         .unwrap_or_else(|| workspace_repo.target_branch.clone());
 
-    match deployment
+    if deployment
         .git()
         .check_branch_exists(&repo.path, &new_base_branch)?
     {
-        true => {
-            WorkspaceRepo::update_target_branch(
-                pool,
-                workspace.id,
-                payload.repo_id,
-                &new_base_branch,
-            )
-            .await?;
-        }
-        false => {
-            return Ok(ResponseJson(ApiResponse::error(
-                format!(
-                    "Branch '{}' does not exist in the repository",
-                    new_base_branch
-                )
-                .as_str(),
-            )));
-        }
+        WorkspaceRepo::update_target_branch(
+            pool,
+            workspace.id,
+            payload.repo_id,
+            &new_base_branch,
+        )
+        .await?;
+    } else {
+        return Ok(ResponseJson(ApiResponse::error(
+            format!("Branch '{new_base_branch}' does not exist in the repository").as_str(),
+        )));
     }
 
     let container_ref = deployment
@@ -1329,7 +1322,7 @@ pub async fn get_task_attempt_children(
                     serde_json::json!({
                         "workspace_id": workspace.id.to_string(),
                         "children_count": relationships.children.len(),
-                        "parent_count": if relationships.parent_task.is_some() { 1 } else { 0 },
+                        "parent_count": i32::from(relationships.parent_task.is_some()),
                     }),
                 )
                 .await;
@@ -1405,13 +1398,10 @@ pub async fn run_setup_script(
         .ok_or(SqlxError::RowNotFound)?;
 
     let repos = WorkspaceRepo::find_repos_for_workspace(pool, workspace.id).await?;
-    let executor_action = match deployment.container().setup_actions_for_repos(&repos) {
-        Some(action) => action,
-        None => {
-            return Ok(ResponseJson(ApiResponse::error_with_data(
-                RunScriptError::NoScriptConfigured,
-            )));
-        }
+    let Some(executor_action) = deployment.container().setup_actions_for_repos(&repos) else {
+        return Ok(ResponseJson(ApiResponse::error_with_data(
+            RunScriptError::NoScriptConfigured,
+        )));
     };
 
     // Get or create a session for setup script
@@ -1486,13 +1476,10 @@ pub async fn run_cleanup_script(
         .ok_or(SqlxError::RowNotFound)?;
 
     let repos = WorkspaceRepo::find_repos_for_workspace(pool, workspace.id).await?;
-    let executor_action = match deployment.container().cleanup_actions_for_repos(&repos) {
-        Some(action) => action,
-        None => {
-            return Ok(ResponseJson(ApiResponse::error_with_data(
-                RunScriptError::NoScriptConfigured,
-            )));
-        }
+    let Some(executor_action) = deployment.container().cleanup_actions_for_repos(&repos) else {
+        return Ok(ResponseJson(ApiResponse::error_with_data(
+            RunScriptError::NoScriptConfigured,
+        )));
     };
 
     // Get or create a session for cleanup script

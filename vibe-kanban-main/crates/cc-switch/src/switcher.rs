@@ -108,6 +108,7 @@ impl ModelSwitcher {
     }
 
     /// 设置是否在切换前备份
+    #[must_use]
     pub fn with_backup(mut self, backup: bool) -> Self {
         self.backup_before_switch = backup;
         self
@@ -138,18 +139,18 @@ mod tests {
     #[test]
     fn test_model_switcher_creation() {
         let switcher = ModelSwitcher::new();
-        assert_eq!(switcher.backup_before_switch, true);
+        assert!(switcher.backup_before_switch);
     }
 
     #[test]
     fn test_model_switcher_with_backup() {
         let switcher = ModelSwitcher::new().with_backup(false);
-        assert_eq!(switcher.backup_before_switch, false);
+        assert!(!switcher.backup_before_switch);
     }
 
     #[test]
     fn test_model_switcher_default() {
         let switcher = ModelSwitcher::default();
-        assert_eq!(switcher.backup_before_switch, true);
+        assert!(switcher.backup_before_switch);
     }
 }

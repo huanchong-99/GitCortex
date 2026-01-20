@@ -118,17 +118,17 @@ impl GhCli {
     }
 
     /// Ensure the GitHub CLI binary is discoverable.
-    fn ensure_available(&self) -> Result<(), GhCliError> {
+    fn ensure_available() -> Result<(), GhCliError> {
         resolve_executable_path_blocking("gh").ok_or(GhCliError::NotAvailable)?;
         Ok(())
     }
 
-    fn run<I, S>(&self, args: I, dir: Option<&Path>) -> Result<String, GhCliError>
+    fn run<I, S>(args: I, dir: Option<&Path>) -> Result<String, GhCliError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        self.ensure_available()?;
+        Self::ensure_available()?;
         let gh = resolve_executable_path_blocking("gh").ok_or(GhCliError::NotAvailable)?;
         let mut cmd = Command::new(&gh);
         if let Some(d) = dir {
@@ -171,7 +171,7 @@ impl GhCli {
         remote_url: &str,
         repo_path: &Path,
     ) -> Result<GitHubRepoInfo, GhCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             ["repo", "view", remote_url, "--json", "owner,name"],
             Some(repo_path),
         )?;
@@ -213,7 +213,7 @@ impl GhCli {
         args.push(OsString::from("pr"));
         args.push(OsString::from("create"));
         args.push(OsString::from("--repo"));
-        args.push(OsString::from(format!("{}/{}", owner, repo_name)));
+        args.push(OsString::from(format!("{owner}/{repo_name}")));
         args.push(OsString::from("--head"));
         args.push(OsString::from(&request.head_branch));
         args.push(OsString::from("--base"));
@@ -227,13 +227,13 @@ impl GhCli {
             args.push(OsString::from("--draft"));
         }
 
-        let raw = self.run(args, Some(repo_path))?;
+        let raw = Self::run(args, Some(repo_path))?;
         Self::parse_pr_create_text(&raw)
     }
 
     /// Ensure the GitHub CLI has valid auth.
     pub fn check_auth(&self) -> Result<(), GhCliError> {
-        match self.run(["auth", "status"], None) {
+        match Self::run(["auth", "status"], None) {
             Ok(_) => Ok(()),
             Err(GhCliError::CommandFailed(msg)) => Err(GhCliError::AuthFailed(msg)),
             Err(err) => Err(err),
@@ -242,7 +242,7 @@ impl GhCli {
 
     /// Retrieve details for a pull request by URL.
     pub fn view_pr(&self, pr_url: &str) -> Result<PullRequestInfo, GhCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             [
                 "pr",
                 "view",
@@ -262,7 +262,7 @@ impl GhCli {
         repo: &str,
         branch: &str,
     ) -> Result<Vec<PullRequestInfo>, GhCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             [
                 "pr",
                 "list",
@@ -287,7 +287,7 @@ impl GhCli {
         repo: &str,
         pr_number: i64,
     ) -> Result<Vec<PrComment>, GhCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             [
                 "pr",
                 "view",
@@ -309,7 +309,7 @@ impl GhCli {
         repo: &str,
         pr_number: i64,
     ) -> Result<Vec<PrReviewComment>, GhCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             [
                 "api",
                 &format!("repos/{owner}/{repo}/pulls/{pr_number}/comments"),

@@ -59,13 +59,12 @@ impl ExecutorApprovalService for ExecutorApprovalBridge {
 
         let task_name = ExecutionProcess::load_context(&self.db.pool, self.execution_process_id)
             .await
-            .map(|ctx| ctx.task.title)
-            .unwrap_or_else(|_| "Unknown task".to_string());
+            .map_or_else(|_| "Unknown task".to_string(), |ctx| ctx.task.title);
 
         self.notification_service
             .notify(
-                &format!("Approval Needed: {}", task_name),
-                &format!("Tool '{}' requires approval", tool_name),
+                &format!("Approval Needed: {task_name}"),
+                &format!("Tool '{tool_name}' requires approval"),
             )
             .await;
 

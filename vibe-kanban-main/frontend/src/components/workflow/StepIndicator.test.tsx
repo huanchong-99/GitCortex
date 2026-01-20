@@ -1,28 +1,33 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { screen } from '@testing-library/react';
 import { StepIndicator } from './StepIndicator';
 import { WizardStep } from './types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('StepIndicator', () => {
+  beforeEach(() => {
+    void setTestLanguage();
+  });
+
   it('should render all 7 steps', () => {
-    render(
+    renderWithI18n(
       <StepIndicator
         currentStep={WizardStep.Project}
         completedSteps={[]}
       />
     );
 
-    expect(screen.getByText('工作目录')).toBeInTheDocument();
-    expect(screen.getByText('基础配置')).toBeInTheDocument();
-    expect(screen.getByText('任务配置')).toBeInTheDocument();
-    expect(screen.getByText('模型配置')).toBeInTheDocument();
-    expect(screen.getByText('终端配置')).toBeInTheDocument();
-    expect(screen.getByText('斜杠命令')).toBeInTheDocument();
-    expect(screen.getByText('高级配置')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.project.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.basic.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.tasks.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.models.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.terminals.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.commands.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:steps.advanced.name'))).toBeInTheDocument();
   });
 
   it('should mark current step as active', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <StepIndicator
         currentStep={WizardStep.Basic}
         completedSteps={[]}
@@ -34,20 +39,19 @@ describe('StepIndicator', () => {
   });
 
   it('should mark completed steps with check icon', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <StepIndicator
         currentStep={WizardStep.Tasks}
         completedSteps={[WizardStep.Project, WizardStep.Basic]}
       />
     );
 
-    // Check that completed steps have checkmarks
     const checkIcons = container.querySelectorAll('svg.lucide-check');
     expect(checkIcons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('should color connector lines based on step completion', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <StepIndicator
         currentStep={WizardStep.Tasks}
         completedSteps={[WizardStep.Project, WizardStep.Basic]}
@@ -55,11 +59,8 @@ describe('StepIndicator', () => {
     );
 
     const connectors = container.querySelectorAll('.flex-1.h-0\\.5');
-    // First connector (after step 0) should be brand (completed)
     expect(connectors[0]).toHaveClass('bg-brand');
-    // Second connector (after step 1) should be brand (completed)
     expect(connectors[1]).toHaveClass('bg-brand');
-    // Third connector (after step 2) should be muted (not completed)
     expect(connectors[2]).toHaveClass('bg-muted');
   });
 });

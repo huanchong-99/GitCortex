@@ -12,14 +12,14 @@ pub struct Assets;
 
 pub async fn serve_frontend(uri: axum::extract::Path<String>) -> impl IntoResponse {
     let path = uri.trim_start_matches('/');
-    serve_file(path).await
+    serve_file(path)
 }
 
 pub async fn serve_frontend_root() -> impl IntoResponse {
-    serve_file("index.html").await
+    serve_file("index.html")
 }
 
-async fn serve_file(path: &str) -> impl IntoResponse + use<> {
+fn serve_file(path: &str) -> impl IntoResponse + use<> {
     let file = Assets::get(path);
 
     match file {

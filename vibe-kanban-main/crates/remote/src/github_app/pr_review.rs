@@ -39,6 +39,8 @@ pub enum PrReviewError {
     Database(#[from] ReviewError),
     #[error("Archive error: {0}")]
     Archive(String),
+    #[error("PR number out of range: {0}")]
+    InvalidPrNumber(u64),
     #[error("Worker error: {0}")]
     Worker(String),
 }
@@ -116,7 +118,7 @@ impl PrReviewService {
         let tarball =
             create_tarball(temp_dir.path()).map_err(|e| PrReviewError::Archive(e.to_string()))?;
 
-        let tarball_size_mb = tarball.len() as f64 / 1_048_576.0;
+        let tarball_size_mb = tarball.len() / 1_048_576;
         debug!(review_id = %review_id, size_mb = tarball_size_mb, "Tarball created");
 
         // 4. Upload to R2
@@ -130,6 +132,8 @@ impl PrReviewService {
         );
 
         let repo = ReviewRepository::new(pool);
+        let pr_number = i32::try_from(params.pr_number)
+            .map_err(|_| PrReviewError::InvalidPrNumber(params.pr_number))?;
         repo.create_webhook_review(CreateWebhookReviewParams {
             id: review_id,
             gh_pr_url: &gh_pr_url,
@@ -138,7 +142,7 @@ impl PrReviewService {
             github_installation_id: params.installation_id,
             pr_owner: &params.owner,
             pr_repo: &params.repo,
-            pr_number: params.pr_number as i32,
+            pr_number,
         })
         .await?;
 
@@ -176,8 +180,7 @@ impl PrReviewService {
             let body = response.text().await.unwrap_or_default();
             error!(review_id = %review_id, status = %status, body = %body, "Worker returned error");
             return Err(PrReviewError::Worker(format!(
-                "Worker returned {}: {}",
-                status, body
+                "Worker returned {status}: {body}"
             )));
         }
 

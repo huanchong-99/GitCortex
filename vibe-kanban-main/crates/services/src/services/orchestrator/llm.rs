@@ -1,4 +1,4 @@
-//! LLM 客户端抽象
+//! LLM client abstractions and implementations.
 
 use std::future::Future;
 use std::num::NonZeroU32;
@@ -20,12 +20,13 @@ use super::{
     types::{LLMMessage, LLMResponse, LLMUsage},
 };
 
+/// Defines the LLM client interface used by the orchestrator.
 #[async_trait]
 pub trait LLMClient: Send + Sync {
     async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse>;
 }
 
-/// Retry with exponential backoff
+/// Retries an async operation with exponential backoff.
 pub async fn retry_with_backoff<T, E, F, Fut>(
     max_retries: u32,
     mut operation: F,
@@ -51,7 +52,7 @@ where
                     1000 * (attempt + 1)
                 );
                 last_error = Some(e);
-                sleep(Duration::from_millis(1000 * (attempt + 1) as u64)).await;
+                sleep(Duration::from_millis(1000 * u64::from(attempt + 1))).await;
             }
             Err(e) => {
                 tracing::error!("All {} attempts failed", max_retries);
@@ -63,6 +64,7 @@ where
     Err(last_error.unwrap())
 }
 
+/// Wraps an LLM client with a per-second rate limiter.
 pub struct RateLimitedClient<T> {
     inner: T,
     rate_limiter: Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
@@ -95,6 +97,7 @@ where
     }
 }
 
+/// LLM client for OpenAI-compatible chat endpoints.
 pub struct OpenAICompatibleClient {
     client: Client,
     base_url: String,
@@ -130,6 +133,13 @@ impl MockLLMClient {
             should_fail: true,
             response_content: String::new(),
         }
+    }
+}
+
+#[cfg(test)]
+impl Default for MockLLMClient {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -177,6 +187,7 @@ struct ChatChoice {
     message: ChatMessage,
 }
 
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Deserialize)]
 struct UsageInfo {
     prompt_tokens: i32,
@@ -230,7 +241,7 @@ impl OpenAICompatibleClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!("LLM API error: {} - {}", status, body));
+            return Err(anyhow::anyhow!("LLM API error: {status} - {body}"));
         }
 
         let chat_response: ChatResponse = response.json().await?;
@@ -257,8 +268,8 @@ impl LLMClient for OpenAICompatibleClient {
         let messages_clone = messages.clone();
 
         // Create retry attempts
-        let mut attempt = 0;
-        let max_retries = 3;
+        let mut attempt: u32 = 0;
+        let max_retries: u32 = 3;
 
         loop {
             match self.chat_once(messages_clone.clone()).await {
@@ -275,7 +286,7 @@ impl LLMClient for OpenAICompatibleClient {
                         1000 * (attempt + 1),
                         e
                     );
-                    sleep(Duration::from_millis(1000 * (attempt + 1) as u64)).await;
+                    sleep(Duration::from_millis(1000 * u64::from(attempt + 1))).await;
                     attempt += 1;
                 }
                 Err(e) => {
@@ -305,6 +316,7 @@ pub fn build_terminal_completion_prompt(
     )
 }
 
+/// Validates configuration and returns a rate-limited LLM client.
 pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
     config.validate().map_err(|e| anyhow::anyhow!(e))?;
     let client = OpenAICompatibleClient::new(config);

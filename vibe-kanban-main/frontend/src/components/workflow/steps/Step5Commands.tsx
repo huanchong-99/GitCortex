@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { GripVertical, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, Plus, X } from 'lucide-react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import { cn } from '@/lib/utils';
 import type { CommandConfig } from '../types';
+import { useErrorNotification } from '@/hooks/useErrorNotification';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // Types
@@ -11,8 +13,10 @@ import type { CommandConfig } from '../types';
 interface CommandPreset {
   id: string;
   name: string;
-  displayName: string;
-  description: string;
+  displayName?: string;
+  description?: string;
+  nameKey?: string;
+  descriptionKey?: string;
   isSystem: boolean;
 }
 
@@ -20,6 +24,7 @@ interface Step5CommandsProps {
   config: CommandConfig;
   errors: Record<string, string>;
   onUpdate: (updates: Partial<CommandConfig>) => void;
+  onError?: (error: Error) => void;
 }
 
 // ============================================================================
@@ -31,36 +36,36 @@ export const SYSTEM_PRESETS: CommandPreset[] = [
   {
     id: 'write-code',
     name: 'write-code',
-    displayName: '编写代码',
-    description: '根据需求编写新代码或功能',
+    nameKey: 'step5.presets.writeCode.name',
+    descriptionKey: 'step5.presets.writeCode.description',
     isSystem: true,
   },
   {
     id: 'review',
     name: 'review',
-    displayName: '代码审查',
-    description: '审查代码质量、安全性和最佳实践',
+    nameKey: 'step5.presets.review.name',
+    descriptionKey: 'step5.presets.review.description',
     isSystem: true,
   },
   {
     id: 'fix-issues',
     name: 'fix-issues',
-    displayName: '修复问题',
-    description: '修复 bug、错误和问题',
+    nameKey: 'step5.presets.fixIssues.name',
+    descriptionKey: 'step5.presets.fixIssues.description',
     isSystem: true,
   },
   {
     id: 'test',
     name: 'test',
-    displayName: '运行测试',
-    description: '执行测试套件并验证功能',
+    nameKey: 'step5.presets.test.name',
+    descriptionKey: 'step5.presets.test.description',
     isSystem: true,
   },
   {
     id: 'refactor',
     name: 'refactor',
-    displayName: '代码重构',
-    description: '重构代码以提高可维护性',
+    nameKey: 'step5.presets.refactor.name',
+    descriptionKey: 'step5.presets.refactor.description',
     isSystem: true,
   },
 ];
@@ -68,17 +73,49 @@ export const SYSTEM_PRESETS: CommandPreset[] = [
 /** Default preset IDs */
 const DEFAULT_PRESET_IDS = ['write-code', 'review'];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isCommandPreset = (value: unknown): value is CommandPreset => {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.name === 'string' &&
+    typeof value.isSystem === 'boolean'
+  );
+};
+
+const parseJson = async (response: Response): Promise<unknown> => {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
+};
+
 // ============================================================================
 // Component
 // ============================================================================
 
+/**
+ * Step 5: Configures slash command presets and ordering.
+ */
 export const Step5Commands: React.FC<Step5CommandsProps> = ({
   config,
   errors,
   onUpdate,
+  onError,
 }) => {
+  const { notifyError } = useErrorNotification({ onError, context: 'Step5Commands' });
+  const { t } = useTranslation('workflow');
   const [userPresets, setUserPresets] = useState<CommandPreset[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const getPresetName = (preset: CommandPreset) =>
+    preset.nameKey ? t(preset.nameKey) : preset.displayName ?? preset.name;
+
+  const getPresetDescription = (preset: CommandPreset) =>
+    preset.descriptionKey ? t(preset.descriptionKey) : preset.description ?? '';
 
   // Fetch user presets from API
   useEffect(() => {
@@ -87,18 +124,21 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
       try {
         const response = await fetch('/api/workflows/presets/commands');
         if (response.ok) {
-          const data: CommandPreset[] = await response.json();
-          setUserPresets(data.filter((p) => !p.isSystem));
+          const data = await parseJson(response);
+          if (Array.isArray(data)) {
+            const presets = data.filter(isCommandPreset);
+            setUserPresets(presets.filter((preset) => !preset.isSystem));
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch user presets:', error);
+        notifyError(error, 'fetchUserPresets');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserPresets();
-  }, []);
+    void fetchUserPresets();
+  }, [notifyError]);
 
   // Combine all presets
   const allPresets = [...SYSTEM_PRESETS, ...userPresets];
@@ -160,18 +200,20 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
     <div className="flex flex-col gap-base">
       {/* Enable/Disable Radio Buttons */}
       <Field>
-        <FieldLabel>斜杠命令配置</FieldLabel>
+        <FieldLabel>{t('step5.title')}</FieldLabel>
         <div className="flex flex-col gap-base">
           <label className="flex items-center gap-base cursor-pointer">
             <input
               type="radio"
               name="commandsEnabled"
               checked={config.enabled}
-              onChange={() => handleEnabledChange(true)}
+              onChange={() => {
+                handleEnabledChange(true);
+              }}
               className="size-icon-sm accent-brand"
             />
             <span className="text-base text-normal">
-              启用斜杠命令
+              {t('step5.enableLabel')}
             </span>
           </label>
           <label className="flex items-center gap-base cursor-pointer">
@@ -179,15 +221,17 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
               type="radio"
               name="commandsEnabled"
               checked={!config.enabled}
-              onChange={() => handleEnabledChange(false)}
+              onChange={() => {
+                handleEnabledChange(false);
+              }}
               className="size-icon-sm accent-brand"
             />
             <span className="text-base text-normal">
-              不启用
+              {t('step5.disableLabel')}
             </span>
           </label>
         </div>
-        {errors.enabled && <FieldError>{errors.enabled}</FieldError>}
+        {errors.enabled && <FieldError>{t(errors.enabled)}</FieldError>}
       </Field>
 
       {/* Command List (shown only when enabled) */}
@@ -195,13 +239,13 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
         <>
           {/* Selected Commands Section */}
           <Field>
-            <FieldLabel>已选命令 (按执行顺序排列)</FieldLabel>
+            <FieldLabel>{t('step5.selectedTitle')}</FieldLabel>
 
             {selectedPresets.length === 0 ? (
               /* Empty State */
               <div className="bg-secondary rounded-sm border p-double text-center">
                 <p className="text-base text-low">
-                  暂未选择任何命令，从下方预设中添加
+                  {t('step5.selectedEmpty')}
                 </p>
               </div>
             ) : (
@@ -218,10 +262,10 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                     {/* Command Info */}
                     <div className="flex-1 min-w-0">
                       <div className="text-base text-high truncate">
-                        {preset.displayName}
+                        {getPresetName(preset)}
                       </div>
                       <div className="text-xs text-low truncate">
-                        {preset.description}
+                        {getPresetDescription(preset)}
                       </div>
                     </div>
 
@@ -229,39 +273,45 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                     <div className="flex items-center gap-sm">
                       <button
                         type="button"
-                        onClick={() => moveUp(index)}
+                        onClick={() => {
+                          moveUp(index);
+                        }}
                         disabled={index === 0}
                         className={cn(
                           'flex items-center justify-center p-half rounded border text-low',
                           'hover:text-normal hover:border-brand disabled:opacity-50 disabled:cursor-not-allowed'
                         )}
-                        aria-label="上移"
+                        aria-label={t('step5.moveUp')}
                       >
-                        ↑
+                        <ChevronUp className="size-icon-sm" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => moveDown(index)}
+                        onClick={() => {
+                          moveDown(index);
+                        }}
                         disabled={index === selectedPresets.length - 1}
                         className={cn(
                           'flex items-center justify-center p-half rounded border text-low',
                           'hover:text-normal hover:border-brand disabled:opacity-50 disabled:cursor-not-allowed'
                         )}
-                        aria-label="下移"
+                        aria-label={t('step5.moveDown')}
                       >
-                        ↓
+                        <ChevronDown className="size-icon-sm" />
                       </button>
                     </div>
 
                     {/* Remove Button */}
                     <button
                       type="button"
-                      onClick={() => removePreset(preset.id)}
+                      onClick={() => {
+                        removePreset(preset.id);
+                      }}
                       className={cn(
                         'flex items-center justify-center p-half rounded border text-low',
                         'hover:text-error hover:border-error'
                       )}
-                      aria-label="移除"
+                      aria-label={t('step5.remove')}
                     >
                       <X className="size-icon-sm" />
                     </button>
@@ -281,7 +331,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                     'hover:text-normal hover:border-brand'
                   )}
                 >
-                  清除全部
+                  {t('step5.clearAll')}
                 </button>
                 <button
                   type="button"
@@ -291,7 +341,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                     'hover:text-normal hover:border-brand'
                   )}
                 >
-                  重置默认
+                  {t('step5.resetDefault')}
                 </button>
               </div>
             )}
@@ -299,11 +349,11 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
 
           {/* Available Presets */}
           <Field>
-            <FieldLabel>可用预设</FieldLabel>
+            <FieldLabel>{t('step5.availableTitle')}</FieldLabel>
 
             {/* System Presets */}
             <div className="mb-base">
-              <div className="text-sm text-high mb-base">系统预设</div>
+              <div className="text-sm text-high mb-base">{t('step5.systemPresetsTitle')}</div>
               <div className="flex flex-col gap-sm">
                 {SYSTEM_PRESETS.map((preset) => {
                   const isSelected = config.presetIds.includes(preset.id);
@@ -317,22 +367,24 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-base text-high truncate">
-                          {preset.displayName}
+                          {getPresetName(preset)}
                         </div>
                         <div className="text-xs text-low truncate">
-                          {preset.description}
+                          {getPresetDescription(preset)}
                         </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => addPreset(preset.id)}
+                        onClick={() => {
+                          addPreset(preset.id);
+                        }}
                         disabled={isSelected}
                         className={cn(
                           'flex items-center justify-center p-half rounded border text-low',
                           'hover:text-normal hover:border-brand',
                           isSelected && 'opacity-50 cursor-not-allowed'
                         )}
-                        aria-label="添加"
+                        aria-label={t('step5.add')}
                       >
                         <Plus className="size-icon-sm" />
                       </button>
@@ -345,7 +397,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
             {/* User Presets */}
             {userPresets.length > 0 && (
               <div>
-                <div className="text-sm text-high mb-base">用户预设</div>
+                <div className="text-sm text-high mb-base">{t('step5.userPresetsTitle')}</div>
                 <div className="flex flex-col gap-sm">
                   {userPresets.map((preset) => {
                     const isSelected = config.presetIds.includes(preset.id);
@@ -359,22 +411,24 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                       >
                         <div className="flex-1 min-w-0">
                           <div className="text-base text-high truncate">
-                            {preset.displayName}
+                            {getPresetName(preset)}
                           </div>
                           <div className="text-xs text-low truncate">
-                            {preset.description}
+                            {getPresetDescription(preset)}
                           </div>
                         </div>
                         <button
                           type="button"
-                          onClick={() => addPreset(preset.id)}
+                          onClick={() => {
+                            addPreset(preset.id);
+                          }}
                           disabled={isSelected}
                           className={cn(
                             'flex items-center justify-center p-half rounded border text-low',
                             'hover:text-normal hover:border-brand',
                             isSelected && 'opacity-50 cursor-not-allowed'
                           )}
-                          aria-label="添加"
+                          aria-label={t('step5.add')}
                         >
                           <Plus className="size-icon-sm" />
                         </button>
@@ -387,7 +441,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
 
             {isLoading && (
               <div className="text-base text-low">
-                加载用户预设中...
+                {t('step5.loadingUserPresets')}
               </div>
             )}
           </Field>

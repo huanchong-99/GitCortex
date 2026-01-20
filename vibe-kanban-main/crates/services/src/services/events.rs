@@ -177,11 +177,14 @@ impl EventService {
                         let rowid = hook.rowid;
                         runtime_handle.spawn(async move {
                             let record_type: RecordTypes = match (table, hook.operation.clone()) {
-                                (HookTables::Tasks, SqliteOperation::Delete)
-                                | (HookTables::Projects, SqliteOperation::Delete)
-                                | (HookTables::Workspaces, SqliteOperation::Delete)
-                                | (HookTables::ExecutionProcesses, SqliteOperation::Delete)
-                                | (HookTables::Scratch, SqliteOperation::Delete) => {
+                                (
+                                    HookTables::Tasks
+                                    | HookTables::Projects
+                                    | HookTables::Workspaces
+                                    | HookTables::ExecutionProcesses
+                                    | HookTables::Scratch,
+                                    SqliteOperation::Delete,
+                                ) => {
                                     // Deletions handled in preupdate hook for reliable data capture
                                     return;
                                 }
@@ -305,7 +308,6 @@ impl EventService {
                                 RecordTypes::Project(project) => {
                                     let patch = match hook.operation {
                                         SqliteOperation::Insert => project_patch::add(project),
-                                        SqliteOperation::Update => project_patch::replace(project),
                                         _ => project_patch::replace(project),
                                     };
                                     msg_store_for_hook.push_patch(patch);
@@ -314,7 +316,6 @@ impl EventService {
                                 RecordTypes::Scratch(scratch) => {
                                     let patch = match hook.operation {
                                         SqliteOperation::Insert => scratch_patch::add(scratch),
-                                        SqliteOperation::Update => scratch_patch::replace(scratch),
                                         _ => scratch_patch::replace(scratch),
                                     };
                                     msg_store_for_hook.push_patch(patch);

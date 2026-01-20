@@ -113,12 +113,12 @@ impl CliType {
     /// Get all CLI types from database
     pub async fn find_all(pool: &SqlitePool) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, CliType>(
-            r#"
+            r"
             SELECT id, name, display_name, detect_command, install_command,
                    install_guide_url, config_file_path, is_system, created_at
             FROM cli_type
             ORDER BY is_system DESC, name ASC
-            "#
+            "
         )
         .fetch_all(pool)
         .await
@@ -127,12 +127,12 @@ impl CliType {
     /// Find CLI type by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, CliType>(
-            r#"
+            r"
             SELECT id, name, display_name, detect_command, install_command,
                    install_guide_url, config_file_path, is_system, created_at
             FROM cli_type
             WHERE id = ?
-            "#
+            "
         )
         .bind(id)
         .fetch_optional(pool)
@@ -142,12 +142,12 @@ impl CliType {
     /// Find CLI type by name
     pub async fn find_by_name(pool: &SqlitePool, name: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, CliType>(
-            r#"
+            r"
             SELECT id, name, display_name, detect_command, install_command,
                    install_guide_url, config_file_path, is_system, created_at
             FROM cli_type
             WHERE name = ?
-            "#
+            "
         )
         .bind(name)
         .fetch_optional(pool)
@@ -159,13 +159,13 @@ impl ModelConfig {
     /// Get all models for a CLI type
     pub async fn find_by_cli_type(pool: &SqlitePool, cli_type_id: &str) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, ModelConfig>(
-            r#"
+            r"
             SELECT id, cli_type_id, name, display_name, api_model_id,
                    is_default, is_official, created_at, updated_at
             FROM model_config
             WHERE cli_type_id = ?
             ORDER BY is_default DESC, name ASC
-            "#
+            "
         )
         .bind(cli_type_id)
         .fetch_all(pool)
@@ -175,12 +175,12 @@ impl ModelConfig {
     /// Find model config by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, ModelConfig>(
-            r#"
+            r"
             SELECT id, cli_type_id, name, display_name, api_model_id,
                    is_default, is_official, created_at, updated_at
             FROM model_config
             WHERE id = ?
-            "#
+            "
         )
         .bind(id)
         .fetch_optional(pool)
@@ -190,13 +190,13 @@ impl ModelConfig {
     /// Get default model for a CLI type
     pub async fn find_default_for_cli(pool: &SqlitePool, cli_type_id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, ModelConfig>(
-            r#"
+            r"
             SELECT id, cli_type_id, name, display_name, api_model_id,
                    is_default, is_official, created_at, updated_at
             FROM model_config
             WHERE cli_type_id = ? AND is_default = 1
             LIMIT 1
-            "#
+            "
         )
         .bind(cli_type_id)
         .fetch_optional(pool)

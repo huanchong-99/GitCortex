@@ -100,8 +100,10 @@ impl FileRanker {
         };
 
         if let Some(stat) = stats.get(&result.path) {
-            let recency_bonus = (100 - stat.last_index.min(99) as i64) * RECENCY_WEIGHT;
-            let frequency_bonus = stat.commit_count as i64 * FREQUENCY_WEIGHT;
+            let recency_index =
+                i64::from(u32::try_from(stat.last_index.min(99)).unwrap_or(99));
+            let recency_bonus = (100 - recency_index) * RECENCY_WEIGHT;
+            let frequency_bonus = i64::from(stat.commit_count) * FREQUENCY_WEIGHT;
 
             // Multiply base score to maintain hierarchy, add git-based bonuses
             base_score * 1000 + recency_bonus * 10 + frequency_bonus

@@ -2,7 +2,7 @@
 //!
 //! 提供各 CLI 配置文件的路径获取功能。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use crate::error::{CCSwitchError, Result};
 
 /// 获取用户主目录
@@ -90,7 +90,7 @@ pub fn get_gemini_settings_path() -> Result<PathBuf> {
 // ============================================================================
 
 /// 确保目录存在
-pub async fn ensure_dir_exists(path: &PathBuf) -> Result<()> {
+pub async fn ensure_dir_exists(path: &Path) -> Result<()> {
     if !path.exists() {
         tokio::fs::create_dir_all(path).await?;
     }
@@ -98,9 +98,9 @@ pub async fn ensure_dir_exists(path: &PathBuf) -> Result<()> {
 }
 
 /// 确保父目录存在
-pub async fn ensure_parent_dir_exists(path: &PathBuf) -> Result<()> {
+pub async fn ensure_parent_dir_exists(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
-        ensure_dir_exists(&parent.to_path_buf()).await?;
+        ensure_dir_exists(parent).await?;
     }
     Ok(())
 }

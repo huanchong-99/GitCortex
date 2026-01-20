@@ -1,3 +1,14 @@
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
@@ -67,11 +78,11 @@ struct PendingHandoff {
 #[async_trait]
 impl Deployment for LocalDeployment {
     async fn new() -> Result<Self, DeploymentError> {
-        let mut raw_config = load_config_from_file(&config_path()).await;
+        let mut raw_config = load_config_from_file(&config_path());
 
         let profiles = ExecutorConfigs::get_cached();
         if !raw_config.onboarding_acknowledged
-            && let Ok(recommended_executor) = profiles.get_recommended_executor_profile().await
+            && let Ok(recommended_executor) = profiles.get_recommended_executor_profile()
         {
             raw_config.executor_profile = recommended_executor;
         }
@@ -89,7 +100,7 @@ impl Deployment for LocalDeployment {
         }
 
         // Always save config (may have been migrated or version updated)
-        save_config_to_file(&raw_config, &config_path()).await?;
+        save_config_to_file(&raw_config, &config_path())?;
 
         let config = Arc::new(RwLock::new(raw_config));
         let user_id = generate_user_id();
@@ -140,10 +151,10 @@ impl Deployment for LocalDeployment {
 
         let api_base = std::env::var("VK_SHARED_API_BASE")
             .ok()
-            .or_else(|| option_env!("VK_SHARED_API_BASE").map(|s| s.to_string()));
+            .or_else(|| option_env!("VK_SHARED_API_BASE").map(ToString::to_string));
 
-        let remote_client = match api_base {
-            Some(url) => match RemoteClient::new(&url, auth_context.clone()) {
+        let remote_client = if let Some(url) = api_base {
+            match RemoteClient::new(&url, auth_context.clone()) {
                 Ok(client) => {
                     tracing::info!("Remote client initialized with URL: {}", url);
                     Ok(client)
@@ -152,11 +163,10 @@ impl Deployment for LocalDeployment {
                     tracing::error!(?e, "failed to create remote client");
                     Err(RemoteClientNotConfigured)
                 }
-            },
-            None => {
-                tracing::info!("VK_SHARED_API_BASE not set; remote features disabled");
-                Err(RemoteClientNotConfigured)
             }
+        } else {
+            tracing::info!("VK_SHARED_API_BASE not set; remote features disabled");
+            Err(RemoteClientNotConfigured)
         };
 
         let share_publisher = remote_client
@@ -182,8 +192,7 @@ impl Deployment for LocalDeployment {
             approvals.clone(),
             queued_message_service.clone(),
             share_publisher.clone(),
-        )
-        .await;
+        );
 
         let events = EventService::new(db.clone(), events_msg_store, events_entry_count);
 
@@ -288,7 +297,7 @@ impl LocalDeployment {
         if self.auth_context.get_credentials().await.is_none() {
             self.auth_context.clear_profile().await;
             return LoginStatus::LoggedOut;
-        };
+        }
 
         if let Some(cached_profile) = self.auth_context.cached_profile().await {
             return LoginStatus::LoggedIn {

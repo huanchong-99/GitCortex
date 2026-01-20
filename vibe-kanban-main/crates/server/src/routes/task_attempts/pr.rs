@@ -22,7 +22,7 @@ use executors::actions::{
 use serde::{Deserialize, Serialize};
 use services::services::{
     container::ContainerService,
-    git::{GitCliError, GitServiceError},
+    git::{GitCliError, GitService, GitServiceError},
     git_host::{
         self, CreatePrRequest, GitHostError, GitHostProvider, ProviderKind, UnifiedPrComment,
     },
@@ -228,7 +228,7 @@ pub async fn create_pr(
     // Try to get the remote from the branch name (works for remote-tracking branches like "upstream/main").
     // Fall back to push_remote if the branch doesn't exist locally or isn't a remote-tracking branch.
     let (target_remote, base_branch) =
-        match git.get_remote_name_from_branch_name(&repo_path, &target_branch) {
+        match GitService::get_remote_name_from_branch_name(&repo_path, &target_branch) {
             Ok(remote) => {
                 let branch = target_branch
                     .strip_prefix(&format!("{remote}/"))
@@ -327,7 +327,7 @@ pub async fn create_pr(
             }
 
             // Auto-open PR in browser
-            if let Err(e) = utils::browser::open_browser(&pr_info.url).await {
+            if let Err(e) = utils::browser::open_browser(&pr_info.url) {
                 tracing::warn!("Failed to open PR in browser: {}", e);
             }
 

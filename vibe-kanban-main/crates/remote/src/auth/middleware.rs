@@ -105,7 +105,7 @@ pub async fn require_session(
     });
 
     match session_repo.touch(session.id).await {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(error) => warn!(?error, "failed to update session last-used timestamp"),
     }
 

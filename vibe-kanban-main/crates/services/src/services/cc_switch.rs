@@ -41,7 +41,7 @@ impl CCSwitchService {
             })?;
 
         // 解析 CLI 类型
-        let cli = CcCliType::from_str(&cli_type.name)
+        let cli = CcCliType::parse(&cli_type.name)
             .ok_or_else(|| anyhow::anyhow!("Unsupported CLI: {}", cli_type.name))?;
 
         // 构建切换配置

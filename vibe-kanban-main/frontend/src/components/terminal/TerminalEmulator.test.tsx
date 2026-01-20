@@ -1,28 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { TerminalEmulator, TerminalEmulatorRef } from './TerminalEmulator';
+
+const VALID_TERMINAL_ID = '123e4567-e89b-12d3-a456-426614174000';
 
 // Mock xterm
 vi.mock('@xterm/xterm', () => {
   class MockTerminal {
-    onData: any;
-    open: any;
-    write: any;
-    clear: any;
-    dispose: any;
-    loadAddon: any;
+    onData = vi.fn<(handler: (data: string) => void) => void>();
+    open = vi.fn<(container: HTMLElement) => void>();
+    write = vi.fn<(data: string) => void>();
+    clear = vi.fn<() => void>();
+    dispose = vi.fn<() => void>();
+    loadAddon = vi.fn<(addon: unknown) => void>();
     cols = 80;
     rows = 24;
-
-    constructor(options: any) {
-      this.onData = vi.fn();
-      this.open = vi.fn();
-      this.write = vi.fn();
-      this.clear = vi.fn();
-      this.dispose = vi.fn();
-      this.loadAddon = vi.fn();
-    }
   }
   return { Terminal: MockTerminal };
 });
@@ -30,10 +23,7 @@ vi.mock('@xterm/xterm', () => {
 // Mock FitAddon
 vi.mock('@xterm/addon-fit', () => {
   class MockFitAddon {
-    fit: any;
-    constructor() {
-      this.fit = vi.fn();
-    }
+    fit = vi.fn<() => void>();
   }
   return { FitAddon: MockFitAddon };
 });
@@ -42,8 +32,9 @@ vi.mock('@xterm/addon-fit', () => {
 class MockWebSocket {
   url = '';
   readyState = 0;
+  lastSent: string | null = null;
   onopen: (() => void) | null = null;
-  onmessage: ((event: MessageEvent) => void) | null = null;
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
   onerror: ((error: Event) => void) | null = null;
   onclose: (() => void) | null = null;
 
@@ -56,7 +47,7 @@ class MockWebSocket {
   }
 
   send(data: string) {
-    // Mock send
+    this.lastSent = data;
   }
 
   close() {
@@ -64,12 +55,12 @@ class MockWebSocket {
     this.onclose?.();
   }
 
-  addEventListener(_: string, handler: () => void) {
-    if (_ === 'open') this.onopen = handler;
+  addEventListener(event: string, handler: () => void) {
+    if (event === 'open') this.onopen = handler;
   }
 }
 
-(globalThis as any).WebSocket = MockWebSocket;
+globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
 
 describe('TerminalEmulator', () => {
   beforeEach(() => {
@@ -78,19 +69,19 @@ describe('TerminalEmulator', () => {
 
   describe('Rendering', () => {
     it('should render terminal container', () => {
-      render(<TerminalEmulator terminalId="test-terminal-1" />);
+      render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
       const container = document.querySelector('.w-full.h-full.min-h-\\[300px\\]');
       expect(container).toBeInTheDocument();
     });
 
     it('should have correct CSS classes for styling', () => {
-      render(<TerminalEmulator terminalId="test-terminal-1" />);
+      render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
       const container = document.querySelector('.bg-\\[\\#1e1e1e\\]');
       expect(container).toBeInTheDocument();
     });
 
     it('should have accessibility attributes', () => {
-      render(<TerminalEmulator terminalId="test-terminal-1" />);
+      render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
       const container = document.querySelector('[role="terminal"]');
       expect(container).toBeInTheDocument();
       expect(container).toHaveAttribute('aria-label', 'Terminal emulator');
@@ -100,7 +91,7 @@ describe('TerminalEmulator', () => {
   describe('Terminal Initialization', () => {
     it('should initialize terminal without errors', () => {
       expect(() => {
-        render(<TerminalEmulator terminalId="test-terminal-1" />);
+        render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
       }).not.toThrow();
     });
 
@@ -110,21 +101,21 @@ describe('TerminalEmulator', () => {
   });
 
   describe('Ref Methods', () => {
-    it('should expose write method via ref', () => {
+    it('should expose write method via ref', async () => {
       const ref = createRef<TerminalEmulatorRef>();
-      render(<TerminalEmulator terminalId="test-terminal-1" ref={ref} />);
+      render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} ref={ref} />);
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(ref.current).toBeDefined();
         expect(ref.current?.write).toBeInstanceOf(Function);
       });
     });
 
-    it('should expose clear method via ref', () => {
+    it('should expose clear method via ref', async () => {
       const ref = createRef<TerminalEmulatorRef>();
-      render(<TerminalEmulator terminalId="test-terminal-1" ref={ref} />);
+      render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} ref={ref} />);
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(ref.current).toBeDefined();
         expect(ref.current?.clear).toBeInstanceOf(Function);
       });
@@ -133,11 +124,11 @@ describe('TerminalEmulator', () => {
 
   describe('WebSocket Connection', () => {
     it('should establish WebSocket connection when wsUrl is provided', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       render(
         <TerminalEmulator
-          terminalId="test-terminal-1"
+          terminalId={VALID_TERMINAL_ID}
           wsUrl="ws://localhost:8080"
         />
       );
@@ -151,7 +142,7 @@ describe('TerminalEmulator', () => {
 
     it('should not connect WebSocket when wsUrl is not provided', () => {
       expect(() => {
-        render(<TerminalEmulator terminalId="test-terminal-1" />);
+        render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
       }).not.toThrow();
     });
 
@@ -187,7 +178,7 @@ describe('TerminalEmulator', () => {
       );
     });
 
-    it('should accept valid terminalId with alphanumeric characters and hyphens', () => {
+    it('should reject non-UUID terminalId values', () => {
       const onError = vi.fn();
 
       render(
@@ -198,7 +189,22 @@ describe('TerminalEmulator', () => {
         />
       );
 
-      // Should not emit error for valid terminalId
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Invalid terminalId' })
+      );
+    });
+
+    it('should accept valid terminalId UUIDs', () => {
+      const onError = vi.fn();
+
+      render(
+        <TerminalEmulator
+          terminalId={VALID_TERMINAL_ID}
+          wsUrl="ws://localhost:8080"
+          onError={onError}
+        />
+      );
+
       expect(onError).not.toHaveBeenCalled();
     });
   });
@@ -208,7 +214,7 @@ describe('TerminalEmulator', () => {
       const onData = vi.fn();
       render(
         <TerminalEmulator
-          terminalId="test-terminal-1"
+          terminalId={VALID_TERMINAL_ID}
           wsUrl="ws://localhost:8080"
           onData={onData}
         />
@@ -227,7 +233,7 @@ describe('TerminalEmulator', () => {
 
       render(
         <TerminalEmulator
-          terminalId="test-terminal-1"
+          terminalId={VALID_TERMINAL_ID}
           wsUrl="ws://localhost:8080"
           onError={onError}
         />
@@ -245,7 +251,7 @@ describe('TerminalEmulator', () => {
 
       render(
         <TerminalEmulator
-          terminalId="test-terminal-1"
+          terminalId={VALID_TERMINAL_ID}
           wsUrl="ws://localhost:8080"
           onError={onError}
         />
@@ -260,21 +266,21 @@ describe('TerminalEmulator', () => {
     it('should handle onData callback', () => {
       const onData = vi.fn();
       expect(() => {
-        render(<TerminalEmulator terminalId="test-terminal-1" onData={onData} />);
+        render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} onData={onData} />);
       }).not.toThrow();
     });
 
     it('should handle onResize callback', () => {
       const onResize = vi.fn();
       expect(() => {
-        render(<TerminalEmulator terminalId="test-terminal-1" onResize={onResize} />);
+        render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} onResize={onResize} />);
       }).not.toThrow();
     });
   });
 
   describe('Cleanup', () => {
     it('should cleanup on unmount', () => {
-      const { unmount } = render(<TerminalEmulator terminalId="test-terminal-1" />);
+      const { unmount } = render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
       expect(() => {
         unmount();
       }).not.toThrow();
@@ -283,7 +289,7 @@ describe('TerminalEmulator', () => {
     it('should close WebSocket on unmount', () => {
       const { unmount } = render(
         <TerminalEmulator
-          terminalId="test-terminal-1"
+          terminalId={VALID_TERMINAL_ID}
           wsUrl="ws://localhost:8080"
         />
       );
@@ -296,11 +302,11 @@ describe('TerminalEmulator', () => {
 
   describe('Race Condition Prevention', () => {
     it('should wait for terminal to be ready before connecting WebSocket', () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       render(
         <TerminalEmulator
-          terminalId="test-terminal-1"
+          terminalId={VALID_TERMINAL_ID}
           wsUrl="ws://localhost:8080"
         />
       );

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { Step2Tasks } from './Step2Tasks';
 import type { TaskConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('Step2Tasks', () => {
-  const mockOnChange = vi.fn();
+  const mockOnChange = vi.fn<(tasks: TaskConfig[]) => void>();
 
   const emptyTasks: TaskConfig[] = [];
 
@@ -27,10 +28,11 @@ describe('Step2Tasks', () => {
 
   beforeEach(() => {
     mockOnChange.mockClear();
+    void setTestLanguage();
   });
 
   it('should render task configuration UI', () => {
-    render(
+    renderWithI18n(
       <Step2Tasks
         config={initializedTasks}
         taskCount={2}
@@ -39,11 +41,13 @@ describe('Step2Tasks', () => {
       />
     );
 
-    expect(screen.getByText(/配置 2 个并行任务/)).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step2.header', { count: 2 }))
+    ).toBeInTheDocument();
   });
 
   it('should initialize empty tasks when config length mismatches taskCount', () => {
-    render(
+    renderWithI18n(
       <Step2Tasks
         config={emptyTasks}
         taskCount={2}
@@ -52,20 +56,21 @@ describe('Step2Tasks', () => {
       />
     );
 
-    // Should trigger onChange to initialize tasks
     expect(mockOnChange).toHaveBeenCalled();
   });
 
   it('should auto-generate branch name from task name', () => {
-    const oneTask: TaskConfig[] = [{
-      id: '1',
-      name: '',
-      description: '',
-      branch: '',
-      terminalCount: 1,
-    }];
+    const oneTask: TaskConfig[] = [
+      {
+        id: '1',
+        name: '',
+        description: '',
+        branch: '',
+        terminalCount: 1,
+      },
+    ];
 
-    render(
+    renderWithI18n(
       <Step2Tasks
         config={oneTask}
         taskCount={1}
@@ -74,27 +79,30 @@ describe('Step2Tasks', () => {
       />
     );
 
-    const nameInput = screen.getByPlaceholderText('例如：登录功能');
+    const nameInput = screen.getByPlaceholderText(
+      i18n.t('workflow:step2.namePlaceholder')
+    );
     fireEvent.change(nameInput, { target: { value: 'User Login Feature' } });
 
-    // Should auto-generate branch name
-    expect(mockOnChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        0: expect.objectContaining({ branch: 'feat/user-login-feature' })
-      })
-    );
+    const calls = mockOnChange.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+
+    const updatedTasks = calls[0][0];
+    expect(updatedTasks[0].branch).toBe('feat/user-login-feature');
   });
 
   it('should show terminal count selection', () => {
-    const tasks: TaskConfig[] = [{
-      id: '1',
-      name: 'Task 1',
-      description: 'Test',
-      branch: 'feat/task-1',
-      terminalCount: 1,
-    }];
+    const tasks: TaskConfig[] = [
+      {
+        id: '1',
+        name: 'Task 1',
+        description: 'Test',
+        branch: 'feat/task-1',
+        terminalCount: 1,
+      },
+    ];
 
-    render(
+    renderWithI18n(
       <Step2Tasks
         config={tasks}
         taskCount={1}
@@ -103,6 +111,8 @@ describe('Step2Tasks', () => {
       />
     );
 
-    expect(screen.getByText('此任务需要几个终端串行执行？')).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t('workflow:step2.terminalCountLabel'))
+    ).toBeInTheDocument();
   });
 });

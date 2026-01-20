@@ -3,17 +3,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import { cn } from '@/lib/utils';
 import type { TaskConfig } from '../types';
+import { useTranslation } from 'react-i18next';
 
 const TERMINAL_COUNT_OPTIONS = [1, 2, 3];
 
-interface Step2TasksProps {
-  config: TaskConfig[];
-  taskCount: number;
-  onChange: (tasks: TaskConfig[]) => void;
-  errors: Record<string, string>;
-}
-
-// Helper function to slugify text for branch names
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -23,15 +16,25 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+interface Step2TasksProps {
+  config: TaskConfig[];
+  taskCount: number;
+  onChange: (tasks: TaskConfig[]) => void;
+  errors: Record<string, string>;
+}
+
+/**
+ * Step 2: Configures task details and per-task terminal counts.
+ */
 export const Step2Tasks: React.FC<Step2TasksProps> = ({
   config,
   taskCount,
   onChange,
   errors,
 }) => {
+  const { t } = useTranslation('workflow');
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
 
-  // Initialize tasks when config length doesn't match taskCount
   useEffect(() => {
     if (config.length !== taskCount) {
       const newTasks: TaskConfig[] = Array.from({ length: taskCount }, (_, i) => ({
@@ -54,7 +57,6 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
   const handleNameChange = (index: number, name: string) => {
     const updates: Partial<TaskConfig> = { name };
 
-    // Auto-generate branch name from task name
     if (name && !config[index]?.branch) {
       updates.branch = `feat/${slugify(name)}`;
     }
@@ -86,31 +88,26 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
     }
   };
 
-  // Guard against rendering before tasks are initialized
   if (!config[currentTaskIndex]) {
     return null;
   }
 
   const currentTask = config[currentTaskIndex];
-
-  // Calculate progress
   const completedTasks = config.filter(
     (task) => task.name && task.description && task.branch
   ).length;
 
   return (
     <div className="flex flex-col gap-base">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg text-high font-medium">
-          配置 {taskCount} 个并行任务
+          {t('step2.header', { count: taskCount })}
         </h2>
         <div className="text-base text-low">
-          进度: {completedTasks}/{taskCount}
+          {t('step2.progress', { completed: completedTasks, total: taskCount })}
         </div>
       </div>
 
-      {/* Progress Indicator */}
       <div className="flex gap-half">
         {Array.from({ length: taskCount }).map((_, index) => (
           <div
@@ -127,7 +124,6 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
         ))}
       </div>
 
-      {/* Task Navigation */}
       {taskCount > 1 && (
         <div className="flex items-center justify-between">
           <button
@@ -143,11 +139,14 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
             )}
           >
             <ChevronLeft size={16} />
-            上一个任务
+            {t('step2.previousTask')}
           </button>
 
           <div className="text-base text-normal">
-            任务 {currentTaskIndex + 1} / {taskCount}
+            {t('step2.taskIndicator', {
+              current: currentTaskIndex + 1,
+              total: taskCount,
+            })}
           </div>
 
           <button
@@ -162,22 +161,22 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
               'border-border text-normal bg-secondary'
             )}
           >
-            下一个任务
+            {t('step2.nextTask')}
             <ChevronRight size={16} />
           </button>
         </div>
       )}
 
-      {/* Task Configuration Form */}
       <div className="flex flex-col gap-base">
-        {/* Task Name */}
         <Field>
-          <FieldLabel>任务名称</FieldLabel>
+          <FieldLabel>{t('step2.nameLabel')}</FieldLabel>
           <input
             type="text"
             value={currentTask.name}
-            onChange={(e) => handleNameChange(currentTaskIndex, e.target.value)}
-            placeholder="例如：登录功能"
+            onChange={(e) => {
+              handleNameChange(currentTaskIndex, e.target.value);
+            }}
+            placeholder={t('step2.namePlaceholder')}
             className={cn(
               'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
               'placeholder:text-low placeholder:opacity-80',
@@ -186,18 +185,19 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
             )}
           />
           {errors[`task-${currentTaskIndex}-name`] && (
-            <FieldError>{errors[`task-${currentTaskIndex}-name`]}</FieldError>
+            <FieldError>{t(errors[`task-${currentTaskIndex}-name`])}</FieldError>
           )}
         </Field>
 
-        {/* Branch Name */}
         <Field>
-          <FieldLabel>Git 分支名</FieldLabel>
+          <FieldLabel>{t('step2.branchLabel')}</FieldLabel>
           <input
             type="text"
             value={currentTask.branch}
-            onChange={(e) => handleBranchChange(currentTaskIndex, e.target.value)}
-            placeholder="feat/feature-name"
+            onChange={(e) => {
+              handleBranchChange(currentTaskIndex, e.target.value);
+            }}
+            placeholder={t('step2.branchPlaceholder')}
             className={cn(
               'w-full bg-secondary rounded-sm border px-base py-half text-base text-normal font-mono',
               'placeholder:text-low placeholder:opacity-80',
@@ -206,19 +206,18 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
             )}
           />
           {errors[`task-${currentTaskIndex}-branch`] && (
-            <FieldError>{errors[`task-${currentTaskIndex}-branch`]}</FieldError>
+            <FieldError>{t(errors[`task-${currentTaskIndex}-branch`])}</FieldError>
           )}
         </Field>
 
-        {/* Description */}
         <Field>
-          <FieldLabel>任务描述</FieldLabel>
+          <FieldLabel>{t('step2.descriptionLabel')}</FieldLabel>
           <textarea
             value={currentTask.description}
-            onChange={(e) =>
-              handleDescriptionChange(currentTaskIndex, e.target.value)
-            }
-            placeholder="详细描述这个任务的目标、范围和预期结果..."
+            onChange={(e) => {
+              handleDescriptionChange(currentTaskIndex, e.target.value);
+            }}
+            placeholder={t('step2.descriptionPlaceholder')}
             rows={4}
             className={cn(
               'w-full bg-secondary rounded-sm border px-base py-half text-base text-normal',
@@ -229,19 +228,20 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
             )}
           />
           {errors[`task-${currentTaskIndex}-description`] && (
-            <FieldError>{errors[`task-${currentTaskIndex}-description`]}</FieldError>
+            <FieldError>{t(errors[`task-${currentTaskIndex}-description`])}</FieldError>
           )}
         </Field>
 
-        {/* Terminal Count Selection */}
         <Field>
-          <FieldLabel>此任务需要几个终端串行执行？</FieldLabel>
+          <FieldLabel>{t('step2.terminalCountLabel')}</FieldLabel>
           <div className="flex flex-wrap gap-base">
             {TERMINAL_COUNT_OPTIONS.map((count) => (
               <button
                 key={count}
                 type="button"
-                onClick={() => handleTerminalCountSelect(currentTaskIndex, count)}
+                onClick={() => {
+                  handleTerminalCountSelect(currentTaskIndex, count);
+                }}
                 className={cn(
                   'px-base py-half rounded-sm border text-base transition-colors',
                   'hover:border-brand hover:text-high',
@@ -250,12 +250,12 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
                     : 'border-border text-normal bg-secondary'
                 )}
               >
-                {count} 个终端
+                {t('step2.terminalCountOption', { count })}
               </button>
             ))}
           </div>
           {errors[`task-${currentTaskIndex}-terminalCount`] && (
-            <FieldError>{errors[`task-${currentTaskIndex}-terminalCount`]}</FieldError>
+            <FieldError>{t(errors[`task-${currentTaskIndex}-terminalCount`])}</FieldError>
           )}
         </Field>
       </div>

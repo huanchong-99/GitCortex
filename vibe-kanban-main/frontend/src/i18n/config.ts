@@ -9,6 +9,7 @@ import enSettings from './locales/en/settings.json';
 import enProjects from './locales/en/projects.json';
 import enTasks from './locales/en/tasks.json';
 import enOrganization from './locales/en/organization.json';
+import enWorkflow from './locales/en/workflow.json';
 import jaCommon from './locales/ja/common.json';
 import jaSettings from './locales/ja/settings.json';
 import jaProjects from './locales/ja/projects.json';
@@ -29,6 +30,7 @@ import zhHansSettings from './locales/zh-Hans/settings.json';
 import zhHansProjects from './locales/zh-Hans/projects.json';
 import zhHansTasks from './locales/zh-Hans/tasks.json';
 import zhHansOrganization from './locales/zh-Hans/organization.json';
+import zhHansWorkflow from './locales/zh-Hans/workflow.json';
 import zhHantCommon from './locales/zh-Hant/common.json';
 import zhHantSettings from './locales/zh-Hant/settings.json';
 import zhHantProjects from './locales/zh-Hant/projects.json';
@@ -42,6 +44,7 @@ const resources = {
     projects: enProjects,
     tasks: enTasks,
     organization: enOrganization,
+    workflow: enWorkflow,
   },
   ja: {
     common: jaCommon,
@@ -70,6 +73,7 @@ const resources = {
     projects: zhHansProjects,
     tasks: zhHansTasks,
     organization: zhHansOrganization,
+    workflow: zhHansWorkflow,
   },
   'zh-Hant': {
     common: zhHantCommon,

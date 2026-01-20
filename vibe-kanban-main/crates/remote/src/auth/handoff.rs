@@ -108,7 +108,7 @@ impl OAuthHandoffService {
         pool: PgPool,
         providers: Arc<ProviderRegistry>,
         jwt: Arc<JwtService>,
-        public_origin: String,
+        public_origin: &str,
     ) -> Self {
         let trimmed_origin = public_origin.trim_end_matches('/').to_string();
         Self {
@@ -206,7 +206,7 @@ impl OAuthHandoffService {
 
         provider
             .authorize_url(&record.state, &redirect_uri)
-            .map(|url| url.into())
+            .map(Into::into)
             .map_err(HandoffError::Provider)
     }
 
@@ -372,7 +372,7 @@ impl OAuthHandoffService {
             .jwt
             .decrypt_provider_tokens(&encrypted_provider_tokens)?;
 
-        let tokens = self.jwt.generate_tokens(&session, &user, provider_token)?;
+        let tokens = self.jwt.generate_tokens(&session, &user, &provider_token)?;
 
         session_repo
             .set_current_refresh_token(session.id, tokens.refresh_token_id)
@@ -548,7 +548,7 @@ fn derive_username(provider: &str, profile: &ProviderUser) -> Option<String> {
         return Some(login);
     }
     if let Some(email) = profile.email.as_deref() {
-        return email.split('@').next().map(|part| part.to_owned());
+        return email.split('@').next().map(ToOwned::to_owned);
     }
     Some(format!("{}-{}", provider, profile.id))
 }
@@ -561,7 +561,7 @@ fn split_name(name: Option<&str>) -> (Option<String>, Option<String>) {
     match name {
         Some(value) => {
             let mut iter = value.split_whitespace();
-            let first = iter.next().map(|s| s.to_string());
+            let first = iter.next().map(ToString::to_string);
             let remainder: Vec<&str> = iter.collect();
             let last = if remainder.is_empty() {
                 None
@@ -578,9 +578,8 @@ fn is_forbidden_error(err: &AnyhowError) -> bool {
     err.chain().any(|cause| {
         cause
             .downcast_ref::<reqwest::Error>()
-            .and_then(|req_err| req_err.status())
-            .map(|status| status == StatusCode::FORBIDDEN)
-            .unwrap_or(false)
+            .and_then(reqwest::Error::status)
+            .is_some_and(|status| status == StatusCode::FORBIDDEN)
     })
 }
 

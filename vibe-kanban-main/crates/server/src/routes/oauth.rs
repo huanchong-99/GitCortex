@@ -103,31 +103,28 @@ async fn handoff_complete(
     Query(query): Query<HandoffCompleteQuery>,
 ) -> Result<Response<String>, ApiError> {
     if let Some(error) = query.error {
-        return Ok(simple_html_response(
-            StatusCode::BAD_REQUEST,
-            format!("OAuth authorization failed: {error}"),
-        ));
+        let message = format!("OAuth authorization failed: {error}");
+        return Ok(simple_html_response(StatusCode::BAD_REQUEST, &message));
     }
 
     let Some(app_code) = query.app_code.clone() else {
         return Ok(simple_html_response(
             StatusCode::BAD_REQUEST,
-            "Missing app_code in callback".to_string(),
+            "Missing app_code in callback",
         ));
     };
 
-    let (provider, app_verifier) = match deployment.take_oauth_handoff(&query.handoff_id).await {
-        Some(state) => state,
-        None => {
-            tracing::warn!(
-                handoff_id = %query.handoff_id,
-                "received callback for unknown handoff"
-            );
-            return Ok(simple_html_response(
-                StatusCode::BAD_REQUEST,
-                "OAuth handoff not found or already completed".to_string(),
-            ));
-        }
+    let Some((provider, app_verifier)) =
+        deployment.take_oauth_handoff(&query.handoff_id).await
+    else {
+        tracing::warn!(
+            handoff_id = %query.handoff_id,
+            "received callback for unknown handoff"
+        );
+        return Ok(simple_html_response(
+            StatusCode::BAD_REQUEST,
+            "OAuth handoff not found or already completed",
+        ));
     };
 
     let client = deployment.remote_client()?;
@@ -159,7 +156,9 @@ async fn handoff_complete(
 
     // Enable analytics automatically on login if not already enabled
     let config_guard = deployment.config().read().await;
-    if !config_guard.analytics_enabled {
+    if config_guard.analytics_enabled {
+        drop(config_guard);
+    } else {
         let mut new_config = config_guard.clone();
         drop(config_guard); // Release read lock before acquiring write lock
 
@@ -167,7 +166,7 @@ async fn handoff_complete(
 
         // Save updated config to disk
         let config_path = config_path();
-        if let Err(e) = save_config_to_file(&new_config, &config_path).await {
+        if let Err(e) = save_config_to_file(&new_config, &config_path) {
             tracing::warn!(
                 ?e,
                 "failed to save config after enabling analytics on login"
@@ -189,8 +188,6 @@ async fn handoff_complete(
                 );
             }
         }
-    } else {
-        drop(config_guard);
     }
 
     // Fetch and cache the user's profile
@@ -217,9 +214,8 @@ async fn handoff_complete(
         });
     }
 
-    Ok(close_window_response(format!(
-        "Signed in with {provider}. You can return to the app."
-    )))
+    let message = format!("Signed in with {provider}. You can return to the app.");
+    Ok(close_window_response(&message))
 }
 
 async fn logout(State(deployment): State<DeploymentImpl>) -> Result<StatusCode, ApiError> {
@@ -318,16 +314,15 @@ fn hash_sha256_hex(input: &str) -> String {
     let digest = Sha256::digest(input.as_bytes());
     for byte in digest {
         use std::fmt::Write;
-        let _ = write!(output, "{:02x}", byte);
+        let _ = write!(output, "{byte:02x}");
     }
     output
 }
 
-fn simple_html_response(status: StatusCode, message: String) -> Response<String> {
+fn simple_html_response(status: StatusCode, message: &str) -> Response<String> {
     let body = format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>OAuth</title></head>\
-         <body style=\"font-family: sans-serif; margin: 3rem;\"><h1>{}</h1></body></html>",
-        message
+         <body style=\"font-family: sans-serif; margin: 3rem;\"><h1>{message}</h1></body></html>"
     );
     Response::builder()
         .status(status)
@@ -336,7 +331,7 @@ fn simple_html_response(status: StatusCode, message: String) -> Response<String>
         .unwrap()
 }
 
-fn close_window_response(message: String) -> Response<String> {
+fn close_window_response(message: &str) -> Response<String> {
     let body = format!(
         "<!doctype html>\
          <html>\
@@ -354,11 +349,10 @@ fn close_window_response(message: String) -> Response<String> {
              </style>\
            </head>\
            <body>\
-             <h1>{}</h1>\
+             <h1>{message}</h1>\
              <p>If this window does not close automatically, you may close it manually.</p>\
            </body>\
          </html>",
-        message
     );
 
     Response::builder()

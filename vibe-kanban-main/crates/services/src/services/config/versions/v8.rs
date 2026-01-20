@@ -1,4 +1,3 @@
-use anyhow::Error;
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -17,6 +16,7 @@ fn default_pr_auto_description_enabled() -> bool {
     true
 }
 
+#[allow(clippy::struct_excessive_bools, clippy::struct_field_names)]
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 pub struct Config {
     pub config_version: String,
@@ -75,9 +75,9 @@ impl Config {
         }
     }
 
-    pub fn from_previous_version(raw_config: &str) -> Result<Self, Error> {
+    pub fn from_previous_version(raw_config: &str) -> Self {
         let old_config = v7::Config::from(raw_config.to_string());
-        Ok(Self::from_v7_config(old_config))
+        Self::from_v7_config(old_config)
     }
 }
 
@@ -89,16 +89,9 @@ impl From<String> for Config {
             return config;
         }
 
-        match Self::from_previous_version(&raw_config) {
-            Ok(config) => {
-                tracing::info!("Config upgraded to v8");
-                config
-            }
-            Err(e) => {
-                tracing::warn!("Config migration failed: {}, using default", e);
-                Self::default()
-            }
-        }
+        let config = Self::from_previous_version(&raw_config);
+        tracing::info!("Config upgraded to v8");
+        config
     }
 }
 

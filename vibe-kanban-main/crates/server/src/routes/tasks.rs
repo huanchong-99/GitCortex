@@ -216,12 +216,17 @@ pub async fn create_task_and_start(
         .collect();
     WorkspaceRepo::create_many(&deployment.db().pool, workspace.id, &workspace_repos).await?;
 
-    let is_attempt_running = deployment
+    let is_attempt_running = match deployment
         .container()
         .start_workspace(&workspace, payload.executor_profile_id.clone())
         .await
-        .inspect_err(|err| tracing::error!("Failed to start task attempt: {}", err))
-        .is_ok();
+    {
+        Ok(_) => true,
+        Err(err) => {
+            tracing::error!("Failed to start task attempt: {err}");
+            false
+        }
+    };
     deployment
         .track_if_analytics_allowed(
             "task_attempt_started",

@@ -136,14 +136,6 @@ impl CodingAgent {
                 self.preconfigured_mcp(),
                 false,
             ),
-            Self::Droid(_) => McpConfig::new(
-                vec!["mcpServers".to_string()],
-                serde_json::json!({
-                    "mcpServers": {}
-                }),
-                self.preconfigured_mcp(),
-                false,
-            ),
             _ => McpConfig::new(
                 vec!["mcpServers".to_string()],
                 serde_json::json!({
@@ -241,8 +233,7 @@ pub trait StandardCodingAgentExecutor {
     fn get_availability_info(&self) -> AvailabilityInfo {
         let config_files_found = self
             .default_mcp_config_path()
-            .map(|path| path.exists())
-            .unwrap_or(false);
+            .is_some_and(|path| path.exists());
 
         if config_files_found {
             AvailabilityInfo::InstallationFound
@@ -316,19 +307,23 @@ pub fn build_review_prompt(
     context: Option<&[RepoReviewContext]>,
     additional_prompt: Option<&str>,
 ) -> String {
+    use std::fmt::Write;
+
     let mut prompt = String::from("Please review the code changes.\n\n");
 
     if let Some(repos) = context {
         for repo in repos {
-            prompt.push_str(&format!("Repository: {}\n", repo.repo_name));
-            prompt.push_str(&format!(
-                "Review all changes from base commit {} to HEAD.\n",
+            let _ = writeln!(prompt, "Repository: {}", repo.repo_name);
+            let _ = writeln!(
+                prompt,
+                "Review all changes from base commit {} to HEAD.",
                 repo.base_commit
-            ));
-            prompt.push_str(&format!(
-                "Use `git diff {}..HEAD` to see the changes.\n",
+            );
+            let _ = writeln!(
+                prompt,
+                "Use `git diff {}..HEAD` to see the changes.",
                 repo.base_commit
-            ));
+            );
             prompt.push('\n');
         }
     }

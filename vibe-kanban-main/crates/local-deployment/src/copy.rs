@@ -15,6 +15,7 @@ fn normalize_pattern(pattern: &str) -> String {
 
 /// Copy project files from source to target directory based on glob patterns.
 /// Skips files that already exist at target with same size.
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn copy_project_files_impl(
     source_dir: &Path,
     target_dir: &Path,
@@ -22,7 +23,7 @@ pub(crate) fn copy_project_files_impl(
 ) -> Result<(), ContainerError> {
     let patterns: Vec<&str> = copy_files
         .split(',')
-        .map(|s| s.trim())
+        .map(str::trim)
         .filter(|s| !s.is_empty())
         .collect();
 
@@ -84,7 +85,8 @@ fn copy_single_file(
     // Validate path is within source_dir
     if !canonical_file.starts_with(canonical_source) {
         return Err(ContainerError::Other(anyhow!(
-            "File {source_file:?} is outside project directory"
+            "File {} is outside project directory",
+            source_file.display()
         )));
     }
 
@@ -94,7 +96,8 @@ fn copy_single_file(
 
     let relative_path = source_file.strip_prefix(source_root).map_err(|e| {
         ContainerError::Other(anyhow!(
-            "Failed to get relative path for {source_file:?}: {e}"
+            "Failed to get relative path for {}: {e}",
+            source_file.display()
         ))
     })?;
 

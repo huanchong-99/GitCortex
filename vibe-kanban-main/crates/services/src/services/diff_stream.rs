@@ -54,7 +54,7 @@ pub enum DiffStreamError {
 /// When this stream is dropped, the watcher is automatically cleaned up
 pub struct DiffStreamHandle {
     stream: futures::stream::BoxStream<'static, Result<LogMsg, io::Error>>,
-    _watcher_task: Option<JoinHandle<()>>,
+    watcher_task: Option<JoinHandle<()>>,
 }
 
 impl futures::Stream for DiffStreamHandle {
@@ -71,7 +71,7 @@ impl futures::Stream for DiffStreamHandle {
 
 impl Drop for DiffStreamHandle {
     fn drop(&mut self) {
-        if let Some(handle) = self._watcher_task.take() {
+        if let Some(handle) = self.watcher_task.take() {
             handle.abort();
         }
     }
@@ -85,7 +85,7 @@ impl DiffStreamHandle {
     ) -> Self {
         Self {
             stream,
-            _watcher_task: watcher_task,
+            watcher_task,
         }
     }
 }
@@ -121,7 +121,7 @@ enum DiffEvent {
     CheckTarget,
 }
 
-pub async fn create(args: DiffStreamArgs) -> Result<DiffStreamHandle, DiffStreamError> {
+pub fn create(args: &DiffStreamArgs) -> Result<DiffStreamHandle, DiffStreamError> {
     let (tx, rx) = mpsc::channel::<Result<LogMsg, io::Error>>(DIFF_STREAM_CHANNEL_CAPACITY);
     let manager_args = args.clone();
 
@@ -159,7 +159,7 @@ impl DiffStreamManager {
         let _ready_error = self.tx.send(Ok(LogMsg::Ready)).await;
 
         let (fs_debouncer, mut fs_rx, canonical_worktree) =
-            filesystem_watcher::async_watcher(self.args.worktree_path.clone())
+            filesystem_watcher::async_watcher(&self.args.worktree_path)
                 .map_err(|e| io::Error::other(e.to_string()))?;
         let _fs_guard = fs_debouncer;
 
@@ -215,7 +215,8 @@ impl DiffStreamManager {
 
         for raw_path in paths_to_clear {
             let prefixed = prefix_path(raw_path, self.args.path_prefix.as_deref());
-            let patch = ConversationPatch::remove_diff(escape_json_pointer_segment(&prefixed));
+            let entry_index = escape_json_pointer_segment(&prefixed);
+            let patch = ConversationPatch::remove_diff(&entry_index);
             if self.tx.send(Ok(LogMsg::JsonPatch(patch))).await.is_err() {
                 return Ok(());
             }
@@ -279,8 +280,8 @@ impl DiffStreamManager {
             }
             diff.repo_id = Some(self.args.repo_id);
 
-            let patch =
-                ConversationPatch::add_diff(escape_json_pointer_segment(&prefixed_entry), diff);
+            let entry_index = escape_json_pointer_segment(&prefixed_entry);
+            let patch = ConversationPatch::add_diff(&entry_index, diff);
             if self.tx.send(Ok(LogMsg::JsonPatch(patch))).await.is_err() {
                 return Ok(());
             }
@@ -464,7 +465,7 @@ fn process_file_changes(
     path_prefix: Option<&str>,
     repo_id: Uuid,
 ) -> Result<Vec<LogMsg>, DiffStreamError> {
-    let path_filter: Vec<&str> = changed_paths.iter().map(|s| s.as_str()).collect();
+    let path_filter: Vec<&str> = changed_paths.iter().map(String::as_str).collect();
 
     let current_diffs = git_service.get_diffs(
         DiffTarget::Worktree {
@@ -505,15 +506,16 @@ fn process_file_changes(
         }
         diff.repo_id = Some(repo_id);
 
-        let patch =
-            ConversationPatch::add_diff(escape_json_pointer_segment(&prefixed_entry_index), diff);
+        let entry_index = escape_json_pointer_segment(&prefixed_entry_index);
+        let patch = ConversationPatch::add_diff(&entry_index, diff);
         msgs.push(LogMsg::JsonPatch(patch));
     }
 
     for changed_path in changed_paths {
         if !files_with_diffs.contains(changed_path) {
             let prefixed_path = prefix_path(changed_path.clone(), path_prefix);
-            let patch = ConversationPatch::remove_diff(escape_json_pointer_segment(&prefixed_path));
+            let entry_index = escape_json_pointer_segment(&prefixed_path);
+            let patch = ConversationPatch::remove_diff(&entry_index);
             msgs.push(LogMsg::JsonPatch(patch));
             {
                 let mut guard = known_paths.write().unwrap();

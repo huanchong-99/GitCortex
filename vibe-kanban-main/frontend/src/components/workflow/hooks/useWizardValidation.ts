@@ -11,6 +11,9 @@ export interface UseWizardValidationReturn {
   clearErrors: () => void;
 }
 
+/**
+ * Tracks per-step validation errors and exposes validation helpers.
+ */
 export function useWizardValidation(currentStep: WizardStep): UseWizardValidationReturn {
   const [errors, setErrors] = useState<Record<string, string>>({});
 

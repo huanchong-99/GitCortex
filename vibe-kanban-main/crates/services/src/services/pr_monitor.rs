@@ -39,7 +39,7 @@ pub struct PrMonitorService {
 }
 
 impl PrMonitorService {
-    pub async fn spawn(
+    pub fn spawn(
         db: DBService,
         analytics: Option<AnalyticsContext>,
         publisher: Option<SharePublisher>,

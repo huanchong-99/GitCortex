@@ -2,6 +2,7 @@ import React from 'react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import { cn } from '@/lib/utils';
 import type { BasicConfig } from '../types';
+import { useTranslation } from 'react-i18next';
 
 const TASK_COUNT_OPTIONS = [1, 2, 3, 4];
 
@@ -11,11 +12,15 @@ interface Step1BasicProps {
   errors: Record<string, string>;
 }
 
+/**
+ * Step 1: Captures basic workflow metadata and task count.
+ */
 export const Step1Basic: React.FC<Step1BasicProps> = ({
   config,
   onChange,
   errors,
 }) => {
+  const { t } = useTranslation('workflow');
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ name: e.target.value });
   };
@@ -43,12 +48,12 @@ export const Step1Basic: React.FC<Step1BasicProps> = ({
     <div className="flex flex-col gap-base">
       {/* Workflow Name */}
       <Field>
-        <FieldLabel>工作流名称</FieldLabel>
+        <FieldLabel>{t('step1.nameLabel')}</FieldLabel>
         <input
           type="text"
           value={config.name}
           onChange={handleNameChange}
-          placeholder="例如：重构用户认证系统"
+          placeholder={t('step1.namePlaceholder')}
           className={cn(
             'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
             'placeholder:text-low placeholder:opacity-80',
@@ -56,16 +61,16 @@ export const Step1Basic: React.FC<Step1BasicProps> = ({
             errors.name && 'border-error'
           )}
         />
-        {errors.name && <FieldError>{errors.name}</FieldError>}
+        {errors.name && <FieldError>{t(errors.name)}</FieldError>}
       </Field>
 
       {/* Description */}
       <Field>
-        <FieldLabel>工作流描述（可选）</FieldLabel>
+        <FieldLabel>{t('step1.descriptionLabel')}</FieldLabel>
         <textarea
-          value={config.description || ''}
+          value={config.description ?? ''}
           onChange={handleDescriptionChange}
-          placeholder="简要描述工作流的目标和范围..."
+          placeholder={t('step1.descriptionPlaceholder')}
           rows={3}
           className={cn(
             'w-full bg-secondary rounded-sm border px-base py-half text-base text-normal',
@@ -78,13 +83,15 @@ export const Step1Basic: React.FC<Step1BasicProps> = ({
 
       {/* Task Count Selection */}
       <Field>
-        <FieldLabel>本次启动几个并行任务？</FieldLabel>
+        <FieldLabel>{t('step1.taskCountLabel')}</FieldLabel>
         <div className="flex flex-wrap gap-base">
           {TASK_COUNT_OPTIONS.map((count) => (
             <button
               key={count}
               type="button"
-              onClick={() => handleTaskCountSelect(count)}
+              onClick={() => {
+                handleTaskCountSelect(count);
+              }}
               className={cn(
                 'px-base py-half rounded-sm border text-base transition-colors',
                 'hover:border-brand hover:text-high',
@@ -93,19 +100,18 @@ export const Step1Basic: React.FC<Step1BasicProps> = ({
                   : 'border-border text-normal bg-secondary'
               )}
             >
-              {count} 个任务
-            </button>
+              {t('step1.taskCountOption', { count })}</button>
           ))}
         </div>
         <div className="mt-base flex items-center gap-base">
-          <span className="text-base text-low">或自定义数量 (5-10):</span>
+          <span className="text-base text-low">{t('step1.customCountLabel')}</span>
           <input
             type="number"
             min={5}
             max={10}
             value={config.taskCount >= 5 && config.taskCount <= 10 ? config.taskCount : ''}
             onChange={handleCustomTaskCountChange}
-            placeholder="5-10"
+            placeholder={t('step1.customCountPlaceholder')}
             className={cn(
               'w-20 bg-secondary rounded-sm border px-base py-half text-base text-normal',
               'placeholder:text-low placeholder:opacity-80',
@@ -113,36 +119,36 @@ export const Step1Basic: React.FC<Step1BasicProps> = ({
             )}
           />
         </div>
-        {errors.taskCount && <FieldError>{errors.taskCount}</FieldError>}
+        {errors.taskCount && <FieldError>{t(errors.taskCount)}</FieldError>}
       </Field>
 
       {/* Import Mode */}
       <Field>
-        <FieldLabel>任务来源</FieldLabel>
+        <FieldLabel>{t('step1.importLabel')}</FieldLabel>
         <div className="flex flex-col gap-base">
           <label className="flex items-center gap-base cursor-pointer">
             <input
               type="radio"
               name="importMode"
               checked={!config.importFromKanban}
-              onChange={() => handleImportModeChange(false)}
+              onChange={() => {
+                handleImportModeChange(false);
+              }}
               className="size-icon-sm accent-brand"
             />
-            <span className="text-base text-normal">
-              新建任务（在下一步中配置）
-            </span>
+            <span className="text-base text-normal">{t('step1.importNew')}</span>
           </label>
           <label className="flex items-center gap-base cursor-pointer">
             <input
               type="radio"
               name="importMode"
               checked={config.importFromKanban}
-              onChange={() => handleImportModeChange(true)}
+              onChange={() => {
+                handleImportModeChange(true);
+              }}
               className="size-icon-sm accent-brand"
             />
-            <span className="text-base text-normal">
-              从看板导入（选择已有任务卡片）
-            </span>
+            <span className="text-base text-normal">{t('step1.importKanban')}</span>
           </label>
         </div>
       </Field>

@@ -31,6 +31,47 @@ pub struct CommitMetadata {
     pub files_changed: Vec<FileChange>,
 }
 
+/// Parse commit message to extract metadata
+///
+/// Expected format:
+/// ```text
+/// Commit message title
+///
+/// Optional description
+///
+/// ---METADATA---
+/// {"workflow_id":"wf-123",...}
+/// ```
+pub fn parse_commit_metadata(commit_message: &str) -> Result<CommitMetadata> {
+    // Find separator
+    let separator_pos = commit_message
+        .find(METADATA_SEPARATOR)
+        .ok_or_else(|| anyhow!("Commit metadata separator '{METADATA_SEPARATOR}' not found"))?;
+
+    // Extract JSON after separator
+    let json_str = commit_message[separator_pos + METADATA_SEPARATOR.len()..]
+        .trim();
+
+    // Parse JSON
+    let metadata: CommitMetadata = serde_json::from_str(json_str)
+        .map_err(|e| anyhow!("Failed to parse commit metadata JSON: {e}"))?;
+
+    // Validate required fields
+    if metadata.workflow_id.is_empty() {
+        return Err(anyhow!("workflow_id cannot be empty"));
+    }
+
+    tracing::debug!(
+        "Parsed commit metadata: workflow={}, task={}, terminal={}, status={}",
+        metadata.workflow_id,
+        metadata.task_id,
+        metadata.terminal_id,
+        metadata.status
+    );
+
+    Ok(metadata)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,55 +136,14 @@ Review rejected
 
     #[test]
     fn test_parse_commit_metadata_invalid_json() {
-        let commit_message = r#"
+        let commit_message = r"
 Commit with bad metadata
 
 ---METADATA---
 {invalid json}
-"#;
+";
 
         let result = parse_commit_metadata(commit_message);
         assert!(result.is_err());
     }
-}
-
-/// Parse commit message to extract metadata
-///
-/// Expected format:
-/// ```text
-/// Commit message title
-///
-/// Optional description
-///
-/// ---METADATA---
-/// {"workflow_id":"wf-123",...}
-/// ```
-pub fn parse_commit_metadata(commit_message: &str) -> Result<CommitMetadata> {
-    // Find separator
-    let separator_pos = commit_message
-        .find(METADATA_SEPARATOR)
-        .ok_or_else(|| anyhow!("Commit metadata separator '{}' not found", METADATA_SEPARATOR))?;
-
-    // Extract JSON after separator
-    let json_str = commit_message[separator_pos + METADATA_SEPARATOR.len()..]
-        .trim();
-
-    // Parse JSON
-    let metadata: CommitMetadata = serde_json::from_str(json_str)
-        .map_err(|e| anyhow!("Failed to parse commit metadata JSON: {}", e))?;
-
-    // Validate required fields
-    if metadata.workflow_id.is_empty() {
-        return Err(anyhow!("workflow_id cannot be empty"));
-    }
-
-    tracing::debug!(
-        "Parsed commit metadata: workflow={}, task={}, terminal={}, status={}",
-        metadata.workflow_id,
-        metadata.task_id,
-        metadata.terminal_id,
-        metadata.status
-    );
-
-    Ok(metadata)
 }

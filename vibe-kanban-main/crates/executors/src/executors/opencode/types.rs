@@ -292,7 +292,7 @@ impl SdkError {
             .pointer("/data/message")
             .or_else(|| self.raw.get("message"))
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
     }
 }
 

@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { Step4Terminals } from './Step4Terminals';
-import type { WizardConfig, TaskConfig } from '../types';
+import type { WizardConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('Step4Terminals', () => {
-  const mockOnUpdate = vi.fn();
+  const mockOnUpdate = vi.fn<(updates: Partial<WizardConfig>) => void>();
+  const mockFetch = vi.fn<
+    (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  >();
+
+  const createFetchResponse = (body: unknown, ok = true): Response =>
+    ({
+      ok,
+      json: () => Promise.resolve(body),
+    } as Response);
 
   const baseConfig: WizardConfig = {
     project: {
@@ -63,12 +73,13 @@ describe('Step4Terminals', () => {
 
   beforeEach(() => {
     mockOnUpdate.mockClear();
-    // Mock fetch API
-    globalThis.fetch = vi.fn();
+    mockFetch.mockReset();
+    globalThis.fetch = mockFetch as typeof fetch;
+    void setTestLanguage();
   });
 
   it('should render terminal configuration UI', () => {
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
@@ -76,12 +87,12 @@ describe('Step4Terminals', () => {
       />
     );
 
-    expect(screen.getByText('配置终端')).toBeInTheDocument();
-    expect(screen.getByText(/任务 1 \/ 2/)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step4.title'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step4.taskIndicator', { current: 1, total: 2 }))).toBeInTheDocument();
   });
 
   it('should initialize terminals when config length mismatches task count', async () => {
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
@@ -94,14 +105,15 @@ describe('Step4Terminals', () => {
     });
 
     const calls = mockOnUpdate.mock.calls;
-    const terminalsUpdate = calls.find((call) => call[0].terminals);
+    const terminalsUpdate = calls.find(([update]) => update.terminals);
 
     expect(terminalsUpdate).toBeDefined();
-    expect(terminalsUpdate![0].terminals).toHaveLength(2);
+    const [update] = terminalsUpdate ?? [];
+    expect(update?.terminals).toHaveLength(2);
   });
 
   it('should display terminal count for current task', () => {
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
@@ -109,21 +121,20 @@ describe('Step4Terminals', () => {
       />
     );
 
-    expect(screen.getByText('此任务有 2 个串行终端')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step4.terminalCount', { count: 2 }))).toBeInTheDocument();
   });
 
   it('should show CLI installation status', () => {
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
@@ -131,23 +142,22 @@ describe('Step4Terminals', () => {
       />
     );
 
-    expect(screen.getByText('CLI 安装状态')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step4.cliStatusTitle'))).toBeInTheDocument();
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('Gemini CLI')).toBeInTheDocument();
   });
 
   it('should show install guide links for uninstalled CLIs', async () => {
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
@@ -155,12 +165,12 @@ describe('Step4Terminals', () => {
       />
     );
 
-    const installLinks = await screen.findAllByText('安装指南');
+    const installLinks = await screen.findAllByText(i18n.t('workflow:step4.installGuide'));
     expect(installLinks.length).toBeGreaterThan(0);
   });
 
   it('should navigate between tasks', () => {
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
@@ -168,8 +178,8 @@ describe('Step4Terminals', () => {
       />
     );
 
-    const nextButton = screen.getByText('下一个任务');
-    const prevButton = screen.getByText('上一个任务');
+    const nextButton = screen.getByText(i18n.t('workflow:step4.nextTask'));
+    const prevButton = screen.getByText(i18n.t('workflow:step4.previousTask'));
 
     expect(nextButton).toBeInTheDocument();
     expect(prevButton).toBeInTheDocument();
@@ -199,17 +209,16 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={configWithTerminals}
         errors={{}}
@@ -219,7 +228,7 @@ describe('Step4Terminals', () => {
 
     // Wait for CLI status section to appear
     await waitFor(() => {
-      expect(screen.getByText('CLI 安装状态')).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step4.cliStatusTitle'))).toBeInTheDocument();
     });
 
     // Claude Code should appear in the list
@@ -242,17 +251,16 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={configWithTerminals}
         errors={{}}
@@ -261,7 +269,7 @@ describe('Step4Terminals', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('模型配置')).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step4.modelLabel'))).toBeInTheDocument();
     });
 
     const option = screen.getByText('Claude 3.5 Sonnet');
@@ -283,17 +291,16 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={configWithTerminals}
         errors={{}}
@@ -302,10 +309,10 @@ describe('Step4Terminals', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('角色描述（可选）')).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step4.roleLabel'))).toBeInTheDocument();
     });
 
-    const roleInput = screen.getByPlaceholderText('例如：负责后端 API 开发的专家');
+    const roleInput = screen.getByPlaceholderText(i18n.t('workflow:step4.rolePlaceholder'));
     expect(roleInput).toBeInTheDocument();
 
     // Just verify the input exists and can be changed
@@ -329,17 +336,16 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={configWithTerminals}
         errors={{}}
@@ -348,22 +354,20 @@ describe('Step4Terminals', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('角色描述（可选）')).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:step4.roleLabel'))).toBeInTheDocument();
     });
 
-    const roleInput = screen.getByPlaceholderText('例如：负责后端 API 开发的专家');
+    const roleInput = screen.getByPlaceholderText(i18n.t('workflow:step4.rolePlaceholder'));
     fireEvent.change(roleInput, { target: { value: 'Test role' } });
 
     await waitFor(() => {
-      expect(mockOnUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          terminals: expect.arrayContaining([
-            expect.objectContaining({
-              role: 'Test role',
-            }),
-          ]),
-        })
+      const calls = mockOnUpdate.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1][0];
+      const terminalWithRole = lastCall.terminals?.find(
+        (terminal) => terminal.role === 'Test role'
       );
+      expect(terminalWithRole).toBeTruthy();
     });
   });
 
@@ -382,30 +386,36 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': false,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={configWithTerminals}
         errors={{
-          'terminal-terminal-task-1-0-cli': '请选择 CLI 类型',
-          'terminal-terminal-task-1-0-model': '请选择模型配置',
+          'terminal-terminal-task-1-0-cli': 'validation.terminals.cliRequired',
+          'terminal-terminal-task-1-0-model': 'validation.terminals.modelRequired',
         }}
         onUpdate={mockOnUpdate}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText('请选择 CLI 类型')).toBeInTheDocument();
-      expect(screen.getByText('请选择模型配置')).toBeInTheDocument();
+      const alertTexts = screen
+        .getAllByRole('alert')
+        .map((alert) => alert.textContent);
+      expect(alertTexts).toEqual(
+        expect.arrayContaining([
+          i18n.t('workflow:validation.terminals.cliRequired'),
+          i18n.t('workflow:validation.terminals.modelRequired'),
+        ])
+      );
     });
   });
 
@@ -432,17 +442,16 @@ describe('Step4Terminals', () => {
       ],
     };
 
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    mockFetch.mockResolvedValueOnce(
+      createFetchResponse({
         'claude-code': true,
         'gemini-cli': true,
         codex: false,
         'cursor-agent': false,
-      }),
-    });
+      })
+    );
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={configWithTerminals}
         errors={{}}
@@ -451,25 +460,37 @@ describe('Step4Terminals', () => {
     );
 
     await waitFor(() => {
-      const terminalHeaders = screen.getAllByText(/终端 \d/);
-      expect(terminalHeaders[0]).toHaveTextContent('终端 1');
-      expect(terminalHeaders[1]).toHaveTextContent('终端 2');
+      const labelPattern = new RegExp(
+        i18n.t('workflow:step4.terminalLabel', { index: 1 }).replace('1', '\\d')
+      );
+      const terminalHeaders = screen.getAllByText(labelPattern);
+      expect(terminalHeaders[0]).toHaveTextContent(
+        i18n.t('workflow:step4.terminalLabel', { index: 1 })
+      );
+      expect(terminalHeaders[1]).toHaveTextContent(
+        i18n.t('workflow:step4.terminalLabel', { index: 2 })
+      );
     });
   });
 
   it('should handle fetch error gracefully', async () => {
-    (globalThis.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    const onError = vi.fn();
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-    render(
+    renderWithI18n(
       <Step4Terminals
         config={baseConfig}
         errors={{}}
         onUpdate={mockOnUpdate}
+        onError={onError}
       />
     );
 
     // Should still render even if fetch fails
-    expect(screen.getByText('配置终端')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step4.title'))).toBeInTheDocument();
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    });
   });
 
   it('should return null when current task is not available', () => {
@@ -478,7 +499,7 @@ describe('Step4Terminals', () => {
       tasks: [],
     };
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <Step4Terminals
         config={configWithoutTasks}
         errors={{}}

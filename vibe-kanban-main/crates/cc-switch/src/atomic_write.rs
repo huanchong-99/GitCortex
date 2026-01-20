@@ -26,15 +26,16 @@ pub async fn atomic_write(path: &Path, data: &[u8]) -> Result<()> {
     use tokio::io::AsyncWriteExt;
 
     // 确保父目录存在
-    ensure_parent_dir_exists(&path.to_path_buf()).await?;
+    ensure_parent_dir_exists(path).await?;
 
     // 创建临时文件（在同一目录下，确保重命名是原子的）
     let parent = path.parent().unwrap_or(Path::new("."));
     let temp_path = parent.join(format!(
         ".{}.tmp.{}",
-        path.file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "config".to_string()),
+        path.file_name().map_or_else(
+            || "config".to_string(),
+            |n| n.to_string_lossy().to_string()
+        ),
         std::process::id()
     ));
 

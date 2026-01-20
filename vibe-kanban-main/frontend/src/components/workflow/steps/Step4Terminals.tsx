@@ -3,36 +3,63 @@ import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import { cn } from '@/lib/utils';
 import type { WizardConfig, TerminalConfig } from '../types';
+import { useErrorNotification } from '@/hooks/useErrorNotification';
+import { useTranslation } from 'react-i18next';
 
 interface Step4TerminalsProps {
   config: WizardConfig;
   errors: Record<string, string>;
   onUpdate: (updates: Partial<WizardConfig>) => void;
+  onError?: (error: Error) => void;
 }
 
-const CLI_TYPES = [
+interface CliType {
+  id: string;
+  name: string;
+  installed: boolean;
+  installGuide: string;
+}
+
+const CLI_TYPES: CliType[] = [
   { id: 'claude-code', name: 'Claude Code', installed: false, installGuide: 'https://claude.ai/code' },
   { id: 'gemini-cli', name: 'Gemini CLI', installed: false, installGuide: 'https://ai.google.dev/gemini-api/docs/cli' },
   { id: 'codex', name: 'Codex', installed: false, installGuide: 'https://docs.openai.com/codex' },
   { id: 'cursor-agent', name: 'Cursor Agent', installed: false, installGuide: 'https://cursor.sh/docs' },
-] as const;
+];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isCliStatusMap = (value: unknown): value is Record<string, boolean> => {
+  if (!isRecord(value)) return false;
+  return Object.values(value).every((entry) => typeof entry === 'boolean');
+};
+
+const parseJson = async (response: Response): Promise<unknown> => {
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Step 4: Assigns terminals and CLI/model settings for each task.
+ */
 export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   config,
   errors,
   onUpdate,
+  onError,
 }) => {
+  const { notifyError } = useErrorNotification({ onError, context: 'Step4Terminals' });
+  const { t } = useTranslation('workflow');
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [cliTypes, setCliTypes] = useState(CLI_TYPES);
-  const [isDetecting, setIsDetecting] = useState(false);
 
   // Get current task
-  const currentTask = config.tasks[currentTaskIndex];
-
-  // Get terminals for current task, sorted by orderIndex
-  const taskTerminals = config.terminals
-    .filter((t) => t.taskId === currentTask?.id)
-    .sort((a, b) => a.orderIndex - b.orderIndex);
+  const hasTasks = config.tasks.length > 0;
+  const currentTask = hasTasks ? config.tasks[currentTaskIndex] : null;
 
   // Initialize terminals when config length mismatches task count
   useEffect(() => {
@@ -63,27 +90,24 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   // Detect CLI installation status
   useEffect(() => {
     const detectCliTypes = async () => {
-      setIsDetecting(true);
       try {
         const response = await fetch('/api/cli_types/detect');
-        if (response.ok) {
-          const data = await response.json();
+        const data = await parseJson(response);
+        if (response.ok && isCliStatusMap(data)) {
           setCliTypes((prev) =>
             prev.map((cli) => ({
               ...cli,
-              installed: data[cli.id] || false,
+              installed: data[cli.id] ?? false,
             }))
           );
         }
       } catch (error) {
-        console.error('Failed to detect CLI types:', error);
-      } finally {
-        setIsDetecting(false);
+        notifyError(error, 'detectCliTypes');
       }
     };
 
-    detectCliTypes();
-  }, []);
+    void detectCliTypes();
+  }, [notifyError]);
 
   const updateTerminal = (terminalId: string, updates: Partial<TerminalConfig>) => {
     const newTerminals = config.terminals.map((t) =>
@@ -109,13 +133,23 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
     return null;
   }
 
+  // Get terminals for current task, sorted by orderIndex
+  const taskTerminals = config.terminals
+    .filter((terminal) => terminal.taskId === currentTask.id)
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+
+  const taskNameValue = currentTask.name.trim();
+  const taskName = taskNameValue
+    ? currentTask.name
+    : t('step4.taskNameFallback', { index: currentTaskIndex + 1 });
+
   return (
     <div className="flex flex-col gap-base">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg text-high font-medium">配置终端</h2>
+        <h2 className="text-lg text-high font-medium">{t('step4.title')}</h2>
         <div className="text-base text-low">
-          任务 {currentTaskIndex + 1} / {config.tasks.length}
+          {t('step4.taskIndicator', { current: currentTaskIndex + 1, total: config.tasks.length })}
         </div>
       </div>
 
@@ -135,11 +169,11 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
             )}
           >
             <ChevronLeft size={16} />
-            上一个任务
+            {t('step4.previousTask')}
           </button>
 
           <div className="text-base text-normal">
-            {currentTask.name || `任务 ${currentTaskIndex + 1}`}
+            {taskName}
           </div>
 
           <button
@@ -154,7 +188,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
               'border-border text-normal bg-secondary'
             )}
           >
-            下一个任务
+            {t('step4.nextTask')}
             <ChevronRight size={16} />
           </button>
         </div>
@@ -162,12 +196,12 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
 
       {/* Terminal Count Display */}
       <div className="text-base text-normal">
-        此任务有 {currentTask.terminalCount} 个串行终端
+        {t('step4.terminalCount', { count: currentTask.terminalCount })}
       </div>
 
       {/* CLI Installation Status */}
       <div className="bg-secondary border rounded-sm p-base">
-        <div className="text-base text-high font-medium mb-base">CLI 安装状态</div>
+        <div className="text-base text-high font-medium mb-base">{t('step4.cliStatusTitle')}</div>
         <div className="grid grid-cols-2 gap-base">
           {cliTypes.map((cli) => (
             <div
@@ -189,7 +223,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                   rel="noopener noreferrer"
                   className="text-base text-brand hover:underline"
                 >
-                  安装指南
+                  {t('step4.installGuide')}
                 </a>
               )}
             </div>
@@ -205,19 +239,21 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
             className="bg-secondary border rounded-sm p-base"
           >
             <div className="text-base text-high font-medium mb-base">
-              终端 {terminal.orderIndex + 1}
+              {t('step4.terminalLabel', { index: terminal.orderIndex + 1 })}
             </div>
 
             <div className="flex flex-col gap-base">
               {/* CLI Type Selection */}
               <Field>
-                <FieldLabel>CLI 类型</FieldLabel>
+                <FieldLabel>{t('step4.cliTypeLabel')}</FieldLabel>
                 <div className="grid grid-cols-2 gap-base">
                   {cliTypes.map((cli) => (
                     <button
                       key={cli.id}
                       type="button"
-                      onClick={() => updateTerminal(terminal.id, { cliTypeId: cli.id })}
+                      onClick={() => {
+                        updateTerminal(terminal.id, { cliTypeId: cli.id });
+                      }}
                       disabled={!cli.installed}
                       className={cn(
                         'flex items-center gap-half px-base py-half rounded-sm border text-base transition-colors',
@@ -238,25 +274,25 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                   ))}
                 </div>
                 {errors[`terminal-${terminal.id}-cli`] && (
-                  <FieldError>{errors[`terminal-${terminal.id}-cli`]}</FieldError>
+                  <FieldError>{t(errors[`terminal-${terminal.id}-cli`])}</FieldError>
                 )}
               </Field>
 
               {/* Model Selection */}
               <Field>
-                <FieldLabel>模型配置</FieldLabel>
+                <FieldLabel>{t('step4.modelLabel')}</FieldLabel>
                 <select
                   value={terminal.modelConfigId}
-                  onChange={(e) =>
-                    updateTerminal(terminal.id, { modelConfigId: e.target.value })
-                  }
+                  onChange={(e) => {
+                    updateTerminal(terminal.id, { modelConfigId: e.target.value });
+                  }}
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                     'focus:outline-none focus:ring-1 focus:ring-brand',
                     errors[`terminal-${terminal.id}-model`] && 'border-error'
                   )}
                 >
-                  <option value="">请选择模型</option>
+                  <option value="">{t('step4.modelPlaceholder')}</option>
                   {config.models.map((model) => (
                     <option key={model.id} value={model.id}>
                       {model.displayName}
@@ -264,18 +300,20 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                   ))}
                 </select>
                 {errors[`terminal-${terminal.id}-model`] && (
-                  <FieldError>{errors[`terminal-${terminal.id}-model`]}</FieldError>
+                  <FieldError>{t(errors[`terminal-${terminal.id}-model`])}</FieldError>
                 )}
               </Field>
 
               {/* Role Description */}
               <Field>
-                <FieldLabel>角色描述（可选）</FieldLabel>
+                <FieldLabel>{t('step4.roleLabel')}</FieldLabel>
                 <input
                   type="text"
-                  value={terminal.role || ''}
-                  onChange={(e) => updateTerminal(terminal.id, { role: e.target.value })}
-                  placeholder="例如：负责后端 API 开发的专家"
+                  value={terminal.role ?? ''}
+                  onChange={(e) => {
+                    updateTerminal(terminal.id, { role: e.target.value });
+                  }}
+                  placeholder={t('step4.rolePlaceholder')}
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-normal',
                     'placeholder:text-low placeholder:opacity-80',

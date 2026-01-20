@@ -1,3 +1,14 @@
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::doc_markdown,
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::similar_names,
+    clippy::too_many_lines
+)]
+
 use std::{env, sync::OnceLock};
 
 use directories::ProjectDirs;
@@ -62,7 +73,7 @@ pub fn cache_dir() -> std::path::PathBuf {
 }
 
 // Get or create cached PowerShell script file
-pub async fn get_powershell_script()
+pub fn get_powershell_script()
 -> Result<std::path::PathBuf, Box<dyn std::error::Error + Send + Sync>> {
     use std::io::Write;
 

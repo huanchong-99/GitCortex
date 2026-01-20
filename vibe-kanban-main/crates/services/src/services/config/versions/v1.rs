@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct Config {
     pub(super) theme: ThemeMode,

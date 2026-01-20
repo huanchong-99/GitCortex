@@ -218,12 +218,10 @@ impl StandardCodingAgentExecutor for Copilot {
     fn get_availability_info(&self) -> AvailabilityInfo {
         let mcp_config_found = self
             .default_mcp_config_path()
-            .map(|p| p.exists())
-            .unwrap_or(false);
+            .is_some_and(|p| p.exists());
 
         let installation_indicator_found = dirs::home_dir()
-            .map(|home| home.join(".copilot").join("config.json").exists())
-            .unwrap_or(false);
+            .is_some_and(|home| home.join(".copilot").join("config.json").exists());
 
         if mcp_config_found || installation_indicator_found {
             AvailabilityInfo::InstallationFound
@@ -245,9 +243,9 @@ impl Copilot {
                 metadata: None,
             }))
             .transform_lines(Box::new(|lines| {
-                lines.iter_mut().for_each(|line| {
+                for line in lines.iter_mut() {
                     *line = strip_ansi_escapes::strip_str(&line);
-                })
+                }
             }))
             .index_provider(index_provider)
             .build()
@@ -281,7 +279,7 @@ impl Copilot {
                 if let Ok(mut rd) = fs::read_dir(&log_dir_clone).await {
                     while let Ok(Some(entry)) = rd.next_entry().await {
                         let path = entry.path();
-                        if path.extension().map(|e| e == "log").unwrap_or(false)
+                        if path.extension().is_some_and(|e| e == "log")
                             && let Ok(content) = fs::read_to_string(&path).await
                             && let Some(caps) = session_regex.captures(&content)
                             && let Some(matched) = caps.get(1)
@@ -297,7 +295,12 @@ impl Copilot {
             }
         })
         .await
-        .map_err(|_| format!("No session ID found in log files at {log_dir_path:?}"))?
+        .map_err(|_| {
+            format!(
+                "No session ID found in log files at {}",
+                log_dir_path.display()
+            )
+        })?
     }
 
     const SESSION_PREFIX: &'static str = "[copilot-session] ";

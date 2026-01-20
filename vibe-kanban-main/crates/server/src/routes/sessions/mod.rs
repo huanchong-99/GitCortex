@@ -119,25 +119,25 @@ pub async fn follow_up(
         .await?;
 
     // Get executor from the latest CodingAgent process, or fall back to session's executor
-    let base_executor =
-        match ExecutionProcess::latest_executor_profile_for_session(pool, session.id).await? {
-            Some(profile) => profile.executor,
-            None => {
-                // No prior execution - use session's executor field
-                let executor_str = session.executor.as_ref().ok_or_else(|| {
-                    ApiError::Workspace(WorkspaceError::ValidationError(
-                        "No prior execution and no executor configured on session".to_string(),
-                    ))
-                })?;
-                BaseCodingAgent::from_str(&executor_str.replace('-', "_").to_ascii_uppercase())
-                    .map_err(|_| {
-                        ApiError::Workspace(WorkspaceError::ValidationError(format!(
-                            "Invalid executor: {}",
-                            executor_str
-                        )))
-                    })?
-            }
-        };
+    let base_executor = if let Some(profile) =
+        ExecutionProcess::latest_executor_profile_for_session(pool, session.id).await?
+    {
+        profile.executor
+    } else {
+        // No prior execution - use session's executor field
+        let executor_str = session.executor.as_ref().ok_or_else(|| {
+            ApiError::Workspace(WorkspaceError::ValidationError(
+                "No prior execution and no executor configured on session".to_string(),
+            ))
+        })?;
+        BaseCodingAgent::from_str(&executor_str.replace('-', "_").to_ascii_uppercase()).map_err(
+            |_| {
+                ApiError::Workspace(WorkspaceError::ValidationError(format!(
+                    "Invalid executor: {executor_str}"
+                )))
+            },
+        )?
+    };
 
     let executor_profile_id = ExecutorProfileId {
         executor: base_executor,

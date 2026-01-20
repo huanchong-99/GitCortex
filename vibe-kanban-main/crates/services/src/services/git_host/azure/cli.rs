@@ -126,17 +126,17 @@ impl AzCli {
     }
 
     /// Ensure the Azure CLI binary is discoverable.
-    fn ensure_available(&self) -> Result<(), AzCliError> {
+    fn ensure_available() -> Result<(), AzCliError> {
         resolve_executable_path_blocking("az").ok_or(AzCliError::NotAvailable)?;
         Ok(())
     }
 
-    fn run<I, S>(&self, args: I, dir: Option<&Path>) -> Result<String, AzCliError>
+    fn run<I, S>(args: I, dir: Option<&Path>) -> Result<String, AzCliError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        self.ensure_available()?;
+        Self::ensure_available()?;
         let az = resolve_executable_path_blocking("az").ok_or(AzCliError::NotAvailable)?;
         let mut cmd = Command::new(&az);
 
@@ -178,7 +178,7 @@ impl AzCli {
         repo_path: &Path,
         remote_url: &str,
     ) -> Result<AzureRepoInfo, AzCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             ["repos", "list", "--detect", "true", "--output", "json"],
             Some(repo_path),
         )?;
@@ -195,16 +195,14 @@ impl AzCli {
                 if is_ssh {
                     r.ssh_url
                         .as_ref()
-                        .map(|ssh| Self::urls_match(ssh, remote_url))
-                        .unwrap_or(false)
+                        .is_some_and(|ssh| Self::urls_match(ssh, remote_url))
                 } else {
                     Self::urls_match(&r.remote_url, remote_url)
                 }
             })
             .ok_or_else(|| {
                 AzCliError::UnexpectedOutput(format!(
-                    "No repo found matching remote URL: {}",
-                    remote_url
+                    "No repo found matching remote URL: {remote_url}"
                 ))
             })?;
 
@@ -254,15 +252,15 @@ impl AzCli {
             let parts: Vec<&str> = url.split('/').collect();
             let azure_idx = parts.iter().position(|&p| p.contains("dev.azure.com"))?;
             let org = parts.get(azure_idx + 1)?;
-            return Some(format!("https://dev.azure.com/{}", org));
+            return Some(format!("https://dev.azure.com/{org}"));
         }
 
         // Legacy format: https://{org}.visualstudio.com/... -> https://{org}.visualstudio.com
         if url.contains(".visualstudio.com") {
             let parts: Vec<&str> = url.split('/').collect();
-            for part in parts.iter() {
+            for part in &parts {
                 if part.contains(".visualstudio.com") {
-                    return Some(format!("https://{}", part));
+                    return Some(format!("https://{part}"));
                 }
             }
         }
@@ -304,12 +302,12 @@ impl AzCli {
             args.push(OsString::from("--draft"));
         }
 
-        let raw = self.run(args, None)?;
+        let raw = Self::run(args, None)?;
         Self::parse_pr_response(&raw)
     }
 
     pub fn check_auth(&self) -> Result<(), AzCliError> {
-        match self.run(["account", "show"], None) {
+        match Self::run(["account", "show"], None) {
             Ok(_) => Ok(()),
             Err(AzCliError::CommandFailed(msg)) => Err(AzCliError::AuthFailed(msg)),
             Err(err) => Err(err),
@@ -321,9 +319,9 @@ impl AzCli {
             AzCliError::UnexpectedOutput(format!("Could not parse Azure DevOps PR URL: {pr_url}"))
         })?;
 
-        let org_url = format!("https://dev.azure.com/{}", organization);
+        let org_url = format!("https://dev.azure.com/{organization}");
 
-        let raw = self.run(
+        let raw = Self::run(
             [
                 "repos",
                 "pr",
@@ -348,7 +346,7 @@ impl AzCli {
         repo_name: &str,
         branch: &str,
     ) -> Result<Vec<PullRequestInfo>, AzCliError> {
-        let raw = self.run(
+        let raw = Self::run(
             [
                 "repos",
                 "pr",
@@ -387,9 +385,9 @@ impl AzCli {
         args.push(OsString::from("--resource"));
         args.push(OsString::from("pullRequestThreads"));
         args.push(OsString::from("--route-parameters"));
-        args.push(OsString::from(format!("project={}", project_id)));
-        args.push(OsString::from(format!("repositoryId={}", repo_id)));
-        args.push(OsString::from(format!("pullRequestId={}", pr_id)));
+        args.push(OsString::from(format!("project={project_id}")));
+        args.push(OsString::from(format!("repositoryId={repo_id}")));
+        args.push(OsString::from(format!("pullRequestId={pr_id}")));
         args.push(OsString::from("--organization"));
         args.push(OsString::from(organization_url));
         args.push(OsString::from("--api-version"));
@@ -397,7 +395,7 @@ impl AzCli {
         args.push(OsString::from("--output"));
         args.push(OsString::from("json"));
 
-        let raw = self.run(args, None)?;
+        let raw = Self::run(args, None)?;
         Self::parse_pr_threads(&raw)
     }
 
@@ -426,7 +424,7 @@ impl AzCli {
         // Legacy format: https://{org}.visualstudio.com/{project}/_git/{repo}/pullrequest/{id}
         if url_lower.contains(".visualstudio.com") && url_lower.contains("/pullrequest/") {
             let parts: Vec<&str> = url.split('/').collect();
-            for part in parts.iter() {
+            for part in &parts {
                 if let Some(org) = part.strip_suffix(".visualstudio.com")
                     && let Some(pr_idx) = parts.iter().position(|&p| p == "pullrequest")
                     && parts.len() > pr_idx + 1
@@ -463,8 +461,10 @@ impl AzCli {
         let url = pr
             .repository
             .and_then(|r| r.web_url)
-            .map(|u| format!("{}/pullrequest/{}", u, pr.pull_request_id))
-            .unwrap_or_else(|| format!("pullrequest/{}", pr.pull_request_id));
+            .map_or_else(
+                || format!("pullrequest/{}", pr.pull_request_id),
+                |u| format!("{u}/pullrequest/{}", pr.pull_request_id),
+            );
 
         let status = pr.status.as_deref().unwrap_or("active");
         let merged_at = pr
@@ -518,8 +518,7 @@ impl AzCli {
                     let created_at = c
                         .published_date
                         .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(Utc::now);
+                        .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
                     if let Some(ref path) = file_path {
                         comments.push(UnifiedPrComment::Review {
@@ -548,7 +547,7 @@ impl AzCli {
             }
         }
 
-        comments.sort_by_key(|c| c.created_at());
+        comments.sort_by_key(UnifiedPrComment::created_at);
         Ok(comments)
     }
 

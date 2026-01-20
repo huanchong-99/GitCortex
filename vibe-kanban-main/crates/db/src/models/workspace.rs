@@ -537,7 +537,7 @@ impl Workspace {
             if let Some(last_space) = truncated.rfind(' ') {
                 format!("{}...", &truncated[..last_space])
             } else {
-                format!("{}...", truncated)
+                format!("{truncated}...")
             }
         }
     }
@@ -608,12 +608,16 @@ impl Workspace {
                 is_errored: rec.is_errored != 0,
             })
             // Apply archived filter if provided
-            .filter(|ws| archived.is_none_or(|a| ws.workspace.archived == a))
+            .filter(|ws| archived.map_or(true, |a| ws.workspace.archived == a))
             .collect();
 
         // Apply limit if provided (already sorted by updated_at DESC from query)
         if let Some(lim) = limit {
-            workspaces.truncate(lim as usize);
+            if let Ok(limit) = usize::try_from(lim) {
+                workspaces.truncate(limit);
+            } else {
+                workspaces.clear();
+            }
         }
 
         for ws in &mut workspaces {

@@ -4,7 +4,6 @@ import {
   PencilSimpleIcon,
   TrashIcon,
   CheckCircleIcon,
-  Icon,
 } from '@phosphor-icons/react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import {
@@ -17,10 +16,10 @@ import {
 import { IconButton } from '../../ui-new/primitives/IconButton';
 import { cn } from '@/lib/utils';
 import type { WizardConfig, ModelConfig, ApiType } from '../types';
+import { useTranslation } from 'react-i18next';
 
 interface Step3ModelsProps {
   config: WizardConfig;
-  errors: Record<string, string>;
   onUpdate: (updates: Partial<WizardConfig>) => void;
 }
 
@@ -63,11 +62,14 @@ const initialFormData: ModelFormData = {
   modelId: '',
 };
 
+/**
+ * Step 3: Manages AI model configurations and verification.
+ */
 export const Step3Models: React.FC<Step3ModelsProps> = ({
   config,
-  errors,
   onUpdate,
 }) => {
+  const { t } = useTranslation('workflow');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [formData, setFormData] = useState<ModelFormData>(initialFormData);
@@ -123,32 +125,25 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setAvailableModels([...config.defaultModels]);
   };
 
-  const handleFetchModels = async () => {
-    if (!formData.apiKey) {
-      setFormErrors({ apiKey: '请先输入 API Key' });
+  const handleFetchModels = () => {
+    if (!formData.apiKey.trim()) {
+      setFormErrors({ apiKey: t('step3.errors.apiKeyRequired') });
       return;
     }
 
     setIsFetching(true);
     setFormErrors({});
 
-    try {
-      // TODO: Implement actual API call to fetch models
-      // For now, use default models based on API type
-      const defaultModels = API_TYPES[formData.apiType].defaultModels;
-      setAvailableModels([...defaultModels]);
-    } catch (error) {
-      setFormErrors({ fetch: '获取模型列表失败，请检查 API Key' });
-    } finally {
-      setIsFetching(false);
-    }
+    // TODO: Implement actual API call to fetch models
+    // For now, use default models based on API type
+    const defaultModels = API_TYPES[formData.apiType].defaultModels;
+    setAvailableModels([...defaultModels]);
+    setIsFetching(false);
   };
 
   const handleVerify = async () => {
     if (!formData.baseUrl || !formData.apiKey || !formData.modelId) {
-      setFormErrors({
-        verify: '请先填写完整信息',
-      });
+      setFormErrors({ verify: t('step3.errors.verifyMissingInfo') });
       return;
     }
 
@@ -159,11 +154,11 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       // TODO: Implement actual API verification
       // For now, simulate successful verification
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      setFormErrors({ verify: '' });
+      setFormErrors({});
       // Show success indication
-      alert('连接验证成功！');
+      alert(t('step3.messages.verifySuccess'));
     } catch (error) {
-      setFormErrors({ verify: '连接验证失败，请检查配置' });
+      setFormErrors({ verify: t('step3.errors.verifyFailed') });
     } finally {
       setIsVerifying(false);
     }
@@ -173,16 +168,16 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     const errors: Record<string, string> = {};
 
     if (!formData.displayName.trim()) {
-      errors.displayName = '请输入模型名称';
+      errors.displayName = t('step3.errors.displayNameRequired');
     }
     if (!formData.baseUrl.trim()) {
-      errors.baseUrl = '请输入 Base URL';
+      errors.baseUrl = t('step3.errors.baseUrlRequired');
     }
     if (!formData.apiKey.trim()) {
-      errors.apiKey = '请输入 API Key';
+      errors.apiKey = t('step3.errors.apiKeyRequired');
     }
     if (!formData.modelId.trim()) {
-      errors.modelId = '请选择或输入模型 ID';
+      errors.modelId = t('step3.errors.modelIdRequired');
     }
 
     setFormErrors(errors);
@@ -195,13 +190,13 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     }
 
     const newModel: ModelConfig = {
-      id: editingModel?.id || `model-${Date.now()}`,
+      id: editingModel?.id ?? `model-${Date.now()}`,
       displayName: formData.displayName,
       apiType: formData.apiType,
       baseUrl: formData.baseUrl,
       apiKey: formData.apiKey,
       modelId: formData.modelId,
-      isVerified: editingModel?.isVerified || false,
+      isVerified: editingModel?.isVerified ?? false,
     };
 
     let updatedModels: ModelConfig[];
@@ -218,7 +213,9 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   };
 
   const handleDelete = (modelId: string) => {
-    if (window.confirm('确定要删除这个模型配置吗？')) {
+    const modelName =
+      config.models.find((model) => model.id === modelId)?.displayName ?? '';
+    if (window.confirm(t('step3.messages.confirmDelete', { name: modelName }))) {
       const updatedModels = config.models.filter((m) => m.id !== modelId);
       onUpdate({ models: updatedModels });
     }
@@ -227,21 +224,21 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   return (
     <div className="flex flex-col gap-base">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-high">配置 AI 模型</h2>
+        <h2 className="text-lg font-semibold text-high">{t('step3.title')}</h2>
         <button
           type="button"
           onClick={handleOpenAddDialog}
           className="flex items-center gap-half px-base py-half rounded-sm bg-brand text-on-brand text-base hover:bg-brand-hover transition-colors"
         >
           <PlusIcon className="size-icon-sm" weight="bold" />
-          添加模型
+          {t('step3.addModel')}
         </button>
       </div>
 
       {config.models.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-double text-low">
-          <div className="text-base">还没有配置任何模型</div>
-          <div className="text-sm mt-half">点击上方按钮添加第一个模型配置</div>
+          <div className="text-base">{t('step3.emptyTitle')}</div>
+          <div className="text-sm mt-half">{t('step3.emptyDescription')}</div>
         </div>
       ) : (
         <div className="flex flex-col gap-base">
@@ -259,26 +256,28 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   />
                 )}
                 <div className="flex-1">
-                  <div className="text-base font-medium text-high">
-                    {model.displayName}
-                  </div>
+                  <div className="text-base font-medium text-high">{model.displayName}</div>
                   <div className="text-sm text-low mt-quarter">
-                    {API_TYPES[model.apiType].label} · {model.modelId}
+                    {API_TYPES[model.apiType].label} - {model.modelId}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-half">
                 <IconButton
                   icon={PencilSimpleIcon}
-                  onClick={() => handleOpenEditDialog(model)}
-                  aria-label={`编辑 ${model.displayName}`}
-                  title="编辑"
+                  onClick={() => {
+                    handleOpenEditDialog(model);
+                  }}
+                  aria-label={`${t('step3.editLabel')} ${model.displayName}`}
+                  title={t('step3.editLabel')}
                 />
                 <IconButton
                   icon={TrashIcon}
-                  onClick={() => handleDelete(model.id)}
-                  aria-label={`删除 ${model.displayName}`}
-                  title="删除"
+                  onClick={() => {
+                    handleDelete(model.id);
+                  }}
+                  aria-label={`${t('step3.deleteLabel')} ${model.displayName}`}
+                  title={t('step3.deleteLabel')}
                 />
               </div>
             </div>
@@ -291,22 +290,22 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingModel ? '编辑模型' : '添加模型'}
+              {editingModel ? t('step3.dialog.editTitle') : t('step3.dialog.addTitle')}
             </DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-base py-base">
             {/* Display Name */}
             <Field>
-              <FieldLabel htmlFor="displayName">模型名称</FieldLabel>
+              <FieldLabel htmlFor="displayName">{t('step3.fields.displayName.label')}</FieldLabel>
               <input
                 id="displayName"
                 type="text"
                 value={formData.displayName}
-                onChange={(e) =>
-                  setFormData({ ...formData, displayName: e.target.value })
-                }
-                placeholder="例如：Claude 3.5 Sonnet"
+                onChange={(e) => {
+                  setFormData({ ...formData, displayName: e.target.value });
+                }}
+                placeholder={t('step3.fields.displayName.placeholder')}
                 className={cn(
                   'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                   'placeholder:text-low placeholder:opacity-80',
@@ -319,7 +318,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
 
             {/* API Type */}
             <Field>
-              <FieldLabel htmlFor="apiType">API 类型</FieldLabel>
+              <FieldLabel htmlFor="apiType">{t('step3.fields.apiType.label')}</FieldLabel>
               <div className="flex flex-wrap gap-base">
                 {(Object.keys(API_TYPES) as ApiType[]).map((type) => (
                   <label
@@ -337,7 +336,9 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                       name="apiType"
                       value={type}
                       checked={formData.apiType === type}
-                      onChange={() => handleApiTypeChange(type)}
+                      onChange={() => {
+                        handleApiTypeChange(type);
+                      }}
                       className="hidden"
                     />
                     {API_TYPES[type].label}
@@ -348,15 +349,15 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
 
             {/* Base URL */}
             <Field>
-              <FieldLabel htmlFor="baseUrl">Base URL</FieldLabel>
+              <FieldLabel htmlFor="baseUrl">{t('step3.fields.baseUrl.label')}</FieldLabel>
               <input
                 id="baseUrl"
                 type="text"
                 value={formData.baseUrl}
-                onChange={(e) =>
-                  setFormData({ ...formData, baseUrl: e.target.value })
-                }
-                placeholder="API 端点地址"
+                onChange={(e) => {
+                  setFormData({ ...formData, baseUrl: e.target.value });
+                }}
+                placeholder={t('step3.fields.baseUrl.placeholder')}
                 disabled={formData.apiType !== 'openai-compatible'}
                 className={cn(
                   'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
@@ -371,15 +372,15 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
 
             {/* API Key */}
             <Field>
-              <FieldLabel htmlFor="apiKey">API Key</FieldLabel>
+              <FieldLabel htmlFor="apiKey">{t('step3.fields.apiKey.label')}</FieldLabel>
               <input
                 id="apiKey"
                 type="password"
                 value={formData.apiKey}
-                onChange={(e) =>
-                  setFormData({ ...formData, apiKey: e.target.value })
-                }
-                placeholder="输入 API 密钥"
+                onChange={(e) => {
+                  setFormData({ ...formData, apiKey: e.target.value });
+                }}
+                placeholder={t('step3.fields.apiKey.placeholder')}
                 className={cn(
                   'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                   'placeholder:text-low placeholder:opacity-80',
@@ -403,28 +404,28 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   'bg-secondary text-normal'
                 )}
               >
-                {isFetching ? '获取中...' : '获取可用模型'}
+                {isFetching ? t('step3.actions.fetching') : t('step3.actions.fetchModels')}
               </button>
               {formErrors.fetch && <FieldError>{formErrors.fetch}</FieldError>}
             </Field>
 
             {/* Model Selection/Input */}
             <Field>
-              <FieldLabel htmlFor="modelId">模型 ID</FieldLabel>
+              <FieldLabel htmlFor="modelId">{t('step3.fields.modelId.label')}</FieldLabel>
               {availableModels.length > 0 ? (
                 <select
                   id="modelId"
                   value={formData.modelId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, modelId: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setFormData({ ...formData, modelId: e.target.value });
+                  }}
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                     'focus:outline-none focus:ring-1 focus:ring-brand',
                     formErrors.modelId && 'border-error'
                   )}
                 >
-                  <option value="">请选择模型</option>
+                  <option value="">{t('step3.fields.modelId.selectPlaceholder')}</option>
                   {availableModels.map((model) => (
                     <option key={model} value={model}>
                       {model}
@@ -436,10 +437,10 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   id="modelId"
                   type="text"
                   value={formData.modelId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, modelId: e.target.value })
-                  }
-                  placeholder="输入模型 ID，例如：claude-3-5-sonnet-20241022"
+                  onChange={(e) => {
+                    setFormData({ ...formData, modelId: e.target.value });
+                  }}
+                  placeholder={t('step3.fields.modelId.placeholder')}
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                     'placeholder:text-low placeholder:opacity-80',
@@ -455,7 +456,9 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             <Field>
               <button
                 type="button"
-                onClick={handleVerify}
+                onClick={() => {
+                  void handleVerify();
+                }}
                 disabled={isVerifying}
                 className={cn(
                   'flex items-center justify-center gap-half w-full px-base py-half rounded-sm border text-base',
@@ -464,7 +467,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   'bg-secondary text-normal'
                 )}
               >
-                {isVerifying ? '验证中...' : '验证连接'}
+                {isVerifying ? t('step3.actions.verifying') : t('step3.actions.verify')}
               </button>
               {formErrors.verify && <FieldError>{formErrors.verify}</FieldError>}
             </Field>
@@ -481,7 +484,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   'transition-colors'
                 )}
               >
-                取消
+                {t('step3.actions.cancel')}
               </button>
               <button
                 type="button"
@@ -492,7 +495,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   'transition-colors'
                 )}
               >
-                保存
+                {t('step3.actions.save')}
               </button>
             </div>
           </DialogFooter>
@@ -501,3 +504,4 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     </div>
   );
 };
+

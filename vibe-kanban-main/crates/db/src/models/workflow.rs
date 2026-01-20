@@ -4,7 +4,7 @@
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce, Key
+    Aes256Gcm, Nonce,
 };
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
@@ -19,12 +19,13 @@ use tracing::{instrument, debug};
 use super::terminal::Terminal;
 
 /// Workflow Status Enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display, Default)]
 #[sqlx(type_name = "workflow_status", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
 pub enum WorkflowStatus {
     /// Created, waiting for configuration
+    #[default]
     Created,
     /// Starting terminals
     Starting,
@@ -44,19 +45,14 @@ pub enum WorkflowStatus {
     Cancelled,
 }
 
-impl Default for WorkflowStatus {
-    fn default() -> Self {
-        Self::Created
-    }
-}
-
 /// Workflow Task Status Enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display, Default)]
 #[sqlx(type_name = "workflow_task_status", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
 pub enum WorkflowTaskStatus {
     /// Waiting to execute
+    #[default]
     Pending,
     /// Running
     Running,
@@ -68,12 +64,6 @@ pub enum WorkflowTaskStatus {
     Failed,
     /// Cancelled
     Cancelled,
-}
-
-impl Default for WorkflowTaskStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 /// Workflow
@@ -181,11 +171,12 @@ impl Workflow {
     /// Set API key with encryption
     pub fn set_api_key(&mut self, plaintext: &str) -> anyhow::Result<()> {
         let key = Self::get_encryption_key()?;
-        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
         let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
 
         // Combine nonce + ciphertext
         let mut combined = nonce.to_vec();
@@ -207,21 +198,23 @@ impl Workflow {
             Some(encoded) => {
                 let key = Self::get_encryption_key()?;
                 let combined = general_purpose::STANDARD.decode(encoded)
-                    .map_err(|e| anyhow::anyhow!("Base64 decode failed: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Base64 decode failed: {e}"))?;
 
                 if combined.len() < 12 {
                     return Err(anyhow::anyhow!("Invalid encrypted data length"));
                 }
 
                 let (nonce_bytes, ciphertext) = combined.split_at(12);
+                #[allow(deprecated)]
                 let nonce = Nonce::from_slice(nonce_bytes);
-                let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+                let cipher = Aes256Gcm::new_from_slice(&key)
+                    .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
 
                 let plaintext_bytes = cipher.decrypt(nonce, ciphertext)
-                    .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
 
                 Ok(Some(String::from_utf8(plaintext_bytes)
-                    .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in decrypted data: {}", e))?))
+                    .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}"))?))
             }
         }
     }
@@ -378,7 +371,7 @@ impl Workflow {
     /// Create workflow
     pub async fn create(pool: &SqlitePool, workflow: &Workflow) -> sqlx::Result<Self> {
         sqlx::query_as::<_, Workflow>(
-            r#"
+            r"
             INSERT INTO workflow (
                 id, project_id, name, description, status,
                 use_slash_commands, orchestrator_enabled,
@@ -389,7 +382,7 @@ impl Workflow {
                 target_branch, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
             RETURNING *
-            "#
+            "
         )
         .bind(&workflow.id)
         .bind(&workflow.project_id)
@@ -417,7 +410,7 @@ impl Workflow {
     /// Find workflow by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, Workflow>(
-            r#"SELECT * FROM workflow WHERE id = ?"#
+            r"SELECT * FROM workflow WHERE id = ?"
         )
         .bind(id)
         .fetch_optional(pool)
@@ -429,11 +422,11 @@ impl Workflow {
     pub async fn find_by_project(pool: &SqlitePool, project_id: &str) -> sqlx::Result<Vec<Self>> {
         let start = std::time::Instant::now();
         let result = sqlx::query_as::<_, Workflow>(
-            r#"
+            r"
             SELECT * FROM workflow
             WHERE project_id = ?
             ORDER BY created_at DESC
-            "#
+            "
         )
         .bind(project_id)
         .fetch_all(pool)
@@ -442,7 +435,7 @@ impl Workflow {
         let elapsed = start.elapsed();
         debug!(
             project_id = %project_id,
-            count = result.as_ref().map(|v| v.len()).unwrap_or(0),
+            count = result.as_ref().map_or(0, Vec::len),
             duration_ms = elapsed.as_millis(),
             "find_by_project query completed"
         );
@@ -454,11 +447,11 @@ impl Workflow {
     pub async fn update_status(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE workflow
             SET status = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(status)
         .bind(now)
@@ -472,11 +465,11 @@ impl Workflow {
     pub async fn set_ready(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE workflow
             SET status = 'ready', ready_at = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(now)
         .bind(now)
@@ -490,11 +483,11 @@ impl Workflow {
     pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE workflow
             SET status = 'running', started_at = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(now)
         .bind(now)
@@ -527,7 +520,7 @@ impl Workflow {
 
         // Create workflow
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow (
                 id, project_id, name, description, status,
                 use_slash_commands, orchestrator_enabled,
@@ -537,7 +530,7 @@ impl Workflow {
                 merge_terminal_cli_id, merge_terminal_model_id,
                 target_branch, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
-            "#
+            "
         )
         .bind(&workflow.id)
         .bind(&workflow.project_id)
@@ -564,12 +557,12 @@ impl Workflow {
         // Create tasks and terminals
         for (task, terminals) in tasks {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO workflow_task (
                     id, workflow_id, vk_task_id, name, description,
                     branch, status, order_index, created_at, updated_at
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-                "#
+                "
             )
             .bind(&task.id)
             .bind(&task.workflow_id)
@@ -587,13 +580,13 @@ impl Workflow {
             // Create terminals for this task
             for terminal in terminals {
                 sqlx::query(
-                    r#"
+                    r"
                     INSERT INTO terminal (
                         id, workflow_task_id, cli_type_id, model_config_id,
                         custom_base_url, custom_api_key, role, role_description,
                         order_index, status, created_at, updated_at
                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-                    "#
+                    "
                 )
                 .bind(&terminal.id)
                 .bind(&terminal.workflow_task_id)
@@ -621,13 +614,13 @@ impl WorkflowTask {
     /// Create workflow task
     pub async fn create(pool: &SqlitePool, task: &WorkflowTask) -> sqlx::Result<Self> {
         sqlx::query_as::<_, WorkflowTask>(
-            r#"
+            r"
             INSERT INTO workflow_task (
                 id, workflow_id, vk_task_id, name, description,
                 branch, status, order_index, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             RETURNING *
-            "#
+            "
         )
         .bind(&task.id)
         .bind(&task.workflow_id)
@@ -646,11 +639,11 @@ impl WorkflowTask {
     /// Find tasks by workflow
     pub async fn find_by_workflow(pool: &SqlitePool, workflow_id: &str) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, WorkflowTask>(
-            r#"
+            r"
             SELECT * FROM workflow_task
             WHERE workflow_id = ?
             ORDER BY order_index ASC
-            "#
+            "
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -660,7 +653,7 @@ impl WorkflowTask {
     /// Find workflow task by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, WorkflowTask>(
-            r#"SELECT * FROM workflow_task WHERE id = ?"#
+            r"SELECT * FROM workflow_task WHERE id = ?"
         )
         .bind(id)
         .fetch_optional(pool)
@@ -671,11 +664,11 @@ impl WorkflowTask {
     pub async fn update_status(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         sqlx::query(
-            r#"
+            r"
             UPDATE workflow_task
             SET status = ?, updated_at = ?
             WHERE id = ?
-            "#
+            "
         )
         .bind(status)
         .bind(now)
@@ -690,10 +683,10 @@ impl SlashCommandPreset {
     /// Get all slash command presets
     pub async fn find_all(pool: &SqlitePool) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, SlashCommandPreset>(
-            r#"
+            r"
             SELECT * FROM slash_command_preset
             ORDER BY is_system DESC, command ASC
-            "#
+            "
         )
         .fetch_all(pool)
         .await
@@ -704,11 +697,11 @@ impl WorkflowCommand {
     /// Get commands by workflow
     pub async fn find_by_workflow(pool: &SqlitePool, workflow_id: &str) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, WorkflowCommand>(
-            r#"
+            r"
             SELECT * FROM workflow_command
             WHERE workflow_id = ?
             ORDER BY order_index ASC
-            "#
+            "
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -726,11 +719,11 @@ impl WorkflowCommand {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now();
         sqlx::query_as::<_, WorkflowCommand>(
-            r#"
+            r"
             INSERT INTO workflow_command (id, workflow_id, preset_id, order_index, custom_params, created_at)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             RETURNING *
-            "#
+            "
         )
         .bind(&id)
         .bind(workflow_id)

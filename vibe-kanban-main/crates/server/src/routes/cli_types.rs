@@ -3,13 +3,12 @@
 use axum::{
     extract::{Path, State},
     routing::get,
-    Json, Router,
+    Router,
     response::Json as ResponseJson,
 };
 use db::models::{CliType, ModelConfig, CliDetectionStatus, CliType as CliTypeModel};
 use deployment::Deployment;
 use crate::{error::ApiError, DeploymentImpl};
-use utils::response::ApiResponse;
 
 /// Create CLI types router
 pub fn cli_types_routes() -> Router<DeploymentImpl> {

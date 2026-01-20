@@ -196,10 +196,10 @@ impl GitHostProvider for GitHubProvider {
         // For cross-fork PRs, get the head repo info to format head_branch as "owner:branch".
         let head_branch = if let Some(head_url) = &request.head_repo_url {
             let head_repo_info = self.get_repo_info(head_url, repo_path).await?;
-            if head_repo_info.owner != target_repo_info.owner {
-                format!("{}:{}", head_repo_info.owner, request.head_branch)
-            } else {
+            if head_repo_info.owner == target_repo_info.owner {
                 request.head_branch.clone()
+            } else {
+                format!("{}:{}", head_repo_info.owner, request.head_branch)
             }
         } else {
             request.head_branch.clone()
@@ -380,7 +380,7 @@ impl GitHostProvider for GitHubProvider {
         }
 
         // Sort by creation time
-        unified.sort_by_key(|c| c.created_at());
+        unified.sort_by_key(UnifiedPrComment::created_at);
 
         Ok(unified)
     }

@@ -58,11 +58,13 @@ impl AcpAgentHarness {
         }
     }
 
+    #[must_use]
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.model = Some(model.into());
         self
     }
 
+    #[must_use]
     pub fn with_mode(mut self, mode: impl Into<String>) -> Self {
         self.mode = Some(mode.into());
         self
@@ -106,8 +108,7 @@ impl AcpAgentHarness {
             self.model.clone(),
             self.mode.clone(),
             approvals,
-        )
-        .await?;
+        )?;
 
         Ok(SpawnedChild {
             child,
@@ -156,8 +157,7 @@ impl AcpAgentHarness {
             self.model.clone(),
             self.mode.clone(),
             approvals,
-        )
-        .await?;
+        )?;
 
         Ok(SpawnedChild {
             child,
@@ -167,7 +167,7 @@ impl AcpAgentHarness {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn bootstrap_acp_connection(
+    fn bootstrap_acp_connection(
         child: &mut AsyncGroupChild,
         cwd: PathBuf,
         existing_session: Option<String>,

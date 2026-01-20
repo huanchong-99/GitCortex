@@ -1,13 +1,19 @@
 import { cn } from '@/lib/utils';
 import { WizardStep, WIZARD_STEPS } from './types';
 import { Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   currentStep: WizardStep;
   completedSteps: WizardStep[];
 }
 
+/**
+ * Displays wizard step progress with completion indicators.
+ */
 export function StepIndicator({ currentStep, completedSteps }: Props) {
+  const { t } = useTranslation('workflow');
+
   return (
     <div className="flex items-center justify-between w-full mb-8">
       {WIZARD_STEPS.map((stepInfo, index) => {
@@ -36,7 +42,7 @@ export function StepIndicator({ currentStep, completedSteps }: Props) {
                   isCurrent ? 'text-normal font-medium' : 'text-low'
                 )}
               >
-                {stepInfo.name}
+                {t(stepInfo.nameKey)}
               </span>
             </div>
 

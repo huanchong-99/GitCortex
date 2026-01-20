@@ -32,24 +32,21 @@ pub async fn launch_codex_review(
         ));
     }
 
-    let conversation_id = match resume_session {
-        Some(session_id) => {
-            let (rollout_path, _forked_session_id) = SessionHandler::fork_rollout_file(&session_id)
-                .map_err(|e| ExecutorError::FollowUpNotSupported(e.to_string()))?;
-            let response = client
-                .resume_conversation(rollout_path.clone(), conversation_params)
-                .await?;
-            tracing::debug!(
-                "resuming session for review using rollout file {}, response {:?}",
-                rollout_path.display(),
-                response
-            );
-            response.conversation_id
-        }
-        None => {
-            let response = client.new_conversation(conversation_params).await?;
-            response.conversation_id
-        }
+    let conversation_id = if let Some(session_id) = resume_session {
+        let (rollout_path, _forked_session_id) = SessionHandler::fork_rollout_file(&session_id)
+            .map_err(|e| ExecutorError::FollowUpNotSupported(e.to_string()))?;
+        let response = client
+            .resume_conversation(rollout_path.clone(), conversation_params)
+            .await?;
+        tracing::debug!(
+            "resuming session for review using rollout file {}, response {:?}",
+            rollout_path.display(),
+            response
+        );
+        response.conversation_id
+    } else {
+        let response = client.new_conversation(conversation_params).await?;
+        response.conversation_id
     };
 
     client.register_session(&conversation_id).await?;

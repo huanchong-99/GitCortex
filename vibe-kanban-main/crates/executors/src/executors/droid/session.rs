@@ -59,8 +59,7 @@ fn replace_session_id(line: &str, new_session_id: &str) -> String {
         && meta
             .get("type")
             .and_then(|value| value.as_str())
-            .map(|value| value == "session_start")
-            .unwrap_or(false)
+            .is_some_and(|value| value == "session_start")
         && let Some(Value::String(id)) = meta.get_mut("id")
     {
         *id = new_session_id.to_string();

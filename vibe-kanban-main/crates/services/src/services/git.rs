@@ -90,6 +90,7 @@ impl std::fmt::Display for Commit {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct WorktreeResetOptions {
     pub perform_reset: bool,
     pub force_when_dirty: bool,
@@ -98,6 +99,7 @@ pub struct WorktreeResetOptions {
 }
 
 impl WorktreeResetOptions {
+    #[allow(clippy::fn_params_excessive_bools)]
     pub fn new(
         perform_reset: bool,
         force_when_dirty: bool,
@@ -120,6 +122,7 @@ pub struct WorktreeResetOutcome {
 }
 
 /// Target for diff generation
+#[derive(Clone, Copy)]
 pub enum DiffTarget<'p> {
     /// Work-in-progress branch checked out in this worktree
     Worktree {
@@ -176,10 +179,9 @@ impl GitService {
     }
 
     /// Get a signature for libgit2 commits with a safe fallback identity.
-    fn signature_with_fallback<'a>(
-        &self,
-        repo: &'a Repository,
-    ) -> Result<git2::Signature<'a>, GitServiceError> {
+    fn signature_with_fallback(
+        repo: &Repository,
+    ) -> Result<git2::Signature<'_>, GitServiceError> {
         match repo.signature() {
             Ok(sig) => Ok(sig),
             Err(_) => git2::Signature::now("Vibe Kanban", "noreply@vibekanban.com")
@@ -187,7 +189,7 @@ impl GitService {
         }
     }
 
-    fn default_remote_name(&self, repo: &Repository) -> String {
+    fn default_remote_name(repo: &Repository) -> String {
         if let Ok(config) = repo.config()
             && let Ok(default) = config.get_string("remote.pushDefault")
         {
@@ -247,7 +249,7 @@ impl GitService {
     }
 
     pub fn create_initial_commit(&self, repo: &Repository) -> Result<(), GitServiceError> {
-        let signature = self.signature_with_fallback(repo)?;
+        let signature = Self::signature_with_fallback(repo)?;
 
         let tree_id = {
             let tree_builder = repo.treebuilder(None)?;
@@ -315,10 +317,12 @@ impl GitService {
 
                 let git = GitCli::new();
                 let cli_opts = StatusDiffOptions {
-                    path_filter: path_filter.map(|fs| fs.iter().map(|s| s.to_string()).collect()),
+                    path_filter: path_filter.map(|fs| {
+                        fs.iter().copied().map(ToString::to_string).collect()
+                    }),
                 };
                 let entries = git
-                    .diff_status(worktree_path, base_commit, cli_opts)
+                    .diff_status(worktree_path, base_commit, &cli_opts)
                     .map_err(|e| {
                         GitServiceError::InvalidRepository(format!("git diff failed: {e}"))
                     })?;
@@ -362,7 +366,7 @@ impl GitService {
                 let mut find_opts = DiffFindOptions::new();
                 diff.find_similar(Some(&mut find_opts))?;
 
-                self.convert_diff_to_file_diffs(diff, &repo)
+                Self::convert_diff_to_file_diffs(&diff, &repo)
             }
             DiffTarget::Commit {
                 repo_path,
@@ -407,15 +411,14 @@ impl GitService {
                 let mut find_opts = git2::DiffFindOptions::new();
                 diff.find_similar(Some(&mut find_opts))?;
 
-                self.convert_diff_to_file_diffs(diff, &repo)
+                Self::convert_diff_to_file_diffs(&diff, &repo)
             }
         }
     }
 
     /// Convert git2::Diff to our Diff structs
     fn convert_diff_to_file_diffs(
-        &self,
-        diff: git2::Diff,
+        diff: &git2::Diff,
         repo: &Repository,
     ) -> Result<Vec<Diff>, GitServiceError> {
         let mut file_diffs = Vec::new();
@@ -468,7 +471,7 @@ impl GitService {
                         let details = delta
                             .old_file()
                             .path()
-                            .map(|p| self.create_file_details(p, &delta.old_file().id(), repo));
+                            .map(|p| Self::create_file_details(p, &delta.old_file().id(), repo));
                         (
                             details.as_ref().and_then(|f| f.file_name.clone()),
                             details.and_then(|f| f.content),
@@ -489,7 +492,7 @@ impl GitService {
                         let details = delta
                             .new_file()
                             .path()
-                            .map(|p| self.create_file_details(p, &delta.new_file().id(), repo));
+                            .map(|p| Self::create_file_details(p, &delta.new_file().id(), repo));
                         (
                             details.as_ref().and_then(|f| f.file_name.clone()),
                             details.and_then(|f| f.content),
@@ -498,12 +501,10 @@ impl GitService {
                 };
 
                 let mut change = match status {
-                    Delta::Added => DiffChangeKind::Added,
+                    Delta::Added | Delta::Untracked => DiffChangeKind::Added,
                     Delta::Deleted => DiffChangeKind::Deleted,
-                    Delta::Modified => DiffChangeKind::Modified,
                     Delta::Renamed => DiffChangeKind::Renamed,
                     Delta::Copied => DiffChangeKind::Copied,
-                    Delta::Untracked => DiffChangeKind::Added,
                     _ => DiffChangeKind::Modified,
                 };
 
@@ -520,7 +521,7 @@ impl GitService {
 
                 // Always compute line stats via libgit2 Patch
                 let (additions, deletions) = if let Ok(Some(patch)) =
-                    git2::Patch::from_diff(&diff, delta_index)
+                    git2::Patch::from_diff(diff, delta_index)
                     && let Ok((_ctx, adds, dels)) = patch.line_stats()
                 {
                     (Some(adds), Some(dels))
@@ -566,7 +567,7 @@ impl GitService {
         } else {
             std::str::from_utf8(blob.content())
                 .ok()
-                .map(|s| s.to_string())
+                .map(ToString::to_string)
         }
     }
 
@@ -612,7 +613,6 @@ impl GitService {
 
     /// Create FileDiffDetails from path and blob with filesystem fallback
     fn create_file_details(
-        &self,
         path: &Path,
         blob_id: &git2::Oid,
         repo: &Repository,
@@ -620,7 +620,10 @@ impl GitService {
         let file_name = path.to_string_lossy().to_string();
 
         // Try to get content from blob first (for non-zero OIDs)
-        let content = if !blob_id.is_zero() {
+        let content = if blob_id.is_zero() {
+            // For zero OIDs, check filesystem directly (covers new/untracked files)
+            Self::read_file_to_string(repo, path)
+        } else {
             repo.find_blob(*blob_id)
                 .ok()
                 .and_then(|blob| Self::blob_to_string(&blob))
@@ -632,9 +635,6 @@ impl GitService {
                     );
                     Self::read_file_to_string(repo, path)
                 })
-        } else {
-            // For zero OIDs, check filesystem directly (covers new/untracked files)
-            Self::read_file_to_string(repo, path)
         };
 
         FileDiffDetails {
@@ -650,12 +650,13 @@ impl GitService {
         let mut change = match e.change {
             ChangeType::Added => DiffChangeKind::Added,
             ChangeType::Deleted => DiffChangeKind::Deleted,
-            ChangeType::Modified => DiffChangeKind::Modified,
             ChangeType::Renamed => DiffChangeKind::Renamed,
             ChangeType::Copied => DiffChangeKind::Copied,
             // Treat type changes and unmerged as modified for now
-            ChangeType::TypeChanged | ChangeType::Unmerged => DiffChangeKind::Modified,
-            ChangeType::Unknown(_) => DiffChangeKind::Modified,
+            ChangeType::Modified
+            | ChangeType::TypeChanged
+            | ChangeType::Unmerged
+            | ChangeType::Unknown(_) => DiffChangeKind::Modified,
         };
 
         // Determine old/new paths based on change
@@ -666,8 +667,9 @@ impl GitService {
                 Some(e.old_path.unwrap_or(e.path.clone())),
                 Some(e.path.clone()),
             ),
-            ChangeType::Renamed | ChangeType::Copied => (e.old_path.clone(), Some(e.path.clone())),
-            ChangeType::Unknown(_) => (e.old_path.clone(), Some(e.path.clone())),
+            ChangeType::Renamed | ChangeType::Copied | ChangeType::Unknown(_) => {
+                (e.old_path.clone(), Some(e.path.clone()))
+            }
         };
 
         // Decide if we should omit content by size (either side)
@@ -690,7 +692,7 @@ impl GitService {
         {
             let abs = workdir.join(newp);
             if let Ok(md) = std::fs::metadata(&abs)
-                && (md.len() as usize) > MAX_INLINE_DIFF_BYTES
+                && usize::try_from(md.len()).map_or(true, |len| len > MAX_INLINE_DIFF_BYTES)
             {
                 content_omitted = true;
             }
@@ -765,7 +767,6 @@ impl GitService {
 
     /// Find where a branch is currently checked out
     fn find_checkout_path_for_branch(
-        &self,
         repo_path: &Path,
         branch_name: &str,
     ) -> Result<Option<std::path::PathBuf>, GitServiceError> {
@@ -809,8 +810,9 @@ impl GitService {
         }
 
         // Check where base branch is checked out (if anywhere)
-        match self.find_checkout_path_for_branch(base_worktree_path, base_branch_name)? {
-            Some(base_checkout_path) => {
+        if let Some(base_checkout_path) =
+            Self::find_checkout_path_for_branch(base_worktree_path, base_branch_name)?
+        {
                 // base branch is checked out somewhere - use CLI merge
                 let git_cli = GitCli::new();
 
@@ -849,8 +851,7 @@ impl GitService {
                     })?;
 
                 Ok(sha)
-            }
-            None => {
+            } else {
                 // base branch not checked out anywhere - use libgit2 pure ref operations
                 let task_branch = Self::find_branch(&task_repo, task_branch_name)?;
                 let base_branch = Self::find_branch(&task_repo, base_branch_name)?;
@@ -860,8 +861,8 @@ impl GitService {
                 let task_commit = task_branch.get().peel_to_commit()?;
 
                 // Create the squash commit in-memory (no checkout) and update the base branch ref
-                let signature = self.signature_with_fallback(&task_repo)?;
-                let squash_commit_id = self.perform_squash_merge(
+                let signature = Self::signature_with_fallback(&task_repo)?;
+                let squash_commit_id = Self::perform_squash_merge(
                     &task_repo,
                     &base_commit,
                     &task_commit,
@@ -882,10 +883,8 @@ impl GitService {
 
                 Ok(squash_commit_id.to_string())
             }
-        }
     }
     fn get_branch_status_inner(
-        &self,
         repo: &Repository,
         branch_ref: &Reference,
         base_branch_ref: &Reference,
@@ -912,7 +911,7 @@ impl GitService {
         let repo = Repository::open(repo_path)?;
         let branch = Self::find_branch(&repo, branch_name)?;
         let base_branch = Self::find_branch(&repo, base_branch_name)?;
-        self.get_branch_status_inner(
+        Self::get_branch_status_inner(
             &repo,
             &branch.into_reference(),
             &base_branch.into_reference(),
@@ -954,14 +953,14 @@ impl GitService {
                 .upstream()?
         }
         .into_reference();
-        let remote = self.get_remote_from_branch_ref(&repo, &base_branch_ref)?;
-        self.fetch_all_from_remote(&repo, &remote)?;
-        self.get_branch_status_inner(&repo, &branch_ref, &base_branch_ref)
+        let remote = Self::get_remote_from_branch_ref(&repo, &base_branch_ref)?;
+        Self::fetch_all_from_remote(&repo, &remote)?;
+        Self::get_branch_status_inner(&repo, &branch_ref, &base_branch_ref)
     }
 
     pub fn is_worktree_clean(&self, worktree_path: &Path) -> Result<bool, GitServiceError> {
         let repo = self.open_repo(worktree_path)?;
-        match self.check_worktree_clean(&repo) {
+        match Self::check_worktree_clean(&repo) {
             Ok(()) => Ok(true),
             Err(GitServiceError::WorktreeDirty(_, _)) => Ok(false),
             Err(e) => Err(e),
@@ -969,7 +968,7 @@ impl GitService {
     }
 
     /// Check if the worktree is clean (no uncommitted changes to tracked files)
-    fn check_worktree_clean(&self, repo: &Repository) -> Result<(), GitServiceError> {
+    fn check_worktree_clean(repo: &Repository) -> Result<(), GitServiceError> {
         let mut status_options = git2::StatusOptions::new();
         status_options
             .include_untracked(false) // Don't include untracked files
@@ -1002,7 +1001,7 @@ impl GitService {
                 let branch_name = repo
                     .head()
                     .ok()
-                    .and_then(|h| h.shorthand().map(|s| s.to_string()))
+                    .and_then(|h| h.shorthand().map(ToString::to_string))
                     .unwrap_or_else(|| "unknown branch".to_string());
                 return Err(GitServiceError::WorktreeDirty(
                     branch_name,
@@ -1162,7 +1161,7 @@ impl GitService {
         let repo = self.open_repo(worktree_path)?;
         if !force {
             // Avoid clobbering uncommitted changes unless explicitly forced
-            self.check_worktree_clean(&repo)?;
+            Self::check_worktree_clean(&repo)?;
         }
         let cli = GitCli::new();
         cli.git(worktree_path, ["reset", "--hard", commit_sha])
@@ -1287,7 +1286,6 @@ impl GitService {
 
     /// Perform a squash merge of task branch into base branch, but fail on conflicts
     fn perform_squash_merge(
-        &self,
         repo: &Repository,
         base_commit: &git2::Commit,
         task_commit: &git2::Commit,
@@ -1345,7 +1343,7 @@ impl GitService {
         // Safety guard: never operate on a dirty worktree. This preserves any
         // uncommitted changes to tracked files by failing fast instead of
         // resetting or cherry-picking over them. Untracked files are allowed.
-        self.check_worktree_clean(&worktree_repo)?;
+        Self::check_worktree_clean(&worktree_repo)?;
 
         // If a rebase is already in progress, refuse to proceed instead of
         // aborting (which might destroy user changes mid-rebase).
@@ -1358,7 +1356,7 @@ impl GitService {
         let nbr = Self::find_branch(&main_repo, new_base_branch)?.into_reference();
         // If the target base is remote, update it first so CLI sees latest
         if nbr.is_remote() {
-            self.fetch_branch_from_remote(&main_repo, &nbr)?;
+            Self::fetch_branch_from_remote(&main_repo, &nbr)?;
         }
 
         // Ensure identity for any commits produced by rebase
@@ -1379,12 +1377,12 @@ impl GitService {
                     let attempt_branch = worktree_repo
                         .head()
                         .ok()
-                        .and_then(|h| h.shorthand().map(|s| s.to_string()))
+                        .and_then(|h| h.shorthand().map(ToString::to_string))
                         .unwrap_or_else(|| "(unknown)".to_string());
                     // List conflicted files (best-effort)
                     let conflicts = git.get_conflicted_files(worktree_path).unwrap_or_default();
                     let files_part = if conflicts.is_empty() {
-                        "".to_string()
+                        String::new()
                     } else {
                         let mut sample = conflicts.clone();
                         let total = sample.len();
@@ -1536,11 +1534,10 @@ impl GitService {
                 .is_empty();
             if has_conflicts {
                 return self.abort_rebase(worktree_path);
-            } else {
-                return git.quit_rebase(worktree_path).map_err(|e| {
-                    GitServiceError::InvalidRepository(format!("git rebase --quit failed: {e}"))
-                });
             }
+            return git.quit_rebase(worktree_path).map_err(|e| {
+                GitServiceError::InvalidRepository(format!("git rebase --quit failed: {e}"))
+            });
         }
         if git.is_merge_in_progress(worktree_path).unwrap_or(false) {
             return git.abort_merge(worktree_path).map_err(|e| {
@@ -1581,15 +1578,14 @@ impl GitService {
     }
 
     pub fn get_remote_name_from_branch_name(
-        &self,
         repo_path: &Path,
         branch_name: &str,
     ) -> Result<String, GitServiceError> {
         let repo = Repository::open(repo_path)?;
         let branch_ref = Self::find_branch(&repo, branch_name)?.into_reference();
-        self.get_remote_from_branch_ref(&repo, &branch_ref)?
+        Self::get_remote_from_branch_ref(&repo, &branch_ref)?
             .name()
-            .map(|name| name.to_string())
+            .map(ToString::to_string)
             .ok_or_else(|| {
                 GitServiceError::InvalidRepository(format!(
                     "Remote for branch '{branch_name}' has no name"
@@ -1624,25 +1620,24 @@ impl GitService {
         repo_path: &Path,
         branch_name: &str,
     ) -> Result<String, GitServiceError> {
-        self.get_remote_name_from_branch_name(repo_path, branch_name)
+        Self::get_remote_name_from_branch_name(repo_path, branch_name)
             .or_else(|_| {
                 let repo = self.open_repo(repo_path)?;
-                Ok(self.default_remote_name(&repo))
+                Ok(Self::default_remote_name(&repo))
             })
     }
 
     fn get_remote_from_branch_ref<'a>(
-        &self,
         repo: &'a Repository,
         branch_ref: &Reference,
     ) -> Result<Remote<'a>, GitServiceError> {
         let branch_name = branch_ref
             .name()
-            .map(|name| name.to_string())
+            .map(ToString::to_string)
             .ok_or_else(|| GitServiceError::InvalidRepository("Invalid branch ref".into()))?;
         let remote_name_buf = repo.branch_remote_name(&branch_name)?;
 
-        let remote_name = str::from_utf8(&remote_name_buf)
+        let remote_name = std::str::from_utf8(remote_name_buf.as_ref())
             .map_err(|e| {
                 GitServiceError::InvalidRepository(format!(
                     "Invalid remote name for branch {branch_name}: {e}"
@@ -1663,10 +1658,10 @@ impl GitService {
         force: bool,
     ) -> Result<(), GitServiceError> {
         let repo = Repository::open(worktree_path)?;
-        self.check_worktree_clean(&repo)?;
+        Self::check_worktree_clean(&repo)?;
 
         // Get the remote
-        let remote_name = self.default_remote_name(&repo);
+        let remote_name = Self::default_remote_name(&repo);
         let remote = repo.find_remote(&remote_name)?;
 
         let remote_url = remote
@@ -1697,7 +1692,6 @@ impl GitService {
 
     /// Fetch from remote repository using native git authentication
     fn fetch_from_remote(
-        &self,
         repo: &Repository,
         remote: &Remote,
         refspec: &str,
@@ -1717,12 +1711,11 @@ impl GitService {
 
     /// Fetch from remote repository using native git authentication
     fn fetch_branch_from_remote(
-        &self,
         repo: &Repository,
         branch: &Reference,
     ) -> Result<(), GitServiceError> {
-        let remote = self.get_remote_from_branch_ref(repo, branch)?;
-        let default_remote_name = self.default_remote_name(repo);
+        let remote = Self::get_remote_from_branch_ref(repo, branch)?;
+        let default_remote_name = Self::default_remote_name(repo);
         let remote_name = remote.name().unwrap_or(&default_remote_name);
         let dest_ref = branch
             .name()
@@ -1730,19 +1723,18 @@ impl GitService {
         let remote_prefix = format!("refs/remotes/{remote_name}/");
         let src_ref = dest_ref.replacen(&remote_prefix, "refs/heads/", 1);
         let refspec = format!("+{src_ref}:{dest_ref}");
-        self.fetch_from_remote(repo, &remote, &refspec)
+        Self::fetch_from_remote(repo, &remote, &refspec)
     }
 
     /// Fetch from remote repository using native git authentication
     fn fetch_all_from_remote(
-        &self,
         repo: &Repository,
         remote: &Remote,
     ) -> Result<(), GitServiceError> {
-        let default_remote_name = self.default_remote_name(repo);
+        let default_remote_name = Self::default_remote_name(repo);
         let remote_name = remote.name().unwrap_or(&default_remote_name);
         let refspec = format!("+refs/heads/*:refs/remotes/{remote_name}/*");
-        self.fetch_from_remote(repo, remote, &refspec)
+        Self::fetch_from_remote(repo, remote, &refspec)
     }
 
     /// Clone a repository to the specified directory

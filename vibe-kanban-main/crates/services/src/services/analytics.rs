@@ -22,10 +22,10 @@ pub struct AnalyticsConfig {
 impl AnalyticsConfig {
     pub fn new() -> Option<Self> {
         let api_key = option_env!("POSTHOG_API_KEY")
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| std::env::var("POSTHOG_API_KEY").ok())?;
         let api_endpoint = option_env!("POSTHOG_API_ENDPOINT")
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| std::env::var("POSTHOG_API_ENDPOINT").ok())?;
 
         Some(Self {
@@ -144,7 +144,7 @@ pub fn generate_user_id() -> String {
     {
         // Use PowerShell to get machine GUID from registry
         if let Ok(output) = std::process::Command::new("powershell")
-            .args(&[
+            .args([
                 "-NoProfile",
                 "-Command",
                 "(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography').MachineGuid",

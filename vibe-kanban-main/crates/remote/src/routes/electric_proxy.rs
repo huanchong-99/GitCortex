@@ -67,7 +67,7 @@ pub async fn proxy_shared_tasks(
         "{{{}}}",
         org_uuids
             .iter()
-            .map(|u| u.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(",")
     )];

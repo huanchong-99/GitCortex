@@ -91,7 +91,7 @@ pub struct GitHubAppService {
 
 impl GitHubAppService {
     pub fn new(config: &GitHubAppConfig, client: Client) -> Result<Self, GitHubAppError> {
-        let jwt_generator = GitHubAppJwt::new(config.app_id, config.private_key.clone())?;
+        let jwt_generator = GitHubAppJwt::new(config.app_id, &config.private_key)?;
 
         Ok(Self {
             jwt_generator,
@@ -118,15 +118,13 @@ impl GitHubAppService {
     ) -> Result<String, GitHubAppError> {
         let jwt = self.jwt_generator.generate()?;
 
-        let url = format!(
-            "{}/app/installations/{}/access_tokens",
-            GITHUB_API_BASE, installation_id
-        );
+        let url =
+            format!("{GITHUB_API_BASE}/app/installations/{installation_id}/access_tokens");
 
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", jwt))
+            .header("Authorization", format!("Bearer {jwt}"))
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", USER_AGENT)
             .header("X-GitHub-Api-Version", "2022-11-28")
@@ -160,12 +158,12 @@ impl GitHubAppService {
     ) -> Result<InstallationInfo, GitHubAppError> {
         let jwt = self.jwt_generator.generate()?;
 
-        let url = format!("{}/app/installations/{}", GITHUB_API_BASE, installation_id);
+        let url = format!("{GITHUB_API_BASE}/app/installations/{installation_id}");
 
         let response = self
             .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", jwt))
+            .header("Authorization", format!("Bearer {jwt}"))
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", USER_AGENT)
             .header("X-GitHub-Api-Version", "2022-11-28")
@@ -192,7 +190,7 @@ impl GitHubAppService {
         installation_id: i64,
     ) -> Result<Vec<Repository>, GitHubAppError> {
         let token = self.get_installation_token(installation_id).await?;
-        let url = format!("{}/installation/repositories", GITHUB_API_BASE);
+        let url = format!("{GITHUB_API_BASE}/installation/repositories");
 
         let mut all_repos = Vec::new();
         let mut page = 1u32;
@@ -201,7 +199,7 @@ impl GitHubAppService {
             let response = self
                 .client
                 .get(&url)
-                .header("Authorization", format!("Bearer {}", token))
+                .header("Authorization", format!("Bearer {token}"))
                 .header("Accept", "application/vnd.github+json")
                 .header("User-Agent", USER_AGENT)
                 .header("X-GitHub-Api-Version", "2022-11-28")
@@ -241,15 +239,12 @@ impl GitHubAppService {
         let token = self.get_installation_token(installation_id).await?;
 
         // Use the issues API to post comments (PRs are issues in GitHub)
-        let url = format!(
-            "{}/repos/{}/{}/issues/{}/comments",
-            GITHUB_API_BASE, owner, repo, pr_number
-        );
+        let url = format!("{GITHUB_API_BASE}/repos/{owner}/{repo}/issues/{pr_number}/comments");
 
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", USER_AGENT)
             .header("X-GitHub-Api-Version", "2022-11-28")
@@ -288,10 +283,7 @@ impl GitHubAppService {
         let temp_dir = tempfile::tempdir()
             .map_err(|e| GitHubAppError::GitOperation(format!("Failed to create temp dir: {e}")))?;
 
-        let clone_url = format!(
-            "https://x-access-token:{}@github.com/{}/{}.git",
-            token, owner, repo
-        );
+        let clone_url = format!("https://x-access-token:{token}@github.com/{owner}/{repo}.git");
 
         debug!(owner, repo, head_sha, "Cloning repository");
 
@@ -398,7 +390,7 @@ impl GitHubAppService {
         base_ref: &str,
     ) -> Result<String, GitHubAppError> {
         let output = Command::new("git")
-            .args(["merge-base", &format!("origin/{}", base_ref), "HEAD"])
+            .args(["merge-base", &format!("origin/{base_ref}"), "HEAD"])
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_SYSTEM", "/dev/null")
             .current_dir(repo_dir)
@@ -426,15 +418,12 @@ impl GitHubAppService {
     ) -> Result<PrDetails, GitHubAppError> {
         let token = self.get_installation_token(installation_id).await?;
 
-        let url = format!(
-            "{}/repos/{}/{}/pulls/{}",
-            GITHUB_API_BASE, owner, repo, pr_number
-        );
+        let url = format!("{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{pr_number}");
 
         let response = self
             .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", USER_AGENT)
             .header("X-GitHub-Api-Version", "2022-11-28")

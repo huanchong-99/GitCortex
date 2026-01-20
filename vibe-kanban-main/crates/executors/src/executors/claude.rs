@@ -76,7 +76,7 @@ pub struct ClaudeCode {
 }
 
 impl ClaudeCode {
-    async fn build_command_builder(&self) -> CommandBuilder {
+    fn build_command_builder(&self) -> CommandBuilder {
         // If base_command_override is provided and claude_code_router is also set, log a warning
         if self.cmd.base_command_override.is_some() && self.claude_code_router.is_some() {
             tracing::warn!(
@@ -169,7 +169,7 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         prompt: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let command_builder = self.build_command_builder().await;
+        let command_builder = self.build_command_builder();
         let command_parts = command_builder.build_initial()?;
         self.spawn_internal(current_dir, prompt, command_parts, env)
             .await
@@ -182,7 +182,7 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         session_id: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let command_builder = self.build_command_builder().await;
+        let command_builder = self.build_command_builder();
         let command_parts = command_builder.build_follow_up(&[
             "--fork-session".to_string(),
             "--resume".to_string(),
@@ -220,7 +220,7 @@ impl StandardCodingAgentExecutor for ClaudeCode {
                 .ok()
                 .and_then(|m| m.modified().ok())
                 .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64)
+                .and_then(|d| i64::try_from(d.as_secs()).ok())
         {
             return AvailabilityInfo::LoginDetected {
                 last_auth_timestamp: timestamp,
@@ -458,24 +458,24 @@ impl ClaudeLogProcessor {
     /// Extract session ID from Claude JSON
     fn extract_session_id(claude_json: &ClaudeJson) -> Option<String> {
         match claude_json {
-            ClaudeJson::System { .. } => None, // session might not have been initialized yet
-            ClaudeJson::Assistant { session_id, .. } => session_id.clone(),
-            ClaudeJson::User { session_id, .. } => session_id.clone(),
-            ClaudeJson::ToolUse { session_id, .. } => session_id.clone(),
-            ClaudeJson::ToolResult { session_id, .. } => session_id.clone(),
-            ClaudeJson::Result { session_id, .. } => session_id.clone(),
-            ClaudeJson::StreamEvent { .. } => None, // session might not have been initialized yet
-            ClaudeJson::ApprovalResponse { .. } => None,
-            ClaudeJson::ControlRequest { .. } => None,
-            ClaudeJson::ControlResponse { .. } => None,
-            ClaudeJson::ControlCancelRequest { .. } => None,
-            ClaudeJson::Unknown { .. } => None,
+            ClaudeJson::Assistant { session_id, .. }
+            | ClaudeJson::User { session_id, .. }
+            | ClaudeJson::ToolUse { session_id, .. }
+            | ClaudeJson::ToolResult { session_id, .. }
+            | ClaudeJson::Result { session_id, .. } => session_id.clone(),
+            ClaudeJson::System { .. }
+            | ClaudeJson::StreamEvent { .. }
+            | ClaudeJson::ApprovalResponse { .. }
+            | ClaudeJson::ControlRequest { .. }
+            | ClaudeJson::ControlResponse { .. }
+            | ClaudeJson::ControlCancelRequest { .. }
+            | ClaudeJson::Unknown { .. } => None, // session might not have been initialized yet
         }
     }
 
     /// Generate warning entry if API key source is ANTHROPIC_API_KEY
-    fn warn_if_unmanaged_key(src: &Option<String>) -> Option<NormalizedEntry> {
-        match src.as_deref() {
+    fn warn_if_unmanaged_key(src: Option<&str>) -> Option<NormalizedEntry> {
+        match src {
             Some("ANTHROPIC_API_KEY") => {
                 tracing::warn!(
                     "ANTHROPIC_API_KEY env variable detected, your Anthropic subscription is not being used"
@@ -652,9 +652,11 @@ impl ClaudeLogProcessor {
                 command: command.clone(),
                 result: None,
             },
-            ClaudeToolData::Grep { pattern, .. } => ActionType::Search {
-                query: pattern.clone(),
-            },
+            ClaudeToolData::Grep { pattern, .. } | ClaudeToolData::Glob { pattern, .. } => {
+                ActionType::Search {
+                    query: pattern.clone(),
+                }
+            }
             ClaudeToolData::WebFetch { url, .. } => ActionType::WebFetch { url: url.clone() },
             ClaudeToolData::WebSearch { query, .. } => ActionType::WebFetch { url: query.clone() },
             ClaudeToolData::Task {
@@ -694,9 +696,6 @@ impl ClaudeLogProcessor {
                 todos: vec![],
                 operation: "read".to_string(),
             },
-            ClaudeToolData::Glob { pattern, .. } => ActionType::Search {
-                query: pattern.clone(),
-            },
             ClaudeToolData::LS { .. } => ActionType::Other {
                 description: "List directory".to_string(),
             },
@@ -726,8 +725,7 @@ impl ClaudeLogProcessor {
                     let args = serde_json::to_value(tool_data)
                         .ok()
                         .and_then(|v| serde_json::from_value::<ClaudeToolWithInput>(v).ok())
-                        .map(|w| w.input)
-                        .unwrap_or(serde_json::Value::Null);
+                        .map_or(serde_json::Value::Null, |w| w.input);
                     ActionType::Tool {
                         tool_name: label,
                         arguments: Some(args),
@@ -757,7 +755,7 @@ impl ClaudeLogProcessor {
                 ..
             } => {
                 // emit billing warning if required
-                if let Some(warning) = Self::warn_if_unmanaged_key(api_key_source) {
+                if let Some(warning) = Self::warn_if_unmanaged_key(api_key_source.as_deref()) {
                     let idx = entry_index_provider.next();
                     patches.push(ConversationPatch::add_normalized_entry(idx, warning));
                 }
@@ -890,7 +888,7 @@ impl ClaudeLogProcessor {
                     let cur = entry_index_provider.current();
                     if cur > 0 {
                         for _ in 0..cur {
-                            patches.push(ConversationPatch::remove_diff(0.to_string()));
+                            patches.push(ConversationPatch::remove_diff("0"));
                         }
                         entry_index_provider.reset();
                         self.tool_map.clear();
@@ -999,8 +997,7 @@ impl ClaudeLogProcessor {
                             let args_to_show = serde_json::to_value(&info.tool_data)
                                 .ok()
                                 .and_then(|v| serde_json::from_value::<ClaudeToolWithInput>(v).ok())
-                                .map(|w| w.input)
-                                .unwrap_or(serde_json::Value::Null);
+                                .map_or(serde_json::Value::Null, |w| w.input);
 
                             let tool_name = info.tool_data.get_name().to_string();
                             let is_mcp = tool_name.starts_with("mcp__");
@@ -1066,9 +1063,6 @@ impl ClaudeLogProcessor {
                 let idx = entry_index_provider.next();
                 patches.push(ConversationPatch::add_normalized_entry(idx, entry));
             }
-            ClaudeJson::ToolResult { .. } => {
-                // Add proper ToolResult support to NormalizedEntry when the type system supports it
-            }
             ClaudeJson::StreamEvent { event, .. } => match event {
                 ClaudeStreamEvent::MessageStart { message } => {
                     if message.role == "assistant" {
@@ -1117,14 +1111,14 @@ impl ClaudeLogProcessor {
                         patches.push(patch);
                     }
                 }
-                ClaudeStreamEvent::ContentBlockStop { .. } => {}
-                ClaudeStreamEvent::MessageDelta { .. } => {}
+                ClaudeStreamEvent::ContentBlockStop { .. }
+                | ClaudeStreamEvent::MessageDelta { .. }
+                | ClaudeStreamEvent::Unknown => {}
                 ClaudeStreamEvent::MessageStop => {
                     if let Some(message_id) = self.streaming_message_id.take() {
                         let _ = self.streaming_messages.remove(&message_id);
                     }
                 }
-                ClaudeStreamEvent::Unknown => {}
             },
             ClaudeJson::Result { is_error, .. } => {
                 if matches!(self.strategy, HistoryStrategy::AmpResume) && is_error.unwrap_or(false)
@@ -1151,8 +1145,7 @@ impl ClaudeLogProcessor {
             } => {
                 // Convert denials and timeouts to visible entries (matching Codex behavior)
                 let entry_opt = match approval_status {
-                    ApprovalStatus::Pending => None,
-                    ApprovalStatus::Approved => None,
+                    ApprovalStatus::Pending | ApprovalStatus::Approved => None,
                     ApprovalStatus::Denied { reason } => Some(NormalizedEntry {
                         timestamp: None,
                         entry_type: NormalizedEntryType::UserFeedback {
@@ -1193,9 +1186,12 @@ impl ClaudeLogProcessor {
                 let idx = entry_index_provider.next();
                 patches.push(ConversationPatch::add_normalized_entry(idx, entry));
             }
-            ClaudeJson::ControlRequest { .. }
+            ClaudeJson::ToolResult { .. }
+            | ClaudeJson::ControlRequest { .. }
             | ClaudeJson::ControlResponse { .. }
-            | ClaudeJson::ControlCancelRequest { .. } => {}
+            | ClaudeJson::ControlCancelRequest { .. } => {
+                // ToolResult support lands with typed entries; control messages are no-ops here.
+            }
         }
         patches
     }
@@ -1206,11 +1202,10 @@ impl ClaudeLogProcessor {
         worktree_path: &str,
     ) -> String {
         match action_type {
-            ActionType::FileRead { path } => path.to_string(),
-            ActionType::FileEdit { path, .. } => path.to_string(),
-            ActionType::CommandRun { command, .. } => command.to_string(),
-            ActionType::Search { query } => query.to_string(),
-            ActionType::WebFetch { url } => url.to_string(),
+            ActionType::FileRead { path } | ActionType::FileEdit { path, .. } => path.clone(),
+            ActionType::CommandRun { command, .. } => command.clone(),
+            ActionType::Search { query } => query.clone(),
+            ActionType::WebFetch { url } => url.clone(),
             ActionType::TaskCreate { description } => {
                 if description.is_empty() {
                     "Task".to_string()
@@ -1413,7 +1408,7 @@ impl StreamingContentState {
                 buffer: String::new(),
                 entry_index: None,
             }),
-            _ => None,
+            ClaudeContentBlockDelta::Unknown => None,
         }
     }
 

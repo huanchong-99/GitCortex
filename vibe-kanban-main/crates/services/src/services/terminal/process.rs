@@ -93,7 +93,7 @@ impl ProcessManager {
 
         let child = cmd
             .spawn()
-            .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {e}"))?;
         let pid = child
             .id()
             .ok_or_else(|| anyhow::anyhow!("Failed to get process ID"))?;
@@ -134,11 +134,11 @@ impl ProcessManager {
     /// # #[tokio::main]
     /// # async fn main() -> anyhow::Result<()> {
     /// let manager = ProcessManager::new();
-    /// manager.kill(12345).await?;
+    /// manager.kill(12345)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn kill(&self, pid: u32) -> anyhow::Result<()> {
+    pub fn kill(&self, pid: u32) -> anyhow::Result<()> {
         #[cfg(unix)]
         {
             use nix::{
@@ -146,7 +146,7 @@ impl ProcessManager {
                 unistd::Pid,
             };
             signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
-                .map_err(|e| anyhow::anyhow!("Failed to kill process {}: {}", pid, e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to kill process {pid}: {e}"))?;
         }
 
         #[cfg(windows)]
@@ -154,11 +154,11 @@ impl ProcessManager {
             let output = std::process::Command::new("taskkill")
                 .args(["/PID", &pid.to_string(), "/F"])
                 .output()
-                .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {e}"))?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow::anyhow!("taskkill failed: {}", stderr));
+                return Err(anyhow::anyhow!("taskkill failed: {stderr}"));
             }
         }
 
@@ -190,8 +190,7 @@ impl ProcessManager {
         let processes = self.processes.read().await;
         processes
             .get(terminal_id)
-            .map(|child| child.id().is_some())
-            .unwrap_or(false)
+            .is_some_and(|child| child.id().is_some())
     }
 
     /// Lists all currently tracked terminal IDs

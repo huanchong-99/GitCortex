@@ -29,12 +29,9 @@ pub struct R2Config {
 
 impl R2Config {
     pub fn from_env() -> Result<Option<Self>, ConfigError> {
-        let access_key_id = match env::var("R2_ACCESS_KEY_ID") {
-            Ok(v) => v,
-            Err(_) => {
-                tracing::info!("R2_ACCESS_KEY_ID not set, R2 storage disabled");
-                return Ok(None);
-            }
+        let Ok(access_key_id) = env::var("R2_ACCESS_KEY_ID") else {
+            tracing::info!("R2_ACCESS_KEY_ID not set, R2 storage disabled");
+            return Ok(None);
         };
 
         tracing::info!("R2_ACCESS_KEY_ID is set, checking other R2 env vars");
@@ -75,12 +72,9 @@ pub struct GitHubAppConfig {
 
 impl GitHubAppConfig {
     pub fn from_env() -> Result<Option<Self>, ConfigError> {
-        let app_id = match env::var("GITHUB_APP_ID") {
-            Ok(v) => v,
-            Err(_) => {
-                tracing::info!("GITHUB_APP_ID not set, GitHub App integration disabled");
-                return Ok(None);
-            }
+        let Ok(app_id) = env::var("GITHUB_APP_ID") else {
+            tracing::info!("GITHUB_APP_ID not set, GitHub App integration disabled");
+            return Ok(None);
         };
 
         let app_id: u64 = app_id

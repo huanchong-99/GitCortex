@@ -91,8 +91,7 @@ pub(crate) async fn process_image_upload(
         if field.name() == Some("image") {
             let filename = field
                 .file_name()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "image.png".to_string());
+                .map_or_else(|| "image.png".to_string(), ToString::to_string);
 
             let data = field.bytes().await?;
             let image = image_service.store_image(&data, &filename).await?;
@@ -224,9 +223,8 @@ pub async fn get_task_image_metadata(
     };
 
     // Look up the image by file_path (which is just the filename in the images table)
-    let image = match Image::find_by_file_path(&deployment.db().pool, file_name).await? {
-        Some(img) => img,
-        None => return Ok(ResponseJson(ApiResponse::success(not_found_response()))),
+    let Some(image) = Image::find_by_file_path(&deployment.db().pool, file_name).await? else {
+        return Ok(ResponseJson(ApiResponse::success(not_found_response())));
     };
 
     // Verify the image is associated with this task

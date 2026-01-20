@@ -24,8 +24,8 @@ describe('Workflow Types', () => {
       expect(WIZARD_STEPS).toHaveLength(7);
       expect(WIZARD_STEPS[0]).toEqual({
         step: WizardStep.Project,
-        name: '工作目录',
-        description: '选择项目文件夹'
+        nameKey: 'steps.project.name',
+        descriptionKey: 'steps.project.description',
       });
     });
   });

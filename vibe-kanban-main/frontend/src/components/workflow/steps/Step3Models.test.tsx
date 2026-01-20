@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { Step3Models } from './Step3Models';
-import type { WizardConfig, ModelConfig } from '../types';
+import type { WizardConfig } from '../types';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('Step3Models', () => {
   const mockOnUpdate = vi.fn();
-  const mockConfirm = vi.fn();
+  const mockConfirm = vi.fn<[string], boolean>();
 
   beforeEach(() => {
     mockOnUpdate.mockClear();
-    (globalThis as any).confirm = mockConfirm;
+    vi.spyOn(globalThis, 'confirm').mockImplementation(mockConfirm);
+    void setTestLanguage();
   });
 
   afterEach(() => {
@@ -47,45 +49,42 @@ describe('Step3Models', () => {
   };
 
   it('should render empty state when no models configured', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    expect(screen.getByText('配置 AI 模型')).toBeInTheDocument();
-    expect(screen.getByText(/还没有配置任何模型/i)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step3.title'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step3.emptyTitle'))).toBeInTheDocument();
   });
 
   it('should render add model button', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    expect(screen.getByRole('button', { name: /添加模型/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') })).toBeInTheDocument();
   });
 
   it('should open dialog when add model button is clicked', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /^添加模型$/ });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
-    // Check that dialog content is visible (multiple "添加模型" texts expected)
-    expect(screen.getAllByText(/添加模型/i)).toHaveLength(2);
-    expect(screen.getByLabelText(/模型名称/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: i18n.t('workflow:step3.dialog.addTitle') })).toBeInTheDocument();
+    expect(screen.getByLabelText(i18n.t('workflow:step3.fields.displayName.label'))).toBeInTheDocument();
+
   });
 
   it('should render list of configured models', () => {
@@ -104,16 +103,15 @@ describe('Step3Models', () => {
       ],
     };
 
-    render(
+    renderWithI18n(
       <Step3Models
         config={configWithModels}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
     expect(screen.getByText('Claude 3.5')).toBeInTheDocument();
-    // The model ID is rendered with "Anthropic · " prefix
+    // The model ID should be present
     expect(screen.getByText(/claude-3-5-sonnet-20241022/)).toBeInTheDocument();
   });
 
@@ -133,11 +131,10 @@ describe('Step3Models', () => {
       ],
     };
 
-    render(
+    renderWithI18n(
       <Step3Models
         config={configWithModels}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
@@ -162,18 +159,17 @@ describe('Step3Models', () => {
       ],
     };
 
-    render(
+    renderWithI18n(
       <Step3Models
         config={configWithModels}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const editButton = screen.getByRole('button', { name: /编辑.*Claude 3\.5/i });
+    const editButton = screen.getByRole('button', { name: `${i18n.t('workflow:step3.editLabel')} Claude 3.5` });
     fireEvent.click(editButton);
 
-    expect(screen.getByLabelText(/模型名称/i)).toHaveValue('Claude 3.5');
+    expect(screen.getByLabelText(i18n.t('workflow:step3.fields.displayName.label'))).toHaveValue('Claude 3.5');
   });
 
   it('should allow deleting a model', () => {
@@ -194,107 +190,101 @@ describe('Step3Models', () => {
       ],
     };
 
-    render(
+    renderWithI18n(
       <Step3Models
         config={configWithModels}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const deleteButton = screen.getByTitle('删除');
+    const deleteButton = screen.getByTitle(i18n.t('workflow:step3.deleteLabel'));
     fireEvent.click(deleteButton);
 
-    expect(mockConfirm).toHaveBeenCalledWith('确定要删除这个模型配置吗？');
+    expect(mockConfirm).toHaveBeenCalledWith(i18n.t('workflow:step3.messages.confirmDelete', { name: 'Claude 3.5' }));
     expect(mockOnUpdate).toHaveBeenCalled();
   });
 
   it('should auto-fill base URL based on API type selection', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /^添加模型$/ });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
     // Click on Anthropic radio button label
     const anthropicLabel = screen.getByText('Anthropic');
     fireEvent.click(anthropicLabel);
 
-    const baseUrlInput = screen.getByLabelText(/Base URL/i);
+    const baseUrlInput = screen.getByLabelText(i18n.t('workflow:step3.fields.baseUrl.label'));
     expect(baseUrlInput).toHaveValue('https://api.anthropic.com');
   });
 
   it('should allow manual base URL input for openai-compatible', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /^添加模型$/ });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
     // Click on OpenAI Compatible radio button label
     const compatibleLabel = screen.getByText('OpenAI Compatible');
     fireEvent.click(compatibleLabel);
 
-    const baseUrlInput = screen.getByLabelText(/Base URL/i);
+    const baseUrlInput = screen.getByLabelText(i18n.t('workflow:step3.fields.baseUrl.label'));
     expect(baseUrlInput).toHaveValue('');
     expect(baseUrlInput).not.toBeDisabled();
   });
 
   it('should show validation errors for required fields', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /添加模型/i });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
-    const saveButton = screen.getByRole('button', { name: /保存/i });
+    const saveButton = screen.getByRole('button', { name: i18n.t('workflow:step3.actions.save') });
     fireEvent.click(saveButton);
 
-    expect(screen.getByText(/请输入模型名称/i)).toBeInTheDocument();
-    expect(screen.getByText(/请输入 API Key/i)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step3.errors.displayNameRequired'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:step3.errors.apiKeyRequired'))).toBeInTheDocument();
   });
 
   it('should handle API key input with password type', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /添加模型/i });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
-    const apiKeyInput = screen.getByLabelText(/API Key/i);
+    const apiKeyInput = screen.getByLabelText(i18n.t('workflow:step3.fields.apiKey.label'));
     expect(apiKeyInput).toHaveAttribute('type', 'password');
   });
 
   it('should render all API type options', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /^添加模型$/ });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
     expect(screen.getByText('Anthropic')).toBeInTheDocument();
@@ -304,21 +294,20 @@ describe('Step3Models', () => {
   });
 
   it('should close dialog when cancel is clicked', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /添加模型/i });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
-    const cancelButton = screen.getByRole('button', { name: /取消/i });
+    const cancelButton = screen.getByRole('button', { name: i18n.t('workflow:step3.actions.cancel') });
     fireEvent.click(cancelButton);
 
-    expect(screen.queryByLabelText(/模型名称/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(i18n.t('workflow:step3.fields.displayName.label'))).not.toBeInTheDocument();
   });
 
   it('should display multiple models', () => {
@@ -346,11 +335,10 @@ describe('Step3Models', () => {
       ],
     };
 
-    render(
+    renderWithI18n(
       <Step3Models
         config={configWithMultipleModels}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
@@ -359,57 +347,54 @@ describe('Step3Models', () => {
   });
 
   it('should show fetch models button', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /添加模型/i });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
-    expect(screen.getByRole('button', { name: /获取可用模型/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('workflow:step3.actions.fetchModels') })).toBeInTheDocument();
   });
 
   it('should show verify connection button', () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /添加模型/i });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
-    expect(screen.getByRole('button', { name: /验证连接/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('workflow:step3.actions.verify') })).toBeInTheDocument();
   });
 
   it('should display model selection dropdown when models are fetched', async () => {
-    render(
+    renderWithI18n(
       <Step3Models
         config={defaultConfig}
         onUpdate={mockOnUpdate}
-        errors={{}}
       />
     );
 
-    const addButton = screen.getByRole('button', { name: /^添加模型$/ });
+    const addButton = screen.getByRole('button', { name: i18n.t('workflow:step3.addModel') });
     fireEvent.click(addButton);
 
     // Fill in API Key
-    fireEvent.change(screen.getByLabelText(/API Key/i), { target: { value: 'sk-test-key' } });
+    fireEvent.change(screen.getByLabelText(i18n.t('workflow:step3.fields.apiKey.label')), { target: { value: 'sk-test-key' } });
 
     // Click fetch models
-    const fetchButton = screen.getByRole('button', { name: /获取可用模型/i });
+    const fetchButton = screen.getByRole('button', { name: i18n.t('workflow:step3.actions.fetchModels') });
     fireEvent.click(fetchButton);
 
     // After fetching, model selection should be available (dropdown with options)
     await waitFor(() => {
-      const modelIdSelect = screen.getByLabelText(/模型 ID/i);
+      const modelIdSelect = screen.getByLabelText(i18n.t('workflow:step3.fields.modelId.label'));
       expect(modelIdSelect).toBeInTheDocument();
       expect(modelIdSelect.tagName).toBe('SELECT');
     });

@@ -597,10 +597,7 @@ pub async fn handle_callback(
     );
 
     // Redirect to organization page with success
-    let url = format!(
-        "{}/account/organizations/{}?github_app=installed",
-        frontend_base, org_id
-    );
+    let url = format!("{frontend_base}/account/organizations/{org_id}?github_app=installed");
     Redirect::temporary(&url).into_response()
 }
 
@@ -850,8 +847,9 @@ async fn try_trigger_pr_review(
     // Optionally check for pending review
     if check_pending {
         let review_repo = ReviewRepository::new(state.pool());
+        let pr_number = i32::try_from(ctx.pr_number).map_err(|_| "PR number out of range")?;
         if review_repo
-            .has_pending_review_for_pr(ctx.repo_owner, ctx.repo_name, ctx.pr_number as i32)
+            .has_pending_review_for_pr(ctx.repo_owner, ctx.repo_name, pr_number)
             .await
             .unwrap_or(false)
         {
@@ -868,9 +866,10 @@ async fn try_trigger_pr_review(
         .ok_or("Review worker not configured")?;
 
     // Get PR metadata (from payload or fetch from API)
-    let (pr_title, pr_body, head_sha, base_ref) = match ctx.pr_metadata {
-        Some(meta) => (meta.title, meta.body, meta.head_sha, meta.base_ref),
-        None => {
+    let (pr_title, pr_body, head_sha, base_ref) =
+        if let Some(meta) = ctx.pr_metadata {
+            (meta.title, meta.body, meta.head_sha, meta.base_ref)
+        } else {
             let pr_details = github_app
                 .get_pr_details(
                     ctx.installation_id,
@@ -886,8 +885,7 @@ async fn try_trigger_pr_review(
                 pr_details.head.sha,
                 pr_details.base.ref_name,
             )
-        }
-    };
+        };
 
     // Spawn async task to process PR review
     let github_app_clone = github_app.clone();
@@ -1107,7 +1105,7 @@ pub async fn trigger_pr_review(
         .ok_or_else(|| {
             ErrorResponse::new(
                 StatusCode::NOT_FOUND,
-                format!("No installation found for {}", owner),
+                format!("No installation found for {owner}"),
             )
         })?;
 

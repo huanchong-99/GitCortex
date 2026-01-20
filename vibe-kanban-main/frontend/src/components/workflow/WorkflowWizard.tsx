@@ -5,6 +5,7 @@ import { StepIndicator } from './StepIndicator';
 import { WizardStep, WizardConfig, getDefaultWizardConfig } from './types';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardValidation } from './hooks/useWizardValidation';
+import { useTranslation } from 'react-i18next';
 import {
   Step0Project,
   Step1Basic,
@@ -16,11 +17,14 @@ import {
 } from './steps';
 
 interface WorkflowWizardProps {
-  onComplete: (config: WizardConfig) => void;
+  onComplete: (config: WizardConfig) => void | Promise<void>;
   onCancel: () => void;
   onError?: (error: Error) => void;
 }
 
+/**
+ * Renders the multi-step workflow wizard with navigation and validation.
+ */
 export function WorkflowWizard({
   onComplete,
   onCancel,
@@ -41,6 +45,7 @@ export function WorkflowWizard({
   const { currentStep } = navigation;
   const validation = useWizardValidation(currentStep);
   const { errors } = validation;
+  const { t } = useTranslation('workflow');
 
   const handleNext = () => {
     const newErrors = validation.validate(config);
@@ -78,14 +83,14 @@ export function WorkflowWizard({
     setSubmitError(null);
 
     try {
-      await onComplete(config);
+      await Promise.resolve(onComplete(config));
       // Reset submitting state after successful completion
       setState({ ...state, isSubmitting: false });
     } catch (error) {
       const errorObj =
         error instanceof Error
           ? error
-          : new Error('???????????');
+          : new Error(t('wizard.errors.submitUnknown'));
       onError?.(errorObj);
       setSubmitError(errorObj.message);
       setState({ ...state, isSubmitting: false });
@@ -113,7 +118,10 @@ export function WorkflowWizard({
           <Step0Project
             config={config.project}
             errors={errors}
-            onChange={(updates) => handleUpdateConfig({ project: { ...config.project, ...updates } })}
+            onError={onError}
+            onChange={(updates) => {
+              handleUpdateConfig({ project: { ...config.project, ...updates } });
+            }}
           />
         );
       case WizardStep.Basic:
@@ -121,7 +129,9 @@ export function WorkflowWizard({
           <Step1Basic
             config={config.basic}
             errors={errors}
-            onChange={(updates) => handleUpdateConfig({ basic: { ...config.basic, ...updates } })}
+            onChange={(updates) => {
+              handleUpdateConfig({ basic: { ...config.basic, ...updates } });
+            }}
           />
         );
       case WizardStep.Tasks:
@@ -129,7 +139,9 @@ export function WorkflowWizard({
           <Step2Tasks
             config={config.tasks}
             taskCount={config.basic.taskCount}
-            onChange={(tasks) => handleUpdateConfig({ tasks })}
+            onChange={(tasks) => {
+              handleUpdateConfig({ tasks });
+            }}
             errors={errors}
           />
         );
@@ -137,7 +149,6 @@ export function WorkflowWizard({
         return (
           <Step3Models
             config={config}
-            errors={errors}
             onUpdate={handleUpdateConfig}
           />
         );
@@ -147,14 +158,18 @@ export function WorkflowWizard({
             config={config}
             errors={errors}
             onUpdate={handleUpdateConfig}
+            onError={onError}
           />
         );
       case WizardStep.Commands:
         return (
           <Step5Commands
-            config={config}
+            config={config.commands}
             errors={errors}
-            onUpdate={handleUpdateConfig}
+            onUpdate={(updates) => {
+              handleUpdateConfig({ commands: { ...config.commands, ...updates } });
+            }}
+            onError={onError}
           />
         );
       case WizardStep.Advanced:
@@ -172,21 +187,23 @@ export function WorkflowWizard({
 
   const getButtonText = () => {
     if (currentStep === WizardStep.Advanced) {
-      return isSubmitting ? '提交中...' : '创建工作流';
+      return isSubmitting
+        ? t('wizard.buttons.submitting')
+        : t('wizard.buttons.submit');
     }
-    return '下一步';
+    return t('wizard.buttons.next');
   };
 
   const getBackButtonText = () => {
     if (currentStep === WizardStep.Project) {
-      return '取消';
+      return t('wizard.buttons.cancel');
     }
-    return '上一步';
+    return t('wizard.buttons.back');
   };
 
   const handlePrimaryButtonClick = () => {
     if (currentStep === WizardStep.Advanced) {
-      handleSubmit();
+      void handleSubmit();
     } else {
       handleNext();
     }
@@ -195,7 +212,7 @@ export function WorkflowWizard({
   return (
     <Card className="w-full max-w-4xl mx-auto bg-panel text-high">
       <CardHeader>
-        <CardTitle className="text-xl">创建工作流</CardTitle>
+        <CardTitle className="text-xl">{t('wizard.title')}</CardTitle>
       </CardHeader>
       <CardContent className="px-base">
         <StepIndicator currentStep={currentStep} completedSteps={completedSteps} />
@@ -231,7 +248,7 @@ export function WorkflowWizard({
                   'bg-secondary text-low hover:text-normal'
                 )}
               >
-                取消
+                {t('wizard.buttons.cancel')}
               </button>
             ) : null}
 
@@ -256,15 +273,15 @@ export function WorkflowWizard({
           <div className="mt-4 p-3 bg-error/10 border border-error rounded">
             {submitError ? (
               <div>
-                <p className="text-sm text-error font-medium">提交失败</p>
+                <p className="text-sm text-error font-medium">{t('wizard.errors.submitFailedTitle')}</p>
                 <p className="mt-2 text-sm text-error">{submitError}</p>
               </div>
             ) : (
               <div>
-                <p className="text-sm text-error font-medium">请修正以下错误后继续:</p>
+                <p className="text-sm text-error font-medium">{t('wizard.errors.validationTitle')}</p>
                 <ul className="mt-2 text-sm text-error list-disc list-inside">
                   {Object.values(errors).map((error, index) => (
-                    <li key={index}>{error}</li>
+                    <li key={index}>{t(error)}</li>
                   ))}
                 </ul>
               </div>

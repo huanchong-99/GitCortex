@@ -384,7 +384,7 @@ pub(crate) fn ensure_text_size(
     title: &str,
     description: Option<&str>,
 ) -> Result<(), SharedTaskError> {
-    let total = title.len() + description.map(|value| value.len()).unwrap_or(0);
+    let total = title.len() + description.map_or(0, str::len);
 
     if total > MAX_SHARED_TASK_TEXT_BYTES {
         return Err(SharedTaskError::PayloadTooLarge);

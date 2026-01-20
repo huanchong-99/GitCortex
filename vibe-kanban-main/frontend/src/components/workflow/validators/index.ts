@@ -18,6 +18,9 @@ const stepValidators: Record<WizardStep, (config: WizardConfig) => Record<string
   [WizardStep.Advanced]: validateStep6Advanced,
 };
 
+/**
+ * Runs the appropriate validator for the current wizard step.
+ */
 export function validateWizardStep(
   step: WizardStep,
   config: WizardConfig

@@ -32,7 +32,10 @@ pub async fn run_gh_cli_setup(
     deployment: &crate::DeploymentImpl,
     workspace: &Workspace,
 ) -> Result<ExecutionProcess, ApiError> {
+    #[cfg(unix)]
     let executor_action = get_gh_cli_setup_helper_action().await?;
+    #[cfg(not(unix))]
+    let executor_action = get_gh_cli_setup_helper_action()?;
 
     deployment
         .container()
@@ -68,10 +71,9 @@ pub async fn run_gh_cli_setup(
     Ok(execution_process)
 }
 
+#[cfg(unix)]
 async fn get_gh_cli_setup_helper_action() -> Result<ExecutorAction, ApiError> {
-    #[cfg(unix)]
-    {
-        use utils::shell::resolve_executable_path;
+    use utils::shell::resolve_executable_path;
 
         if resolve_executable_path("brew").await.is_none() {
             return Err(ApiError::Executor(ExecutorError::ExecutableNotFound {
@@ -121,11 +123,10 @@ gh auth login --web --git-protocol https --skip-ssh-key
                 None,
             ))),
         ))
-    }
+}
 
-    #[cfg(not(unix))]
-    {
-        use executors::executors::ExecutorError::SetupHelperNotSupported;
-        Err(ApiError::Executor(SetupHelperNotSupported))
-    }
+#[cfg(not(unix))]
+fn get_gh_cli_setup_helper_action() -> Result<ExecutorAction, ApiError> {
+    use executors::executors::ExecutorError::SetupHelperNotSupported;
+    Err(ApiError::Executor(SetupHelperNotSupported))
 }

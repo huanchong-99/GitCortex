@@ -402,7 +402,6 @@ impl EventService {
                                 let value = match op {
                                     json_patch::PatchOperation::Add(a) => Some(&a.value),
                                     json_patch::PatchOperation::Replace(r) => Some(&r.value),
-                                    json_patch::PatchOperation::Remove(_) => None,
                                     _ => None,
                                 };
 
@@ -475,7 +474,7 @@ impl EventService {
 
                                 if let Some(v) = value
                                     && let Some(ws_archived) =
-                                        v.get("archived").and_then(|a| a.as_bool())
+                                        v.get("archived").and_then(serde_json::Value::as_bool)
                                 {
                                     if ws_archived == archived_filter {
                                         // Workspace matches this filter
@@ -492,21 +491,20 @@ impl EventService {
                                             return Some(Ok(LogMsg::JsonPatch(add_patch)));
                                         }
                                         return Some(Ok(LogMsg::JsonPatch(patch)));
-                                    } else {
-                                        // Workspace no longer matches this filter - send remove
-                                        let remove_patch = json_patch::Patch(vec![
-                                            json_patch::PatchOperation::Remove(
-                                                json_patch::RemoveOperation {
-                                                    path: op
-                                                        .path()
-                                                        .to_string()
-                                                        .try_into()
-                                                        .expect("Workspace path should be valid"),
-                                                },
-                                            ),
-                                        ]);
-                                        return Some(Ok(LogMsg::JsonPatch(remove_patch)));
                                     }
+                                    // Workspace no longer matches this filter - send remove
+                                    let remove_patch = json_patch::Patch(vec![
+                                        json_patch::PatchOperation::Remove(
+                                            json_patch::RemoveOperation {
+                                                path: op
+                                                    .path()
+                                                    .to_string()
+                                                    .try_into()
+                                                    .expect("Workspace path should be valid"),
+                                            },
+                                        ),
+                                    ]);
+                                    return Some(Ok(LogMsg::JsonPatch(remove_patch)));
                                 }
                             }
                             return Some(Ok(LogMsg::JsonPatch(patch)));

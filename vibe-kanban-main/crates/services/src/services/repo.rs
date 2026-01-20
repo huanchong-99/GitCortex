@@ -57,7 +57,12 @@ impl RepoService {
     }
 
     pub fn normalize_path(&self, path: &str) -> std::io::Result<PathBuf> {
-        std::path::absolute(expand_tilde(path))
+        let expanded = expand_tilde(path);
+        if expanded.is_absolute() {
+            Ok(expanded)
+        } else {
+            std::env::current_dir().map(|cwd| cwd.join(expanded))
+        }
     }
 
     pub async fn register(
@@ -71,8 +76,7 @@ impl RepoService {
 
         let name = normalized_path
             .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "unnamed".to_string());
+            .map_or_else(|| "unnamed".to_string(), |n| n.to_string_lossy().to_string());
 
         let display_name = display_name.unwrap_or(&name);
 

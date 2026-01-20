@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import { TerminalCard, type Terminal } from './TerminalCard';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('TerminalCard', () => {
   const createMockTerminal = (overrides: Partial<Terminal> = {}): Terminal => ({
@@ -12,49 +13,60 @@ describe('TerminalCard', () => {
     ...overrides,
   });
 
+  beforeEach(() => {
+    void setTestLanguage();
+  });
+
   describe('Status Display', () => {
-    it('should display gray circle ○ for not_started status', () => {
+    it('should display dot for not_started status', () => {
       const terminal = createMockTerminal({ status: 'not_started' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('○')).toBeInTheDocument();
+      const statusWrapper = container.querySelector('div.flex.items-center.justify-center');
+      expect(statusWrapper).toBeInTheDocument();
+      expect(statusWrapper).toHaveClass('text-low');
+      expect(statusWrapper?.querySelector('span[aria-hidden="true"]')).toBeInTheDocument();
     });
 
-    it('should display yellow circle ◐ for starting status', () => {
+    it('should display dot for starting status', () => {
       const terminal = createMockTerminal({ status: 'starting' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('◐')).toBeInTheDocument();
+      const statusWrapper = container.querySelector('div.flex.items-center.justify-center');
+      expect(statusWrapper).toHaveClass('text-yellow-500');
+      expect(statusWrapper?.querySelector('span[aria-hidden="true"]')).toBeInTheDocument();
     });
 
-    it('should display blue circle ◑ for waiting status', () => {
+    it('should display dot for waiting status', () => {
       const terminal = createMockTerminal({ status: 'waiting' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('◑')).toBeInTheDocument();
+      const statusWrapper = container.querySelector('div.flex.items-center.justify-center');
+      expect(statusWrapper).toHaveClass('text-blue-500');
+      expect(statusWrapper?.querySelector('span[aria-hidden="true"]')).toBeInTheDocument();
     });
 
-    it('should display green circle ● for working status', () => {
+    it('should display dot for working status', () => {
       const terminal = createMockTerminal({ status: 'working' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('●')).toBeInTheDocument();
+      const statusWrapper = container.querySelector('div.flex.items-center.justify-center');
+      expect(statusWrapper).toHaveClass('text-green-500');
+      expect(statusWrapper?.querySelector('span[aria-hidden="true"]')).toBeInTheDocument();
     });
 
     it('should display green checkmark for completed status', () => {
       const terminal = createMockTerminal({ status: 'completed' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      // Check icon from lucide-react
       const checkIcon = container.querySelector('svg.lucide-check');
       expect(checkIcon).toBeInTheDocument();
     });
 
     it('should display red X for failed status', () => {
       const terminal = createMockTerminal({ status: 'failed' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      // X icon from lucide-react
       const xIcon = container.querySelector('svg.lucide-x');
       expect(xIcon).toBeInTheDocument();
     });
@@ -63,42 +75,48 @@ describe('TerminalCard', () => {
   describe('Terminal Information Display', () => {
     it('should display terminal order index as T{index+1}', () => {
       const terminal = createMockTerminal({ orderIndex: 0 });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('T1')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:terminalCard.orderLabel', { index: 1 }))
+      ).toBeInTheDocument();
     });
 
     it('should display correct terminal order index for different indices', () => {
       const terminal = createMockTerminal({ orderIndex: 2 });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('T3')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:terminalCard.orderLabel', { index: 3 }))
+      ).toBeInTheDocument();
     });
 
     it('should display role name when provided', () => {
       const terminal = createMockTerminal({ role: 'Developer' });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
       expect(screen.getByText('Developer')).toBeInTheDocument();
     });
 
-    it('should display "Terminal" when no role is provided', () => {
+    it('should display default role when no role is provided', () => {
       const terminal = createMockTerminal({ role: undefined });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('Terminal')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:terminalCard.defaultRole'))
+      ).toBeInTheDocument();
     });
 
     it('should display CLI type label from constants', () => {
       const terminal = createMockTerminal({ cliTypeId: 'claude-code' });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
       expect(screen.getByText('Claude Code')).toBeInTheDocument();
     });
 
     it('should display CLI type ID if not found in constants', () => {
       const terminal = createMockTerminal({ cliTypeId: 'unknown-cli' });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
       expect(screen.getByText('unknown-cli')).toBeInTheDocument();
     });
@@ -107,7 +125,7 @@ describe('TerminalCard', () => {
   describe('Styling', () => {
     it('should have w-32 width class', () => {
       const terminal = createMockTerminal();
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const card = container.firstChild as HTMLElement;
       expect(card.className).toContain('w-32');
@@ -115,7 +133,7 @@ describe('TerminalCard', () => {
 
     it('should have rounded-lg border-2 classes', () => {
       const terminal = createMockTerminal();
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const card = container.firstChild as HTMLElement;
       expect(card.className).toContain('rounded-lg');
@@ -124,7 +142,7 @@ describe('TerminalCard', () => {
 
     it('should have hover:shadow-md class', () => {
       const terminal = createMockTerminal();
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const card = container.firstChild as HTMLElement;
       expect(card.className).toContain('hover:shadow-md');
@@ -132,7 +150,7 @@ describe('TerminalCard', () => {
 
     it('should have cursor-pointer class', () => {
       const terminal = createMockTerminal();
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const card = container.firstChild as HTMLElement;
       expect(card.className).toContain('cursor-pointer');
@@ -143,7 +161,7 @@ describe('TerminalCard', () => {
     it('should call onClick handler when clicked', () => {
       const handleClick = vi.fn();
       const terminal = createMockTerminal();
-      const { container } = render(
+      const { container } = renderWithI18n(
         <TerminalCard terminal={terminal} onClick={handleClick} />
       );
 
@@ -155,7 +173,7 @@ describe('TerminalCard', () => {
 
     it('should work without onClick handler', () => {
       const terminal = createMockTerminal();
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const card = container.firstChild as HTMLElement;
       expect(() => fireEvent.click(card)).not.toThrow();
@@ -170,34 +188,35 @@ describe('TerminalCard', () => {
         cliTypeId: 'claude-code',
         status: 'working',
       });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      // Check that all elements are present
-      expect(screen.getByText('●')).toBeInTheDocument();
-      expect(screen.getByText('T1')).toBeInTheDocument();
+      expect(container.querySelector('span[aria-hidden="true"]')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:terminalCard.orderLabel', { index: 1 }))
+      ).toBeInTheDocument();
       expect(screen.getByText('Developer')).toBeInTheDocument();
       expect(screen.getByText('Claude Code')).toBeInTheDocument();
     });
 
-    it('should apply text-lg to status icon', () => {
+    it('should apply size-2 to status dot', () => {
       const terminal = createMockTerminal({ status: 'not_started' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      const icon = screen.getByText('○');
-      expect(icon.className).toContain('text-lg');
+      const dot = container.querySelector('span[aria-hidden="true"]');
+      expect(dot?.className).toContain('size-2');
     });
 
     it('should apply text-xs to terminal order index', () => {
       const terminal = createMockTerminal();
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      const orderIndex = screen.getByText('T1');
+      const orderIndex = screen.getByText(i18n.t('workflow:terminalCard.orderLabel', { index: 1 }));
       expect(orderIndex.className).toContain('text-xs');
     });
 
     it('should apply text-sm font-medium to role name', () => {
       const terminal = createMockTerminal({ role: 'Developer' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const role = screen.getByText('Developer');
       expect(role.className).toContain('text-sm');
@@ -206,7 +225,7 @@ describe('TerminalCard', () => {
 
     it('should apply text-xs text-low to CLI type', () => {
       const terminal = createMockTerminal({ cliTypeId: 'claude-code' });
-      const { container } = render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const cliType = screen.getByText('Claude Code');
       expect(cliType.className).toContain('text-xs');
@@ -217,23 +236,24 @@ describe('TerminalCard', () => {
   describe('Edge Cases', () => {
     it('should handle empty role string', () => {
       const terminal = createMockTerminal({ role: '' });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      // Empty string is falsy, so should display "Terminal"
-      expect(screen.getByText('Terminal')).toBeInTheDocument();
+      expect(screen.getByText(i18n.t('workflow:terminalCard.defaultRole'))).toBeInTheDocument();
     });
 
     it('should handle large order index', () => {
       const terminal = createMockTerminal({ orderIndex: 99 });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
-      expect(screen.getByText('T100')).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:terminalCard.orderLabel', { index: 100 }))
+      ).toBeInTheDocument();
     });
 
     it('should handle long role names', () => {
       const longRole = 'Senior Full Stack Developer Specialist';
       const terminal = createMockTerminal({ role: longRole });
-      render(<TerminalCard terminal={terminal} />);
+      renderWithI18n(<TerminalCard terminal={terminal} />);
 
       expect(screen.getByText(longRole)).toBeInTheDocument();
     });

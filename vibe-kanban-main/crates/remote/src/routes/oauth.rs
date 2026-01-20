@@ -58,7 +58,7 @@ pub async fn web_init(
             }),
         )
             .into_response(),
-        Err(error) => init_error_response(error),
+        Err(error) => init_error_response(&error),
     }
 }
 
@@ -80,7 +80,7 @@ pub async fn web_redeem(
             }),
         )
             .into_response(),
-        Err(error) => redeem_error_response(error),
+        Err(error) => redeem_error_response(&error),
     }
 }
 
@@ -213,7 +213,7 @@ pub async fn logout(
     let repo = AuthSessionRepository::new(state.pool());
 
     match repo.revoke(ctx.session_id).await {
-        Ok(_) | Err(AuthSessionError::NotFound) => StatusCode::NO_CONTENT.into_response(),
+        Ok(()) | Err(AuthSessionError::NotFound) => StatusCode::NO_CONTENT.into_response(),
         Err(AuthSessionError::Database(error)) => {
             warn!(?error, session_id = %ctx.session_id, "failed to revoke auth session");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
@@ -225,8 +225,8 @@ pub async fn logout(
     }
 }
 
-fn init_error_response(error: HandoffError) -> Response {
-    match &error {
+fn init_error_response(error: &HandoffError) -> Response {
+    match error {
         HandoffError::Provider(err) => warn!(?err, "provider error during oauth init"),
         HandoffError::Database(err) => warn!(?err, "database error during oauth init"),
         HandoffError::Authorization(err) => warn!(?err, "authorization error during oauth init"),
@@ -235,13 +235,13 @@ fn init_error_response(error: HandoffError) -> Response {
         _ => {}
     }
 
-    let (status, code) = classify_handoff_error(&error);
+    let (status, code) = classify_handoff_error(error);
     let code = code.into_owned();
     (status, Json(serde_json::json!({ "error": code }))).into_response()
 }
 
-fn redeem_error_response(error: HandoffError) -> Response {
-    match &error {
+fn redeem_error_response(error: &HandoffError) -> Response {
+    match error {
         HandoffError::Provider(err) => warn!(?err, "provider error during oauth redeem"),
         HandoffError::Database(err) => warn!(?err, "database error during oauth redeem"),
         HandoffError::Authorization(err) => warn!(?err, "authorization error during oauth redeem"),
@@ -252,7 +252,7 @@ fn redeem_error_response(error: HandoffError) -> Response {
         _ => {}
     }
 
-    let (status, code) = classify_handoff_error(&error);
+    let (status, code) = classify_handoff_error(error);
     let code = code.into_owned();
 
     (status, Json(serde_json::json!({ "error": code }))).into_response()

@@ -165,21 +165,20 @@ async fn run_session_inner(
     cancel: CancellationToken,
 ) -> Result<(), ExecutorError> {
     tokio::select! {
-        _ = cancel.cancelled() => return Ok(()),
+        () = cancel.cancelled() => return Ok(()),
         res = wait_for_health(&client, &config.base_url) => res?,
     }
 
-    let session_id = match config.resume_session_id.as_deref() {
-        Some(existing) => {
-            tokio::select! {
-                _ = cancel.cancelled() => return Ok(()),
-                res = fork_session(&client, &config.base_url, &config.directory, existing) => res?,
-            }
+    let session_id = if let Some(existing) = config.resume_session_id.as_deref() {
+        tokio::select! {
+            () = cancel.cancelled() => return Ok(()),
+            res = fork_session(&client, &config.base_url, &config.directory, existing) => res?,
         }
-        None => tokio::select! {
-            _ = cancel.cancelled() => return Ok(()),
+    } else {
+        tokio::select! {
+            () = cancel.cancelled() => return Ok(()),
             res = create_session(&client, &config.base_url, &config.directory) => res?,
-        },
+        }
     };
 
     log_writer
@@ -188,12 +187,12 @@ async fn run_session_inner(
         })
         .await?;
 
-    let model = config.model.as_deref().and_then(parse_model);
+    let model = config.model.as_deref().map(parse_model);
 
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<ControlEvent>();
 
     let event_resp = tokio::select! {
-        _ = cancel.cancelled() => return Ok(()),
+        () = cancel.cancelled() => return Ok(()),
         res = connect_event_stream(&client, &config.base_url, &config.directory, None) => res?,
     };
     let event_handle = tokio::spawn(spawn_event_listener(
@@ -287,7 +286,7 @@ async fn run_prompt_with_control(
 
     let prompt_result = loop {
         tokio::select! {
-            _ = cancel.cancelled() => return Ok(()),
+            () = cancel.cancelled() => return Ok(()),
             res = &mut prompt_fut => break res,
             event = control_rx.recv() => match event {
                 Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
@@ -314,7 +313,7 @@ async fn run_prompt_with_control(
         // tail updates reliably (e.g. final tool completion events).
         loop {
             tokio::select! {
-                _ = cancel.cancelled() => return Ok(()),
+                () = cancel.cancelled() => return Ok(()),
                 event = control_rx.recv() => match event {
                     Some(ControlEvent::Idle) | None => break,
                     Some(ControlEvent::AuthRequired { message }) => return Err(ExecutorError::AuthRequired(message)),
@@ -516,16 +515,16 @@ async fn send_abort(client: &reqwest::Client, base_url: &str, directory: &str, s
     .await;
 }
 
-fn parse_model(model: &str) -> Option<ModelSpec> {
+fn parse_model(model: &str) -> ModelSpec {
     let (provider_id, model_id) = match model.split_once('/') {
         Some((provider, rest)) => (provider.to_string(), rest.to_string()),
         None => (model.to_string(), String::new()),
     };
 
-    Some(ModelSpec {
+    ModelSpec {
         provider_id,
         model_id,
-    })
+    }
 }
 
 async fn connect_event_stream(
@@ -642,7 +641,7 @@ async fn spawn_event_listener(config: EventListenerConfig, initial_resp: reqwest
         .await;
 
         match outcome {
-            Ok(EventStreamOutcome::Idle) | Ok(EventStreamOutcome::Terminal) => return,
+            Ok(EventStreamOutcome::Idle | EventStreamOutcome::Terminal) => return,
             Ok(EventStreamOutcome::Disconnected) | Err(_) => {
                 attempt += 1;
                 if attempt >= max_attempts {

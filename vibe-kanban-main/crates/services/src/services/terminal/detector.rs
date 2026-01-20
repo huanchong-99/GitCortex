@@ -53,7 +53,7 @@ impl CliDetector {
         let parts: Vec<&str> = cli_type.detect_command.split_whitespace().collect();
 
         if parts.is_empty() {
-            return self.not_installed(cli_type);
+            return Self::not_installed(cli_type);
         }
 
         let cmd = parts[0];
@@ -78,12 +78,12 @@ impl CliDetector {
                     install_guide_url: cli_type.install_guide_url.clone(),
                 }
             }
-            _ => self.not_installed(cli_type),
+            _ => Self::not_installed(cli_type),
         }
     }
 
     /// Create a "not installed" status for a CLI type
-    fn not_installed(&self, cli_type: &CliType) -> CliDetectionStatus {
+    fn not_installed(cli_type: &CliType) -> CliDetectionStatus {
         CliDetectionStatus {
             cli_type_id: cli_type.id.clone(),
             name: cli_type.name.clone(),
@@ -202,11 +202,6 @@ mod tests {
             assert!(sh_path.unwrap().ends_with("sh"));
         }
 
-        #[cfg(windows)]
-        {
-            // Skip on Windows
-            assert!(true);
-        }
     }
 
     #[tokio::test]
@@ -277,8 +272,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let detector = CliDetector::new(db);
-        let status = detector.detect_single(&cli).await;
+        let status = CliDetector::new(db).detect_single(&cli).await;
 
         assert!(!status.installed);
         assert_eq!(status.name, "definitely-not-a-real-command-xyz123");
@@ -288,9 +282,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_not_installed_helper() {
-        let db = setup_test_db().await;
-        let detector = CliDetector::new(db);
-
         let cli = CliType {
             id: "test-1".to_string(),
             name: "fake-cli".to_string(),
@@ -303,7 +294,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let status = detector.not_installed(&cli);
+        let status = CliDetector::not_installed(&cli);
         assert!(!status.installed);
         assert_eq!(
             status.install_guide_url,

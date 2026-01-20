@@ -18,6 +18,9 @@ export interface UseWizardNavigationReturn {
   goToStep: (step: WizardStep) => void;
 }
 
+/**
+ * Provides step navigation state and helpers for the workflow wizard.
+ */
 export function useWizardNavigation(
   options: UseWizardNavigationOptions = {}
 ): UseWizardNavigationReturn {

@@ -42,36 +42,33 @@ pub fn normalize_logs(
 
         while let Some(line) = lines_stream.next().await {
             let trimmed = line.trim();
-            let droid_json = match serde_json::from_str::<DroidJson>(trimmed) {
-                Ok(droid_json) => droid_json,
-                Err(_) => {
-                    if let Ok(DroidErrorLog { error, .. }) =
-                        serde_json::from_str::<DroidErrorLog>(trimmed)
-                    {
-                        let entry = NormalizedEntry {
-                            timestamp: None,
-                            entry_type: NormalizedEntryType::ErrorMessage {
-                                error_type: NormalizedEntryError::Other,
-                            },
-                            content: error.message,
-                            metadata: None,
-                        };
-                        add_normalized_entry(&msg_store, &entry_index_provider, entry);
-                        continue;
-                    }
-                    // Handle non-JSON output as raw system message
-                    if !trimmed.is_empty() {
-                        let entry = NormalizedEntry {
-                            timestamp: None,
-                            entry_type: NormalizedEntryType::SystemMessage,
-                            content: strip_ansi_escapes::strip_str(trimmed).to_string(),
-                            metadata: None,
-                        };
-
-                        add_normalized_entry(&msg_store, &entry_index_provider, entry);
-                    }
+            let Ok(droid_json) = serde_json::from_str::<DroidJson>(trimmed) else {
+                if let Ok(DroidErrorLog { error, .. }) =
+                    serde_json::from_str::<DroidErrorLog>(trimmed)
+                {
+                    let entry = NormalizedEntry {
+                        timestamp: None,
+                        entry_type: NormalizedEntryType::ErrorMessage {
+                            error_type: NormalizedEntryError::Other,
+                        },
+                        content: error.message,
+                        metadata: None,
+                    };
+                    add_normalized_entry(&msg_store, &entry_index_provider, entry);
                     continue;
                 }
+                // Handle non-JSON output as raw system message
+                if !trimmed.is_empty() {
+                    let entry = NormalizedEntry {
+                        timestamp: None,
+                        entry_type: NormalizedEntryType::SystemMessage,
+                        content: strip_ansi_escapes::strip_str(trimmed),
+                        metadata: None,
+                    };
+
+                    add_normalized_entry(&msg_store, &entry_index_provider, entry);
+                }
+                continue;
             };
 
             // Extract session ID if not already done
@@ -142,9 +139,9 @@ pub fn normalize_logs(
                                     path: path.clone(),
                                     status: ToolStatus::Created,
                                 };
-                                state.file_reads.insert(id.to_string(), tool_state);
+                                state.file_reads.insert(id.clone(), tool_state);
                                 state.pending_fifo.push_back(PendingToolCall::Read {
-                                    tool_call_id: id.to_string(),
+                                    tool_call_id: id.clone(),
                                 });
                                 let tool_state = state.file_reads.get_mut(&id).unwrap();
                                 let index = add_normalized_entry(
@@ -443,7 +440,7 @@ pub fn normalize_logs(
                             | DroidToolData::Unknown { .. } => {
                                 let tool_state = GenericToolState {
                                     index: None,
-                                    name: tool_name.to_string(),
+                                    name: tool_name.clone(),
                                     arguments: Some(arguments.clone()),
                                     result: None,
                                     status: ToolStatus::Created,
@@ -682,13 +679,13 @@ fn normalize_stderr_logs(msg_store: Arc<MsgStore>, entry_index_provider: EntryIn
                 metadata: None,
             }))
             .transform_lines(Box::new(|lines| {
-                lines.iter_mut().for_each(|line| {
+                for line in lines.iter_mut() {
                     *line = strip_ansi_escapes::strip_str(&line);
                     // noisy, but seemingly harmless message happens when session is forked
                     if line.starts_with("Error fetching session ") {
                         line.clear();
                     }
-                });
+                }
             }))
             .time_gap(std::time::Duration::from_secs(2))
             .index_provider(entry_index_provider)
@@ -748,19 +745,19 @@ fn parse_apply_patch_result(value: &Value, worktree_path: &str) -> Option<Action
         .get("file_path")
         .or_else(|| result_obj.get("value").and_then(|v| v.get("file_path")))
         .and_then(|v: &Value| v.as_str())
-        .map(|s| s.to_string())?;
+        .map(ToString::to_string)?;
 
     let diff = result_obj
         .get("diff")
         .or_else(|| result_obj.get("value").and_then(|v| v.get("diff")))
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(ToString::to_string);
 
     let content = result_obj
         .get("content")
         .or_else(|| result_obj.get("value").and_then(|v| v.get("content")))
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(ToString::to_string);
 
     let relative_path = make_path_relative(&file_path, worktree_path);
 
@@ -888,12 +885,11 @@ struct DroidErrorDetail {
 impl DroidJson {
     pub fn session_id(&self) -> Option<&str> {
         match self {
-            DroidJson::System { .. } => None, // session might not have been initialized yet
-            DroidJson::Message { session_id, .. } => Some(session_id),
-            DroidJson::ToolCall { session_id, .. } => Some(session_id),
-            DroidJson::ToolResult { session_id, .. } => Some(session_id),
-            DroidJson::Completion { session_id, .. } => Some(session_id),
-            DroidJson::Error { .. } => None,
+            DroidJson::Message { session_id, .. }
+            | DroidJson::ToolCall { session_id, .. }
+            | DroidJson::ToolResult { session_id, .. }
+            | DroidJson::Completion { session_id, .. } => Some(session_id),
+            DroidJson::System { .. } | DroidJson::Error { .. } => None, // session might not have been initialized yet
         }
     }
 }

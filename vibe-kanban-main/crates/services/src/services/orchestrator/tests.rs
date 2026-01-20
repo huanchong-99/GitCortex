@@ -3,7 +3,7 @@
 //! Comprehensive test suite for LLM client, message bus, and Agent core functionality.
 
 #[cfg(test)]
-mod tests {
+mod orchestrator_tests {
     use crate::services::orchestrator::{
         BusMessage, CommitMetadata, LLMMessage, MessageBus, MockLLMClient, OrchestratorAgent,
         OrchestratorConfig, OrchestratorInstruction, OrchestratorRunState, OrchestratorState,
@@ -11,7 +11,8 @@ mod tests {
         create_llm_client,
     };
     use std::sync::Arc;
-    use tokio::sync::RwLock;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::matchers::{method, path};
 
     // Tests will be added in subsequent tasks
 
@@ -105,7 +106,7 @@ mod tests {
 
         for instruction in variants {
             let json = serde_json::to_string(&instruction).unwrap();
-            let parsed: OrchestratorInstruction = serde_json::from_str(&json).unwrap();
+            let _parsed: OrchestratorInstruction = serde_json::from_str(&json).unwrap();
 
             // Verify type tag is correctly serialized
             let json_obj = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -280,8 +281,8 @@ mod tests {
 
         // Add 60 user messages (exceeds max_conversation_history of 50)
         for i in 0..60 {
-            state.add_message("user", &format!("Message {}", i), &config);
-            state.add_message("assistant", &format!("Response {}", i), &config);
+            state.add_message("user", &format!("Message {i}"), &config);
+            state.add_message("assistant", &format!("Response {i}"), &config);
         }
 
         // History should be pruned to max_conversation_history, keeping system messages
@@ -316,11 +317,6 @@ mod tests {
     async fn test_llm_client_basic_request() {
         // Install crypto provider for reqwest (ignore if already installed)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
-        use wiremock::{
-            Mock, MockServer, ResponseTemplate,
-            matchers::{method, path},
-        };
 
         let mock_server = MockServer::start().await;
 
@@ -368,11 +364,6 @@ mod tests {
         // Install crypto provider for reqwest (ignore if already installed)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
-        use wiremock::{
-            Mock, MockServer, ResponseTemplate,
-            matchers::{method, path},
-        };
-
         let mock_server = MockServer::start().await;
 
         Mock::given(method("POST"))
@@ -408,11 +399,6 @@ mod tests {
     async fn test_llm_client_empty_response() {
         // Install crypto provider for reqwest (ignore if already installed)
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
-        use wiremock::{
-            Mock, MockServer, ResponseTemplate,
-            matchers::{method, path},
-        };
 
         let mock_server = MockServer::start().await;
 
@@ -472,7 +458,8 @@ mod tests {
                 status: "running".to_string(),
             },
         )
-        .await;
+        .await
+        .unwrap();
 
         // Receive message
         let msg =
@@ -507,7 +494,8 @@ mod tests {
                 status: "running".to_string(),
             },
         )
-        .await;
+        .await
+        .unwrap();
 
         // wf-1 should receive
         let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub_wf1.recv()).await;
@@ -622,7 +610,7 @@ mod tests {
         ];
 
         for (json, expected_type) in test_cases {
-            let instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
+            let _instruction: OrchestratorInstruction = serde_json::from_str(json).unwrap();
             let json_obj = serde_json::from_str::<serde_json::Value>(json).unwrap();
             assert_eq!(json_obj["type"], expected_type);
         }
@@ -682,7 +670,7 @@ mod tests {
             message_bus,
             db,
             mock_llm_client,
-        ).await;
+        );
 
         // Verify agent creation succeeds
         assert!(result.is_ok(), "Agent creation with mock LLM client should succeed");
@@ -747,13 +735,13 @@ mod tests {
 
         // Insert workflow
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow (
                 id, project_id, name, target_branch,
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#
+            "
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -769,12 +757,12 @@ mod tests {
 
         // Insert workflow_task
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow_task (
                 id, workflow_id, name, branch, order_index,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            "#
+            "
         )
         .bind(&task_id)
         .bind(&workflow_id)
@@ -789,12 +777,12 @@ mod tests {
 
         // Insert terminal record
         sqlx::query(
-            r#"
+            r"
             INSERT INTO terminal (
                 id, workflow_task_id, cli_type_id, model_config_id,
                 order_index, status, pty_session_id, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            "#
+            "
         )
         .bind(&terminal_id)
         .bind(&task_id)
@@ -826,20 +814,20 @@ mod tests {
             message_bus.clone(),
             db.clone(),
             mock_llm,
-        ).await.unwrap();
+        )
+        .unwrap();
 
         // Subscribe to terminal topic to verify message sent
         let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
 
         // Execute instruction
         let instruction_json = format!(
-            r#"{{"type":"send_to_terminal","terminal_id":"{}","message":"echo test"}}"#,
-            terminal_id
+            r#"{{"type":"send_to_terminal","terminal_id":"{terminal_id}","message":"echo test"}}"#
         );
 
         // Run in task to allow async message propagation
         tokio::spawn(async move {
-            let _ = agent.execute_instruction(&instruction_json).await;
+            let _ = agent.execute_instruction(instruction_json.as_str()).await;
         });
 
         // Verify message received on terminal topic
@@ -857,7 +845,7 @@ mod tests {
             BusMessage::TerminalMessage { message } => {
                 assert_eq!(message, "echo test");
             }
-            other => panic!("Expected TerminalMessage, got {:?}", other),
+            other => panic!("Expected TerminalMessage, got {other:?}"),
         }
     }
 
@@ -910,13 +898,13 @@ mod tests {
 
         // Insert workflow
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow (
                 id, project_id, name, target_branch,
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#
+            "
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -947,16 +935,17 @@ mod tests {
             message_bus.clone(),
             db.clone(),
             mock_llm,
-        ).await.unwrap();
+        )
+        .unwrap();
 
         // Subscribe to workflow topic
-        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{}", workflow_id)).await;
+        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{workflow_id}")).await;
 
         // Execute instruction
         let instruction_json = r#"{"type":"complete_workflow","summary":"All tasks completed successfully"}"#;
 
         tokio::spawn(async move {
-            let _ = agent.execute_instruction(&instruction_json).await;
+            let _ = agent.execute_instruction(instruction_json).await;
         });
 
         // Verify workflow status updated
@@ -983,7 +972,7 @@ mod tests {
                 assert_eq!(wf_id, workflow_id);
                 assert_eq!(status, "completed");
             }
-            _ => panic!("Expected StatusUpdate, got {:?}", msg),
+            _ => panic!("Expected StatusUpdate, got {msg:?}"),
         }
     }
 
@@ -1036,13 +1025,13 @@ mod tests {
 
         // Insert workflow
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow (
                 id, project_id, name, target_branch,
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#
+            "
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -1073,12 +1062,13 @@ mod tests {
             message_bus.clone(),
             db.clone(),
             mock_llm,
-        ).await.unwrap();
+        )
+        .unwrap();
 
         // Execute instruction with failure
         let instruction_json = r#"{"type":"fail_workflow","reason":"Critical error in task execution"}"#;
 
-        agent.execute_instruction(&instruction_json).await.unwrap();
+        agent.execute_instruction(instruction_json).await.unwrap();
 
         // Verify workflow status is failed
         let updated_workflow = Workflow::find_by_id(&pool, &workflow_id)
@@ -1144,13 +1134,13 @@ mod tests {
 
         // Insert workflow
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow (
                 id, project_id, name, target_branch,
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#
+            "
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -1166,12 +1156,12 @@ mod tests {
 
         // Insert workflow_task
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow_task (
                 id, workflow_id, name, branch, order_index,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            "#
+            "
         )
         .bind(&task_id)
         .bind(&workflow_id)
@@ -1186,12 +1176,12 @@ mod tests {
 
         // Insert terminal record
         sqlx::query(
-            r#"
+            r"
             INSERT INTO terminal (
                 id, workflow_task_id, cli_type_id, model_config_id,
                 order_index, status, pty_session_id, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            "#
+            "
         )
         .bind(&terminal_id)
         .bind(&task_id)
@@ -1248,7 +1238,8 @@ mod tests {
             message_bus.clone(),
             db.clone(),
             mock_llm,
-        ).await.unwrap();
+        )
+        .unwrap();
 
         // Subscribe to workflow topic
         let mut workflow_rx = message_bus.subscribe(
@@ -1318,7 +1309,8 @@ mod tests {
             message_bus.clone(),
             db.clone(),
             mock_llm,
-        ).await.unwrap();
+        )
+        .unwrap();
 
         // Create commit with different workflow ID
         let commit_message = r#"
@@ -1346,19 +1338,7 @@ Terminal completed
     #[tokio::test]
     async fn test_llm_retry_with_backoff() {
         use std::sync::atomic::{AtomicUsize, Ordering};
-        use wiremock::{MockServer, Mock, ResponseTemplate};
-        use wiremock::matchers::{method, path};
 
-        // Install crypto provider for reqwest
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
-        let mock_server = MockServer::start().await;
-
-        // Use a simple counter that will be captured by reference
-        // We'll verify retry behavior by checking the final response
-        let counter = AtomicUsize::new(0);
-
-        // Create a custom responder that tracks calls
         struct RetryResponder {
             counter: AtomicUsize,
         }
@@ -1388,6 +1368,12 @@ Terminal completed
             }
         }
 
+        // Install crypto provider for reqwest
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+        let mock_server = MockServer::start().await;
+
+        // Create a custom responder that tracks calls
         // Mount the responder - it will be moved
         let responder = RetryResponder {
             counter: AtomicUsize::new(0),

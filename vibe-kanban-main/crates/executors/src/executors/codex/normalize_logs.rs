@@ -1,9 +1,10 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock},
+    sync::Arc,
 };
 
+use once_cell::sync::Lazy;
 use codex_app_server_protocol::{
     JSONRPCNotification, JSONRPCResponse, NewConversationResponse, ServerNotification,
 };
@@ -80,7 +81,7 @@ struct CommandState {
 
 impl ToNormalizedEntry for CommandState {
     fn to_normalized_entry(&self) -> NormalizedEntry {
-        let content = self.command.to_string();
+        let content = self.command.clone();
 
         NormalizedEntry {
             timestamp: None,
@@ -146,7 +147,7 @@ struct WebSearchState {
 
 impl WebSearchState {
     fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 }
 
@@ -218,6 +219,7 @@ struct LogState {
     token_usage_info: Option<TokenUsageInfo>,
 }
 
+#[derive(Clone, Copy)]
 enum StreamingTextKind {
     Assistant,
     Thinking,
@@ -306,6 +308,7 @@ impl LogState {
     }
 }
 
+#[derive(Clone, Copy)]
 enum UpdateMode {
     Append,
     Set,
@@ -380,7 +383,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
             }
 
             if let Ok(response) = serde_json::from_str::<JSONRPCResponse>(&line) {
-                handle_jsonrpc_response(response, &msg_store, &entry_index);
+                handle_jsonrpc_response(&response, &msg_store, &entry_index);
                 continue;
             }
 
@@ -390,12 +393,12 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 {
                     msg_store.push_session_id(session_configured.session_id.to_string());
                     handle_model_params(
-                        session_configured.model,
+                        &session_configured.model,
                         session_configured.reasoning_effort,
                         &msg_store,
                         &entry_index,
                     );
-                };
+                }
                 continue;
             } else if let Some(session_id) = line
                 .strip_prefix(r#"{"method":"sessionConfigured","params":{"sessionId":""#)
@@ -428,7 +431,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 EventMsg::SessionConfigured(payload) => {
                     msg_store.push_session_id(payload.session_id.to_string());
                     handle_model_params(
-                        payload.model,
+                        &payload.model,
                         payload.reasoning_effort,
                         &msg_store,
                         &entry_index,
@@ -577,7 +580,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                         &entry_index,
                         command_state.to_normalized_entry(),
                     );
-                    command_state.index = Some(index)
+                    command_state.index = Some(index);
                 }
                 EventMsg::ExecCommandOutputDelta(ExecCommandOutputDeltaEvent {
                     call_id,
@@ -743,7 +746,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                     value: Value::String(err),
                                 });
                             }
-                        };
+                        }
                         let Some(index) = mcp_tool_state.index else {
                             tracing::error!("missing entry index for existing mcp tool state");
                             continue;
@@ -888,12 +891,12 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             timestamp: None,
                             entry_type: NormalizedEntryType::ToolUse {
                                 tool_name: "view_image".to_string(),
-                                action_type: ActionType::FileRead {
-                                    path: relative_path.clone(),
-                                },
-                                status: ToolStatus::Success,
+                            action_type: ActionType::FileRead {
+                                path: relative_path.clone(),
                             },
-                            content: relative_path.to_string(),
+                            status: ToolStatus::Success,
+                        },
+                            content: relative_path.clone(),
                             metadata: None,
                         },
                     );
@@ -911,7 +914,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                         .as_ref()
                         .map(|text| text.trim())
                         .filter(|text| !text.is_empty())
-                        .map(|text| text.to_string());
+                        .map(ToString::to_string);
                     let content = explanation.clone().unwrap_or_else(|| {
                         if todos.is_empty() {
                             "Plan updated".to_string()
@@ -1018,7 +1021,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
 }
 
 fn handle_jsonrpc_response(
-    response: JSONRPCResponse,
+    response: &JSONRPCResponse,
     msg_store: &Arc<MsgStore>,
     entry_index: &EntryIndexProvider,
 ) {
@@ -1027,13 +1030,13 @@ fn handle_jsonrpc_response(
         return;
     };
 
-    match SessionHandler::extract_session_id_from_rollout_path(response.rollout_path) {
+    match SessionHandler::extract_session_id_from_rollout_path(&response.rollout_path) {
         Ok(session_id) => msg_store.push_session_id(session_id),
         Err(err) => tracing::error!("failed to extract session id: {err}"),
     }
 
     handle_model_params(
-        response.model,
+        &response.model,
         response.reasoning_effort,
         msg_store,
         entry_index,
@@ -1041,7 +1044,7 @@ fn handle_jsonrpc_response(
 }
 
 fn handle_model_params(
-    model: String,
+    model: &str,
     reasoning_effort: Option<ReasoningEffort>,
     msg_store: &Arc<MsgStore>,
     entry_index: &EntryIndexProvider,
@@ -1058,7 +1061,7 @@ fn handle_model_params(
         NormalizedEntry {
             timestamp: None,
             entry_type: NormalizedEntryType::SystemMessage,
-            content: params.join("  ").to_string(),
+            content: params.join("  "),
             metadata: None,
         },
     );
@@ -1086,8 +1089,8 @@ fn build_command_output(stdout: Option<&str>, stderr: Option<&str>) -> Option<St
     }
 }
 
-static SESSION_ID: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"#)
+static SESSION_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})")
         .expect("valid regex")
 });
 
@@ -1179,8 +1182,7 @@ impl ToNormalizedEntryOpt for Approval {
         let tool_name = self.display_tool_name();
 
         match approval_status {
-            ApprovalStatus::Pending => None,
-            ApprovalStatus::Approved => None,
+            ApprovalStatus::Pending | ApprovalStatus::Approved => None,
             ApprovalStatus::Denied { reason } => Some(NormalizedEntry {
                 timestamp: None,
                 entry_type: NormalizedEntryType::UserFeedback {

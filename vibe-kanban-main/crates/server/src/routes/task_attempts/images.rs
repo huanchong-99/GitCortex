@@ -141,7 +141,7 @@ pub async fn get_image_metadata(
         exists: true,
         file_name,
         path: Some(query.path),
-        size_bytes: Some(metadata.len() as i64),
+        size_bytes: i64::try_from(metadata.len()).ok(),
         format,
         proxy_url: Some(proxy_url),
     })))

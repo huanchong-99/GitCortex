@@ -112,10 +112,8 @@ impl IntoResponse for ApiError {
             },
             // Promote certain GitService errors to conflict status with concise messages
             ApiError::GitService(git_err) => match git_err {
-                services::services::git::GitServiceError::MergeConflicts(_) => {
-                    (StatusCode::CONFLICT, "GitServiceError")
-                }
-                services::services::git::GitServiceError::RebaseInProgress => {
+                services::services::git::GitServiceError::MergeConflicts(_)
+                | services::services::git::GitServiceError::RebaseInProgress => {
                     (StatusCode::CONFLICT, "GitServiceError")
                 }
                 _ => (StatusCode::INTERNAL_SERVER_ERROR, "GitServiceError"),
@@ -144,12 +142,13 @@ impl IntoResponse for ApiError {
             ApiError::RemoteClient(err) => match err {
                 RemoteClientError::Auth => (StatusCode::UNAUTHORIZED, "RemoteClientError"),
                 RemoteClientError::Timeout => (StatusCode::GATEWAY_TIMEOUT, "RemoteClientError"),
-                RemoteClientError::Transport(_) => (StatusCode::BAD_GATEWAY, "RemoteClientError"),
+                RemoteClientError::Transport(_) | RemoteClientError::Token(_) => {
+                    (StatusCode::BAD_GATEWAY, "RemoteClientError")
+                }
                 RemoteClientError::Http { status, .. } => (
                     StatusCode::from_u16(*status).unwrap_or(StatusCode::BAD_GATEWAY),
                     "RemoteClientError",
                 ),
-                RemoteClientError::Token(_) => (StatusCode::BAD_GATEWAY, "RemoteClientError"),
                 RemoteClientError::Api(code) => match code {
                     services::services::remote_client::HandoffErrorCode::NotFound => {
                         (StatusCode::NOT_FOUND, "RemoteClientError")
@@ -182,11 +181,15 @@ impl IntoResponse for ApiError {
         let error_message = match &self {
             ApiError::Image(img_err) => match img_err {
                 ImageError::InvalidFormat => "This file type is not supported. Please upload an image file (PNG, JPG, GIF, WebP, or BMP).".to_string(),
-                ImageError::TooLarge(size, max) => format!(
-                    "This image is too large ({:.1} MB). Maximum file size is {:.1} MB.",
-                    *size as f64 / 1_048_576.0,
-                    *max as f64 / 1_048_576.0
-                ),
+                ImageError::TooLarge(size, max) => {
+                    #[allow(clippy::cast_precision_loss)]
+                    let size_mb = *size as f64 / 1_048_576.0;
+                    #[allow(clippy::cast_precision_loss)]
+                    let max_mb = *max as f64 / 1_048_576.0;
+                    format!(
+                        "This image is too large ({size_mb:.1} MB). Maximum file size is {max_mb:.1} MB."
+                    )
+                }
                 ImageError::NotFound => "Image not found.".to_string(),
                 _ => {
                     "Failed to process image. Please try again.".to_string()
@@ -197,7 +200,7 @@ impl IntoResponse for ApiError {
                 services::services::git::GitServiceError::RebaseInProgress => {
                     "A rebase is already in progress. Resolve conflicts or abort the rebase, then retry.".to_string()
                 }
-                _ => format!("{}: {}", error_type, self),
+                _ => format!("{error_type}: {self}"),
             },
             ApiError::Multipart(_) => "Failed to upload file. Please ensure the file is valid and try again.".to_string(),
             ApiError::RemoteClient(err) => match err {
@@ -243,17 +246,17 @@ impl IntoResponse for ApiError {
                         "Internal remote service error. Please try again.".to_string()
                     }
                     services::services::remote_client::HandoffErrorCode::Other(msg) => {
-                        format!("Authentication error: {}", msg)
+                        format!("Authentication error: {msg}")
                     }
                 },
                 RemoteClientError::Serde(_) => "Unexpected response from remote service.".to_string(),
                 RemoteClientError::Url(_) => "Remote service URL is invalid.".to_string(),
             },
             ApiError::Unauthorized => "Unauthorized. Please sign in again.".to_string(),
-            ApiError::BadRequest(msg) => msg.clone(),
-            ApiError::Conflict(msg) => msg.clone(),
-            ApiError::Forbidden(msg) => msg.clone(),
-            _ => format!("{}: {}", error_type, self),
+            ApiError::BadRequest(msg) | ApiError::Conflict(msg) | ApiError::Forbidden(msg) => {
+                msg.clone()
+            }
+            _ => format!("{error_type}: {self}"),
         };
         let response = ApiResponse::<()>::error(&error_message);
         (status_code, Json(response)).into_response()
@@ -339,10 +342,10 @@ impl From<ProjectServiceError> for ApiError {
                 ApiError::BadRequest("Repository not found".to_string())
             }
             ProjectServiceError::GitError(msg) => {
-                ApiError::BadRequest(format!("Git operation failed: {}", msg))
+                ApiError::BadRequest(format!("Git operation failed: {msg}"))
             }
             ProjectServiceError::RemoteClient(msg) => {
-                ApiError::BadRequest(format!("Remote client error: {}", msg))
+                ApiError::BadRequest(format!("Remote client error: {msg}"))
             }
         }
     }
@@ -367,10 +370,10 @@ impl From<RepoServiceError> for ApiError {
                 ApiError::BadRequest(format!("Directory already exists: {}", path.display()))
             }
             RepoServiceError::Git(git_err) => {
-                ApiError::BadRequest(format!("Git error: {}", git_err))
+                ApiError::BadRequest(format!("Git error: {git_err}"))
             }
             RepoServiceError::InvalidFolderName(name) => {
-                ApiError::BadRequest(format!("Invalid folder name: {}", name))
+                ApiError::BadRequest(format!("Invalid folder name: {name}"))
             }
         }
     }

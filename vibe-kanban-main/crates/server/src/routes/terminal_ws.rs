@@ -2,8 +2,7 @@
 
 use axum::{
     extract::{Path, State, WebSocketUpgrade, ws::{Message, WebSocket}},
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    response::IntoResponse,
     routing::get,
     Router,
 };
@@ -32,6 +31,11 @@ const WS_IDLE_TIMEOUT_SECS: u64 = 300;
 
 /// Heartbeat interval for keep-alive (30 seconds)
 const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+// Compile-time sanity check for timeout ordering.
+const _: () = {
+    assert!(WS_HEARTBEAT_INTERVAL_SECS < WS_IDLE_TIMEOUT_SECS);
+};
 
 // ============================================================================
 // UUID Validation
@@ -102,7 +106,7 @@ async fn terminal_ws_handler(
     // Validate terminal_id format before proceeding
     if let Err(e) = validate_terminal_id(&terminal_id) {
         tracing::warn!("Invalid terminal_id format: {} - {}", terminal_id, e);
-        return ApiError::BadRequest(format!("Invalid terminal_id format: {}", e)).into_response();
+        return ApiError::BadRequest(format!("Invalid terminal_id format: {e}")).into_response();
     }
 
     ws.on_upgrade(move |socket| handle_terminal_socket(socket, terminal_id, deployment))
@@ -140,7 +144,7 @@ async fn handle_terminal_socket(
         Ok(Err(e)) => {
             tracing::error!("Database error fetching terminal: {}", e);
             let msg = WsMessage::Error {
-                message: format!("Database error: {}", e),
+                message: format!("Database error: {e}"),
             };
             let _ = ws_sender
                 .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
@@ -151,7 +155,7 @@ async fn handle_terminal_socket(
         Err(_) => {
             tracing::error!("Connection timeout while fetching terminal {}", terminal_id);
             let msg = WsMessage::Error {
-                message: format!("Connection timeout after {}s", WS_CONNECT_TIMEOUT_SECS),
+                message: format!("Connection timeout after {WS_CONNECT_TIMEOUT_SECS}s"),
             };
             let _ = ws_sender
                 .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
@@ -343,8 +347,6 @@ mod tests {
         assert_eq!(WS_IDLE_TIMEOUT_SECS, 300); // 5 minutes
         assert_eq!(WS_HEARTBEAT_INTERVAL_SECS, 30);
 
-        // Heartbeat should be more frequent than idle timeout
-        assert!(WS_HEARTBEAT_INTERVAL_SECS < WS_IDLE_TIMEOUT_SECS);
     }
 
     #[test]

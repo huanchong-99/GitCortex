@@ -46,7 +46,7 @@ pub fn duplicate_stdout(
     child.inner().stdout = Some(wrap_fd_as_child_stdout(pipe_reader)?);
 
     // Obtain writer from fd
-    let mut fd_writer = wrap_fd_as_tokio_writer(pipe_writer)?;
+    let mut fd_writer = wrap_fd_as_tokio_writer(pipe_writer);
 
     // Create the duplicate stdout stream
     let (dup_writer, dup_reader) =
@@ -114,7 +114,7 @@ pub fn tee_stdout_with_appender(
     child.inner().stdout = Some(wrap_fd_as_child_stdout(pipe_reader)?);
 
     // Single shared writer for both original stdout forwarding and injected lines
-    let writer = wrap_fd_as_tokio_writer(pipe_writer)?;
+    let writer = wrap_fd_as_tokio_writer(pipe_writer);
     let shared_writer = std::sync::Arc::new(tokio::sync::Mutex::new(writer));
 
     // Create duplicate stream publisher
@@ -180,7 +180,7 @@ pub fn create_stdout_pipe_writer<'b>(
     child.inner().stdout = Some(wrap_fd_as_child_stdout(pipe_reader)?);
 
     // Return async writer to the caller
-    wrap_fd_as_tokio_writer(pipe_writer)
+    Ok(wrap_fd_as_tokio_writer(pipe_writer))
 }
 
 // =========================================
@@ -211,16 +211,14 @@ fn wrap_fd_as_child_stdout(
 }
 
 /// Convert os_pipe::PipeWriter to a tokio file for async writing
-fn wrap_fd_as_tokio_writer(
-    pipe_writer: os_pipe::PipeWriter,
-) -> Result<impl AsyncWrite, ExecutorError> {
+fn wrap_fd_as_tokio_writer(pipe_writer: os_pipe::PipeWriter) -> impl AsyncWrite {
     #[cfg(unix)]
     {
         // On Unix: PipeWriter -> raw fd -> OwnedFd -> std::fs::File -> tokio::fs::File
         let raw_fd = pipe_writer.into_raw_fd();
         let owned_fd = unsafe { OwnedFd::from_raw_fd(raw_fd) };
         let std_file = std::fs::File::from(owned_fd);
-        Ok(tokio::fs::File::from_std(std_file))
+        tokio::fs::File::from_std(std_file)
     }
 
     #[cfg(windows)]
@@ -229,6 +227,6 @@ fn wrap_fd_as_tokio_writer(
         let raw_handle = pipe_writer.into_raw_handle();
         let owned_handle = unsafe { OwnedHandle::from_raw_handle(raw_handle) };
         let std_file = std::fs::File::from(owned_handle);
-        Ok(tokio::fs::File::from_std(std_file))
+        tokio::fs::File::from_std(std_file)
     }
 }

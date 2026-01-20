@@ -28,18 +28,17 @@ pub type UiLanguage = versions::v8::UiLanguage;
 pub type ShowcaseState = versions::v8::ShowcaseState;
 
 /// Will always return config, trying old schemas or eventually returning default
-pub async fn load_config_from_file(config_path: &PathBuf) -> Config {
-    match std::fs::read_to_string(config_path) {
-        Ok(raw_config) => Config::from(raw_config),
-        Err(_) => {
-            tracing::info!("No config file found, creating one");
-            Config::default()
-        }
+pub fn load_config_from_file(config_path: &PathBuf) -> Config {
+    if let Ok(raw_config) = std::fs::read_to_string(config_path) {
+        Config::from(raw_config)
+    } else {
+        tracing::info!("No config file found, creating one");
+        Config::default()
     }
 }
 
 /// Saves the config to the given path
-pub async fn save_config_to_file(
+pub fn save_config_to_file(
     config: &Config,
     config_path: &PathBuf,
 ) -> Result<(), ConfigError> {

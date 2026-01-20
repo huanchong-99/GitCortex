@@ -147,8 +147,9 @@ async fn create_workflow(
 
     // Encrypt and store API key if provided
     if let Some(orch_config) = &req.orchestrator_config {
-        workflow.set_api_key(&orch_config.api_key)
-            .map_err(|e| ApiError::BadRequest(format!("Failed to encrypt API key: {}", e)))?;
+        workflow
+            .set_api_key(&orch_config.api_key)
+            .map_err(|e| ApiError::BadRequest(format!("Failed to encrypt API key: {e}")))?;
     }
 
     let workflow = Workflow::create(&deployment.db().pool, &workflow).await?;
@@ -157,7 +158,9 @@ async fn create_workflow(
     let mut commands: Vec<WorkflowCommand> = Vec::new();
     if let Some(preset_ids) = req.command_preset_ids {
         for (index, preset_id) in preset_ids.iter().enumerate() {
-            let index: i32 = index as i32;
+            let index = i32::try_from(index).map_err(|_| {
+                ApiError::BadRequest("Command preset index overflow".to_string())
+            })?;
             let preset_id: &str = preset_id;
             WorkflowCommand::create(
                 &deployment.db().pool,

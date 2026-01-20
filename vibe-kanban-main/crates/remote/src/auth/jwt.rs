@@ -24,6 +24,7 @@ use crate::{
 pub const ACCESS_TOKEN_TTL_SECONDS: i64 = 120;
 pub const REFRESH_TOKEN_TTL_DAYS: i64 = 365;
 const DEFAULT_JWT_LEEWAY_SECONDS: u64 = 60;
+const NONCE_SIZE: usize = 12; // 96 bits for AES-256-GCM
 
 #[derive(Debug, Error)]
 pub enum JwtError {
@@ -88,6 +89,7 @@ pub struct JwtService {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_field_names)]
 pub struct Tokens {
     pub access_token: String,
     pub refresh_token: String,
@@ -106,7 +108,7 @@ impl JwtService {
         &self,
         session: &AuthSession,
         user: &User,
-        provider_token: ProviderTokenDetails,
+        provider_token: &ProviderTokenDetails,
     ) -> Result<Tokens, JwtError> {
         let now = Utc::now();
         let refresh_token_id = Uuid::new_v4();
@@ -121,7 +123,7 @@ impl JwtService {
             aud: "access".to_string(),
         };
 
-        let encrypted_provider_tokens = self.encrypt_provider_tokens(&provider_token)?;
+        let encrypted_provider_tokens = self.encrypt_provider_tokens(provider_token)?;
 
         // Refresh token, long-lived (~1 year)
         let refresh_exp = now + ChronoDuration::days(REFRESH_TOKEN_TTL_DAYS);
@@ -258,7 +260,6 @@ impl JwtService {
             .decode(encrypted)
             .map_err(|_| JwtError::InvalidToken)?;
 
-        const NONCE_SIZE: usize = 12; // 96 bits for AES-256-GCM
         if decoded.len() < NONCE_SIZE {
             return Err(JwtError::InvalidToken);
         }

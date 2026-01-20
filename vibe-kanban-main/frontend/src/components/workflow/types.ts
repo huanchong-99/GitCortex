@@ -16,13 +16,41 @@ export enum WizardStep {
 
 /** 向导步骤元数据 */
 export const WIZARD_STEPS = [
-  { step: WizardStep.Project, name: '工作目录', description: '选择项目文件夹' },
-  { step: WizardStep.Basic, name: '基础配置', description: '工作流名称和任务数量' },
-  { step: WizardStep.Tasks, name: '任务配置', description: '配置每个任务详情' },
-  { step: WizardStep.Models, name: '模型配置', description: '配置 API 和可用模型' },
-  { step: WizardStep.Terminals, name: '终端配置', description: '为任务分配终端' },
-  { step: WizardStep.Commands, name: '斜杠命令', description: '配置执行命令' },
-  { step: WizardStep.Advanced, name: '高级配置', description: '主 Agent 和合并配置' },
+  {
+    step: WizardStep.Project,
+    nameKey: 'steps.project.name',
+    descriptionKey: 'steps.project.description',
+  },
+  {
+    step: WizardStep.Basic,
+    nameKey: 'steps.basic.name',
+    descriptionKey: 'steps.basic.description',
+  },
+  {
+    step: WizardStep.Tasks,
+    nameKey: 'steps.tasks.name',
+    descriptionKey: 'steps.tasks.description',
+  },
+  {
+    step: WizardStep.Models,
+    nameKey: 'steps.models.name',
+    descriptionKey: 'steps.models.description',
+  },
+  {
+    step: WizardStep.Terminals,
+    nameKey: 'steps.terminals.name',
+    descriptionKey: 'steps.terminals.description',
+  },
+  {
+    step: WizardStep.Commands,
+    nameKey: 'steps.commands.name',
+    descriptionKey: 'steps.commands.description',
+  },
+  {
+    step: WizardStep.Advanced,
+    nameKey: 'steps.advanced.name',
+    descriptionKey: 'steps.advanced.description',
+  },
 ] as const;
 
 /** Git 仓库状态 */

@@ -76,8 +76,6 @@ impl JsonRpcPeer {
         };
 
         let reader_peer = peer.clone();
-        let callbacks = callbacks.clone();
-
         tokio::spawn(async move {
             let mut reader = BufReader::new(stdout);
             let mut buffer = String::new();

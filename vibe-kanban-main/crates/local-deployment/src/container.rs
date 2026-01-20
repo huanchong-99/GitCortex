@@ -82,7 +82,7 @@ pub struct LocalContainerService {
 
 impl LocalContainerService {
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         db: DBService,
         msg_stores: Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>>,
         config: Arc<RwLock<Config>>,
@@ -206,7 +206,7 @@ impl LocalContainerService {
                 cleanup_interval.tick().await;
                 tracing::info!("Starting periodic workspace cleanup...");
                 cleanup_expired(&db).await.unwrap_or_else(|e| {
-                    tracing::error!("Failed to clean up expired workspaces: {}", e)
+                    tracing::error!("Failed to clean up expired workspaces: {}", e);
                 });
             }
         });
@@ -281,7 +281,6 @@ impl LocalContainerService {
 
     /// Check which repos have uncommitted changes. Fails if any repo is inaccessible.
     fn check_repos_for_changes(
-        &self,
         workspace_root: &Path,
         repos: &[Repo],
     ) -> Result<Vec<(Repo, PathBuf)>, ContainerError> {
@@ -358,9 +357,10 @@ impl LocalContainerService {
         let mut process_exit_rx = self.spawn_os_exit_watcher(exec_id);
 
         tokio::spawn(async move {
-            let mut exit_signal_future = exit_signal
-                .map(|rx| rx.boxed()) // wait for result
-                .unwrap_or_else(|| std::future::pending().boxed()); // no signal, stall forever
+            let mut exit_signal_future = exit_signal.map_or_else(
+                || std::future::pending().boxed(), // no signal, stall forever
+                futures::FutureExt::boxed,         // wait for result
+            );
 
             let status_result: std::io::Result<std::process::ExitStatus>;
 
@@ -380,9 +380,10 @@ impl LocalContainerService {
 
                     // Map the exit result to appropriate exit status
                     status_result = match exit_result {
-                        Ok(ExecutorExitResult::Success) => Ok(success_exit_status()),
                         Ok(ExecutorExitResult::Failure) => Ok(failure_exit_status()),
-                        Err(_) => Ok(success_exit_status()), // Channel closed, assume success
+                        Ok(ExecutorExitResult::Success) | Err(_) => {
+                            Ok(success_exit_status()) // Channel closed, assume success
+                        }
                     };
                 }
                 // Process exit
@@ -393,7 +394,7 @@ impl LocalContainerService {
 
             let (exit_code, status) = match status_result {
                 Ok(exit_status) => {
-                    let code = exit_status.code().unwrap_or(-1) as i64;
+                    let code = i64::from(exit_status.code().unwrap_or(-1));
                     let status = if exit_status.success() {
                         ExecutionProcessStatus::Completed
                     } else {
@@ -630,13 +631,10 @@ impl LocalContainerService {
 
     /// Create a live diff log stream for ongoing attempts for WebSocket
     /// Returns a stream that owns the filesystem watcher - when dropped, watcher is cleaned up
-    async fn create_live_diff_stream(
-        &self,
-        args: diff_stream::DiffStreamArgs,
+    fn create_live_diff_stream(
+        args: &diff_stream::DiffStreamArgs,
     ) -> Result<DiffStreamHandle, ContainerError> {
-        diff_stream::create(args)
-            .await
-            .map_err(|e| ContainerError::Other(anyhow!("{e}")))
+        diff_stream::create(args).map_err(|e| ContainerError::Other(anyhow!("{e}")))
     }
 
     /// Extract the last assistant message from the MsgStore history
@@ -793,26 +791,23 @@ impl LocalContainerService {
         queued_data: &DraftFollowUpData,
     ) -> Result<ExecutionProcess, ContainerError> {
         // Get executor from the latest CodingAgent process, or fall back to session's executor
-        let base_executor = match ExecutionProcess::latest_executor_profile_for_session(
-            &self.db.pool,
-            ctx.session.id,
-        )
-        .await
-        .map_err(|e| ContainerError::Other(anyhow!("Failed to get executor profile: {e}")))?
+        let base_executor = if let Some(profile) =
+            ExecutionProcess::latest_executor_profile_for_session(&self.db.pool, ctx.session.id)
+                .await
+                .map_err(|e| ContainerError::Other(anyhow!("Failed to get executor profile: {e}")))?
         {
-            Some(profile) => profile.executor,
-            None => {
-                // No prior execution - use session's executor field
-                let executor_str = ctx.session.executor.as_ref().ok_or_else(|| {
-                    ContainerError::Other(anyhow!(
-                        "No prior execution and no executor configured on session"
-                    ))
-                })?;
-                BaseCodingAgent::from_str(&executor_str.replace('-', "_").to_ascii_uppercase())
-                    .map_err(|_| {
-                        ContainerError::Other(anyhow!("Invalid executor: {}", executor_str))
-                    })?
-            }
+            profile.executor
+        } else {
+            // No prior execution - use session's executor field
+            let executor_str = ctx.session.executor.as_ref().ok_or_else(|| {
+                ContainerError::Other(anyhow!(
+                    "No prior execution and no executor configured on session"
+                ))
+            })?;
+            BaseCodingAgent::from_str(&executor_str.replace('-', "_").to_ascii_uppercase())
+                .map_err(|_| {
+                    ContainerError::Other(anyhow!("Invalid executor: {executor_str}"))
+                })?
         };
 
         let executor_profile_id = ExecutorProfileId {
@@ -1205,7 +1200,7 @@ impl ContainerService for LocalContainerService {
             )
         {
             match Task::update_status(&self.db.pool, ctx.task.id, TaskStatus::InReview).await {
-                Ok(_) => {
+                Ok(()) => {
                     if let Some(publisher) = self.share_publisher()
                         && let Err(err) = publisher.update_shared_task_by_id(ctx.task.id).await
                     {
@@ -1281,21 +1276,19 @@ impl ContainerService for LocalContainerService {
                 }
             };
 
-            let stream = self
-                .create_live_diff_stream(diff_stream::DiffStreamArgs {
-                    git_service: self.git().clone(),
-                    db: self.db().clone(),
-                    workspace_id: workspace.id,
-                    repo_id: repo.id,
-                    repo_path: repo.path.clone(),
-                    worktree_path: worktree_path.clone(),
-                    branch: branch.to_string(),
-                    target_branch: target_branch.clone(),
-                    base_commit: base_commit.clone(),
-                    stats_only,
-                    path_prefix: Some(repo.name.clone()),
-                })
-                .await?;
+            let stream = Self::create_live_diff_stream(&diff_stream::DiffStreamArgs {
+                git_service: self.git().clone(),
+                db: self.db().clone(),
+                workspace_id: workspace.id,
+                repo_id: repo.id,
+                repo_path: repo.path.clone(),
+                worktree_path: worktree_path.clone(),
+                branch: branch.clone(),
+                target_branch: target_branch.clone(),
+                base_commit: base_commit.clone(),
+                stats_only,
+                path_prefix: Some(repo.name.clone()),
+            })?;
 
             streams.push(Box::pin(stream));
         }
@@ -1325,7 +1318,7 @@ impl ContainerService for LocalContainerService {
             .ok_or_else(|| ContainerError::Other(anyhow!("Container reference not found")))?;
         let workspace_root = PathBuf::from(container_ref);
 
-        let repos_with_changes = self.check_repos_for_changes(&workspace_root, &ctx.repos)?;
+        let repos_with_changes = Self::check_repos_for_changes(&workspace_root, &ctx.repos)?;
         if repos_with_changes.is_empty() {
             tracing::debug!("No changes to commit in any repository");
             return Ok(false);

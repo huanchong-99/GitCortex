@@ -41,11 +41,11 @@ impl AuthContext {
     }
 
     pub async fn set_profile(&self, profile: ProfileResponse) {
-        *self.profile.write().await = Some(profile)
+        *self.profile.write().await = Some(profile);
     }
 
     pub async fn clear_profile(&self) {
-        *self.profile.write().await = None
+        *self.profile.write().await = None;
     }
 
     pub async fn refresh_guard(&self) -> OwnedMutexGuard<()> {

@@ -178,6 +178,7 @@ impl EditorConfig {
         Ok(())
     }
 
+    #[must_use]
     pub fn with_override(&self, editor_type_str: Option<&str>) -> Self {
         if let Some(editor_type_str) = editor_type_str {
             let editor_type =

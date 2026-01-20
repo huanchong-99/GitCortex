@@ -54,7 +54,8 @@ impl ExecutionProcessLogs {
         execution_id: Uuid,
         jsonl_line: &str,
     ) -> Result<(), sqlx::Error> {
-        let byte_size = jsonl_line.len() as i64;
+        let byte_size = i64::try_from(jsonl_line.len())
+            .map_err(|_| sqlx::Error::Protocol("log line too large".into()))?;
         sqlx::query!(
             r#"INSERT INTO execution_process_logs (execution_id, logs, byte_size, inserted_at)
                VALUES ($1, $2, $3, datetime('now', 'subsec'))"#,

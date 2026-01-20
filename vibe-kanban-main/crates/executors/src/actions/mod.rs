@@ -42,6 +42,7 @@ impl ExecutorAction {
     pub fn new(typ: ExecutorActionType, next_action: Option<Box<ExecutorAction>>) -> Self {
         Self { typ, next_action }
     }
+    #[must_use]
     pub fn append_action(mut self, action: ExecutorAction) -> Self {
         if let Some(next) = self.next_action {
             self.next_action = Some(Box::new(next.append_action(action)));

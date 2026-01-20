@@ -1,6 +1,7 @@
 use std::{collections::HashSet, env, io::ErrorKind, path::Path};
 
 use sha2::{Digest, Sha256};
+use std::fmt::Write;
 use tokio::fs;
 use tracing::warn;
 
@@ -20,7 +21,7 @@ async fn ensure_mcp_server_trust_impl(
     cursor: &CursorAgent,
     current_dir: &Path,
 ) -> Result<(), ExecutorError> {
-    let current_dir =
+    let resolved_dir =
         std::fs::canonicalize(current_dir).unwrap_or_else(|_| current_dir.to_path_buf());
 
     let Some(config_path) = cursor.default_mcp_config_path() else {
@@ -31,12 +32,12 @@ async fn ensure_mcp_server_trust_impl(
         return Ok(());
     };
 
-    let absolute_path = if current_dir.is_absolute() {
-        current_dir.to_path_buf()
+    let absolute_path = if resolved_dir.is_absolute() {
+        resolved_dir.clone()
     } else {
         match env::current_dir() {
-            Ok(cwd) => cwd.join(current_dir),
-            Err(_) => current_dir.to_path_buf(),
+            Ok(cwd) => cwd.join(resolved_dir),
+            Err(_) => resolved_dir.clone(),
         }
     };
 
@@ -159,10 +160,10 @@ fn compute_cursor_approval_id(
     let mut hasher = Sha256::new();
     hasher.update(serialized.as_bytes());
     let digest = hasher.finalize();
-    let hex = digest
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for byte in &digest {
+        let _ = write!(hex, "{byte:02x}");
+    }
     Some(format!("{server_name}-{}", &hex[..16]))
 }
 

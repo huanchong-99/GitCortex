@@ -4,6 +4,7 @@
 //! - ~/.gemini/.env - 环境变量配置
 
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 use crate::error::Result;
 use crate::config_path::{get_gemini_env_path, ensure_parent_dir_exists};
 use crate::atomic_write::atomic_write_text;
@@ -30,15 +31,15 @@ pub fn parse_env_file(content: &str) -> HashMap<String, String> {
 }
 
 /// 序列化为 .env 格式
-pub fn serialize_env_file(map: &HashMap<String, String>) -> String {
+pub fn serialize_env_file<S: BuildHasher>(map: &HashMap<String, String, S>) -> String {
     let mut lines: Vec<String> = map
         .iter()
         .map(|(k, v)| {
             // 如果值包含空格或特殊字符，使用引号
             if v.contains(' ') || v.contains('=') || v.contains('#') {
-                format!("{}=\"{}\"", k, v)
+                format!("{k}=\"{v}\"")
             } else {
-                format!("{}={}", k, v)
+                format!("{k}={v}")
             }
         })
         .collect();
@@ -57,7 +58,9 @@ pub async fn read_gemini_config() -> Result<HashMap<String, String>> {
 }
 
 /// 写入 Gemini 配置
-pub async fn write_gemini_config(config: &HashMap<String, String>) -> Result<()> {
+pub async fn write_gemini_config<S: BuildHasher>(
+    config: &HashMap<String, String, S>,
+) -> Result<()> {
     let path = get_gemini_env_path()?;
     ensure_parent_dir_exists(&path).await?;
     let content = serialize_env_file(config);
@@ -103,7 +106,7 @@ EMPTY=
         let map = parse_env_file(content);
         assert_eq!(map.get("GEMINI_API_KEY"), Some(&"test-key".to_string()));
         assert_eq!(map.get("GEMINI_MODEL"), Some(&"gemini-pro".to_string()));
-        assert_eq!(map.get("EMPTY"), Some(&"".to_string()));
+        assert_eq!(map.get("EMPTY").map(String::as_str), Some(""));
     }
 
     #[test]

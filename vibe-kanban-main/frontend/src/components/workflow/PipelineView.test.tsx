@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen } from '@testing-library/react';
 import { PipelineView } from './PipelineView';
 import type { Terminal } from './TerminalCard';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('PipelineView', () => {
   const mockTasks = [
@@ -48,8 +49,12 @@ describe('PipelineView', () => {
     status: 'not_started' as Terminal['status'],
   };
 
+  beforeEach(() => {
+    void setTestLanguage();
+  });
+
   it('should render workflow name and status badge', () => {
-    render(
+    renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="idle"
@@ -59,11 +64,11 @@ describe('PipelineView', () => {
     );
 
     expect(screen.getByText('Test Workflow')).toBeInTheDocument();
-    expect(screen.getByText('未开始')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:pipeline.status.idle'))).toBeInTheDocument();
   });
 
   it('should render all tasks with their numbers and names', () => {
-    render(
+    renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -72,14 +77,14 @@ describe('PipelineView', () => {
       />
     );
 
-    expect(screen.getByText('Task 1')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:pipeline.taskLabel', { index: 1 }))).toBeInTheDocument();
     expect(screen.getByText('Implement Authentication')).toBeInTheDocument();
-    expect(screen.getByText('Task 2')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:pipeline.taskLabel', { index: 2 }))).toBeInTheDocument();
     expect(screen.getByText('Add Database Integration')).toBeInTheDocument();
   });
 
   it('should render git branch badges for each task', () => {
-    render(
+    renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -93,7 +98,7 @@ describe('PipelineView', () => {
   });
 
   it('should display terminals horizontally for each task', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -102,13 +107,12 @@ describe('PipelineView', () => {
       />
     );
 
-    // Check that terminals are rendered
     const terminalCards = container.querySelectorAll('[class*="w-32"]');
     expect(terminalCards.length).toBeGreaterThan(0);
   });
 
   it('should render connector lines between terminals', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -117,14 +121,12 @@ describe('PipelineView', () => {
       />
     );
 
-    // Check for connector lines (w-8 h-0.5 bg-muted/30)
     const connectors = container.querySelectorAll('.w-8.h-0\\.5.bg-muted\\/30');
-    // First task has 2 terminals, so should have 1 connector
     expect(connectors.length).toBe(1);
   });
 
   it('should render merge terminal with dashed border', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -133,14 +135,13 @@ describe('PipelineView', () => {
       />
     );
 
-    // Check for dashed border container
     const dashedBorder = container.querySelector('.border-dashed');
     expect(dashedBorder).toBeInTheDocument();
-    expect(screen.getByText('Merge Terminal')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:pipeline.mergeTerminalRole'))).toBeInTheDocument();
   });
 
   it('should display correct status labels', () => {
-    const statuses: Array<PipelineViewProps['status']> = [
+    const statuses: PipelineViewProps['status'][] = [
       'idle',
       'running',
       'paused',
@@ -149,15 +150,15 @@ describe('PipelineView', () => {
     ];
 
     const expectedLabels = {
-      idle: '未开始',
-      running: '运行中',
-      paused: '已暂停',
-      completed: '已完成',
-      failed: '失败',
+      idle: i18n.t('workflow:pipeline.status.idle'),
+      running: i18n.t('workflow:pipeline.status.running'),
+      paused: i18n.t('workflow:pipeline.status.paused'),
+      completed: i18n.t('workflow:pipeline.status.completed'),
+      failed: i18n.t('workflow:pipeline.status.failed'),
     };
 
     statuses.forEach((status) => {
-      const { unmount } = render(
+      const { unmount } = renderWithI18n(
         <PipelineView
           name="Test Workflow"
           status={status}
@@ -174,7 +175,7 @@ describe('PipelineView', () => {
   it('should call onTerminalClick when terminal is clicked', () => {
     const onTerminalClick = vi.fn();
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -184,18 +185,16 @@ describe('PipelineView', () => {
       />
     );
 
-    // Click on the first terminal card
-    const terminalCards = container.querySelectorAll('[class*="w-32"]');
-    if (terminalCards[0]) {
-      terminalCards[0].click();
-      expect(onTerminalClick).toHaveBeenCalledWith('task-1', 'terminal-1');
-    }
+    const terminalCards = container.querySelectorAll<HTMLElement>('[class*="w-32"]');
+    const terminalCard = terminalCards.item(0);
+    terminalCard.click();
+    expect(onTerminalClick).toHaveBeenCalledWith('task-1', 'terminal-1');
   });
 
   it('should call onMergeTerminalClick when merge terminal is clicked', () => {
     const onMergeTerminalClick = vi.fn();
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="running"
@@ -205,10 +204,9 @@ describe('PipelineView', () => {
       />
     );
 
-    // Click on the merge terminal card inside the dashed border
     const dashedBorder = container.querySelector('.border-dashed');
-    if (dashedBorder) {
-      const terminalCard = dashedBorder.querySelector('[class*="w-32"]');
+    if (dashedBorder instanceof HTMLElement) {
+      const terminalCard = dashedBorder.querySelector<HTMLElement>('[class*="w-32"]');
       if (terminalCard) {
         terminalCard.click();
         expect(onMergeTerminalClick).toHaveBeenCalled();
@@ -233,7 +231,7 @@ describe('PipelineView', () => {
       },
     ];
 
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="idle"
@@ -242,13 +240,12 @@ describe('PipelineView', () => {
       />
     );
 
-    // Should not have any connectors
     const connectors = container.querySelectorAll('.w-8.h-0\\.5.bg-muted\\/30');
     expect(connectors.length).toBe(0);
   });
 
   it('should handle empty tasks array', () => {
-    const { container } = render(
+    renderWithI18n(
       <PipelineView
         name="Test Workflow"
         status="idle"
@@ -257,12 +254,9 @@ describe('PipelineView', () => {
       />
     );
 
-    // Should still render workflow name and status
     expect(screen.getByText('Test Workflow')).toBeInTheDocument();
-    expect(screen.getByText('未开始')).toBeInTheDocument();
-
-    // Should still render merge terminal
-    expect(screen.getByText('Merge Terminal')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:pipeline.status.idle'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:pipeline.mergeTerminalRole'))).toBeInTheDocument();
   });
 });
 

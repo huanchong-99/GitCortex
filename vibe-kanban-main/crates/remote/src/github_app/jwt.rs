@@ -34,7 +34,7 @@ struct GitHubAppClaims {
 
 impl GitHubAppJwt {
     /// Create a new JWT generator from base64-encoded PEM private key
-    pub fn new(app_id: u64, private_key_base64: SecretString) -> Result<Self, JwtError> {
+    pub fn new(app_id: u64, private_key_base64: &SecretString) -> Result<Self, JwtError> {
         // Decode base64 to get raw PEM
         let pem_bytes = BASE64_STANDARD
             .decode(private_key_base64.expose_secret().as_bytes())
@@ -83,7 +83,8 @@ mod tests {
     // Test with a dummy key - in real tests you'd use a proper test key
     #[test]
     fn test_invalid_base64_fails() {
-        let result = GitHubAppJwt::new(12345, SecretString::new("not-valid-base64!!!".into()));
+        let invalid_key = SecretString::new("not-valid-base64!!!".into());
+        let result = GitHubAppJwt::new(12345, &invalid_key);
         assert!(matches!(result, Err(JwtError::Base64Error)));
     }
 
@@ -91,7 +92,8 @@ mod tests {
     fn test_invalid_pem_fails() {
         // Valid base64, but not a valid PEM
         let invalid_pem_b64 = BASE64_STANDARD.encode("not a real pem key");
-        let result = GitHubAppJwt::new(12345, SecretString::new(invalid_pem_b64.into()));
+        let invalid_key = SecretString::new(invalid_pem_b64.into());
+        let result = GitHubAppJwt::new(12345, &invalid_key);
         assert!(matches!(result, Err(JwtError::InvalidPrivateKey(_))));
     }
 }

@@ -4,6 +4,9 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { isWsOutputMessage, isWsErrorMessage } from '@/types/websocket';
 
+const TERMINAL_ID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface Props {
   terminalId: string;
   wsUrl?: string;
@@ -17,6 +20,9 @@ export interface TerminalEmulatorRef {
   clear: () => void;
 }
 
+/**
+ * Terminal emulator with WebSocket-backed input/output.
+ */
 export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
   ({ terminalId, wsUrl, onData, onResize, onError }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +117,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       if (!wsUrl || !terminalReadyRef.current) return;
 
       // Basic validation
-      if (!terminalId || !/^[a-zA-Z0-9-]+$/.test(terminalId)) {
+      if (!terminalId || !TERMINAL_ID_REGEX.test(terminalId)) {
         notifyError('Invalid terminalId');
         return;
       }
@@ -128,9 +134,9 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         }
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = (event: MessageEvent<string>) => {
         try {
-          const message = JSON.parse(event.data);
+          const message: unknown = JSON.parse(event.data);
 
           // Use type guards for safe message handling
           if (isWsOutputMessage(message)) {
