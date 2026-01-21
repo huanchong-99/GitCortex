@@ -1,8 +1,0 @@
-packages:
-  - frontend
-  - remote-frontend
-
-onlyBuiltDependencies:
-  - '@sentry/cli'
-  - core-js
-  - esbuild
