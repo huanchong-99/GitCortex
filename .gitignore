@@ -6,7 +6,6 @@ GitCortex/
 # Rust
 target/
 **/*.rs.bk
-Cargo.lock
 
 # Auto-generated TypeScript bindings (ts-rs)
 **/bindings/
