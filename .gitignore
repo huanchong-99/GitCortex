@@ -2,3 +2,6 @@
 .worktrees/
 worktrees/
 GitCortex/
+
+# Auto-generated TypeScript bindings (ts-rs)
+**/bindings/
