@@ -3,5 +3,21 @@
 worktrees/
 GitCortex/
 
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
 # Auto-generated TypeScript bindings (ts-rs)
 **/bindings/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
