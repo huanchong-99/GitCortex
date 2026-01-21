@@ -43,6 +43,8 @@ pub fn router() -> Router<DeploymentImpl> {
         .route("/agents/check-availability", get(check_agent_availability))
 }
 
+const REMOTE_FEATURES_ENABLED: bool = false;
+
 #[derive(Debug, Serialize, Deserialize, TS)]
 pub struct Environment {
     pub os_type: String,
@@ -79,6 +81,7 @@ pub struct UserSystemInfo {
     pub environment: Environment,
     /// Capabilities supported per executor (e.g., { "CLAUDE_CODE": [`SESSION_FORK`] })
     pub capabilities: HashMap<String, Vec<BaseAgentCapability>>,
+    pub remote_features_enabled: bool,
 }
 
 // TODO: update frontend, BE schema has changed, this replaces GET /config and /config/constants
@@ -105,6 +108,7 @@ async fn get_user_system_info(
             }
             caps
         },
+        remote_features_enabled: REMOTE_FEATURES_ENABLED,
     };
 
     ResponseJson(ApiResponse::success(user_system_info))

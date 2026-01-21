@@ -6,15 +6,16 @@ import { useEffect, useMemo } from 'react';
 interface UseAssigneeUserNamesOptions {
   projectId: string | undefined;
   sharedTasks?: SharedTask[];
+  enabled?: boolean;
 }
 
 export function useAssigneeUserNames(options: UseAssigneeUserNamesOptions) {
-  const { projectId, sharedTasks } = options;
+  const { projectId, sharedTasks, enabled = true } = options;
 
   const { data: assignees, refetch } = useQuery<UserData[], Error>({
     queryKey: ['project', 'assignees', projectId],
     queryFn: () => getSharedTaskAssignees(projectId!),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -27,9 +28,9 @@ export function useAssigneeUserNames(options: UseAssigneeUserNamesOptions) {
 
   // Refetch when assignee ids change
   useEffect(() => {
-    if (!assignedUserIds) return;
+    if (!assignedUserIds || !enabled) return;
     refetch();
-  }, [assignedUserIds, refetch]);
+  }, [assignedUserIds, refetch, enabled]);
 
   return {
     assignees,

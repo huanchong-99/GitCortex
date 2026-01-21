@@ -11,6 +11,7 @@ interface UseAutoLinkSharedTasksProps {
   isLoading: boolean;
   remoteProjectId?: string;
   projectId?: string;
+  enabled?: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function useAutoLinkSharedTasks({
   isLoading,
   remoteProjectId,
   projectId,
+  enabled = true,
 }: UseAutoLinkSharedTasksProps): void {
   const { data: currentUser } = useCurrentUser();
   const { linkSharedTaskToLocal } = useTaskMutations(projectId);
@@ -31,7 +33,13 @@ export function useAutoLinkSharedTasks({
   const failedTasks = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!currentUser?.user_id || isLoading || !remoteProjectId || !projectId) {
+    if (
+      !enabled ||
+      !currentUser?.user_id ||
+      isLoading ||
+      !remoteProjectId ||
+      !projectId
+    ) {
       return;
     }
 
@@ -81,5 +89,6 @@ export function useAutoLinkSharedTasks({
     remoteProjectId,
     projectId,
     linkSharedTaskToLocal,
+    enabled,
   ]);
 }

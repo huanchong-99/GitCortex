@@ -78,7 +78,7 @@ export function Navbar() {
   const { query, setQuery, active, clear, registerInputRef } = useSearch();
   const handleOpenInEditor = useOpenProjectInEditor(project || null);
   const { data: onlineCount } = useDiscordOnlineCount();
-  const { loginStatus, reloadSystem } = useUserSystem();
+  const { loginStatus, reloadSystem, remoteFeaturesEnabled } = useUserSystem();
 
   const { data: repos } = useProjectRepos(projectId);
   const isSingleRepoProject = repos?.length === 1;
@@ -94,7 +94,10 @@ export function Navbar() {
   const isTasksRoute = /^\/projects\/[^/]+\/tasks/.test(location.pathname);
   const showSharedTasks = searchParams.get('shared') !== 'off';
   const shouldShowSharedToggle =
-    isTasksRoute && active && project?.remote_project_id != null;
+    remoteFeaturesEnabled &&
+    isTasksRoute &&
+    active &&
+    project?.remote_project_id != null;
 
   const handleSharedToggle = useCallback(
     (checked: boolean) => {

@@ -200,7 +200,8 @@ export function ProjectTasks() {
   const isSharedPanelOpen = Boolean(selectedSharedTask);
   const isPanelOpen = isTaskPanelOpen || isSharedPanelOpen;
 
-  const { config, updateAndSaveConfig, loading } = useUserSystem();
+  const { config, updateAndSaveConfig, loading, remoteFeaturesEnabled } =
+    useUserSystem();
 
   const isLoaded = !loading;
   const showcaseId = showcases.taskPanel.id;
@@ -392,7 +393,8 @@ export function ProjectTasks() {
 
   const hasSearch = Boolean(searchQuery.trim());
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const showSharedTasks = searchParams.get('shared') !== 'off';
+  const showSharedTasks =
+    remoteFeaturesEnabled && searchParams.get('shared') !== 'off';
 
   useEffect(() => {
     if (showSharedTasks) return;

@@ -43,7 +43,11 @@ import { useProjectMutations } from '@/hooks/useProjectMutations';
 
 export function OrganizationSettings() {
   const { t } = useTranslation('organization');
-  const { loginStatus } = useUserSystem();
+  const {
+    loginStatus,
+    remoteFeaturesEnabled,
+    loading: systemLoading,
+  } = useUserSystem();
   const { isSignedIn, isLoaded } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -253,11 +257,25 @@ export function OrganizationSettings() {
     unlinkProject.mutate(projectId);
   };
 
-  if (!isLoaded || orgsLoading) {
+  if (!isLoaded || orgsLoading || systemLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-8 w-8 animate-spin" />
         <span className="ml-2">{t('settings.loadingOrganizations')}</span>
+      </div>
+    );
+  }
+
+  if (!remoteFeaturesEnabled) {
+    return (
+      <div className="py-8">
+        <Alert>
+          <AlertDescription>
+            {t('settings.remoteDisabled', {
+              defaultValue: 'Remote features are disabled in this build.',
+            })}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }

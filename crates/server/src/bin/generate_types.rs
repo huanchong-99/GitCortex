@@ -11,6 +11,10 @@ fn generate_types_content() -> String {
 // If you are an AI, and you absolutely have to edit this file, please confirm with the user first.";
 
     let decls: Vec<String> = vec![
+        server::routes::shared_tasks_types::SharedTaskResponse::decl(),
+        server::routes::shared_tasks_types::AssigneesQuery::decl(),
+        server::routes::shared_tasks_types::SharedTask::decl(),
+        server::routes::shared_tasks_types::UserData::decl(),
         db::models::project::Project::decl(),
         db::models::project::CreateProject::decl(),
         db::models::project::UpdateProject::decl(),
@@ -116,6 +120,8 @@ fn generate_types_content() -> String {
         server::routes::sessions::review::ReviewError::decl(),
         server::routes::task_attempts::OpenEditorRequest::decl(),
         server::routes::task_attempts::OpenEditorResponse::decl(),
+        server::routes::shared_tasks_types::AssignSharedTaskRequest::decl(),
+        server::routes::tasks::ShareTaskResponse::decl(),
         server::routes::tasks::CreateAndStartTaskRequest::decl(),
         server::routes::task_attempts::pr::CreatePrApiRequest::decl(),
         server::routes::images::ImageResponse::decl(),
@@ -159,6 +165,7 @@ fn generate_types_content() -> String {
         services::services::config::UiLanguage::decl(),
         services::services::config::ShowcaseState::decl(),
         services::services::git::GitBranch::decl(),
+        server::routes::shared_tasks_types::SharedTaskDetails::decl(),
         services::services::queued_message::QueuedMessage::decl(),
         services::services::queued_message::QueueStatus::decl(),
         services::services::git::ConflictOp::decl(),

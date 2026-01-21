@@ -29,6 +29,7 @@ import { projectsApi } from '@/lib/api';
 import { LinkProjectDialog } from '@/components/dialogs/projects/LinkProjectDialog';
 import { useTranslation } from 'react-i18next';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
+import { useUserSystem } from '@/components/ConfigProvider';
 
 type Props = {
   project: Project;
@@ -42,9 +43,12 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const handleOpenInEditor = useOpenProjectInEditor(project);
   const { t } = useTranslation('projects');
+  const { remoteFeaturesEnabled } = useUserSystem();
 
   const { data: repos } = useProjectRepos(project.id);
   const isSingleRepoProject = repos?.length === 1;
+  const canUnlinkRemote = Boolean(project.remote_project_id);
+  const canLinkRemote = remoteFeaturesEnabled && !project.remote_project_id;
 
   const { unlinkProject } = useProjectMutations({
     onUnlinkError: (error) => {
@@ -142,7 +146,7 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
                     {t('openInIDE')}
                   </DropdownMenuItem>
                 )}
-                {project.remote_project_id ? (
+                {canUnlinkRemote ? (
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
@@ -152,7 +156,7 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
                     <Unlink className="mr-2 h-4 w-4" />
                     {t('unlinkFromOrganization')}
                   </DropdownMenuItem>
-                ) : (
+                ) : canLinkRemote ? (
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
@@ -162,7 +166,7 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
                     <Link2 className="mr-2 h-4 w-4" />
                     {t('linkToOrganization')}
                   </DropdownMenuItem>
-                )}
+                ) : null}
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();

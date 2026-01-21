@@ -24,6 +24,7 @@ import { useOrganizationProjects } from '@/hooks/useOrganizationProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { LoginRequiredPrompt } from '@/components/dialogs/shared/LoginRequiredPrompt';
+import { useUserSystem } from '@/components/ConfigProvider';
 import type { Project } from 'shared/types';
 import { useTranslation } from 'react-i18next';
 import { defineModal } from '@/lib/modals';
@@ -46,6 +47,7 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
     const { t } = useTranslation('projects');
     const { t: tCommon } = useTranslation('common');
     const { isSignedIn } = useAuth();
+    const { remoteFeaturesEnabled, loading: systemLoading } = useUserSystem();
     const { data: orgsResponse, isLoading: orgsLoading } =
       useUserOrganizations();
 
@@ -55,6 +57,9 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
       useState<string>('');
     const [newProjectName, setNewProjectName] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const remoteDisabledMessage = t('linkDialog.remoteDisabled', {
+      defaultValue: 'Remote project linking is disabled in this build.',
+    });
 
     // Compute default organization (prefer non-personal)
     const defaultOrgId = useMemo(() => {
@@ -159,6 +164,7 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
     };
 
     const canSubmit = () => {
+      if (!remoteFeaturesEnabled && !systemLoading) return false;
       if (!currentOrgId || isSubmitting) return false;
       if (linkMode === 'existing') {
         return !!currentProjectId && !isLoadingProjects;
@@ -166,6 +172,8 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
         return !!newProjectName.trim();
       }
     };
+
+    const isRemoteDisabled = !systemLoading && !remoteFeaturesEnabled;
 
     return (
       <Dialog open={modal.visible} onOpenChange={handleOpenChange}>
@@ -175,150 +183,156 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
             <DialogDescription>{t('linkDialog.description')}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="project-name">
-                {t('linkDialog.projectLabel')}
-              </Label>
-              <div className="px-3 py-2 bg-muted rounded-md text-sm">
-                {projectName}
+          {isRemoteDisabled ? (
+            <Alert>
+              <AlertDescription>{remoteDisabledMessage}</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-name">
+                  {t('linkDialog.projectLabel')}
+                </Label>
+                <div className="px-3 py-2 bg-muted rounded-md text-sm">
+                  {projectName}
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="organization-select">
-                {t('linkDialog.organizationLabel')}
-              </Label>
-              {orgsLoading ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {t('linkDialog.loadingOrganizations')}
-                </div>
-              ) : !isSignedIn ? (
-                <LoginRequiredPrompt
-                  title={t('linkDialog.loginRequired.title')}
-                  description={t('linkDialog.loginRequired.description')}
-                  actionLabel={t('linkDialog.loginRequired.action')}
-                />
-              ) : !orgsResponse?.organizations?.length ? (
-                <Alert>
-                  <AlertDescription>
-                    {t('linkDialog.noOrganizations')}
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Select
-                  value={selectedOrgId}
-                  onValueChange={handleOrgChange}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger id="organization-select">
-                    <SelectValue
-                      placeholder={t('linkDialog.selectOrganization')}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {orgsResponse.organizations.map((org) => (
-                      <SelectItem key={org.id} value={org.id}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {currentOrgId && (
-              <>
-                <div className="space-y-2">
-                  <Label>{t('linkDialog.linkModeLabel')}</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={linkMode === 'existing' ? 'default' : 'outline'}
-                      onClick={() => setLinkMode('existing')}
-                      disabled={isSubmitting}
-                      className="flex-1"
-                    >
-                      {t('linkDialog.linkToExisting')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={linkMode === 'create' ? 'default' : 'outline'}
-                      onClick={() => setLinkMode('create')}
-                      disabled={isSubmitting}
-                      className="flex-1"
-                    >
-                      {t('linkDialog.createNew')}
-                    </Button>
+              <div className="space-y-2">
+                <Label htmlFor="organization-select">
+                  {t('linkDialog.organizationLabel')}
+                </Label>
+                {orgsLoading ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    {t('linkDialog.loadingOrganizations')}
                   </div>
-                </div>
+                ) : !isSignedIn ? (
+                  <LoginRequiredPrompt
+                    title={t('linkDialog.loginRequired.title')}
+                    description={t('linkDialog.loginRequired.description')}
+                    actionLabel={t('linkDialog.loginRequired.action')}
+                  />
+                ) : !orgsResponse?.organizations?.length ? (
+                  <Alert>
+                    <AlertDescription>
+                      {t('linkDialog.noOrganizations')}
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Select
+                    value={selectedOrgId}
+                    onValueChange={handleOrgChange}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="organization-select">
+                      <SelectValue
+                        placeholder={t('linkDialog.selectOrganization')}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {orgsResponse.organizations.map((org) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
 
-                {linkMode === 'existing' ? (
+              {currentOrgId && (
+                <>
                   <div className="space-y-2">
-                    <Label htmlFor="remote-project-select">
-                      {t('linkDialog.remoteProjectLabel')}
-                    </Label>
-                    {isLoadingProjects ? (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        {t('linkDialog.loadingRemoteProjects')}
-                      </div>
-                    ) : remoteProjects.length === 0 ? (
-                      <Alert>
-                        <AlertDescription>
-                          {t('linkDialog.noRemoteProjects')}
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <Select
-                        value={currentProjectId}
-                        onValueChange={(id) => {
-                          setSelectedRemoteProjectId(id);
+                    <Label>{t('linkDialog.linkModeLabel')}</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={linkMode === 'existing' ? 'default' : 'outline'}
+                        onClick={() => setLinkMode('existing')}
+                        disabled={isSubmitting}
+                        className="flex-1"
+                      >
+                        {t('linkDialog.linkToExisting')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={linkMode === 'create' ? 'default' : 'outline'}
+                        onClick={() => setLinkMode('create')}
+                        disabled={isSubmitting}
+                        className="flex-1"
+                      >
+                        {t('linkDialog.createNew')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {linkMode === 'existing' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="remote-project-select">
+                        {t('linkDialog.remoteProjectLabel')}
+                      </Label>
+                      {isLoadingProjects ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          {t('linkDialog.loadingRemoteProjects')}
+                        </div>
+                      ) : remoteProjects.length === 0 ? (
+                        <Alert>
+                          <AlertDescription>
+                            {t('linkDialog.noRemoteProjects')}
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <Select
+                          value={currentProjectId}
+                          onValueChange={(id) => {
+                            setSelectedRemoteProjectId(id);
+                            setError(null);
+                          }}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger id="remote-project-select">
+                            <SelectValue
+                              placeholder={t('linkDialog.selectRemoteProject')}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {remoteProjects.map((project) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="new-project-name">
+                        {t('linkDialog.newProjectNameLabel')}
+                      </Label>
+                      <Input
+                        id="new-project-name"
+                        type="text"
+                        value={newProjectName}
+                        onChange={(e) => {
+                          setNewProjectName(e.target.value);
                           setError(null);
                         }}
+                        placeholder={t('linkDialog.newProjectNamePlaceholder')}
                         disabled={isSubmitting}
-                      >
-                        <SelectTrigger id="remote-project-select">
-                          <SelectValue
-                            placeholder={t('linkDialog.selectRemoteProject')}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {remoteProjects.map((project) => (
-                            <SelectItem key={project.id} value={project.id}>
-                              {project.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="new-project-name">
-                      {t('linkDialog.newProjectNameLabel')}
-                    </Label>
-                    <Input
-                      id="new-project-name"
-                      type="text"
-                      value={newProjectName}
-                      onChange={(e) => {
-                        setNewProjectName(e.target.value);
-                        setError(null);
-                      }}
-                      placeholder={t('linkDialog.newProjectNamePlaceholder')}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                )}
-              </>
-            )}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-          </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <Button
@@ -328,14 +342,16 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
             >
               {tCommon('buttons.cancel')}
             </Button>
-            <Button
-              onClick={handleLink}
-              disabled={!canSubmit() || !orgsResponse?.organizations?.length}
-            >
-              {isSubmitting
-                ? t('linkDialog.linking')
-                : t('linkDialog.linkButton')}
-            </Button>
+            {!isRemoteDisabled && (
+              <Button
+                onClick={handleLink}
+                disabled={!canSubmit() || !orgsResponse?.organizations?.length}
+              >
+                {isSubmitting
+                  ? t('linkDialog.linking')
+                  : t('linkDialog.linkButton')}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

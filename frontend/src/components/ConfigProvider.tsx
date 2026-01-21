@@ -25,6 +25,7 @@ interface UserSystemState {
   capabilities: Record<string, BaseAgentCapability[]> | null;
   analyticsUserId: string | null;
   loginStatus: LoginStatus | null;
+  remoteFeaturesEnabled: boolean;
 }
 
 interface UserSystemContextType {
@@ -43,6 +44,7 @@ interface UserSystemContextType {
   capabilities: Record<string, BaseAgentCapability[]> | null;
   analyticsUserId: string | null;
   loginStatus: LoginStatus | null;
+  remoteFeaturesEnabled: boolean;
   setEnvironment: (env: Environment | null) => void;
   setProfiles: (profiles: Record<string, ExecutorConfig> | null) => void;
   setCapabilities: (caps: Record<string, BaseAgentCapability[]> | null) => void;
@@ -83,6 +85,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       string,
       BaseAgentCapability[]
     > | null) || null;
+  const remoteFeaturesEnabled = userSystemInfo?.remote_features_enabled ?? false;
 
   // Sync language with i18n when config changes
   useEffect(() => {
@@ -188,6 +191,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
         capabilities,
         analyticsUserId,
         loginStatus,
+        remoteFeaturesEnabled,
       },
       config,
       environment,
@@ -195,6 +199,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       capabilities,
       analyticsUserId,
       loginStatus,
+      remoteFeaturesEnabled,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,
@@ -211,6 +216,7 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
       capabilities,
       analyticsUserId,
       loginStatus,
+      remoteFeaturesEnabled,
       updateConfig,
       saveConfig,
       updateAndSaveConfig,

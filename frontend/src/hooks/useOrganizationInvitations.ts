@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { organizationsApi } from '@/lib/api';
+import { useUserSystem } from '@/components/ConfigProvider';
 import { InvitationStatus, type Invitation } from 'shared/types';
 
 interface UseOrganizationInvitationsOptions {
@@ -12,6 +13,7 @@ export function useOrganizationInvitations(
   options: UseOrganizationInvitationsOptions
 ) {
   const { organizationId, isAdmin, isPersonal } = options;
+  const { remoteFeaturesEnabled } = useUserSystem();
 
   return useQuery<Invitation[]>({
     queryKey: ['organization', 'invitations', organizationId],
@@ -26,7 +28,8 @@ export function useOrganizationInvitations(
         (inv) => inv.status === InvitationStatus.PENDING
       );
     },
-    enabled: !!organizationId && !!isAdmin && !isPersonal,
+    enabled:
+      !!organizationId && !!isAdmin && !isPersonal && remoteFeaturesEnabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

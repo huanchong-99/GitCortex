@@ -29,13 +29,16 @@ export interface ShareDialogProps {
 const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
   const modal = useModal();
   const { t } = useTranslation('tasks');
-  const { loading: systemLoading } = useUserSystem();
+  const { loading: systemLoading, remoteFeaturesEnabled } = useUserSystem();
   const { isSignedIn } = useAuth();
   const { project } = useProject();
   const { shareTask } = useTaskMutations(task.project_id);
   const { reset: resetShareTask } = shareTask;
 
   const [shareError, setShareError] = useState<string | null>(null);
+  const remoteDisabledMessage = t('shareDialog.remoteDisabled', {
+    defaultValue: 'Sharing is disabled in this build.',
+  });
 
   useEffect(() => {
     resetShareTask();
@@ -63,6 +66,10 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
   };
 
   const handleShare = async () => {
+    if (!remoteFeaturesEnabled && !systemLoading) {
+      setShareError(remoteDisabledMessage);
+      return;
+    }
     setShareError(null);
     try {
       await shareTask.mutateAsync(task.id);
@@ -84,6 +91,7 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
 
   const handleLinkProject = () => {
     if (!project) return;
+    if (!remoteFeaturesEnabled && !systemLoading) return;
 
     void LinkProjectDialog.show({
       projectId: project.id,
@@ -91,8 +99,12 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
     });
   };
 
-  const isShareDisabled = systemLoading || shareTask.isPending;
+  const isRemoteDisabled = !systemLoading && !remoteFeaturesEnabled;
+  const isShareDisabled =
+    systemLoading || shareTask.isPending || isRemoteDisabled;
   const isProjectLinked = project?.remote_project_id != null;
+  const canShare =
+    isSignedIn && isProjectLinked && !shareTask.isSuccess && !isRemoteDisabled;
 
   return (
     <Dialog
@@ -114,7 +126,11 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
           </DialogDescription>
         </DialogHeader>
 
-        {!isSignedIn ? (
+        {isRemoteDisabled ? (
+          <Alert className="mt-1">
+            <AlertDescription>{remoteDisabledMessage}</AlertDescription>
+          </Alert>
+        ) : !isSignedIn ? (
           <LoginRequiredPrompt
             buttonVariant="outline"
             buttonSize="sm"
@@ -155,7 +171,7 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
               ? t('shareDialog.closeButton')
               : t('shareDialog.cancel')}
           </Button>
-          {isSignedIn && isProjectLinked && !shareTask.isSuccess && (
+          {canShare && (
             <Button
               onClick={handleShare}
               disabled={isShareDisabled}

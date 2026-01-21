@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useJsonPatchWsStream } from './useJsonPatchWsStream';
 import { useAuth } from '@/hooks';
 import { useProject } from '@/contexts/ProjectContext';
+import { useUserSystem } from '@/components/ConfigProvider';
 import { useLiveQuery, eq, isNull } from '@tanstack/react-db';
 import { sharedTasksCollection } from '@/lib/electric/sharedTasksCollection';
 import { useAssigneeUserNames } from './useAssigneeUserName';
@@ -42,7 +43,10 @@ export interface UseProjectTasksResult {
 export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
   const { project } = useProject();
   const { isSignedIn } = useAuth();
+  const { remoteFeaturesEnabled } = useUserSystem();
   const remoteProjectId = project?.remote_project_id;
+  const sharedTasksEnabled =
+    remoteFeaturesEnabled && Boolean(remoteProjectId) && isSignedIn;
 
   const endpoint = `/api/tasks/stream/ws?project_id=${encodeURIComponent(projectId)}`;
 
@@ -57,7 +61,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
   const sharedTasksQuery = useLiveQuery(
     useCallback(
       (q) => {
-        if (!remoteProjectId || !isSignedIn) {
+        if (!sharedTasksEnabled) {
           return undefined;
         }
         return q
@@ -67,31 +71,34 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
           )
           .where(({ sharedTasks }) => isNull(sharedTasks.deleted_at));
       },
-      [remoteProjectId, isSignedIn]
+      [remoteProjectId, isSignedIn, sharedTasksEnabled]
     ),
-    [remoteProjectId, isSignedIn]
+    [remoteProjectId, isSignedIn, sharedTasksEnabled]
   );
 
   const sharedTasksList = useMemo(
-    () => sharedTasksQuery.data ?? [],
-    [sharedTasksQuery.data]
+    () => (sharedTasksEnabled ? sharedTasksQuery.data ?? [] : []),
+    [sharedTasksQuery.data, sharedTasksEnabled]
   );
 
   const localTasksById = useMemo(() => data?.tasks ?? {}, [data?.tasks]);
 
   const referencedSharedIds = useMemo(
     () =>
-      new Set(
-        Object.values(localTasksById)
-          .map((task) => task.shared_task_id)
-          .filter((id): id is string => Boolean(id))
-      ),
-    [localTasksById]
+      sharedTasksEnabled
+        ? new Set(
+            Object.values(localTasksById)
+              .map((task) => task.shared_task_id)
+              .filter((id): id is string => Boolean(id))
+          )
+        : new Set(),
+    [localTasksById, sharedTasksEnabled]
   );
 
   const { assignees } = useAssigneeUserNames({
     projectId: remoteProjectId || undefined,
     sharedTasks: sharedTasksList,
+    enabled: sharedTasksEnabled,
   });
 
   const sharedTasksById = useMemo(() => {
@@ -187,6 +194,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     isLoading,
     remoteProjectId: project?.remote_project_id || undefined,
     projectId,
+    enabled: sharedTasksEnabled,
   });
 
   return {

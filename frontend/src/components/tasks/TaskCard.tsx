@@ -11,6 +11,7 @@ import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
 import { TaskCardHeader } from './TaskCardHeader';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks';
+import { useUserSystem } from '@/components/ConfigProvider';
 
 type Task = TaskWithAttemptStatus;
 
@@ -37,6 +38,10 @@ export function TaskCard({
   const navigate = useNavigateWithSearch();
   const [isNavigatingToParent, setIsNavigatingToParent] = useState(false);
   const { isSignedIn } = useAuth();
+  const { remoteFeaturesEnabled } = useUserSystem();
+
+  const isRemoteShared =
+    remoteFeaturesEnabled && (Boolean(sharedTask) || Boolean(task.shared_task_id));
 
   const handleClick = useCallback(() => {
     onViewDetails(task);
@@ -89,9 +94,9 @@ export function TaskCard({
       onClick={handleClick}
       isOpen={isOpen}
       forwardedRef={localRef}
-      dragDisabled={(!!sharedTask || !!task.shared_task_id) && !isSignedIn}
+      dragDisabled={isRemoteShared && !isSignedIn}
       className={
-        sharedTask || task.shared_task_id
+        isRemoteShared
           ? 'relative overflow-hidden pl-5 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:bg-card-foreground before:content-[""]'
           : undefined
       }

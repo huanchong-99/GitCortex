@@ -26,6 +26,7 @@ import { openTaskForm } from '@/lib/openTaskForm';
 import { useNavigate } from 'react-router-dom';
 import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
 import { useAuth } from '@/hooks';
+import { useUserSystem } from '@/components/ConfigProvider';
 import { WorkspaceWithSession } from '@/types/attempt';
 
 interface ActionsDropdownProps {
@@ -44,11 +45,14 @@ export function ActionsDropdown({
   const openInEditor = useOpenInEditor(attempt?.id);
   const navigate = useNavigate();
   const { userId, isSignedIn } = useAuth();
+  const { remoteFeaturesEnabled } = useUserSystem();
 
   const hasAttemptActions = Boolean(attempt);
   const hasTaskActions = Boolean(task);
-  const isShared = Boolean(sharedTask);
-  const canEditShared = (!isShared && !task?.shared_task_id) || isSignedIn;
+  const isShared = remoteFeaturesEnabled && Boolean(sharedTask);
+  const hasSharedId = remoteFeaturesEnabled && Boolean(task?.shared_task_id);
+  const canEditShared =
+    !remoteFeaturesEnabled || (!isShared && !hasSharedId) || isSignedIn;
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -142,28 +146,31 @@ export function ActionsDropdown({
   };
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!task || isShared) return;
+    if (!task || isShared || !remoteFeaturesEnabled) return;
     ShareDialog.show({ task });
   };
 
   const handleReassign = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!sharedTask) return;
+    if (!sharedTask || !remoteFeaturesEnabled) return;
     ReassignDialog.show({ sharedTask });
   };
 
   const handleStopShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!sharedTask) return;
+    if (!sharedTask || !remoteFeaturesEnabled) return;
     StopShareTaskDialog.show({ sharedTask });
   };
 
   const canReassign =
+    remoteFeaturesEnabled &&
     Boolean(task) &&
     Boolean(sharedTask) &&
     sharedTask?.assignee_user_id === userId;
   const canStopShare =
-    Boolean(sharedTask) && sharedTask?.assignee_user_id === userId;
+    remoteFeaturesEnabled &&
+    Boolean(sharedTask) &&
+    sharedTask?.assignee_user_id === userId;
 
   return (
     <>
@@ -229,26 +236,30 @@ export function ActionsDropdown({
           {hasTaskActions && (
             <>
               <DropdownMenuLabel>{t('actionsMenu.task')}</DropdownMenuLabel>
-              <DropdownMenuItem
-                disabled={!task || isShared}
-                onClick={handleShare}
-              >
-                {t('actionsMenu.share')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!canReassign}
-                onClick={handleReassign}
-              >
-                {t('actionsMenu.reassign')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!canStopShare}
-                onClick={handleStopShare}
-                className="text-destructive"
-              >
-                {t('actionsMenu.stopShare')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {remoteFeaturesEnabled && (
+                <>
+                  <DropdownMenuItem
+                    disabled={!task || isShared}
+                    onClick={handleShare}
+                  >
+                    {t('actionsMenu.share')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!canReassign}
+                    onClick={handleReassign}
+                  >
+                    {t('actionsMenu.reassign')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!canStopShare}
+                    onClick={handleStopShare}
+                    className="text-destructive"
+                  >
+                    {t('actionsMenu.stopShare')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem
                 disabled={!projectId || !canEditShared}
                 onClick={handleEdit}
