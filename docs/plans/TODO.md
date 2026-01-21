@@ -257,7 +257,7 @@
 
 ---
 
-## Phase 11: 单项目结构迁移（一次性迁移）
+## Phase 11: 单项目结构迁移（一次性迁移） ✅
 
 **计划文件:** `2026-01-21-single-project-migration.md`, `2026-01-22-phase-11-audit-remediation.md`
 
@@ -270,17 +270,17 @@
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 11.0 | 创建 Git worktree 隔离环境 | ⬜ |  |
-| 11.1 | 冻结迁移清单（Keep/Drop/补齐） | ⬜ |  |
-| 11.2 | 远程部署依赖清理（share/、remote_client.rs、shared_tasks.rs 等） | ⬜ |  |
-| 11.3 | cc-switch-main 必要模块补齐迁入 | ⬜ |  |
-| 11.4 | 一次性迁移核心目录/配置到根目录 | ⬜ |  |
-| 11.5 | 路径与工作区配置重写（Cargo/pnpm/scripts） | ⬜ |  |
-| 11.6 | 删除不需要模块/目录（remote-frontend、npx-cli、dev_assets_seed、上游 docs 等） | ⬜ |  |
-| 11.7 | 删除源目录（vibe-kanban-main、cc-switch-main） | ⬜ |  |
-| 11.8 | 增加远程功能开关并向前端暴露能力标记 | ⬜ |  |
-| 11.9 | 前端屏蔽分享/远程项目入口并移除 shared_tasks 同步逻辑 | ⬜ |  |
-| 11.10 | 对齐类型生成：更新 generate_types 与 shared/types，消除 SharedTask 残留 | ⬜ |  |
+| 11.0 | 创建 Git worktree 隔离环境 | ✅ | 2026-01-21 |
+| 11.1 | 冻结迁移清单（Keep/Drop/补齐） | ✅ | 2026-01-21 |
+| 11.2 | 远程部署依赖清理（share/、remote_client.rs、shared_tasks.rs 等） | ✅ | 2026-01-21 |
+| 11.3 | cc-switch-main 必要模块补齐迁入 | ✅ | 2026-01-21 |
+| 11.4 | 一次性迁移核心目录/配置到根目录 | ✅ | 2026-01-21 |
+| 11.5 | 路径与工作区配置重写（Cargo/pnpm/scripts） | ✅ | 2026-01-21 |
+| 11.6 | 删除不需要模块/目录（remote-frontend、npx-cli、dev_assets_seed、上游 docs 等） | ✅ | 2026-01-21 |
+| 11.7 | 删除源目录（vibe-kanban-main、cc-switch-main） | ✅ | 2026-01-21 |
+| 11.8 | 增加远程功能开关并向前端暴露能力标记 | ✅ | 2026-01-21 |
+| 11.9 | 前端屏蔽分享/远程项目入口并移除 shared_tasks 同步逻辑 | ✅ | 2026-01-21 |
+| 11.10 | 对齐类型生成：更新 generate_types 与 shared/types，消除 SharedTask 残留 | ✅ | 2026-01-21 |
 
 ---
 

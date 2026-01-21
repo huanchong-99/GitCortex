@@ -2,6 +2,8 @@
 
 Date: 2026-01-22
 Source: Audit report (remote features removed but UI/types still present)
+Status: Completed
+Completed: 2026-01-21
 
 ## Goals
 - Prevent broken share/remote project flows when backend features are disabled.
