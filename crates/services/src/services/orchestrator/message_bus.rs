@@ -23,6 +23,18 @@ pub enum BusMessage {
         workflow_id: String,
         status: String,
     },
+    /// Terminal status update
+    TerminalStatusUpdate {
+        workflow_id: String,
+        terminal_id: String,
+        status: String,
+    },
+    /// Task status update
+    TaskStatusUpdate {
+        workflow_id: String,
+        task_id: String,
+        status: String,
+    },
     Error {
         workflow_id: String,
         error: String,
