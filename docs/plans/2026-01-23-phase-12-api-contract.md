@@ -409,3 +409,53 @@ pnpm test -- --run
 **验收标准:**  
 - 合约测试通过  
 - 前端解析无错误  
+
+---
+
+## Current Code State Analysis (2026-01-24)
+
+### Backend Status Enums
+**Location:** `crates/db/src/models/workflow.rs`
+
+**WorkflowStatus enum:**
+- `Created` (default) - ✓ Correct, NOT using 'draft'
+- `Starting`, `Ready`, `Running`, `Paused`, `Merging`, `Completed`, `Failed`, `Cancelled`
+
+**WorkflowTaskStatus enum:**
+- `Pending` (default), `Running`, `ReviewPending`, `Completed`, `Failed`, `Cancelled`
+
+**TerminalStatus enum:**
+- `NotStarted` (default), `Waiting`, `Working`, `Completed`, `Failed`
+
+**Field Serialization:**
+- Backend uses `#[serde(rename_all = "camelCase")]` on Workflow struct ✓
+- BUT current API responses use `#[serde(flatten)]` in `WorkflowDetailResponse` (PROBLEMATIC)
+
+### Frontend Status Issues Found
+**Location:** `frontend/src/`
+
+**Files using 'draft' status (incorrect):**
+1. `frontend/src/hooks/useWorkflows.ts:14` - Type definition: `'draft' | 'running' | 'completed' | 'failed'`
+2. `frontend/src/pages/Workflows.tsx:197` - Status check: `workflow.status === 'draft'`
+3. `frontend/src/pages/WorkflowDebug.tsx:15-16` - Maps 'draft' to 'idle'
+
+**Files using 'idle' status (doesn't exist in backend):**
+1. `frontend/src/pages/WorkflowDebug.tsx:13` - Return type includes 'idle'
+2. `frontend/src/pages/WorkflowDebug.tsx:15-16, 24` - Maps 'draft' to 'idle'
+3. `frontend/src/components/workflow/PipelineView.tsx:9` - Status type includes 'idle'
+
+### Field Naming Issues Found
+**Backend API Response:**
+- Currently uses `#[serde(flatten)]` in `WorkflowDetailResponse` - can cause field conflicts
+- `crates/server/src/routes/workflows.rs:51-54` uses flatten
+
+**Frontend Field Access:**
+- `frontend/src/pages/Workflows.tsx` - May access `project_id` instead of `projectId`
+- `frontend/src/hooks/useWorkflows.ts` - Type definitions may have snake_case
+
+### Required Changes Summary
+1. ✅ Backend enum is correct (uses 'Created', not 'draft')
+2. ❌ Frontend incorrectly uses 'draft' → need to change to 'created'
+3. ❌ Frontend uses non-existent 'idle' status → need to remove
+4. ❌ API responses use `#[serde(flatten)]` → need explicit DTOs
+5. ❌ Frontend types may not match backend camelCase → need to use generated types
