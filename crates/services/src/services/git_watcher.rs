@@ -4,10 +4,12 @@
 //! and publishes events to the message bus.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Result, Context};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 use crate::services::orchestrator::{BusMessage, MessageBus, TerminalCompletionEvent, TerminalCompletionStatus, CommitMetadata as OrchestratorCommitMetadata, CodeIssue};
 
@@ -158,19 +160,44 @@ pub struct ParsedCommit {
 pub struct GitWatcher {
     config: GitWatcherConfig,
     message_bus: MessageBus,
-    last_commit_hash: Option<String>,
+    last_commit_hash: Arc<Mutex<Option<String>>>,
     is_running: bool,
 }
 
 impl GitWatcher {
     /// Create a new GitWatcher
-    pub fn new(config: GitWatcherConfig, message_bus: MessageBus) -> Self {
-        Self {
+    pub fn new(config: GitWatcherConfig, message_bus: MessageBus) -> Result<Self> {
+        // Validate path exists
+        if !config.repo_path.exists() {
+            return Err(anyhow::anyhow!(
+                "Repository path does not exist: {}",
+                config.repo_path.display()
+            ));
+        }
+
+        // Validate it's a directory
+        if !config.repo_path.is_dir() {
+            return Err(anyhow::anyhow!(
+                "Repository path is not a directory: {}",
+                config.repo_path.display()
+            ));
+        }
+
+        // Validate it's a git repository
+        let git_dir = config.repo_path.join(".git");
+        if !git_dir.exists() {
+            return Err(anyhow::anyhow!(
+                "Not a git repository (missing .git directory): {}",
+                config.repo_path.display()
+            ));
+        }
+
+        Ok(Self {
             config,
             message_bus,
-            last_commit_hash: None,
+            last_commit_hash: Arc::new(Mutex::new(None)),
             is_running: false,
-        }
+        })
     }
 
     /// Check if the watcher is currently running
@@ -195,7 +222,10 @@ impl GitWatcher {
 
         // Get initial HEAD commit
         if let Ok(initial_commit) = self.get_latest_commit(&repo_path).await {
-            self.last_commit_hash = Some(initial_commit.hash.clone());
+            {
+                let mut hash = self.last_commit_hash.lock().await;
+                *hash = Some(initial_commit.hash.clone());
+            }
             tracing::info!("Initial commit: {}", initial_commit.hash);
         }
 
@@ -206,24 +236,29 @@ impl GitWatcher {
             // Check for new commits
             if let Ok(latest_commit) = self.get_latest_commit(&repo_path).await {
                 // Check if this is a new commit
-                if let Some(ref last_hash) = self.last_commit_hash {
-                    if latest_commit.hash != *last_hash {
-                        tracing::info!(
-                            "New commit detected: {}",
-                            latest_commit.hash
-                        );
-
-                        // Process the new commit
-                        if let Err(e) = self.handle_new_commit(latest_commit).await {
-                            tracing::error!("Error handling new commit: {}", e);
-                        }
-
-                        // Update last seen commit
-                        self.last_commit_hash = Some(latest_commit.hash);
+                let new_hash = latest_commit.hash.clone();
+                let should_process = {
+                    let mut last_hash = self.last_commit_hash.lock().await;
+                    let should = match last_hash.as_ref() {
+                        Some(last) => *last != new_hash,
+                        None => true,
+                    };
+                    if should {
+                        *last_hash = Some(new_hash.clone());
                     }
-                } else {
-                    // First time seeing a commit
-                    self.last_commit_hash = Some(latest_commit.hash);
+                    should
+                };
+
+                if should_process {
+                    tracing::info!(
+                        "New commit detected: {}",
+                        latest_commit.hash
+                    );
+
+                    // Process the new commit
+                    if let Err(e) = self.handle_new_commit(latest_commit).await {
+                        tracing::error!("Error handling new commit: {}", e);
+                    }
                 }
             }
         }
@@ -248,7 +283,10 @@ impl GitWatcher {
             .args(["log", "-1", "--format=%H|%s"])
             .output()
             .await
-            .context("Failed to get latest commit")?;
+            .context(format!(
+                "Failed to get latest commit from {}",
+                self.config.repo_path.display()
+            ))?;
 
         if !output.status.success() {
             anyhow::bail!("git log failed: {}", String::from_utf8_lossy(&output.stderr));
@@ -271,7 +309,10 @@ impl GitWatcher {
             .args(["log", "-1", "--format=%B"])
             .output()
             .await
-            .context("Failed to get commit body")?;
+            .context(format!(
+                "Failed to get commit body from {}",
+                self.config.repo_path.display()
+            ))?;
 
         let full_message = String::from_utf8_lossy(&full_output.stdout).to_string();
         let metadata = CommitMetadata::parse(&full_message);
@@ -331,7 +372,8 @@ impl GitWatcher {
         // Publish to message bus
         self.message_bus
             .publish_terminal_completed(event)
-            .await;
+            .await
+            .context("Failed to publish terminal completion event")?;
 
         tracing::info!(
             "Published TerminalCompleted event for terminal {}",
