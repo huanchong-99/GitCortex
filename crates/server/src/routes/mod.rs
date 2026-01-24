@@ -28,6 +28,7 @@ pub mod task_attempts;
 pub mod tasks;
 pub mod terminal_ws;
 pub mod workflows;
+pub mod workflows_dto;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
