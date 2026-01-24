@@ -139,7 +139,8 @@ async fn test_start_workflow_requires_ready_status() {
         .expect("Workflow not found");
     assert_eq!(workflow.status, "created");
 
-    // Attempt to start workflow - should return 400 BadRequest
+    // Attempt to start workflow - should return 500 Internal Server Error
+    // (status validation now happens in runtime, which returns internal error)
     use axum::{
         body::Body,
         http::{StatusCode, Request},
@@ -157,8 +158,8 @@ async fn test_start_workflow_requires_ready_status() {
     let response = app.oneshot(request).await
         .expect("Failed to get response");
 
-    // Should return 400 BadRequest
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    // Should return 500 Internal Server Error (runtime validation failure)
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     // Verify workflow status is still 'created' (not changed)
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)

@@ -445,7 +445,7 @@ async fn get_workflow(
     // Get workflow
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Workflow not found".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
 
     // Get tasks and terminals
     let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
@@ -506,17 +506,9 @@ async fn start_workflow(
     // Check workflow exists
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
-        .ok_or_else(|| ApiError::BadRequest("Workflow not found".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
 
-    // Validate workflow status is ready
-    if workflow.status != "ready" {
-        return Err(ApiError::BadRequest(format!(
-            "Workflow is not ready. Current status: {}",
-            workflow.status
-        )));
-    }
-
-    // Verify orchestrator is enabled
+    // Verify orchestrator is enabled (only check needed at API level)
     if !workflow.orchestrator_enabled {
         return Err(ApiError::BadRequest(
             "Cannot start workflow: orchestrator is not enabled".to_string()
@@ -524,10 +516,17 @@ async fn start_workflow(
     }
 
     // Call orchestrator runtime to start workflow
+    // Runtime handles all status validation atomically
     deployment
         .orchestrator_runtime()
         .start_workflow(&workflow_id)
-        .map_err(|e| ApiError::Internal(format!("Failed to start workflow: {}", e)))?;
+        .await
+        .map_err(|e| {
+            // Log full error internally
+            tracing::error!("Failed to start workflow {}: {:?}", workflow_id, e);
+            // Return generic message to client
+            ApiError::Internal(format!("Failed to start workflow"))
+        })?;
 
     // Note: Workflow::set_started is called inside OrchestratorRuntime::start_workflow
     // to ensure the status update happens atomically with runtime startup

@@ -66,6 +66,10 @@ pub enum ApiError {
     EditorOpen(#[from] EditorOpenError),
     #[error("Unauthorized")]
     Unauthorized,
+    #[error("Internal error: {0}")]
+    Internal(String),
+    #[error("Not found: {0}")]
+    NotFound(String),
     #[error("Bad request: {0}")]
     BadRequest(String),
     #[error("Conflict: {0}")]
@@ -130,6 +134,8 @@ impl IntoResponse for ApiError {
             },
             ApiError::Multipart(_) => (StatusCode::BAD_REQUEST, "MultipartError"),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
+            ApiError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "InternalError"),
+            ApiError::NotFound(_) => (StatusCode::NOT_FOUND, "NotFound"),
             ApiError::BadRequest(_) => (StatusCode::BAD_REQUEST, "BadRequest"),
             ApiError::Conflict(_) => (StatusCode::CONFLICT, "ConflictError"),
             ApiError::Forbidden(_) => (StatusCode::FORBIDDEN, "ForbiddenError"),
@@ -161,6 +167,8 @@ impl IntoResponse for ApiError {
             },
             ApiError::Multipart(_) => "Failed to upload file. Please ensure the file is valid and try again.".to_string(),
             ApiError::Unauthorized => "Unauthorized. Please sign in again.".to_string(),
+            ApiError::Internal(_) => "An internal error occurred. Please try again.".to_string(),
+            ApiError::NotFound(msg) => msg.clone(),
             ApiError::BadRequest(msg) | ApiError::Conflict(msg) | ApiError::Forbidden(msg) => {
                 msg.clone()
             }

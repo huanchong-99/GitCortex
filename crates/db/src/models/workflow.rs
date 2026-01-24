@@ -553,13 +553,16 @@ impl Workflow {
     }
 
     /// Set workflow started
+    ///
+    /// Uses Compare-And-Set (CAS) to ensure workflow is in 'ready' state
+    /// before transitioning to 'running'. Returns error if CAS fails.
     pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         let now = Utc::now();
-        sqlx::query(
+        let result = sqlx::query(
             r"
             UPDATE workflow
             SET status = 'running', started_at = ?, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND status = 'ready'
             ",
         )
         .bind(now)
@@ -567,6 +570,12 @@ impl Workflow {
         .bind(id)
         .execute(pool)
         .await?;
+
+        // Check CAS succeeded
+        if result.rows_affected() == 0 {
+            return Err(sqlx::Error::RowNotFound);
+        }
+
         Ok(())
     }
 
