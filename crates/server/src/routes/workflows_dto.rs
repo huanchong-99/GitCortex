@@ -4,11 +4,13 @@
 //! All structs use explicit field mappings (no flatten) to prevent conflicts.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use db::models::{SlashCommandPreset, WorkflowCommand};
 
 /// Workflow detail response DTO
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct WorkflowDetailDto {
     // Basic workflow fields
     pub id: String,
@@ -41,8 +43,9 @@ pub struct WorkflowDetailDto {
 }
 
 /// Workflow task DTO
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct WorkflowTaskDto {
     pub id: String,
     pub workflow_id: String,
@@ -60,8 +63,9 @@ pub struct WorkflowTaskDto {
 }
 
 /// Terminal DTO
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct TerminalDto {
     pub id: String,
     pub workflow_task_id: String,
@@ -78,8 +82,9 @@ pub struct TerminalDto {
 }
 
 /// Workflow command DTO
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct WorkflowCommandDto {
     pub id: String,
     pub workflow_id: String,
@@ -91,8 +96,9 @@ pub struct WorkflowCommandDto {
 }
 
 /// Slash command preset DTO
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct SlashCommandPresetDto {
     pub id: String,
     pub command: String,
@@ -104,8 +110,9 @@ pub struct SlashCommandPresetDto {
 }
 
 /// Workflow list item DTO (simplified for list view)
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct WorkflowListItemDto {
     pub id: String,
     pub project_id: String,

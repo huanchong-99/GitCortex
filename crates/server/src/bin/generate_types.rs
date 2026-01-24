@@ -11,6 +11,12 @@ fn generate_types_content() -> String {
 // If you are an AI, and you absolutely have to edit this file, please confirm with the user first.";
 
     let decls: Vec<String> = vec![
+        server::routes::workflows_dto::WorkflowDetailDto::decl(),
+        server::routes::workflows_dto::WorkflowTaskDto::decl(),
+        server::routes::workflows_dto::TerminalDto::decl(),
+        server::routes::workflows_dto::WorkflowCommandDto::decl(),
+        server::routes::workflows_dto::SlashCommandPresetDto::decl(),
+        server::routes::workflows_dto::WorkflowListItemDto::decl(),
         server::routes::shared_tasks_types::SharedTaskResponse::decl(),
         server::routes::shared_tasks_types::AssigneesQuery::decl(),
         server::routes::shared_tasks_types::SharedTask::decl(),
