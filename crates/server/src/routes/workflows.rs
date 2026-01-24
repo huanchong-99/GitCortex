@@ -14,6 +14,7 @@ use db::models::{
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use utils::response::ApiResponse;
+use utils::slug;
 use uuid::Uuid;
 
 // Import DTOs
@@ -251,14 +252,35 @@ async fn create_workflow(
 
     // 3. Prepare tasks and terminals for transactional creation
     let mut task_rows: Vec<(WorkflowTask, Vec<Terminal>)> = Vec::new();
+    let mut existing_branches: Vec<String> = Vec::new();
 
+    // Collect existing branch names for conflict detection
+    // In a real scenario, we'd query the git repository for existing branches
+    // For now, we collect branches that will be created in this batch
     for (task_index, task_req) in req.tasks.iter().enumerate() {
         let task_id = Uuid::new_v4().to_string();
 
-        // Generate branch name (will be refined in Task 13.4)
-        let branch = task_req.branch.clone().unwrap_or_else(|| {
-            format!("workflow/{}/task-{}", workflow_id, task_index)
-        });
+        // Generate branch name using slugify with conflict detection
+        let branch = if let Some(custom_branch) = &task_req.branch {
+            // Use custom branch name if provided
+            custom_branch.clone()
+        } else {
+            // Auto-generate branch name: workflow/{workflow_id}/{slugified-task-name}
+            // Check against already-generated branches in this batch
+            let base_branch = format!("workflow/{}/{}", workflow_id, slug::slugify(&task_req.name));
+            let mut candidate = base_branch.clone();
+            let mut counter = 2;
+
+            while existing_branches.contains(&candidate) {
+                candidate = format!("{}-{}", base_branch, counter);
+                counter += 1;
+            }
+
+            candidate
+        };
+
+        // Track this branch to avoid conflicts within the same batch
+        existing_branches.push(branch.clone());
 
         let task = WorkflowTask {
             id: task_id.clone(),
