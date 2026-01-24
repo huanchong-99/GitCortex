@@ -9,7 +9,8 @@ use axum::{
     routing::{get, post, put},
 };
 use db::models::{
-    CreateWorkflowRequest, SlashCommandPreset, Terminal, Workflow, WorkflowCommand, WorkflowTask,
+    CliType, CreateWorkflowRequest, ModelConfig, SlashCommandPreset, Terminal, Workflow,
+    WorkflowCommand, WorkflowTask,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
@@ -153,6 +154,72 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
     Ok(())
 }
 
+/// Validate CLI types and model configs exist in database
+async fn validate_cli_and_model_configs(
+    pool: &sqlx::SqlitePool,
+    req: &CreateWorkflowRequest,
+) -> Result<(), ApiError> {
+    // Collect all unique cli_type_id and model_config_id pairs
+    let mut pairs_to_validate: Vec<(String, String)> = Vec::new();
+
+    // Add merge terminal config
+    pairs_to_validate.push((
+        req.merge_terminal_config.cli_type_id.clone(),
+        req.merge_terminal_config.model_config_id.clone(),
+    ));
+
+    // Add error terminal config if present
+    if let Some(error_config) = &req.error_terminal_config {
+        pairs_to_validate.push((
+            error_config.cli_type_id.clone(),
+            error_config.model_config_id.clone(),
+        ));
+    }
+
+    // Add all task terminals
+    for task in &req.tasks {
+        for terminal in &task.terminals {
+            pairs_to_validate.push((
+                terminal.cli_type_id.clone(),
+                terminal.model_config_id.clone(),
+            ));
+        }
+    }
+
+    // Validate each pair
+    for (cli_type_id, model_config_id) in pairs_to_validate {
+        // Validate CLI type exists
+        let cli_type = CliType::find_by_id(pool, &cli_type_id).await
+            .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
+
+        if cli_type.is_none() {
+            return Err(ApiError::BadRequest(format!(
+                "CLI type not found: {cli_type_id}"
+            )));
+        }
+
+        // Validate model config exists
+        let model_config = ModelConfig::find_by_id(pool, &model_config_id).await
+            .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
+
+        if model_config.is_none() {
+            return Err(ApiError::BadRequest(format!(
+                "Model config not found: {model_config_id}"
+            )));
+        }
+
+        // Validate model config belongs to the CLI type
+        let model_config = model_config.unwrap();
+        if model_config.cli_type_id != cli_type_id {
+            return Err(ApiError::BadRequest(format!(
+                "Model config {model_config_id} does not belong to CLI type {cli_type_id}"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 /// GET /api/workflows?project_id=xxx
 /// List workflows for a project
 async fn list_workflows(
@@ -190,8 +257,11 @@ async fn create_workflow(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<CreateWorkflowRequest>,
 ) -> Result<ResponseJson<ApiResponse<WorkflowDetailDto>>, ApiError> {
-    // Validate request
+    // Validate request structure
     validate_create_request(&req)?;
+
+    // Validate CLI types and model configs exist in database
+    validate_cli_and_model_configs(&deployment.db().pool, &req).await?;
 
     let now = chrono::Utc::now();
     let workflow_id = Uuid::new_v4().to_string();
