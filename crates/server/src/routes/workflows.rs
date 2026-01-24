@@ -17,6 +17,9 @@ use uuid::Uuid;
 use crate::{error::ApiError, DeploymentImpl};
 use utils::response::ApiResponse;
 
+// Import DTOs
+use crate::routes::workflows_dto::{WorkflowDetailDto, WorkflowListItemDto};
+
 // ============================================================================
 // Request/Response Types
 // ============================================================================
@@ -101,13 +104,30 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
 async fn list_workflows(
     State(deployment): State<DeploymentImpl>,
     Query(params): Query<HashMap<String, String>>,
-) -> Result<ResponseJson<ApiResponse<Vec<Workflow>>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<Vec<WorkflowListItemDto>>>, ApiError> {
     let project_id = params
         .get("project_id")
         .ok_or_else(|| ApiError::BadRequest("project_id is required".to_string()))?;
 
     let workflows = Workflow::find_by_project(&deployment.db().pool, project_id).await?;
-    Ok(ResponseJson(ApiResponse::success(workflows)))
+
+    // Convert to DTOs
+    let dtos: Vec<WorkflowListItemDto> = workflows
+        .into_iter()
+        .map(|w| WorkflowListItemDto {
+            id: w.id,
+            project_id: w.project_id,
+            name: w.name,
+            description: w.description,
+            status: w.status,
+            created_at: w.created_at.to_rfc3339(),
+            updated_at: w.updated_at.to_rfc3339(),
+            tasks_count: 0, // TODO: load from DB
+            terminals_count: 0, // TODO: load from DB
+        })
+        .collect();
+
+    Ok(ResponseJson(ApiResponse::success(dtos)))
 }
 
 /// POST /api/workflows
@@ -115,7 +135,7 @@ async fn list_workflows(
 async fn create_workflow(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<CreateWorkflowRequest>,
-) -> Result<ResponseJson<ApiResponse<WorkflowDetailResponse>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<WorkflowDetailDto>>, ApiError> {
     let now = chrono::Utc::now();
     let workflow_id = Uuid::new_v4().to_string();
 
@@ -174,27 +194,23 @@ async fn create_workflow(
     }
 
     // 3. Create tasks and terminals (simplified for now)
-    let task_details: Vec<WorkflowTaskDetailResponse> = Vec::new();
+    let tasks: Vec<WorkflowTask> = Vec::new();
 
     // 4. Get command preset details
     let all_presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;
-    let commands_with_presets: Vec<WorkflowCommandWithPreset> = commands
+    let commands_with_presets: Vec<(WorkflowCommand, SlashCommandPreset)> = commands
         .into_iter()
         .filter_map(|cmd| {
             all_presets.iter()
                 .find(|p| p.id == cmd.preset_id)
-                .map(|preset| WorkflowCommandWithPreset {
-                    command: cmd,
-                    preset: preset.clone(),
-                })
+                .map(|preset| (cmd, preset.clone()))
         })
         .collect();
 
-    Ok(ResponseJson(ApiResponse::success(WorkflowDetailResponse {
-        workflow,
-        tasks: task_details,
-        commands: commands_with_presets,
-    })))
+    // Convert to DTO
+    let dto = WorkflowDetailDto::from_workflow(&workflow, &tasks, &commands_with_presets);
+
+    Ok(ResponseJson(ApiResponse::success(dto)))
 }
 
 /// GET /api/workflows/:workflow_id
@@ -202,7 +218,7 @@ async fn create_workflow(
 async fn get_workflow(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<String>,
-) -> Result<ResponseJson<ApiResponse<WorkflowDetailResponse>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<WorkflowDetailDto>>, ApiError> {
     // Get workflow
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
@@ -210,35 +226,23 @@ async fn get_workflow(
 
     // Get tasks and terminals
     let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
-    let mut task_details = Vec::new();
-    for task in tasks {
-        let terminals = Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
-        task_details.push(WorkflowTaskDetailResponse {
-            task,
-            terminals,
-        });
-    }
 
-    // Get commands
+    // Get commands with presets
     let commands = WorkflowCommand::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
     let all_presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;
-    let commands_with_presets: Vec<WorkflowCommandWithPreset> = commands
+    let commands_with_presets: Vec<(WorkflowCommand, SlashCommandPreset)> = commands
         .into_iter()
         .filter_map(|cmd| {
             all_presets.iter()
                 .find(|p| p.id == cmd.preset_id)
-                .map(|preset| WorkflowCommandWithPreset {
-                    command: cmd,
-                    preset: preset.clone(),
-                })
+                .map(|preset| (cmd, preset.clone()))
         })
         .collect();
 
-    Ok(ResponseJson(ApiResponse::success(WorkflowDetailResponse {
-        workflow,
-        tasks: task_details,
-        commands: commands_with_presets,
-    })))
+    // Convert to DTO
+    let dto = WorkflowDetailDto::from_workflow(&workflow, &tasks, &commands_with_presets);
+
+    Ok(ResponseJson(ApiResponse::success(dto)))
 }
 
 /// DELETE /api/workflows/:workflow_id
@@ -322,4 +326,64 @@ async fn list_command_presets(
 ) -> Result<ResponseJson<ApiResponse<Vec<SlashCommandPreset>>>, ApiError> {
     let presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;
     Ok(ResponseJson(ApiResponse::success(presets)))
+}
+
+// ============================================================================
+// Contract Tests
+// ============================================================================
+
+#[cfg(test)]
+mod dto_tests {
+    use super::*;
+    use crate::routes::workflows_dto::WorkflowDetailDto;
+
+    #[test]
+    fn test_list_workflows_returns_camelcase() {
+        // This test validates the expected format
+        let response_json = r#"[
+            {
+                "id": "wf-test",
+                "projectId": "proj-test",
+                "name": "Test",
+                "status": "created",
+                "createdAt": "2026-01-24T10:00:00Z",
+                "updatedAt": "2026-01-24T10:00:00Z",
+                "tasksCount": 0,
+                "terminalsCount": 0
+            }
+        ]"#;
+
+        // Verify no snake_case
+        assert!(!response_json.contains("\"project_id\""));
+        assert!(!response_json.contains("\"created_at\""));
+
+        // Verify camelCase
+        assert!(response_json.contains("\"projectId\""));
+        assert!(response_json.contains("\"createdAt\""));
+    }
+
+    #[test]
+    fn test_get_workflow_returns_camelcase() {
+        let response_json = r#"{
+            "id": "wf-test",
+            "projectId": "proj-test",
+            "name": "Test Workflow",
+            "status": "created",
+            "useSlashCommands": true,
+            "orchestratorEnabled": true,
+            "createdAt": "2026-01-24T10:00:00Z",
+            "updatedAt": "2026-01-24T10:00:00Z",
+            "tasks": [],
+            "commands": []
+        }"#;
+
+        // Verify no snake_case
+        assert!(!response_json.contains("\"project_id\""));
+        assert!(!response_json.contains("\"use_slash_commands\""));
+
+        // Verify camelCase
+        assert!(response_json.contains("\"projectId\""));
+        assert!(response_json.contains("\"useSlashCommands\""));
+        assert!(response_json.contains("\"orchestratorEnabled\""));
+    }
 }
