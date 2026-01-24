@@ -118,6 +118,118 @@ pub struct WorkflowListItemDto {
     pub terminals_count: i32,
 }
 
+impl WorkflowDetailDto {
+    /// Convert from DB models to DTO
+    pub fn from_workflow(
+        workflow: &db::models::Workflow,
+        tasks: &[db::models::WorkflowTask],
+        commands: &[(db::models::WorkflowCommand, db::models::SlashCommandPreset)],
+    ) -> Self {
+        let tasks_dto = tasks.iter().map(|task| {
+            WorkflowTaskDto::from_workflow_task(task, &vec![]) // terminals will be loaded separately
+        }).collect();
+
+        let commands_dto = commands.iter().map(|(cmd, preset)| {
+            WorkflowCommandDto::from_models(cmd, preset)
+        }).collect();
+
+        Self {
+            id: workflow.id.clone(),
+            project_id: workflow.project_id.clone(),
+            name: workflow.name.clone(),
+            description: workflow.description.clone(),
+            status: workflow.status.clone(),
+            use_slash_commands: workflow.use_slash_commands,
+            orchestrator_enabled: workflow.orchestrator_enabled,
+            orchestrator_api_type: workflow.orchestrator_api_type.clone(),
+            orchestrator_base_url: workflow.orchestrator_base_url.clone(),
+            orchestrator_model: workflow.orchestrator_model.clone(),
+            error_terminal_enabled: workflow.error_terminal_enabled,
+            error_terminal_cli_id: workflow.error_terminal_cli_id.clone(),
+            error_terminal_model_id: workflow.error_terminal_model_id.clone(),
+            merge_terminal_cli_id: Some(workflow.merge_terminal_cli_id.clone()),
+            merge_terminal_model_id: Some(workflow.merge_terminal_model_id.clone()),
+            target_branch: workflow.target_branch.clone(),
+            ready_at: workflow.ready_at.map(|dt| dt.to_rfc3339()),
+            started_at: workflow.started_at.map(|dt| dt.to_rfc3339()),
+            completed_at: workflow.completed_at.map(|dt| dt.to_rfc3339()),
+            created_at: workflow.created_at.to_rfc3339(),
+            updated_at: workflow.updated_at.to_rfc3339(),
+            tasks: tasks_dto,
+            commands: commands_dto,
+        }
+    }
+}
+
+impl WorkflowTaskDto {
+    pub fn from_workflow_task(task: &db::models::WorkflowTask, terminals: &[db::models::Terminal]) -> Self {
+        let terminals_dto = terminals.iter().map(TerminalDto::from_terminal).collect();
+
+        Self {
+            id: task.id.clone(),
+            workflow_id: task.workflow_id.clone(),
+            vk_task_id: task.vk_task_id.map(|uuid| uuid.to_string()),
+            name: task.name.clone(),
+            description: task.description.clone(),
+            branch: task.branch.clone(),
+            status: task.status.clone(),
+            order_index: task.order_index,
+            started_at: task.started_at.map(|dt| dt.to_rfc3339()),
+            completed_at: task.completed_at.map(|dt| dt.to_rfc3339()),
+            created_at: task.created_at.to_rfc3339(),
+            updated_at: task.updated_at.to_rfc3339(),
+            terminals: terminals_dto,
+        }
+    }
+}
+
+impl TerminalDto {
+    pub fn from_terminal(terminal: &db::models::Terminal) -> Self {
+        Self {
+            id: terminal.id.clone(),
+            workflow_task_id: terminal.workflow_task_id.clone(),
+            cli_type_id: terminal.cli_type_id.clone(),
+            model_config_id: terminal.model_config_id.clone(),
+            custom_base_url: terminal.custom_base_url.clone(),
+            custom_api_key: terminal.custom_api_key.clone(),
+            role: terminal.role.clone(),
+            role_description: terminal.role_description.clone(),
+            order_index: terminal.order_index,
+            status: terminal.status.clone(),
+            created_at: terminal.created_at.to_rfc3339(),
+            updated_at: terminal.updated_at.to_rfc3339(),
+        }
+    }
+}
+
+impl WorkflowCommandDto {
+    pub fn from_models(command: &db::models::WorkflowCommand, preset: &db::models::SlashCommandPreset) -> Self {
+        Self {
+            id: command.id.clone(),
+            workflow_id: command.workflow_id.clone(),
+            preset_id: command.preset_id.to_string(),
+            order_index: command.order_index,
+            custom_params: command.custom_params.clone(),
+            created_at: command.created_at.to_rfc3339(),
+            preset: SlashCommandPresetDto::from_model(preset),
+        }
+    }
+}
+
+impl SlashCommandPresetDto {
+    pub fn from_model(preset: &db::models::SlashCommandPreset) -> Self {
+        Self {
+            id: preset.id.to_string(),
+            command: preset.command.clone(),
+            description: preset.description.clone(),
+            prompt_template: preset.prompt_template.clone().unwrap_or_default(),
+            is_system: preset.is_system,
+            created_at: preset.created_at.to_rfc3339(),
+            updated_at: preset.updated_at.to_rfc3339(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,5 +342,52 @@ mod tests {
             let json = serde_json::to_string(&dto).unwrap();
             assert!(json.contains(&format!("\"status\":\"{}\"", status)));
         }
+    }
+}
+
+#[cfg(test)]
+mod conversion_tests {
+    use super::*;
+    use db::models::{Workflow, WorkflowTask, Terminal};
+    use uuid::Uuid;
+    use chrono::Utc;
+
+    #[test]
+    fn test_convert_workflow_to_dto() {
+        // This test will fail until we implement the conversion
+        let workflow = Workflow {
+            id: Uuid::new_v4().to_string(),
+            project_id: Uuid::new_v4().to_string(),
+            name: "Test Workflow".to_string(),
+            description: Some("Test".to_string()),
+            status: "created".to_string(),
+            use_slash_commands: true,
+            orchestrator_enabled: true,
+            orchestrator_api_type: Some("openai-compatible".to_string()),
+            orchestrator_base_url: None,
+            orchestrator_model: Some("gpt-4o".to_string()),
+            orchestrator_api_key: None,
+            error_terminal_enabled: true,
+            error_terminal_cli_id: Some("cli-test".to_string()),
+            error_terminal_model_id: Some("model-test".to_string()),
+            merge_terminal_cli_id: "cli-merge".to_string(),
+            merge_terminal_model_id: "model-merge".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: None,
+            started_at: None,
+            completed_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let dto = WorkflowDetailDto::from_workflow(
+            &workflow,
+            &vec![],
+            &vec![]
+        );
+
+        assert_eq!(dto.name, "Test Workflow");
+        assert_eq!(dto.status, "created");
+        assert!(dto.use_slash_commands);
     }
 }
