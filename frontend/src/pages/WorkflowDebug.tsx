@@ -10,18 +10,22 @@ import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
 import { useTranslation } from 'react-i18next';
 
-function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'completed' | 'failed' {
+function mapWorkflowStatus(status: string): 'created' | 'running' | 'paused' | 'completed' | 'failed' {
   switch (status) {
-    case 'draft':
-      return 'idle';
+    case 'created':
+    case 'starting':
+    case 'ready':
+      return 'created';
     case 'running':
       return 'running';
+    case 'paused':
+      return 'paused';
     case 'completed':
       return 'completed';
     case 'failed':
       return 'failed';
     default:
-      return 'idle';
+      return 'created';
   }
 }
 
@@ -80,7 +84,7 @@ export function WorkflowDebugPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {data.status === 'draft' && (
+          {data.status === 'created' && (
             <Button size="sm">
               <Play className="w-4 h-4 mr-2" /> {t('workflowDebug.start')}
             </Button>

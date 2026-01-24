@@ -1,85 +1,69 @@
 import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
 import { handleApiResponse, logApiError } from '@/lib/api';
+import type {
+  WorkflowDetailDto as Workflow,
+  WorkflowListItemDto,
+  WorkflowTaskDto,
+  TerminalDto,
+  WorkflowCommandDto,
+  SlashCommandPresetDto,
+} from '@/shared/types';
 
 // ============================================================================
-// Workflow Types
+// Create Request Types (not in generated types yet)
 // ============================================================================
-
-export interface Workflow {
-  id: string;
-  project_id: string;
-  name: string;
-  description?: string;
-  config: WorkflowConfig;
-  status: 'draft' | 'running' | 'completed' | 'failed';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface WorkflowConfig {
-  tasks: WorkflowTaskConfig[];
-  models: WorkflowModelConfig[];
-  terminals: WorkflowTerminalConfig[];
-  commands: WorkflowCommandConfig;
-  orchestrator: WorkflowOrchestratorConfig;
-}
-
-export interface WorkflowTaskConfig {
-  id: string;
-  name: string;
-  description: string;
-  branch: string;
-  terminalCount: number;
-}
-
-export interface WorkflowModelConfig {
-  id: string;
-  displayName: string;
-  apiType: 'anthropic' | 'google' | 'openai' | 'openai-compatible';
-  baseUrl: string;
-  modelId: string;
-  isVerified: boolean;
-}
-
-export interface WorkflowTerminalConfig {
-  id: string;
-  taskId: string;
-  orderIndex: number;
-  cliTypeId: string;
-  modelConfigId: string;
-  role?: string;
-}
-
-export interface WorkflowCommandConfig {
-  enabled: boolean;
-  presetIds: string[];
-}
-
-export interface WorkflowOrchestratorConfig {
-  modelConfigId: string;
-  errorTerminal?: {
-    enabled: boolean;
-    cliTypeId?: string;
-    modelConfigId?: string;
-  };
-  mergeTerminal: {
-    cliTypeId: string;
-    modelConfigId: string;
-    runTestsBeforeMerge: boolean;
-    pauseOnConflict: boolean;
-  };
-  targetBranch: string;
-}
 
 export interface CreateWorkflowRequest {
-  project_id: string;
+  projectId: string;
   name: string;
   description?: string;
-  config: WorkflowConfig;
+  useSlashCommands?: boolean;
+  commandPresetIds?: string[];
+  commands?: Array<{
+    presetId: string;
+    orderIndex: number;
+    customParams?: string | null;
+  }>;
+  orchestratorConfig?: {
+    apiType: string;
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
+  errorTerminalConfig?: {
+    cliTypeId: string;
+    modelConfigId: string;
+    customBaseUrl?: string | null;
+    customApiKey?: string | null;
+  };
+  mergeTerminalConfig?: {
+    cliTypeId: string;
+    modelConfigId: string;
+    customBaseUrl?: string | null;
+    customApiKey?: string | null;
+  };
+  targetBranch?: string;
+  tasks?: Array<{
+    id?: string;
+    name: string;
+    description?: string;
+    branch?: string;
+    orderIndex: number;
+    terminals: Array<{
+      id?: string;
+      cliTypeId: string;
+      modelConfigId: string;
+      customBaseUrl?: string | null;
+      customApiKey?: string | null;
+      role?: string;
+      roleDescription?: string;
+      orderIndex: number;
+    }>;
+  }>;
 }
 
 export interface StartWorkflowRequest {
-  workflow_id: string;
+  workflow_id: string; // Note: API still uses snake_case for IDs
 }
 
 export interface WorkflowExecution {
@@ -109,9 +93,9 @@ const workflowsApi = {
   /**
    * Get all workflows for a project
    */
-  getForProject: async (projectId: string): Promise<Workflow[]> => {
-    const response = await fetch(`/api/workflows?project_id=${encodeURIComponent(projectId)}`);
-    return handleApiResponse<Workflow[]>(response);
+  getForProject: async (projectId: string): Promise<WorkflowListItemDto[]> => {
+    const response = await fetch(`/api/workflows?projectId=${encodeURIComponent(projectId)}`);
+    return handleApiResponse<WorkflowListItemDto[]>(response);
   },
 
   /**
@@ -165,7 +149,7 @@ const workflowsApi = {
  * @param projectId - The project ID to fetch workflows for
  * @returns Query result with workflows array
  */
-export function useWorkflows(projectId: string): UseQueryResult<Workflow[], Error> {
+export function useWorkflows(projectId: string): UseQueryResult<WorkflowListItemDto[], Error> {
   return useQuery({
     queryKey: workflowKeys.forProject(projectId),
     queryFn: () => workflowsApi.getForProject(projectId),
@@ -200,7 +184,7 @@ export function useCreateWorkflow() {
     onSuccess: (newWorkflow, variables) => {
       // Invalidate the project's workflows list
       queryClient.invalidateQueries({
-        queryKey: workflowKeys.forProject(variables.project_id),
+        queryKey: workflowKeys.forProject(variables.projectId),
       });
       // Add the new workflow to the cache
       queryClient.setQueryData(
@@ -259,3 +243,13 @@ export function useDeleteWorkflow() {
     },
   });
 }
+
+// Export types for convenience
+export type {
+  Workflow,
+  WorkflowListItemDto,
+  WorkflowTaskDto,
+  TerminalDto,
+  WorkflowCommandDto,
+  SlashCommandPresetDto,
+};
