@@ -19,6 +19,7 @@ use super::{
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
     types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus},
 };
+use crate::services::error_handler::ErrorHandler;
 
 /// Coordinates workflow execution, message handling, and LLM interactions.
 pub struct OrchestratorAgent {
@@ -27,6 +28,7 @@ pub struct OrchestratorAgent {
     message_bus: SharedMessageBus,
     llm_client: Box<dyn LLMClient>,
     db: Arc<DBService>,
+    error_handler: ErrorHandler,
 }
 
 impl OrchestratorAgent {
@@ -39,6 +41,7 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<Self> {
         let llm_client = create_llm_client(&config)?;
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
+        let error_handler = ErrorHandler::new(db.clone(), message_bus.clone());
 
         Ok(Self {
             config,
@@ -46,6 +49,7 @@ impl OrchestratorAgent {
             message_bus,
             llm_client,
             db,
+            error_handler,
         })
     }
 
@@ -59,6 +63,7 @@ impl OrchestratorAgent {
         llm_client: Box<dyn LLMClient>,
     ) -> anyhow::Result<Self> {
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
+        let error_handler = ErrorHandler::new(db.clone(), message_bus.clone());
 
         Ok(Self {
             config,
@@ -66,6 +71,7 @@ impl OrchestratorAgent {
             message_bus,
             llm_client,
             db,
+            error_handler,
         })
     }
 
@@ -772,5 +778,25 @@ impl OrchestratorAgent {
         );
 
         Ok(())
+    }
+
+    /// Handle terminal failure
+    ///
+    /// Wrapper around ErrorHandler::handle_terminal_failure that uses
+    /// the agent's workflow_id, message_bus, and db.
+    pub async fn handle_terminal_failure(
+        &self,
+        task_id: &str,
+        terminal_id: &str,
+        error_message: &str,
+    ) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        self.error_handler
+            .handle_terminal_failure(&workflow_id, task_id, terminal_id, error_message)
+            .await
     }
 }

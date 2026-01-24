@@ -5,6 +5,7 @@ pub mod cc_switch;
 pub mod config;
 pub mod container;
 pub mod diff_stream;
+pub mod error_handler;
 pub mod events;
 pub mod file_ranker;
 pub mod file_search;
