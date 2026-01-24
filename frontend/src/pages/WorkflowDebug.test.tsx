@@ -40,27 +40,28 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 
 const baseWorkflow: Workflow = {
   id: 'wf-1',
+  projectId: 'proj-1',
   name: 'Test Workflow',
   status: 'running',
-  project_id: 'proj-1',
-  config: {
-    tasks: [],
-    models: [],
-    terminals: [],
-    commands: { enabled: false, presetIds: [] },
-    orchestrator: {
-      modelConfigId: 'model-1',
-      mergeTerminal: {
-        cliTypeId: 'bash',
-        modelConfigId: 'model-1',
-        runTestsBeforeMerge: false,
-        pauseOnConflict: false,
-      },
-      targetBranch: 'main',
-    },
-  },
-  created_at: '2024-01-01',
-  updated_at: '2024-01-01',
+  useSlashCommands: false,
+  orchestratorEnabled: true,
+  orchestratorApiType: 'openai-compatible',
+  orchestratorBaseUrl: 'https://api.test.com',
+  orchestratorModel: 'gpt-4o',
+  errorTerminalEnabled: false,
+  errorTerminalCliId: '',
+  errorTerminalModelId: '',
+  mergeTerminalCliId: 'bash',
+  mergeTerminalModelId: 'model-1',
+  targetBranch: 'main',
+  readyAt: null,
+  startedAt: null,
+  completedAt: null,
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+  tasks: [],
+  terminals: [],
+  commands: [],
 };
 
 describe('WorkflowDebugPage', () => {
@@ -107,7 +108,7 @@ describe('WorkflowDebugPage', () => {
 
     it('should render back button', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'draft' } })
+        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'created' } })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
@@ -119,7 +120,7 @@ describe('WorkflowDebugPage', () => {
 
     it('should show start button when workflow is ready', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'draft' } })
+        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'created' } })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
@@ -144,7 +145,7 @@ describe('WorkflowDebugPage', () => {
 
     it('should render tabs for pipeline and terminals views', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'draft' } })
+        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'created' } })
       );
 
       render(<WorkflowDebugPage />, { wrapper });

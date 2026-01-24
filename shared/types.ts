@@ -4,6 +4,18 @@
 
 // If you are an AI, and you absolutely have to edit this file, please confirm with the user first.
 
+export type WorkflowDetailDto = { id: string, projectId: string, name: string, description: string | null, status: string, useSlashCommands: boolean, orchestratorEnabled: boolean, orchestratorApiType: string | null, orchestratorBaseUrl: string | null, orchestratorModel: string | null, errorTerminalEnabled: boolean, errorTerminalCliId: string | null, errorTerminalModelId: string | null, mergeTerminalCliId: string | null, mergeTerminalModelId: string | null, targetBranch: string, readyAt: string | null, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, tasks: Array<WorkflowTaskDto>, commands: Array<WorkflowCommandDto>, };
+
+export type WorkflowTaskDto = { id: string, workflowId: string, vkTaskId: string | null, name: string, description: string | null, branch: string, status: string, orderIndex: number, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, terminals: Array<TerminalDto>, };
+
+export type TerminalDto = { id: string, workflowTaskId: string, cliTypeId: string, modelConfigId: string, customBaseUrl: string | null, customApiKey: string | null, role: string | null, roleDescription: string | null, orderIndex: number, status: string, createdAt: string, updatedAt: string, };
+
+export type WorkflowCommandDto = { id: string, workflowId: string, presetId: string, orderIndex: number, customParams: string | null, createdAt: string, preset: SlashCommandPresetDto, };
+
+export type SlashCommandPresetDto = { id: string, command: string, description: string, promptTemplate: string, isSystem: boolean, createdAt: string, updatedAt: string, };
+
+export type WorkflowListItemDto = { id: string, projectId: string, name: string, description: string | null, status: string, createdAt: string, updatedAt: string, tasksCount: number, terminalsCount: number, };
+
 export type SharedTaskResponse = { task: SharedTask, user: UserData | null, };
 
 export type AssigneesQuery = { project_id: string, };
@@ -200,7 +212,7 @@ export type TokenResponse = { access_token: string, expires_at: string | null, }
 
 export type UserSystemInfo = { config: Config, analytics_user_id: string, login_status: LoginStatus, environment: Environment, 
 /**
- * Capabilities supported per executor (e.g., { "CLAUDE_CODE": ["SESSION_FORK"] })
+ * Capabilities supported per executor (e.g., { "CLAUDE_CODE": [`SESSION_FORK`] })
  */
 capabilities: { [key in string]?: Array<BaseAgentCapability> }, remote_features_enabled: boolean, executors: { [key in BaseCodingAgent]?: ExecutorConfig }, };
 
