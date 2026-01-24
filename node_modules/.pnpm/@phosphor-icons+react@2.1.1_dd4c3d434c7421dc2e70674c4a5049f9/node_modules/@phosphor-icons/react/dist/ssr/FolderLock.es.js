@@ -1,0 +1,10 @@
+import * as o from "react";
+import c from "../lib/SSRBase.es.js";
+import a from "../defs/FolderLock.es.js";
+const e = o.forwardRef((r, t) => /* @__PURE__ */ o.createElement(c, { ref: t, ...r, weights: a }));
+e.displayName = "FolderLockIcon";
+const d = e;
+export {
+  d as FolderLock,
+  e as FolderLockIcon
+};

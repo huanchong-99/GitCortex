@@ -1,0 +1,72 @@
+{
+  "name": "developer-icons",
+  "description": "A collection of well-optimized SVG tech logos for developers and designers—customizable, scalable, and free.",
+  "version": "6.0.4",
+  "type": "module",
+  "homepage": "https://xandemon.github.io/developer-icons",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xandemon/developer-icons.git",
+    "directory": ""
+  },
+  "author": "xandemon",
+  "license": "MIT",
+  "keywords": [
+    "developer icons",
+    "tech logos",
+    "tech stack icons",
+    "programming icons",
+    "coding icons",
+    "colorful tech icons",
+    "tech icons",
+    "programming language icons",
+    "icons",
+    "vector icons",
+    "svg icons",
+    "react icons"
+  ],
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "dev:playground": "vite",
+    "dev:showcase": "cd showcase && npm run dev",
+    "clean": "rimraf --glob dist && rimraf --glob lib/icons/*.tsx",
+    "build": "npm run clean && tsx ./lib/scripts/build.ts && tsc --p ./tsconfig-build.json && vite build",
+    "build:showcase": "cd showcase && npm run build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "preview:showcase": "cd showcase && npm run preview",
+    "prePublishOnly": "npm run build",
+    "sort:data": "tsx ./lib/scripts/sortData.ts",
+    "optimize-svgs": "svgo -f ./icons/raw -o ./icons && rimraf --glob icons/raw/*"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0 || ^19.0.0",
+    "react-dom": "^18.2.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "rimraf": "^5.0.5",
+    "svgo": "^3.2.0",
+    "svgson": "^5.3.1",
+    "tsx": "^4.8.2",
+    "typescript": "^5.2.2",
+    "vite": "^6.2.0",
+    "vite-plugin-dts": "^4.3.0",
+    "vite-plugin-lib-inject-css": "^2.0.1"
+  }
+}

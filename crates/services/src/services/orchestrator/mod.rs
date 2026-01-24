@@ -7,6 +7,7 @@ pub mod config;
 pub mod constants;
 pub mod llm;
 pub mod message_bus;
+pub mod runtime;
 pub mod state;
 pub mod types;
 
@@ -16,6 +17,7 @@ pub use llm::{LLMClient, OpenAICompatibleClient, create_llm_client, build_termin
 #[cfg(test)]
 pub use llm::MockLLMClient;
 pub use message_bus::{BusMessage, MessageBus, SharedMessageBus};
+pub use runtime::{OrchestratorRuntime, RuntimeConfig};
 pub use state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState};
 pub use types::*;
 
