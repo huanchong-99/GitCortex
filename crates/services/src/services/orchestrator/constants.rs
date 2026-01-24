@@ -33,3 +33,4 @@ pub const WORKFLOW_STATUS_PENDING: &str = "pending";
 pub const WORKFLOW_STATUS_RUNNING: &str = "running";
 pub const WORKFLOW_STATUS_COMPLETED: &str = "completed";
 pub const WORKFLOW_STATUS_FAILED: &str = "failed";
+pub const WORKFLOW_STATUS_MERGING: &str = "merging";
