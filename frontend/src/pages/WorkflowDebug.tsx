@@ -10,12 +10,12 @@ import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
 import { useTranslation } from 'react-i18next';
 
-function mapWorkflowStatus(status: string): 'created' | 'running' | 'paused' | 'completed' | 'failed' {
+function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'completed' | 'failed' {
   switch (status) {
     case 'created':
     case 'starting':
     case 'ready':
-      return 'created';
+      return 'idle';
     case 'running':
       return 'running';
     case 'paused':
@@ -25,7 +25,7 @@ function mapWorkflowStatus(status: string): 'created' | 'running' | 'paused' | '
     case 'failed':
       return 'failed';
     default:
-      return 'created';
+      return 'idle';
   }
 }
 
@@ -45,21 +45,22 @@ export function WorkflowDebugPage() {
   const wsUrl = `ws://${window.location.host}`;
   const defaultRoleLabel = t('terminalCard.defaultRole');
 
-  const tasks: WorkflowTask[] = data.config.tasks.map((taskConfig) => ({
-    id: taskConfig.id,
-    name: taskConfig.name,
-    branch: taskConfig.branch,
-    terminals: data.config.terminals
-      .filter((termConfig) => termConfig.taskId === taskConfig.id)
+  // Map DTO tasks to internal WorkflowTask format
+  const tasks: WorkflowTask[] = data.tasks.map((taskDto) => ({
+    id: taskDto.id,
+    name: taskDto.name,
+    branch: taskDto.branch ?? null,
+    terminals: data.terminals
+      .filter((termDto) => termDto.taskId === taskDto.id)
       .map(
-        (termConfig): Terminal => ({
-          id: termConfig.id,
-          cliTypeId: termConfig.cliTypeId,
-          modelConfigId: termConfig.modelConfigId,
-          role: termConfig.role?.trim()
-            ? termConfig.role
-            : `${defaultRoleLabel} ${termConfig.orderIndex + 1}`,
-          orderIndex: termConfig.orderIndex,
+        (termDto): Terminal => ({
+          id: termDto.id,
+          cliTypeId: termDto.cliTypeId,
+          modelConfigId: termDto.modelConfigId,
+          role: termDto.role?.trim()
+            ? termDto.role
+            : `${defaultRoleLabel} ${termDto.orderIndex + 1}`,
+          orderIndex: termDto.orderIndex,
           status: 'not_started' as const,
         })
       ),
@@ -115,8 +116,8 @@ export function WorkflowDebugPage() {
               status={pipelineStatus}
               tasks={tasks}
               mergeTerminal={{
-                cliTypeId: data.config.orchestrator.mergeTerminal.cliTypeId,
-                modelConfigId: data.config.orchestrator.mergeTerminal.modelConfigId,
+                cliTypeId: data.mergeTerminalCliId,
+                modelConfigId: data.mergeTerminalModelId,
                 status: 'not_started' as const,
               }}
             />
