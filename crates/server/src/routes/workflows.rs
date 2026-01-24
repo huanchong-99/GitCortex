@@ -232,21 +232,33 @@ async fn list_workflows(
 
     let workflows = Workflow::find_by_project(&deployment.db().pool, project_id).await?;
 
-    // Convert to DTOs
-    let dtos: Vec<WorkflowListItemDto> = workflows
-        .into_iter()
-        .map(|w| WorkflowListItemDto {
-            id: w.id,
-            project_id: w.project_id,
-            name: w.name,
-            description: w.description,
-            status: w.status,
-            created_at: w.created_at.to_rfc3339(),
-            updated_at: w.updated_at.to_rfc3339(),
-            tasks_count: 0,     // TODO: load from DB
-            terminals_count: 0, // TODO: load from DB
-        })
-        .collect();
+    // Convert to DTOs with actual counts
+    let mut dtos: Vec<WorkflowListItemDto> = Vec::new();
+
+    for workflow in workflows {
+        // Get tasks for this workflow
+        let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow.id).await?;
+        let tasks_count = tasks.len() as i32;
+
+        // Count terminals across all tasks
+        let mut terminals_count = 0i32;
+        for task in &tasks {
+            let terminals = Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
+            terminals_count += terminals.len() as i32;
+        }
+
+        dtos.push(WorkflowListItemDto {
+            id: workflow.id,
+            project_id: workflow.project_id,
+            name: workflow.name,
+            description: workflow.description,
+            status: workflow.status,
+            created_at: workflow.created_at.to_rfc3339(),
+            updated_at: workflow.updated_at.to_rfc3339(),
+            tasks_count,
+            terminals_count,
+        });
+    }
 
     Ok(ResponseJson(ApiResponse::success(dtos)))
 }
