@@ -3,23 +3,36 @@
 //! Stores workflow configuration and state for multi-terminal orchestration.
 
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce,
+    aead::{Aead, AeadCore, KeyInit, OsRng},
 };
 use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
 use strum_macros::{Display, EnumString};
+use tracing::{debug, instrument};
 use ts_rs::TS;
 use uuid::Uuid;
-use tracing::{instrument, debug};
 
 // Import Terminal type for batch operations
 use super::terminal::Terminal;
 
 /// Workflow Status Enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Type,
+    Serialize,
+    Deserialize,
+    TS,
+    EnumString,
+    Display,
+    Default,
+)]
 #[sqlx(type_name = "workflow_status", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
@@ -46,7 +59,20 @@ pub enum WorkflowStatus {
 }
 
 /// Workflow Task Status Enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Type,
+    Serialize,
+    Deserialize,
+    TS,
+    EnumString,
+    Display,
+    Default,
+)]
 #[sqlx(type_name = "workflow_task_status", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
@@ -163,7 +189,8 @@ impl Workflow {
             ));
         }
 
-        key_str.as_bytes()
+        key_str
+            .as_bytes()
             .try_into()
             .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))
     }
@@ -175,7 +202,8 @@ impl Workflow {
             .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
-        let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes())
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext.as_bytes())
             .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
 
         // Combine nonce + ciphertext
@@ -183,9 +211,7 @@ impl Workflow {
         combined.extend_from_slice(&ciphertext);
 
         // Base64 encode
-        self.orchestrator_api_key = Some(
-            general_purpose::STANDARD.encode(&combined)
-        );
+        self.orchestrator_api_key = Some(general_purpose::STANDARD.encode(&combined));
 
         tracing::debug!("API key encrypted for workflow {}", self.id);
         Ok(())
@@ -197,7 +223,8 @@ impl Workflow {
             None => Ok(None),
             Some(encoded) => {
                 let key = Self::get_encryption_key()?;
-                let combined = general_purpose::STANDARD.decode(encoded)
+                let combined = general_purpose::STANDARD
+                    .decode(encoded)
                     .map_err(|e| anyhow::anyhow!("Base64 decode failed: {e}"))?;
 
                 if combined.len() < 12 {
@@ -210,11 +237,13 @@ impl Workflow {
                 let cipher = Aes256Gcm::new_from_slice(&key)
                     .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
 
-                let plaintext_bytes = cipher.decrypt(nonce, ciphertext)
+                let plaintext_bytes = cipher
+                    .decrypt(nonce, ciphertext)
                     .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
 
-                Ok(Some(String::from_utf8(plaintext_bytes)
-                    .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}"))?))
+                Ok(Some(String::from_utf8(plaintext_bytes).map_err(|e| {
+                    anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}")
+                })?))
             }
         }
     }
@@ -320,6 +349,48 @@ pub struct WorkflowCommand {
     pub created_at: DateTime<Utc>,
 }
 
+/// Create Workflow Task Request
+#[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CreateWorkflowTaskRequest {
+    /// Task ID (optional, auto-generated if not provided)
+    pub id: Option<String>,
+    /// Task name
+    pub name: String,
+    /// Task description
+    pub description: Option<String>,
+    /// Git branch name (optional, auto-generated)
+    pub branch: Option<String>,
+    /// Task order index
+    pub order_index: i32,
+    /// Terminals for this task
+    pub terminals: Vec<CreateTerminalRequest>,
+}
+
+/// Create Terminal Request
+#[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CreateTerminalRequest {
+    /// Terminal ID (optional, auto-generated if not provided)
+    pub id: Option<String>,
+    /// CLI type ID
+    pub cli_type_id: String,
+    /// Model config ID
+    pub model_config_id: String,
+    /// Custom base URL (overrides model config)
+    pub custom_base_url: Option<String>,
+    /// Custom API key (encrypted storage)
+    pub custom_api_key: Option<String>,
+    /// Role description (optional)
+    pub role: Option<String>,
+    /// Role description (optional)
+    pub role_description: Option<String>,
+    /// Terminal order index within task
+    pub order_index: i32,
+}
+
 /// Create Workflow Request
 #[derive(Debug, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -343,6 +414,10 @@ pub struct CreateWorkflowRequest {
     pub merge_terminal_config: TerminalConfig,
     /// Target branch
     pub target_branch: Option<String>,
+
+    // ========== 新增字段 ==========
+    /// Workflow tasks with terminals
+    pub tasks: Vec<CreateWorkflowTaskRequest>,
 }
 
 /// Main Agent Configuration
@@ -409,12 +484,10 @@ impl Workflow {
 
     /// Find workflow by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
-        sqlx::query_as::<_, Workflow>(
-            r"SELECT * FROM workflow WHERE id = ?"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, Workflow>(r"SELECT * FROM workflow WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Find workflows by project
@@ -426,7 +499,7 @@ impl Workflow {
             SELECT * FROM workflow
             WHERE project_id = ?
             ORDER BY created_at DESC
-            "
+            ",
         )
         .bind(project_id)
         .fetch_all(pool)
@@ -451,7 +524,7 @@ impl Workflow {
             UPDATE workflow
             SET status = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(status)
         .bind(now)
@@ -469,7 +542,7 @@ impl Workflow {
             UPDATE workflow
             SET status = 'ready', ready_at = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(now)
         .bind(now)
@@ -487,7 +560,7 @@ impl Workflow {
             UPDATE workflow
             SET status = 'running', started_at = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(now)
         .bind(now)
@@ -562,7 +635,7 @@ impl Workflow {
                     id, workflow_id, vk_task_id, name, description,
                     branch, status, order_index, created_at, updated_at
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-                "
+                ",
             )
             .bind(&task.id)
             .bind(&task.workflow_id)
@@ -586,7 +659,7 @@ impl Workflow {
                         custom_base_url, custom_api_key, role, role_description,
                         order_index, status, created_at, updated_at
                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-                    "
+                    ",
                 )
                 .bind(&terminal.id)
                 .bind(&terminal.workflow_task_id)
@@ -620,7 +693,7 @@ impl WorkflowTask {
                 branch, status, order_index, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             RETURNING *
-            "
+            ",
         )
         .bind(&task.id)
         .bind(&task.workflow_id)
@@ -643,7 +716,7 @@ impl WorkflowTask {
             SELECT * FROM workflow_task
             WHERE workflow_id = ?
             ORDER BY order_index ASC
-            "
+            ",
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -652,12 +725,10 @@ impl WorkflowTask {
 
     /// Find workflow task by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
-        sqlx::query_as::<_, WorkflowTask>(
-            r"SELECT * FROM workflow_task WHERE id = ?"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, WorkflowTask>(r"SELECT * FROM workflow_task WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Update workflow task status
@@ -668,7 +739,7 @@ impl WorkflowTask {
             UPDATE workflow_task
             SET status = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(status)
         .bind(now)
@@ -686,7 +757,7 @@ impl SlashCommandPreset {
             r"
             SELECT * FROM slash_command_preset
             ORDER BY is_system DESC, command ASC
-            "
+            ",
         )
         .fetch_all(pool)
         .await
@@ -701,7 +772,7 @@ impl WorkflowCommand {
             SELECT * FROM workflow_command
             WHERE workflow_id = ?
             ORDER BY order_index ASC
-            "
+            ",
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -738,9 +809,10 @@ impl WorkflowCommand {
 
 #[cfg(test)]
 mod encryption_tests {
-    use super::*;
     use serial_test::serial;
     use temp_env::with_var;
+
+    use super::*;
 
     #[test]
     #[serial]
@@ -824,7 +896,12 @@ mod encryption_tests {
             // Should fail without encryption key
             let result = workflow.set_api_key("sk-test");
             assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("GITCORTEX_ENCRYPTION_KEY"));
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("GITCORTEX_ENCRYPTION_KEY")
+            );
         });
     }
 
@@ -945,4 +1022,3 @@ mod encryption_tests {
         );
     }
 }
-
