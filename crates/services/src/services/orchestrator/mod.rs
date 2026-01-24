@@ -25,9 +25,4 @@ pub use types::*;
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
 mod terminal_coordinator_test;
-
-#[cfg(test)]
-mod tests;

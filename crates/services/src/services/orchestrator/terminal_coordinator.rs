@@ -7,7 +7,7 @@ use anyhow::Result;
 use tracing::{info, error, instrument};
 
 use db::{DBService, models::{workflow::WorkflowTask, terminal::Terminal}};
-use services::services::cc_switch::CCSwitchService;
+use services::services::cc_switch::CCSwitch;
 
 /// Terminal Coordinator
 ///
@@ -15,12 +15,12 @@ use services::services::cc_switch::CCSwitchService;
 /// Performs serial model switching followed by parallel terminal execution.
 pub struct TerminalCoordinator {
     db: Arc<DBService>,
-    cc_switch: Arc<CCSwitchService>,
+    cc_switch: Arc<dyn CCSwitch>,
 }
 
 impl TerminalCoordinator {
     /// Create a new terminal coordinator
-    pub fn new(db: Arc<DBService>, cc_switch: Arc<CCSwitchService>) -> Self {
+    pub fn new(db: Arc<DBService>, cc_switch: Arc<dyn CCSwitch>) -> Self {
         Self { db, cc_switch }
     }
 
@@ -64,6 +64,7 @@ impl TerminalCoordinator {
         info!(count = all_terminals.len(), "Found terminals to start");
 
         // Step 3: Switch models for each terminal serially
+        let mut successfully_switched = Vec::new();
         for terminal in &all_terminals {
             info!(
                 terminal_id = %terminal.id,
@@ -86,17 +87,18 @@ impl TerminalCoordinator {
             }
 
             info!(terminal_id = %terminal.id, "Model switched successfully");
+            successfully_switched.push(terminal.id.clone());
         }
 
-        // Step 4: Transition all terminals to "waiting" status
-        for terminal in &all_terminals {
-            Terminal::set_started(&self.db.pool, &terminal.id).await?;
-            info!(terminal_id = %terminal.id, "Terminal transitioned to waiting status");
+        // Step 4: Transition only successfully switched terminals to "waiting" status
+        for terminal_id in &successfully_switched {
+            Terminal::set_started(&self.db.pool, terminal_id).await?;
+            info!(terminal_id = %terminal_id, "Terminal transitioned to waiting status");
         }
 
         info!(
             workflow_id = %workflow_id,
-            count = all_terminals.len(),
+            count = successfully_switched.len(),
             "All terminals successfully started"
         );
 

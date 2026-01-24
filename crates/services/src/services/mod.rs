@@ -25,5 +25,5 @@ pub mod repo;
 pub mod terminal;
 pub mod workspace_manager;
 pub mod worktree_manager;
-pub use cc_switch::CCSwitchService;
+pub use cc_switch::{CCSwitchService, CCSwitch};
 pub mod orchestrator;
