@@ -1,24 +1,24 @@
 //! Workflow API Routes
 
+use std::collections::HashMap;
+
 use axum::{
-    extract::{Path, Query, State},
-    routing::{get, post, put},
     Json, Router,
+    extract::{Path, Query, State},
     response::Json as ResponseJson,
+    routing::{get, post, put},
 };
 use db::models::{
-    Workflow, WorkflowTask, Terminal, SlashCommandPreset, WorkflowCommand,
-    CreateWorkflowRequest,
+    CreateWorkflowRequest, SlashCommandPreset, Terminal, Workflow, WorkflowCommand, WorkflowTask,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use uuid::Uuid;
-use crate::{error::ApiError, DeploymentImpl};
 use utils::response::ApiResponse;
+use uuid::Uuid;
 
 // Import DTOs
 use crate::routes::workflows_dto::{WorkflowDetailDto, WorkflowListItemDto};
+use crate::{DeploymentImpl, error::ApiError};
 
 // ============================================================================
 // Request/Response Types
@@ -91,13 +91,66 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/:workflow_id/status", put(update_workflow_status))
         .route("/:workflow_id/start", post(start_workflow))
         .route("/:workflow_id/tasks", get(list_workflow_tasks))
-        .route("/:workflow_id/tasks/:task_id/terminals", get(list_task_terminals))
+        .route(
+            "/:workflow_id/tasks/:task_id/terminals",
+            get(list_task_terminals),
+        )
         .route("/presets/commands", get(list_command_presets))
 }
 
 // ============================================================================
 // Route Handlers
 // ============================================================================
+
+/// Validate create workflow request
+pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiError> {
+    // Validate project_id
+    if req.project_id.trim().is_empty() {
+        return Err(ApiError::BadRequest("projectId is required".to_string()));
+    }
+
+    // Validate workflow name
+    if req.name.trim().is_empty() {
+        return Err(ApiError::BadRequest("name is required".to_string()));
+    }
+
+    // Validate tasks is not empty
+    if req.tasks.is_empty() {
+        return Err(ApiError::BadRequest("tasks must not be empty".to_string()));
+    }
+
+    // Validate each task
+    for (task_index, task) in req.tasks.iter().enumerate() {
+        if task.name.trim().is_empty() {
+            return Err(ApiError::BadRequest(
+                format!("task[{}].name is required", task_index)
+            ));
+        }
+
+        if task.terminals.is_empty() {
+            return Err(ApiError::BadRequest(
+                format!("task[{}].terminals must not be empty", task_index)
+            ));
+        }
+
+        // Validate each terminal
+        for (terminal_index, terminal) in task.terminals.iter().enumerate() {
+            if terminal.cli_type_id.trim().is_empty() {
+                return Err(ApiError::BadRequest(
+                    format!("task[{}].terminal[{}].cliTypeId is required", task_index, terminal_index)
+                ));
+            }
+
+            if terminal.model_config_id.trim().is_empty() {
+                return Err(ApiError::BadRequest(
+                    format!("task[{}].terminal[{}].modelConfigId is required", task_index, terminal_index)
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /// GET /api/workflows?project_id=xxx
 /// List workflows for a project
@@ -122,7 +175,7 @@ async fn list_workflows(
             status: w.status,
             created_at: w.created_at.to_rfc3339(),
             updated_at: w.updated_at.to_rfc3339(),
-            tasks_count: 0, // TODO: load from DB
+            tasks_count: 0,     // TODO: load from DB
             terminals_count: 0, // TODO: load from DB
         })
         .collect();
@@ -136,6 +189,9 @@ async fn create_workflow(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<CreateWorkflowRequest>,
 ) -> Result<ResponseJson<ApiResponse<WorkflowDetailDto>>, ApiError> {
+    // Validate request
+    validate_create_request(&req)?;
+
     let now = chrono::Utc::now();
     let workflow_id = Uuid::new_v4().to_string();
 
@@ -153,8 +209,14 @@ async fn create_workflow(
         orchestrator_api_key: None, // Will be set encrypted below
         orchestrator_model: req.orchestrator_config.as_ref().map(|c| c.model.clone()),
         error_terminal_enabled: req.error_terminal_config.is_some(),
-        error_terminal_cli_id: req.error_terminal_config.as_ref().map(|c| c.cli_type_id.clone()),
-        error_terminal_model_id: req.error_terminal_config.as_ref().map(|c| c.model_config_id.clone()),
+        error_terminal_cli_id: req
+            .error_terminal_config
+            .as_ref()
+            .map(|c| c.cli_type_id.clone()),
+        error_terminal_model_id: req
+            .error_terminal_config
+            .as_ref()
+            .map(|c| c.model_config_id.clone()),
         merge_terminal_cli_id: req.merge_terminal_config.cli_type_id.clone(),
         merge_terminal_model_id: req.merge_terminal_config.model_config_id.clone(),
         target_branch: req.target_branch.unwrap_or_else(|| "main".to_string()),
@@ -178,37 +240,94 @@ async fn create_workflow(
     let mut commands: Vec<WorkflowCommand> = Vec::new();
     if let Some(preset_ids) = req.command_preset_ids {
         for (index, preset_id) in preset_ids.iter().enumerate() {
-            let index = i32::try_from(index).map_err(|_| {
-                ApiError::BadRequest("Command preset index overflow".to_string())
-            })?;
+            let index = i32::try_from(index)
+                .map_err(|_| ApiError::BadRequest("Command preset index overflow".to_string()))?;
             let preset_id: &str = preset_id;
-            WorkflowCommand::create(
-                &deployment.db().pool,
-                &workflow_id,
-                preset_id,
-                index,
-                None,
-            ).await?;
+            WorkflowCommand::create(&deployment.db().pool, &workflow_id, preset_id, index, None)
+                .await?;
         }
         commands = WorkflowCommand::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
     }
 
-    // 3. Create tasks and terminals (simplified for now)
-    let tasks: Vec<WorkflowTask> = Vec::new();
+    // 3. Prepare tasks and terminals for transactional creation
+    let mut task_rows: Vec<(WorkflowTask, Vec<Terminal>)> = Vec::new();
 
-    // 4. Get command preset details
+    for (task_index, task_req) in req.tasks.iter().enumerate() {
+        let task_id = Uuid::new_v4().to_string();
+
+        // Generate branch name (will be refined in Task 13.4)
+        let branch = task_req.branch.clone().unwrap_or_else(|| {
+            format!("workflow/{}/task-{}", workflow_id, task_index)
+        });
+
+        let task = WorkflowTask {
+            id: task_id.clone(),
+            workflow_id: workflow_id.clone(),
+            vk_task_id: None,
+            name: task_req.name.clone(),
+            description: task_req.description.clone(),
+            branch,
+            status: "pending".to_string(),
+            order_index: task_req.order_index,
+            started_at: None,
+            completed_at: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let mut terminals: Vec<Terminal> = Vec::new();
+
+        for terminal_req in &task_req.terminals {
+            let terminal = Terminal {
+                id: Uuid::new_v4().to_string(),
+                workflow_task_id: task_id.clone(),
+                cli_type_id: terminal_req.cli_type_id.clone(),
+                model_config_id: terminal_req.model_config_id.clone(),
+                custom_base_url: terminal_req.custom_base_url.clone(),
+                custom_api_key: terminal_req.custom_api_key.clone(),
+                role: terminal_req.role.clone(),
+                role_description: terminal_req.role_description.clone(),
+                order_index: terminal_req.order_index,
+                status: "not_started".to_string(),
+                process_id: None,
+                session_id: None,
+                started_at: None,
+                completed_at: None,
+                created_at: now,
+                updated_at: now,
+            };
+            terminals.push(terminal);
+        }
+
+        task_rows.push((task, terminals));
+    }
+
+    // 4. Execute transactional creation
+    Workflow::create_with_tasks(&deployment.db().pool, &workflow, task_rows).await
+        .map_err(|e| ApiError::BadRequest(format!("Failed to create workflow: {e}")))?;
+
+    // 5. Get command preset details
     let all_presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;
     let commands_with_presets: Vec<(WorkflowCommand, SlashCommandPreset)> = commands
         .into_iter()
         .filter_map(|cmd| {
-            all_presets.iter()
+            all_presets
+                .iter()
                 .find(|p| p.id == cmd.preset_id)
                 .map(|preset| (cmd, preset.clone()))
         })
         .collect();
 
+    // 6. Load tasks with terminals
+    let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    let mut task_details: Vec<(WorkflowTask, Vec<Terminal>)> = Vec::new();
+    for task in &tasks {
+        let terminals = Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
+        task_details.push((task.clone(), terminals));
+    }
+
     // Convert to DTO
-    let dto = WorkflowDetailDto::from_workflow(&workflow, &tasks, &commands_with_presets);
+    let dto = WorkflowDetailDto::from_workflow_with_terminals(&workflow, &task_details, &commands_with_presets);
 
     Ok(ResponseJson(ApiResponse::success(dto)))
 }
@@ -233,14 +352,22 @@ async fn get_workflow(
     let commands_with_presets: Vec<(WorkflowCommand, SlashCommandPreset)> = commands
         .into_iter()
         .filter_map(|cmd| {
-            all_presets.iter()
+            all_presets
+                .iter()
                 .find(|p| p.id == cmd.preset_id)
                 .map(|preset| (cmd, preset.clone()))
         })
         .collect();
 
+    // Load terminals for each task
+    let mut task_details: Vec<(WorkflowTask, Vec<Terminal>)> = Vec::new();
+    for task in &tasks {
+        let terminals = Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
+        task_details.push((task.clone(), terminals));
+    }
+
     // Convert to DTO
-    let dto = WorkflowDetailDto::from_workflow(&workflow, &tasks, &commands_with_presets);
+    let dto = WorkflowDetailDto::from_workflow_with_terminals(&workflow, &task_details, &commands_with_presets);
 
     Ok(ResponseJson(ApiResponse::success(dto)))
 }
@@ -278,9 +405,10 @@ async fn start_workflow(
         .ok_or_else(|| ApiError::BadRequest("Workflow not found".to_string()))?;
 
     if workflow.status != "ready" {
-        return Err(ApiError::BadRequest(
-            format!("Workflow is not ready. Current status: {}", workflow.status)
-        ));
+        return Err(ApiError::BadRequest(format!(
+            "Workflow is not ready. Current status: {}",
+            workflow.status
+        )));
     }
 
     // Update status to running
@@ -301,10 +429,7 @@ async fn list_workflow_tasks(
     let mut task_details = Vec::new();
     for task in tasks {
         let terminals = Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
-        task_details.push(WorkflowTaskDetailResponse {
-            task,
-            terminals,
-        });
+        task_details.push(WorkflowTaskDetailResponse { task, terminals });
     }
     Ok(ResponseJson(ApiResponse::success(task_details)))
 }

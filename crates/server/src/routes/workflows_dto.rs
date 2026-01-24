@@ -3,9 +3,9 @@
 //! This module defines the API contract for Workflow responses.
 //! All structs use explicit field mappings (no flatten) to prevent conflicts.
 
+use db::models::{SlashCommandPreset, WorkflowCommand};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use db::models::{SlashCommandPreset, WorkflowCommand};
 
 /// Workflow detail response DTO
 #[derive(Debug, Clone, Serialize, TS)]
@@ -132,13 +132,60 @@ impl WorkflowDetailDto {
         tasks: &[db::models::WorkflowTask],
         commands: &[(db::models::WorkflowCommand, db::models::SlashCommandPreset)],
     ) -> Self {
-        let tasks_dto = tasks.iter().map(|task| {
-            WorkflowTaskDto::from_workflow_task(task, &vec![]) // terminals will be loaded separately
-        }).collect();
+        let tasks_dto = tasks
+            .iter()
+            .map(|task| {
+                WorkflowTaskDto::from_workflow_task(task, &vec![]) // terminals will be loaded separately
+            })
+            .collect();
 
-        let commands_dto = commands.iter().map(|(cmd, preset)| {
-            WorkflowCommandDto::from_models(cmd, preset)
-        }).collect();
+        let commands_dto = commands
+            .iter()
+            .map(|(cmd, preset)| WorkflowCommandDto::from_models(cmd, preset))
+            .collect();
+
+        Self {
+            id: workflow.id.clone(),
+            project_id: workflow.project_id.clone(),
+            name: workflow.name.clone(),
+            description: workflow.description.clone(),
+            status: workflow.status.clone(),
+            use_slash_commands: workflow.use_slash_commands,
+            orchestrator_enabled: workflow.orchestrator_enabled,
+            orchestrator_api_type: workflow.orchestrator_api_type.clone(),
+            orchestrator_base_url: workflow.orchestrator_base_url.clone(),
+            orchestrator_model: workflow.orchestrator_model.clone(),
+            error_terminal_enabled: workflow.error_terminal_enabled,
+            error_terminal_cli_id: workflow.error_terminal_cli_id.clone(),
+            error_terminal_model_id: workflow.error_terminal_model_id.clone(),
+            merge_terminal_cli_id: Some(workflow.merge_terminal_cli_id.clone()),
+            merge_terminal_model_id: Some(workflow.merge_terminal_model_id.clone()),
+            target_branch: workflow.target_branch.clone(),
+            ready_at: workflow.ready_at.map(|dt| dt.to_rfc3339()),
+            started_at: workflow.started_at.map(|dt| dt.to_rfc3339()),
+            completed_at: workflow.completed_at.map(|dt| dt.to_rfc3339()),
+            created_at: workflow.created_at.to_rfc3339(),
+            updated_at: workflow.updated_at.to_rfc3339(),
+            tasks: tasks_dto,
+            commands: commands_dto,
+        }
+    }
+
+    /// Convert from DB models to DTO with terminals
+    pub fn from_workflow_with_terminals(
+        workflow: &db::models::Workflow,
+        tasks_with_terminals: &[(db::models::WorkflowTask, Vec<db::models::Terminal>)],
+        commands: &[(db::models::WorkflowCommand, db::models::SlashCommandPreset)],
+    ) -> Self {
+        let tasks_dto: Vec<WorkflowTaskDto> = tasks_with_terminals
+            .iter()
+            .map(|(task, terminals)| WorkflowTaskDto::from_workflow_task(task, terminals))
+            .collect();
+
+        let commands_dto = commands
+            .iter()
+            .map(|(cmd, preset)| WorkflowCommandDto::from_models(cmd, preset))
+            .collect();
 
         Self {
             id: workflow.id.clone(),
@@ -169,7 +216,10 @@ impl WorkflowDetailDto {
 }
 
 impl WorkflowTaskDto {
-    pub fn from_workflow_task(task: &db::models::WorkflowTask, terminals: &[db::models::Terminal]) -> Self {
+    pub fn from_workflow_task(
+        task: &db::models::WorkflowTask,
+        terminals: &[db::models::Terminal],
+    ) -> Self {
         let terminals_dto = terminals.iter().map(TerminalDto::from_terminal).collect();
 
         Self {
@@ -210,7 +260,10 @@ impl TerminalDto {
 }
 
 impl WorkflowCommandDto {
-    pub fn from_models(command: &db::models::WorkflowCommand, preset: &db::models::SlashCommandPreset) -> Self {
+    pub fn from_models(
+        command: &db::models::WorkflowCommand,
+        preset: &db::models::SlashCommandPreset,
+    ) -> Self {
         Self {
             id: command.id.clone(),
             workflow_id: command.workflow_id.clone(),
@@ -287,8 +340,15 @@ mod tests {
     #[test]
     fn test_status_enum_valid_values() {
         let valid_statuses = vec![
-            "created", "starting", "ready", "running",
-            "paused", "merging", "completed", "failed", "cancelled"
+            "created",
+            "starting",
+            "ready",
+            "running",
+            "paused",
+            "merging",
+            "completed",
+            "failed",
+            "cancelled",
         ];
 
         for status in valid_statuses {
@@ -326,7 +386,12 @@ mod tests {
     #[test]
     fn test_task_status_enum_valid_values() {
         let valid_statuses = vec![
-            "pending", "running", "review_pending", "completed", "failed", "cancelled"
+            "pending",
+            "running",
+            "review_pending",
+            "completed",
+            "failed",
+            "cancelled",
         ];
 
         for status in valid_statuses {
@@ -354,10 +419,11 @@ mod tests {
 
 #[cfg(test)]
 mod conversion_tests {
-    use super::*;
-    use db::models::{Workflow, WorkflowTask, Terminal};
-    use uuid::Uuid;
     use chrono::Utc;
+    use db::models::{Terminal, Workflow, WorkflowTask};
+    use uuid::Uuid;
+
+    use super::*;
 
     #[test]
     fn test_convert_workflow_to_dto() {
@@ -387,11 +453,7 @@ mod conversion_tests {
             updated_at: Utc::now(),
         };
 
-        let dto = WorkflowDetailDto::from_workflow(
-            &workflow,
-            &vec![],
-            &vec![]
-        );
+        let dto = WorkflowDetailDto::from_workflow(&workflow, &vec![], &vec![]);
 
         assert_eq!(dto.name, "Test Workflow");
         assert_eq!(dto.status, "created");
