@@ -7,6 +7,7 @@ pub mod config;
 pub mod constants;
 pub mod llm;
 pub mod message_bus;
+pub mod persistence;
 pub mod runtime;
 pub mod state;
 pub mod terminal_coordinator;

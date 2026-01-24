@@ -14,6 +14,7 @@ use tracing::{debug, error, info, warn};
 use super::{
     constants::{WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_READY},
     OrchestratorAgent, OrchestratorConfig, SharedMessageBus,
+    persistence::StatePersistence,
 };
 use db::DBService;
 
@@ -49,16 +50,20 @@ pub struct OrchestratorRuntime {
     message_bus: SharedMessageBus,
     config: RuntimeConfig,
     running_workflows: Arc<Mutex<HashMap<String, RunningWorkflow>>>,
+    persistence: StatePersistence,
 }
 
 impl OrchestratorRuntime {
     /// Create a new runtime instance
     pub fn new(db: Arc<DBService>, message_bus: SharedMessageBus) -> Self {
+        let persistence = StatePersistence::new(db.clone());
+
         Self {
             db,
             message_bus,
             config: RuntimeConfig::default(),
             running_workflows: Arc::new(Mutex::new(HashMap::new())),
+            persistence,
         }
     }
 
@@ -68,11 +73,14 @@ impl OrchestratorRuntime {
         message_bus: SharedMessageBus,
         config: RuntimeConfig,
     ) -> Self {
+        let persistence = StatePersistence::new(db.clone());
+
         Self {
             db,
             message_bus,
             config,
             running_workflows: Arc::new(Mutex::new(HashMap::new())),
+            persistence,
         }
     }
 
@@ -247,6 +255,7 @@ impl OrchestratorRuntime {
     ///
     /// Finds all workflows with status 'running' and marks them as 'failed',
     /// as they were likely interrupted by a crash or restart.
+    /// Should be called on service startup.
     pub async fn recover_running_workflows(&self) -> Result<()> {
         // Query for workflows with status 'running'
         // Note: We need to add this method to Workflow model, but for now use a workaround
@@ -272,21 +281,75 @@ impl OrchestratorRuntime {
 
         for row in rows {
             let workflow_id: &str = &row.id;
-            warn!("Marking workflow {} as failed (recovery)", workflow_id);
+            warn!("Recovering workflow {}", workflow_id);
 
-            if let Err(e) = db::models::Workflow::update_status(
-                pool,
-                workflow_id,
-                WORKFLOW_STATUS_FAILED,
-            )
-            .await
-            {
-                error!(
-                    "Failed to mark workflow {} as failed during recovery: {}",
-                    workflow_id, e
-                );
-            } else {
-                info!("Workflow {} marked as failed", workflow_id);
+            // Try to load persisted state
+            match self.persistence.recover_workflow(workflow_id).await {
+                Ok(Some(state)) => {
+                    info!(
+                        "Successfully recovered state for workflow {} with {} tasks and {} messages",
+                        workflow_id,
+                        state.task_states.len(),
+                        state.conversation_history.len()
+                    );
+
+                    // For now, we mark the workflow as failed since we can't automatically
+                    // resume without more complex recovery logic
+                    // In the future, this could restart the workflow with the recovered state
+                    if let Err(e) = db::models::Workflow::update_status(
+                        pool,
+                        workflow_id,
+                        WORKFLOW_STATUS_FAILED,
+                    )
+                    .await
+                    {
+                        error!(
+                            "Failed to mark workflow {} as failed during recovery: {}",
+                            workflow_id, e
+                        );
+                    } else {
+                        info!("Workflow {} marked as failed (state recovered but auto-resume not implemented)", workflow_id);
+                    }
+                }
+                Ok(None) => {
+                    warn!("No persisted state found for workflow {}", workflow_id);
+
+                    // Mark as failed since we can't recover without state
+                    if let Err(e) = db::models::Workflow::update_status(
+                        pool,
+                        workflow_id,
+                        WORKFLOW_STATUS_FAILED,
+                    )
+                    .await
+                    {
+                        error!(
+                            "Failed to mark workflow {} as failed during recovery: {}",
+                            workflow_id, e
+                        );
+                    } else {
+                        info!("Workflow {} marked as failed (no state recovered)", workflow_id);
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to recover state for workflow {}: {}",
+                        workflow_id, e
+                    );
+
+                    // Still mark as failed even if state recovery failed
+                    if let Err(e) = db::models::Workflow::update_status(
+                        pool,
+                        workflow_id,
+                        WORKFLOW_STATUS_FAILED,
+                    )
+                    .await
+                    {
+                        error!(
+                            "Failed to mark workflow {} as failed during recovery: {}",
+                            workflow_id, e
+                        );
+                    }
+                }
             }
         }
 
