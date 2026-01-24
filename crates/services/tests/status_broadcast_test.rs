@@ -1,55 +1,9 @@
 //! Unit tests for status broadcasting methods
 //!
-//! These tests verify the broadcast method signatures and basic functionality
+//! These tests verify the BusMessage variants and basic functionality
 //! without requiring full integration test infrastructure.
 
-use services::orchestrator::agent::OrchestratorAgent;
-use services::orchestrator::message_bus::{BusMessage, MessageBus};
-use services::orchestrator::config::OrchestratorConfig;
-use services::orchestrator::state::OrchestratorState;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
-#[test]
-fn test_broadcast_workflow_status_signature() {
-    // This test verifies that the broadcast_workflow_status method exists
-    // and has the correct signature. In a real test environment, we would
-    // create an agent and call this method to verify it works.
-
-    // The signature should be:
-    // pub fn broadcast_workflow_status(&self, status: &str) -> anyhow::Result<()>
-
-    // This test is a compile-time check that the method exists
-    // If the method doesn't exist or has the wrong signature,
-    // this will fail to compile
-
-    // We can't actually test it without a runtime, but we can verify
-    // the concept by checking the documentation
-
-    assert!(true, "broadcast_workflow_status method exists with correct signature");
-}
-
-#[test]
-fn test_broadcast_terminal_status_signature() {
-    // This test verifies that the broadcast_terminal_status method exists
-    // and has the correct signature.
-
-    // The signature should be:
-    // pub fn broadcast_terminal_status(&self, terminal_id: &str, status: &str) -> anyhow::Result<()>
-
-    assert!(true, "broadcast_terminal_status method exists with correct signature");
-}
-
-#[test]
-fn test_broadcast_task_status_signature() {
-    // This test verifies that the broadcast_task_status method exists
-    // and has the correct signature.
-
-    // The signature should be:
-    // pub fn broadcast_task_status(&self, task_id: &str, status: &str) -> anyhow::Result<()>
-
-    assert!(true, "broadcast_task_status method exists with correct signature");
-}
+use services::orchestrator::message_bus::BusMessage;
 
 #[test]
 fn test_bus_message_variants_exist() {
@@ -79,6 +33,8 @@ fn test_bus_message_variants_exist() {
 #[test]
 fn test_message_bus_creation() {
     // Verify MessageBus can be created
+    use services::orchestrator::message_bus::MessageBus;
+
     let _bus = MessageBus::new(100);
     let _bus = MessageBus::default();
 }
@@ -86,6 +42,8 @@ fn test_message_bus_creation() {
 #[tokio::test]
 async fn test_orchestrator_state_creation() {
     // Verify OrchestratorState can be created with a workflow_id
+    use services::orchestrator::state::OrchestratorState;
+
     let state = OrchestratorState::new("test-workflow".to_string());
     assert_eq!(state.workflow_id, "test-workflow");
     assert_eq!(state.run_state, services::orchestrator::state::OrchestratorRunState::Idle);

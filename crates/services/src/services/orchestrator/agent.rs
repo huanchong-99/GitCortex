@@ -531,40 +531,27 @@ impl OrchestratorAgent {
     ///
     /// Updates the workflow status in the database and broadcasts
     /// a StatusUpdate message to the workflow's message bus topic.
-    pub fn broadcast_workflow_status(&self, status: &str) -> anyhow::Result<()> {
+    pub async fn broadcast_workflow_status(&self, status: &str) -> anyhow::Result<()> {
+        // 1. Get workflow_id
         let workflow_id = {
-            let state = self.state.try_read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire state lock: {e}"))?;
+            let state = self.state.read().await;
             state.workflow_id.clone()
         };
 
-        // Update database
-        let db = self.db.clone();
-        let workflow_id_clone = workflow_id.clone();
-        let status = status.to_string();
-        tokio::spawn(async move {
-            if let Err(e) = db::models::Workflow::update_status(
-                &db.pool,
-                &workflow_id_clone,
-                &status,
-            ).await {
-                tracing::error!("Failed to update workflow status in database: {}", e);
-            }
-        });
+        // 2. Update database (synchronously await result)
+        db::models::Workflow::update_status(
+            &self.db.pool,
+            &workflow_id,
+            status,
+        ).await?;
 
-        // Broadcast to message bus
+        // 3. Publish to message bus (synchronously await result)
         let message = BusMessage::StatusUpdate {
             workflow_id: workflow_id.clone(),
             status: status.to_string(),
         };
-
-        let message_bus = self.message_bus.clone();
         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        tokio::spawn(async move {
-            if let Err(e) = message_bus.publish(&topic, message).await {
-                tracing::error!("Failed to publish workflow status update: {}", e);
-            }
-        });
+        self.message_bus.publish(&topic, message).await?;
 
         tracing::debug!(
             "Broadcast workflow status: {} -> {}",
@@ -579,41 +566,28 @@ impl OrchestratorAgent {
     ///
     /// Updates the terminal status in the database and broadcasts
     /// a TerminalStatusUpdate message to the workflow's message bus topic.
-    pub fn broadcast_terminal_status(&self, terminal_id: &str, status: &str) -> anyhow::Result<()> {
+    pub async fn broadcast_terminal_status(&self, terminal_id: &str, status: &str) -> anyhow::Result<()> {
+        // 1. Get workflow_id
         let workflow_id = {
-            let state = self.state.try_read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire state lock: {e}"))?;
+            let state = self.state.read().await;
             state.workflow_id.clone()
         };
 
-        // Update database
-        let db = self.db.clone();
-        let terminal_id = terminal_id.to_string();
-        let status = status.to_string();
-        tokio::spawn(async move {
-            if let Err(e) = db::models::Terminal::update_status(
-                &db.pool,
-                &terminal_id,
-                &status,
-            ).await {
-                tracing::error!("Failed to update terminal status in database: {}", e);
-            }
-        });
+        // 2. Update database (synchronously await result)
+        db::models::Terminal::update_status(
+            &self.db.pool,
+            terminal_id,
+            status,
+        ).await?;
 
-        // Broadcast to message bus
+        // 3. Publish to message bus (synchronously await result)
         let message = BusMessage::TerminalStatusUpdate {
             workflow_id: workflow_id.clone(),
             terminal_id: terminal_id.to_string(),
             status: status.to_string(),
         };
-
-        let message_bus = self.message_bus.clone();
         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        tokio::spawn(async move {
-            if let Err(e) = message_bus.publish(&topic, message).await {
-                tracing::error!("Failed to publish terminal status update: {}", e);
-            }
-        });
+        self.message_bus.publish(&topic, message).await?;
 
         tracing::debug!(
             "Broadcast terminal status: {} -> {}",
@@ -628,41 +602,28 @@ impl OrchestratorAgent {
     ///
     /// Updates the task status in the database and broadcasts
     /// a TaskStatusUpdate message to the workflow's message bus topic.
-    pub fn broadcast_task_status(&self, task_id: &str, status: &str) -> anyhow::Result<()> {
+    pub async fn broadcast_task_status(&self, task_id: &str, status: &str) -> anyhow::Result<()> {
+        // 1. Get workflow_id
         let workflow_id = {
-            let state = self.state.try_read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire state lock: {e}"))?;
+            let state = self.state.read().await;
             state.workflow_id.clone()
         };
 
-        // Update database
-        let db = self.db.clone();
-        let task_id = task_id.to_string();
-        let status = status.to_string();
-        tokio::spawn(async move {
-            if let Err(e) = db::models::WorkflowTask::update_status(
-                &db.pool,
-                &task_id,
-                &status,
-            ).await {
-                tracing::error!("Failed to update task status in database: {}", e);
-            }
-        });
+        // 2. Update database (synchronously await result)
+        db::models::WorkflowTask::update_status(
+            &self.db.pool,
+            task_id,
+            status,
+        ).await?;
 
-        // Broadcast to message bus
+        // 3. Publish to message bus (synchronously await result)
         let message = BusMessage::TaskStatusUpdate {
             workflow_id: workflow_id.clone(),
             task_id: task_id.to_string(),
             status: status.to_string(),
         };
-
-        let message_bus = self.message_bus.clone();
         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        tokio::spawn(async move {
-            if let Err(e) = message_bus.publish(&topic, message).await {
-                tracing::error!("Failed to publish task status update: {}", e);
-            }
-        });
+        self.message_bus.publish(&topic, message).await?;
 
         tracing::debug!(
             "Broadcast task status: {} -> {}",

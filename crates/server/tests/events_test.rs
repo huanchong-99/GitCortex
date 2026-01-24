@@ -164,7 +164,7 @@ async fn test_workflow_status_broadcast() {
     ).expect("Failed to create agent");
 
     // Broadcast workflow status
-    agent.broadcast_workflow_status("running").expect("Failed to broadcast workflow status");
+    agent.broadcast_workflow_status("running").await.expect("Failed to broadcast workflow status");
 
     // Verify the status update was received
     let message = timeout(Duration::from_millis(500), subscriber.recv())
@@ -272,7 +272,7 @@ async fn test_terminal_status_broadcast() {
     ).expect("Failed to create agent");
 
     // Broadcast terminal status
-    agent.broadcast_terminal_status(&terminal_id, "running")
+    agent.broadcast_terminal_status(&terminal_id, "running").await
         .expect("Failed to broadcast terminal status");
 
     // Verify the status update was received
@@ -360,7 +360,7 @@ async fn test_task_status_broadcast() {
     ).expect("Failed to create agent");
 
     // Broadcast task status
-    agent.broadcast_task_status(&task_id, "running")
+    agent.broadcast_task_status(&task_id, "running").await
         .expect("Failed to broadcast task status");
 
     // Verify the status update was received
