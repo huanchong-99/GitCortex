@@ -503,11 +503,12 @@ async fn start_workflow(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    // Check workflow status is ready
+    // Check workflow exists
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Workflow not found".to_string()))?;
 
+    // Validate workflow status is ready
     if workflow.status != "ready" {
         return Err(ApiError::BadRequest(format!(
             "Workflow is not ready. Current status: {}",
@@ -515,10 +516,21 @@ async fn start_workflow(
         )));
     }
 
-    // Update status to running
-    Workflow::set_started(&deployment.db().pool, &workflow_id).await?;
+    // Verify orchestrator is enabled
+    if !workflow.orchestrator_enabled {
+        return Err(ApiError::BadRequest(
+            "Cannot start workflow: orchestrator is not enabled".to_string()
+        ));
+    }
 
-    // TODO: Trigger Orchestrator to start coordination
+    // Call orchestrator runtime to start workflow
+    deployment
+        .orchestrator_runtime()
+        .start_workflow(&workflow_id)
+        .map_err(|e| ApiError::Internal(format!("Failed to start workflow: {}", e)))?;
+
+    // Note: Workflow::set_started is called inside OrchestratorRuntime::start_workflow
+    // to ensure the status update happens atomically with runtime startup
 
     Ok(ResponseJson(ApiResponse::success(())))
 }
