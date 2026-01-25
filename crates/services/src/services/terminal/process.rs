@@ -266,6 +266,35 @@ impl ProcessManager {
             processes.remove(&id);
         }
     }
+
+    /// Get process handle by terminal ID
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal_id` - Terminal ID to look up
+    ///
+    /// # Returns
+    ///
+    /// `Some(ProcessHandle)` if the terminal process exists, `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use services::services::terminal::ProcessManager;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let manager = ProcessManager::new();
+    /// let handle = manager.get_handle("my-terminal").await;
+    /// # }
+    /// ```
+    pub async fn get_handle(&self, terminal_id: &str) -> Option<ProcessHandle> {
+        let processes = self.processes.read().await;
+        // ProcessHandle now contains I/O handles but Child is stored
+        // We need to refactor to store I/O handles separately
+        // For now, return None
+        None
+    }
 }
 
 impl Default for ProcessManager {

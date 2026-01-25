@@ -192,6 +192,22 @@ async fn handle_terminal_socket(
         terminal.status
     );
 
+    // Get process handle from ProcessManager
+    let process_handle = deployment.process_manager()
+        .get_handle(&terminal_id)
+        .await;
+
+    if process_handle.is_none() {
+        let msg = WsMessage::Error {
+            message: "Terminal process not running".to_string(),
+        };
+        let _ = ws_sender
+            .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
+            .await;
+        let _ = ws_sender.close().await;
+        return;
+    }
+
     // Create channel for bi-directional communication
     let (_tx, mut rx) = mpsc::channel::<String>(100);
 
