@@ -404,8 +404,8 @@ pub struct CreateWorkflowRequest {
     pub description: Option<String>,
     /// Use slash commands
     pub use_slash_commands: bool,
-    /// Slash command ID list (in order)
-    pub command_preset_ids: Option<Vec<String>>,
+    /// Workflow commands with custom parameters (in order)
+    pub commands: Option<Vec<WorkflowCommandRequest>>,
     /// Main Agent configuration
     pub orchestrator_config: Option<OrchestratorConfig>,
     /// Error handling terminal configuration
@@ -418,6 +418,17 @@ pub struct CreateWorkflowRequest {
     // ========== 新增字段 ==========
     /// Workflow tasks with terminals
     pub tasks: Vec<CreateWorkflowTaskRequest>,
+}
+
+/// Workflow command request for creating workflow
+#[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct WorkflowCommandRequest {
+    /// Preset ID
+    pub preset_id: String,
+    /// Custom parameters (JSON string)
+    pub custom_params: Option<String>,
 }
 
 /// Main Agent Configuration

@@ -10,7 +10,7 @@ use axum::{
 };
 use db::models::{
     CliType, CreateWorkflowRequest, ModelConfig, SlashCommandPreset, Terminal, Workflow,
-    WorkflowCommand, WorkflowTask,
+    WorkflowCommand, WorkflowCommandRequest, WorkflowTask,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
@@ -147,6 +147,27 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
                 return Err(ApiError::BadRequest(
                     format!("task[{}].terminal[{}].modelConfigId is required", task_index, terminal_index)
                 ));
+            }
+        }
+    }
+
+    // Validate commands if provided
+    if let Some(ref commands) = req.commands {
+        for (cmd_index, cmd) in commands.iter().enumerate() {
+            if cmd.preset_id.trim().is_empty() {
+                return Err(ApiError::BadRequest(
+                    format!("commands[{}].presetId is required", cmd_index)
+                ));
+            }
+
+            // Validate custom_params JSON format if provided
+            if let Some(ref params) = cmd.custom_params {
+                if !params.trim().is_empty() {
+                    serde_json::from_str::<serde_json::Value>(params)
+                        .map_err(|_| ApiError::BadRequest(
+                            format!("commands[{}].customParams must be valid JSON", cmd_index)
+                        ))?;
+                }
             }
         }
     }
@@ -319,15 +340,32 @@ async fn create_workflow(
 
     let workflow = Workflow::create(&deployment.db().pool, &workflow).await?;
 
-    // 2. Create slash command associations
+    // 2. Create slash command associations with custom parameters
     let mut commands: Vec<WorkflowCommand> = Vec::new();
-    if let Some(preset_ids) = req.command_preset_ids {
-        for (index, preset_id) in preset_ids.iter().enumerate() {
+    if let Some(command_reqs) = req.commands {
+        for (index, cmd_req) in command_reqs.iter().enumerate() {
             let index = i32::try_from(index)
-                .map_err(|_| ApiError::BadRequest("Command preset index overflow".to_string()))?;
-            let preset_id: &str = preset_id;
-            WorkflowCommand::create(&deployment.db().pool, &workflow_id, preset_id, index, None)
-                .await?;
+                .map_err(|_| ApiError::BadRequest("Command index overflow".to_string()))?;
+
+            // Validate custom_params is valid JSON if provided
+            if let Some(ref params) = cmd_req.custom_params {
+                if !params.trim().is_empty() {
+                    // Validate JSON format
+                    serde_json::from_str::<serde_json::Value>(params)
+                        .map_err(|_| ApiError::BadRequest(
+                            format!("Invalid JSON in custom_params for preset {}", cmd_req.preset_id)
+                        ))?;
+                }
+            }
+
+            WorkflowCommand::create(
+                &deployment.db().pool,
+                &workflow_id,
+                &cmd_req.preset_id,
+                index,
+                cmd_req.custom_params.as_deref(),
+            )
+            .await?;
         }
         commands = WorkflowCommand::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
     }

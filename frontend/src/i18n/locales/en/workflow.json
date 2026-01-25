@@ -209,6 +209,20 @@
         "name": "Refactor code",
         "description": "Refactor code to improve maintainability"
       }
+    },
+    "params": {
+      "title": "Custom Parameters",
+      "description": "Configure custom JSON parameters for this command preset. These parameters will override default values.",
+      "edit": "Edit parameters",
+      "configured": "Configured",
+      "cancel": "Cancel",
+      "save": "Save",
+      "placeholder": "Enter JSON object...",
+      "hint": "Press Ctrl+Enter to save",
+      "error": {
+        "invalidJson": "Invalid JSON syntax",
+        "notObject": "Value must be a JSON object (e.g., {\"key\": \"value\"})"
+      }
     }
   },
   "step6": {

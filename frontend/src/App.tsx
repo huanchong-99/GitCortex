@@ -7,6 +7,7 @@ import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
 import { Workflows } from '@/pages/Workflows';
 import { WorkflowDebugPage } from '@/pages/WorkflowDebug';
+import { SlashCommands } from '@/pages/SlashCommands';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
 import { usePostHog } from 'posthog-js/react';
@@ -155,6 +156,7 @@ function AppContent() {
                 path="/projects/:projectId/tasks"
                 element={<ProjectTasks />}
               />
+              <Route path="/commands" element={<SlashCommands />} />
               <Route path="/settings/*" element={<SettingsLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
                 <Route path="general" element={<GeneralSettings />} />

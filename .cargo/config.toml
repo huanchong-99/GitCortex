@@ -23,3 +23,7 @@ rustflags = ["-C", "link-arg=/DEBUG:FASTLINK"]
 
 [target.aarch64-pc-windows-msvc]
 rustflags = ["-C", "link-arg=/DEBUG:FASTLINK"]
+
+[env]
+AWS_LC_SYS_STATIC = "0"
+AWS_LC_SYS_NO_PREGENERATED_SRC = "1"
