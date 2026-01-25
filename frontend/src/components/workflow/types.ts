@@ -114,6 +114,7 @@ export interface TerminalConfig {
 export interface CommandConfig {
   enabled: boolean;
   presetIds: string[];  // 选中的命令预设 ID（按顺序）
+  customParams?: Record<string, Record<string, unknown>>; // presetId -> JSON object
 }
 
 /** 高级配置 (步骤6) */
@@ -216,7 +217,7 @@ export function wizardConfigToCreateRequest(
     commands: config.commands.presetIds.map((presetId, index) => ({
       presetId,
       orderIndex: index,
-      customParams: null,
+      customParams: config.commands.customParams?.[presetId] ?? null,
     })),
     orchestratorConfig: {
       apiType: orchestratorModel.apiType,
