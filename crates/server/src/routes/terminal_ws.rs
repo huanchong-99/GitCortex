@@ -124,7 +124,7 @@ async fn handle_terminal_socket(
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
     // Create channel for PTY input (client -> PTY)
-    let (_pty_input_tx, mut pty_input_rx) = mpsc::channel::<Vec<u8>>(100);
+    let (pty_input_tx, mut pty_input_rx) = mpsc::channel::<Vec<u8>>(100);
 
     // Clone for tasks
     let terminal_id_clone = terminal_id.clone();
@@ -268,13 +268,11 @@ async fn handle_terminal_socket(
                                 if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
                                     match ws_msg {
                                         WsMessage::Input { data } => {
-                                            // TODO: Send input to PTY
-                                            // For now, just log it
-                                            tracing::debug!(
-                                                "Terminal {} input: {} bytes",
-                                                terminal_id_clone,
-                                                data.len()
-                                            );
+                                            // Send to PTY stdin
+                                            if let Err(e) = pty_input_tx.send(data.into_bytes()).await {
+                                                tracing::error!("Failed to send to PTY: {}", e);
+                                                break;
+                                            }
                                         }
                                         WsMessage::Resize { cols, rows } => {
                                             // TODO: Resize PTY
