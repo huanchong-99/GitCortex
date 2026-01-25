@@ -4,7 +4,9 @@ import {
   WizardStep,
   WIZARD_STEPS,
   getDefaultWizardConfig,
+  wizardConfigToCreateRequest,
 } from './types';
+import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
 
 describe('Workflow Types', () => {
   describe('WizardStep enum', () => {
@@ -52,6 +54,132 @@ describe('Workflow Types', () => {
     it('should set default target branch to main', () => {
       const config = getDefaultWizardConfig();
       expect(config.advanced.targetBranch).toBe('main');
+    });
+  });
+
+  describe('wizardConfigToCreateRequest', () => {
+    it('should transform minimal config correctly', () => {
+      const config = getDefaultWizardConfig();
+      config.basic.name = 'Test Workflow';
+      config.basic.description = 'Test description';
+      config.basic.taskCount = 1;
+      config.project.workingDirectory = 'proj-1';
+
+      config.tasks = [
+        {
+          id: 'task-0',
+          name: 'Task 1',
+          description: 'First task',
+          branch: 'feat/task-1',
+          terminalCount: 1,
+        },
+      ];
+
+      config.models = [
+        {
+          id: 'model-1',
+          displayName: 'Claude 3.5',
+          apiType: 'anthropic',
+          baseUrl: 'https://api.anthropic.com',
+          apiKey: 'sk-ant-xxx',
+          modelId: 'claude-3-5-sonnet-20241022',
+          isVerified: true,
+        },
+      ];
+
+      config.terminals = [
+        {
+          id: 'term-1',
+          taskId: 'task-0',
+          orderIndex: 0,
+          cliTypeId: 'claude-code',
+          modelConfigId: 'model-1',
+        },
+      ];
+
+      config.advanced.orchestrator.modelConfigId = 'model-1';
+      config.advanced.mergeTerminal.cliTypeId = 'claude-code';
+      config.advanced.mergeTerminal.modelConfigId = 'model-1';
+
+      const request = wizardConfigToCreateRequest('proj-1', config);
+
+      expect(request).toEqual({
+        projectId: 'proj-1',
+        name: 'Test Workflow',
+        description: 'Test description',
+        useSlashCommands: false,
+        commandPresetIds: undefined,
+        commands: [],
+        orchestratorConfig: {
+          apiType: 'anthropic',
+          baseUrl: 'https://api.anthropic.com',
+          apiKey: 'sk-ant-xxx',
+          model: 'claude-3-5-sonnet-20241022',
+        },
+        errorTerminalConfig: undefined,
+        mergeTerminalConfig: {
+          cliTypeId: 'claude-code',
+          modelConfigId: 'model-1',
+          customBaseUrl: null,
+          customApiKey: null,
+        },
+        targetBranch: 'main',
+        tasks: [
+          {
+            name: 'Task 1',
+            description: 'First task',
+            branch: 'feat/task-1',
+            orderIndex: 0,
+            terminals: [
+              {
+                cliTypeId: 'claude-code',
+                modelConfigId: 'model-1',
+                customBaseUrl: null,
+                customApiKey: null,
+                role: undefined,
+                roleDescription: null,
+                orderIndex: 0,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should throw error if orchestrator model not found', () => {
+      const config = getDefaultWizardConfig();
+      config.basic.name = 'Test';
+      config.advanced.orchestrator.modelConfigId = 'non-existent';
+
+      expect(() => wizardConfigToCreateRequest('proj-1', config)).toThrow(
+        'Orchestrator model not found'
+      );
+    });
+
+    it('should throw error if task has no terminals', () => {
+      const config = getDefaultWizardConfig();
+      config.basic.name = 'Test';
+      config.basic.taskCount = 1;
+      config.tasks = [{ id: 'task-0', name: 'Task', description: 'Desc', branch: 'feat', terminalCount: 1 }];
+      config.models = [
+        {
+          id: 'model-1',
+          displayName: 'Model',
+          apiType: 'anthropic',
+          baseUrl: 'https://api.test.com',
+          apiKey: 'key',
+          modelId: 'model',
+          isVerified: true,
+        },
+      ];
+      config.terminals = []; // No terminals
+      config.advanced.orchestrator.modelConfigId = 'model-1';
+      config.advanced.mergeTerminal.cliTypeId = 'claude-code';
+      config.advanced.mergeTerminal.modelConfigId = 'model-1';
+
+      expect(() => wizardConfigToCreateRequest('proj-1', config)).toThrow(
+        'Task "Task" has no terminals assigned'
+      );
     });
   });
 });

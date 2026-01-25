@@ -186,3 +186,93 @@ export function getDefaultWizardConfig(): WizardConfig {
     },
   };
 }
+
+// ============================================================================
+// API Request Types (from useWorkflows.ts)
+// ============================================================================
+
+import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
+
+/**
+ * Transform WizardConfig to CreateWorkflowRequest
+ * Matches backend API contract at workflows_dto.rs
+ */
+export function wizardConfigToCreateRequest(
+  projectId: string,
+  config: WizardConfig
+): CreateWorkflowRequest {
+  // Build orchestrator config from models
+  const orchestratorModel = config.models.find(m => m.id === config.advanced.orchestrator.modelConfigId);
+  if (!orchestratorModel) {
+    throw new Error('Orchestrator model not found in configured models');
+  }
+
+  const request: CreateWorkflowRequest = {
+    projectId,
+    name: config.basic.name,
+    description: config.basic.description,
+    useSlashCommands: config.commands.enabled,
+    commandPresetIds: config.commands.presetIds.length > 0 ? config.commands.presetIds : undefined,
+    commands: config.commands.presetIds.map((presetId, index) => ({
+      presetId,
+      orderIndex: index,
+      customParams: null,
+    })),
+    orchestratorConfig: {
+      apiType: orchestratorModel.apiType,
+      baseUrl: orchestratorModel.baseUrl,
+      apiKey: orchestratorModel.apiKey,
+      model: orchestratorModel.modelId,
+    },
+    errorTerminalConfig: config.advanced.errorTerminal.enabled ? {
+      cliTypeId: config.advanced.errorTerminal.cliTypeId!,
+      modelConfigId: config.advanced.errorTerminal.modelConfigId!,
+      customBaseUrl: null,
+      customApiKey: null,
+    } : undefined,
+    mergeTerminalConfig: {
+      cliTypeId: config.advanced.mergeTerminal.cliTypeId,
+      modelConfigId: config.advanced.mergeTerminal.modelConfigId,
+      customBaseUrl: null,
+      customApiKey: null,
+    },
+    targetBranch: config.advanced.targetBranch,
+    tasks: config.tasks
+      .sort((a, b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]))
+      .map((task, taskIndex) => {
+        // Find terminals for this task
+        const taskTerminals = config.terminals
+          .filter(t => t.taskId === task.id)
+          .sort((a, b) => a.orderIndex - b.orderIndex);
+
+        if (taskTerminals.length === 0) {
+          throw new Error(`Task "${task.name}" has no terminals assigned`);
+        }
+
+        return {
+          name: task.name,
+          description: task.description,
+          branch: task.branch,
+          orderIndex: taskIndex,
+          terminals: taskTerminals.map(terminal => {
+            const model = config.models.find(m => m.id === terminal.modelConfigId);
+            if (!model) {
+              throw new Error(`Model not found for terminal ${terminal.id}`);
+            }
+
+            return {
+              cliTypeId: terminal.cliTypeId,
+              modelConfigId: terminal.modelConfigId,
+              customBaseUrl: model.baseUrl !== orchestratorModel.baseUrl ? model.baseUrl : null,
+              customApiKey: model.apiKey !== orchestratorModel.apiKey ? model.apiKey : null,
+              role: terminal.role,
+              roleDescription: null,
+              orderIndex: terminal.orderIndex,
+            };
+          }),
+        };
+      }),
+  };
+
+  return request;
+}

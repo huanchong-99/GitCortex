@@ -15,6 +15,8 @@ import type { WorkflowTaskDto } from 'shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
 import { PipelineView, type WorkflowStatus, type WorkflowTask } from '@/components/workflow/PipelineView';
 import type { WizardConfig } from '@/components/workflow/types';
+import { wizardConfigToCreateRequest } from '@/components/workflow/types';
+import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
@@ -90,53 +92,16 @@ export function Workflows() {
   const handleCreateWorkflow = async (wizardConfig: WizardConfig) => {
     if (!projectId) return;
 
-    // Get orchestrator model config from wizard
-    const orchestratorModel = wizardConfig.models.find(
-      m => m.id === wizardConfig.advanced.orchestrator.modelConfigId
-    );
+    try {
+      // Transform WizardConfig to CreateWorkflowRequest using the helper function
+      const request = wizardConfigToCreateRequest(projectId, wizardConfig);
 
-    if (!orchestratorModel) {
-      console.error('Orchestrator model config not found');
-      return;
+      await createMutation.mutateAsync(request);
+      setShowWizard(false);
+    } catch (error) {
+      console.error('Failed to create workflow:', error);
+      // Error is already handled by the mutation's onError callback
     }
-
-    // Transform WizardConfig to CreateWorkflowRequest format matching backend API
-    const request = {
-      projectId: projectId,
-      name: wizardConfig.basic.name,
-      description: wizardConfig.basic.description,
-      useSlashCommands: wizardConfig.commands.enabled,
-      commandPresetIds: wizardConfig.commands.enabled ? wizardConfig.commands.presetIds : undefined,
-      orchestratorConfig: {
-        apiType: orchestratorModel.apiType,
-        baseUrl: orchestratorModel.baseUrl,
-        apiKey: orchestratorModel.apiKey,
-        model: orchestratorModel.modelId,
-      },
-      mergeTerminalConfig: {
-        cliTypeId: wizardConfig.advanced.mergeTerminal.cliTypeId,
-        modelConfigId: wizardConfig.advanced.mergeTerminal.modelConfigId,
-      },
-      targetBranch: wizardConfig.advanced.targetBranch,
-      tasks: wizardConfig.tasks.map((task, index) => ({
-        name: task.name,
-        description: task.description,
-        branch: task.branch,
-        orderIndex: index,
-        terminals: wizardConfig.terminals
-          .filter(t => t.taskId === task.id)
-          .map((terminal, termIndex) => ({
-            cliTypeId: terminal.cliTypeId,
-            modelConfigId: terminal.modelConfigId,
-            role: terminal.role,
-            roleDescription: terminal.role,
-            orderIndex: termIndex,
-          })),
-      })),
-    };
-
-    await createMutation.mutateAsync(request);
-    setShowWizard(false);
   };
 
   const handleStartWorkflow = async (workflowId: string) => {
