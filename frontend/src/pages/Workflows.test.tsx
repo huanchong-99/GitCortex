@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workflows } from './Workflows';
-import type { WorkflowListItemDto } from '@/shared/types';
+import type { WorkflowListItemDto } from 'shared/types';
 
 // ============================================================================
 // Test Utilities

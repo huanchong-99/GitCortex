@@ -11,12 +11,13 @@ import {
   useDeleteWorkflow,
   useWorkflow,
 } from '@/hooks/useWorkflows';
-import type { WorkflowDetailDto, WorkflowTaskDto } from '@/shared/types';
+import type { WorkflowTaskDto } from 'shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
 import { PipelineView, type WorkflowStatus, type WorkflowTask } from '@/components/workflow/PipelineView';
 import type { WizardConfig } from '@/components/workflow/types';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 
 export function Workflows() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -56,8 +57,11 @@ export function Workflows() {
       branch: task.branch,
       terminals: task.terminals.map(terminal => ({
         id: terminal.id,
+        workflowTaskId: task.id,
         cliTypeId: terminal.cliTypeId,
         modelConfigId: terminal.modelConfigId,
+        role: terminal.role || undefined,
+        orderIndex: terminal.orderIndex,
         status: terminal.status as TerminalStatus,
       })),
     }));
@@ -86,6 +90,16 @@ export function Workflows() {
   const handleCreateWorkflow = async (wizardConfig: WizardConfig) => {
     if (!projectId) return;
 
+    // Get orchestrator model config from wizard
+    const orchestratorModel = wizardConfig.models.find(
+      m => m.id === wizardConfig.advanced.orchestrator.modelConfigId
+    );
+
+    if (!orchestratorModel) {
+      console.error('Orchestrator model config not found');
+      return;
+    }
+
     // Transform WizardConfig to CreateWorkflowRequest format matching backend API
     const request = {
       projectId: projectId,
@@ -94,10 +108,10 @@ export function Workflows() {
       useSlashCommands: wizardConfig.commands.enabled,
       commandPresetIds: wizardConfig.commands.enabled ? wizardConfig.commands.presetIds : undefined,
       orchestratorConfig: {
-        apiType: 'anthropic', // TODO: Get from wizardConfig.models
-        baseUrl: 'https://api.anthropic.com', // TODO: Get from wizardConfig.models
-        apiKey: '', // TODO: Get from wizardConfig.models
-        model: 'claude-sonnet-4-5-20250929', // TODO: Get from wizardConfig.models
+        apiType: orchestratorModel.apiType,
+        baseUrl: orchestratorModel.baseUrl,
+        apiKey: orchestratorModel.apiKey,
+        model: orchestratorModel.modelId,
       },
       mergeTerminalConfig: {
         cliTypeId: wizardConfig.advanced.mergeTerminal.cliTypeId,
@@ -115,7 +129,7 @@ export function Workflows() {
             cliTypeId: terminal.cliTypeId,
             modelConfigId: terminal.modelConfigId,
             role: terminal.role,
-            roleDescription: terminal.roleDescription || terminal.role,
+            roleDescription: terminal.role,
             orderIndex: termIndex,
           })),
       })),
@@ -130,12 +144,18 @@ export function Workflows() {
   };
 
   const handleDeleteWorkflow = async (workflowId: string) => {
-    if (confirm('Are you sure you want to delete this workflow?')) {
+    const result = await ConfirmDialog.show({
+      title: 'Delete Workflow',
+      message: 'Are you sure you want to delete this workflow? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+
+    if (result === 'confirmed') {
       await deleteMutation.mutateAsync(workflowId);
     }
   };
-
-  const selectedWorkflow = workflows?.find(w => w.id === selectedWorkflowId);
 
   if (selectedWorkflowDetail && selectedWorkflowId) {
     return (
@@ -178,7 +198,7 @@ export function Workflows() {
             modelConfigId: selectedWorkflowDetail.mergeTerminalModelId,
             status: 'not_started' as TerminalStatus,
           }}
-          onTerminalClick={(taskId, terminalId) => console.log('Terminal clicked:', taskId, terminalId)}
+          onTerminalClick={undefined}
         />
       </div>
     );
