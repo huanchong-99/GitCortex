@@ -162,3 +162,4 @@ impl Session {
         .await?;
         Ok(session)
     }
+}

@@ -375,6 +375,8 @@ mod tests {
             status: "not_started".to_string(),
             process_id: None,
             pty_session_id: None,
+            session_id: None,
+            execution_process_id: None,
             vk_session_id: None,
             last_commit_hash: None,
             last_commit_message: None,
