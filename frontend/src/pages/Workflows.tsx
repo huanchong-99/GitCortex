@@ -4,9 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Play, Trash2, Edit } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
-import { useWorkflows, useCreateWorkflow, useStartWorkflow, useDeleteWorkflow } from '@/hooks/useWorkflows';
+import {
+  useWorkflows,
+  useCreateWorkflow,
+  useStartWorkflow,
+  useDeleteWorkflow,
+  useWorkflow,
+} from '@/hooks/useWorkflows';
+import type { WorkflowDetailDto, WorkflowTaskDto } from '@/shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
-import { PipelineView } from '@/components/workflow/PipelineView';
+import { PipelineView, type WorkflowStatus, type WorkflowTask } from '@/components/workflow/PipelineView';
 import type { WizardConfig } from '@/components/workflow/types';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
@@ -21,6 +28,40 @@ export function Workflows() {
   const createMutation = useCreateWorkflow();
   const startMutation = useStartWorkflow();
   const deleteMutation = useDeleteWorkflow();
+
+  // Fetch workflow detail when selected
+  const { data: selectedWorkflowDetail } = useWorkflow(selectedWorkflowId || '');
+
+  // Helper to map DTO status to PipelineView status
+  const mapWorkflowStatus = (status: string): WorkflowStatus => {
+    const statusMap: Record<string, WorkflowStatus> = {
+      'created': 'idle',
+      'starting': 'running',
+      'ready': 'idle',
+      'running': 'running',
+      'paused': 'paused',
+      'merging': 'running',
+      'completed': 'completed',
+      'failed': 'failed',
+      'cancelled': 'failed',
+    };
+    return statusMap[status] || 'idle';
+  };
+
+  // Helper to map DTO tasks to PipelineView tasks
+  const mapWorkflowTasks = (dtoTasks: WorkflowTaskDto[]): WorkflowTask[] => {
+    return dtoTasks.map(task => ({
+      id: task.id,
+      name: task.name,
+      branch: task.branch,
+      terminals: task.terminals.map(terminal => ({
+        id: terminal.id,
+        cliTypeId: terminal.cliTypeId,
+        modelConfigId: terminal.modelConfigId,
+        status: terminal.status as TerminalStatus,
+      })),
+    }));
+  };
 
   if (isLoading) {
     return (
@@ -42,43 +83,42 @@ export function Workflows() {
     );
   }
 
-  const handleCreateWorkflow = async (config: WizardConfig) => {
+  const handleCreateWorkflow = async (wizardConfig: WizardConfig) => {
     if (!projectId) return;
 
-    // Transform WizardConfig to CreateWorkflowRequest
+    // Transform WizardConfig to CreateWorkflowRequest format matching backend API
     const request = {
-      project_id: projectId,
-      name: config.basic.name,
-      description: config.basic.description,
-      config: {
-        tasks: config.tasks.map(t => ({
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          branch: t.branch,
-          terminalCount: t.terminalCount,
-        })),
-        models: config.models.map(m => ({
-          id: m.id,
-          displayName: m.displayName,
-          apiType: m.apiType,
-          baseUrl: m.baseUrl,
-          modelId: m.modelId,
-          isVerified: m.isVerified,
-        })),
-        terminals: config.terminals,
-        commands: config.commands,
-        orchestrator: {
-          modelConfigId: config.advanced.orchestrator.modelConfigId,
-          errorTerminal: config.advanced.errorTerminal.enabled ? {
-            enabled: config.advanced.errorTerminal.enabled,
-            cliTypeId: config.advanced.errorTerminal.cliTypeId,
-            modelConfigId: config.advanced.errorTerminal.modelConfigId,
-          } : undefined,
-          mergeTerminal: config.advanced.mergeTerminal,
-          targetBranch: config.advanced.targetBranch,
-        },
+      projectId: projectId,
+      name: wizardConfig.basic.name,
+      description: wizardConfig.basic.description,
+      useSlashCommands: wizardConfig.commands.enabled,
+      commandPresetIds: wizardConfig.commands.enabled ? wizardConfig.commands.presetIds : undefined,
+      orchestratorConfig: {
+        apiType: 'anthropic', // TODO: Get from wizardConfig.models
+        baseUrl: 'https://api.anthropic.com', // TODO: Get from wizardConfig.models
+        apiKey: '', // TODO: Get from wizardConfig.models
+        model: 'claude-sonnet-4-5-20250929', // TODO: Get from wizardConfig.models
       },
+      mergeTerminalConfig: {
+        cliTypeId: wizardConfig.advanced.mergeTerminal.cliTypeId,
+        modelConfigId: wizardConfig.advanced.mergeTerminal.modelConfigId,
+      },
+      targetBranch: wizardConfig.advanced.targetBranch,
+      tasks: wizardConfig.tasks.map((task, index) => ({
+        name: task.name,
+        description: task.description,
+        branch: task.branch,
+        orderIndex: index,
+        terminals: wizardConfig.terminals
+          .filter(t => t.taskId === task.id)
+          .map((terminal, termIndex) => ({
+            cliTypeId: terminal.cliTypeId,
+            modelConfigId: terminal.modelConfigId,
+            role: terminal.role,
+            roleDescription: terminal.roleDescription || terminal.role,
+            orderIndex: termIndex,
+          })),
+      })),
     };
 
     await createMutation.mutateAsync(request);
@@ -97,7 +137,7 @@ export function Workflows() {
 
   const selectedWorkflow = workflows?.find(w => w.id === selectedWorkflowId);
 
-  if (selectedWorkflow && selectedWorkflowId) {
+  if (selectedWorkflowDetail && selectedWorkflowId) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -106,7 +146,7 @@ export function Workflows() {
           </Button>
           <div className="flex gap-2">
             <Button
-              onClick={() => handleStartWorkflow(selectedWorkflow.id)}
+              onClick={() => handleStartWorkflow(selectedWorkflowDetail.id)}
               disabled={startMutation.isPending}
             >
               <Play className="w-4 h-4 mr-2" />
@@ -121,7 +161,7 @@ export function Workflows() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => handleDeleteWorkflow(selectedWorkflow.id)}
+              onClick={() => handleDeleteWorkflow(selectedWorkflowDetail.id)}
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete
@@ -130,12 +170,12 @@ export function Workflows() {
         </div>
 
         <PipelineView
-          name={selectedWorkflow.name}
-          status={selectedWorkflow.status as any}
-          tasks={[]} // TODO: Fetch workflow tasks
+          name={selectedWorkflowDetail.name}
+          status={mapWorkflowStatus(selectedWorkflowDetail.status)}
+          tasks={mapWorkflowTasks(selectedWorkflowDetail.tasks)}
           mergeTerminal={{
-            cliTypeId: selectedWorkflow.config.orchestrator.mergeTerminal.cliTypeId,
-            modelConfigId: selectedWorkflow.config.orchestrator.mergeTerminal.modelConfigId,
+            cliTypeId: selectedWorkflowDetail.mergeTerminalCliId,
+            modelConfigId: selectedWorkflowDetail.mergeTerminalModelId,
             status: 'not_started' as TerminalStatus,
           }}
           onTerminalClick={(taskId, terminalId) => console.log('Terminal clicked:', taskId, terminalId)}
@@ -204,8 +244,8 @@ export function Workflows() {
                   <p className="text-sm text-low mb-4">{workflow.description}</p>
                 )}
                 <div className="flex items-center justify-between text-xs text-low">
-                  <span>{workflow.config.tasks.length} tasks</span>
-                  <span>{workflow.config.terminals.length} terminals</span>
+                  <span>{workflow.tasksCount} tasks</span>
+                  <span>{workflow.terminalsCount} terminals</span>
                 </div>
               </CardContent>
             </Card>
