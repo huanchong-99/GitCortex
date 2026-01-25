@@ -6,7 +6,16 @@ use std::{path::PathBuf, sync::Arc};
 
 // Re-export types
 pub use db::models::Terminal;
-use db::{DBService, models::{cli_type, session::Session, workspace::Workspace}};
+use db::{DBService, models::{
+    cli_type,
+    workspace::Workspace,
+    session::Session,
+    execution_process::{ExecutionProcess, ExecutionProcessRunReason, CreateExecutionProcess},
+    task::Task,
+    project::Project,
+}};
+use uuid::Uuid;
+use executors::actions::ExecutorAction;
 
 use super::process::{ProcessHandle, ProcessManager};
 use crate::services::cc_switch::CCSwitchService;
