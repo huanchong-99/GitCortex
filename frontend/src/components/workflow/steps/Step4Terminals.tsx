@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, X, AlertTriangle } from 'lucide-react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
+import { ErrorAlert } from '../../ui-new/primitives/ErrorAlert';
 import { cn } from '@/lib/utils';
 import type { WizardConfig, TerminalConfig } from '../types';
 import { useErrorNotification } from '@/hooks/useErrorNotification';
@@ -56,6 +57,9 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   const { t } = useTranslation('workflow');
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [cliTypes, setCliTypes] = useState(CLI_TYPES);
+
+  // Filter to only installed CLI types
+  const availableCliTypes = cliTypes.filter((ct) => ct.installed);
 
   // Get current task
   const hasTasks = config.tasks.length > 0;
@@ -153,6 +157,11 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
         </div>
       </div>
 
+      {/* No CLI Installed Error */}
+      {availableCliTypes.length === 0 && (
+        <ErrorAlert message={t('step4.errors.noCliInstalled')} />
+      )}
+
       {/* Task Navigation */}
       {config.tasks.length > 1 && (
         <div className="flex items-center justify-between">
@@ -246,6 +255,22 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
               {/* CLI Type Selection */}
               <Field>
                 <FieldLabel>{t('step4.cliTypeLabel')}</FieldLabel>
+
+                {/* Warning if CLI is not installed */}
+                {terminal.cliTypeId && !cliTypes.find((ct) => ct.id === terminal.cliTypeId)?.installed && (
+                  <div className="mb-base flex items-start gap-half p-base border border-warning bg-warning/10 rounded-sm">
+                    <AlertTriangle className="size-icon-sm text-warning shrink-0 mt-quarter" />
+                    <div className="flex-1">
+                      <div className="text-base text-warning font-medium mb-quarter">
+                        {t('step4.cliNotInstalledTitle')}
+                      </div>
+                      <div className="text-sm text-warning/80">
+                        {t('step4.cliNotInstalledDescription')}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-base">
                   {cliTypes.map((cli) => (
                     <button
