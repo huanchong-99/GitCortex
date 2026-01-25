@@ -123,6 +123,26 @@ async fn handle_terminal_socket(
     // Split the WebSocket into sender and receiver
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
+    // Create channel for PTY input (client -> PTY)
+    let (_pty_input_tx, mut pty_input_rx) = mpsc::channel::<Vec<u8>>(100);
+
+    // Clone for tasks
+    let terminal_id_clone = terminal_id.clone();
+    let terminal_id_pty = terminal_id.clone();
+
+    // Spawn PTY writer task: receive from channel and write to PTY stdin
+    let pty_writer_task = tokio::spawn(async move {
+        while let Some(data) = pty_input_rx.recv().await {
+            // TODO: Write to actual PTY stdin
+            // For now, just log
+            tracing::debug!(
+                "PTY {} stdin: {} bytes",
+                terminal_id_pty,
+                data.len()
+            );
+        }
+    });
+
     // Get terminal from database with timeout
     let terminal_result = timeout(
         Duration::from_secs(WS_CONNECT_TIMEOUT_SECS),
@@ -176,7 +196,6 @@ async fn handle_terminal_socket(
     let (_tx, mut rx) = mpsc::channel::<String>(100);
 
     // Clone terminal_id for use in tasks
-    let terminal_id_clone = terminal_id.clone();
     let terminal_id_heartbeat = terminal_id.clone();
 
     // Track last activity time for idle timeout
@@ -330,6 +349,9 @@ async fn handle_terminal_socket(
         }
         _ = heartbeat_task => {
             tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
+        }
+        _ = pty_writer_task => {
+            tracing::debug!("PTY writer task completed for terminal {}", terminal_id);
         }
     }
 
