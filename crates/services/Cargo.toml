@@ -58,6 +58,10 @@ moka = { version = "0.12", features = ["future"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.29"
+pty = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winbase", "handleapi", "namedpipeapi"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2"
