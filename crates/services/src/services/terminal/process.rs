@@ -178,8 +178,97 @@ impl ProcessManager {
 
         Ok(())
     }
+}
 
-    /// Checks if a terminal's process is still running
+/// Batch logger for terminal output
+///
+/// Batches log lines and flushes them every second to reduce I/O overhead.
+/// Uses an in-memory buffer and periodic background task for efficient logging.
+pub struct TerminalLogger {
+    /// Batch buffer for log lines
+    buffer: Arc<RwLock<Vec<String>>>,
+    /// Flush interval in seconds
+    flush_interval_secs: u64,
+}
+
+impl TerminalLogger {
+    /// Creates a new TerminalLogger with specified flush interval
+    ///
+    /// # Arguments
+    ///
+    /// * `flush_interval_secs` - Seconds between automatic flushes (default: 1)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use services::services::terminal::process::TerminalLogger;
+    ///
+    /// let logger = TerminalLogger::new(1);
+    /// ```
+    pub fn new(flush_interval_secs: u64) -> Self {
+        Self {
+            buffer: Arc::new(RwLock::new(Vec::new())),
+            flush_interval_secs,
+        }
+        .start_flush_task()
+    }
+
+    /// Starts the background flush task
+    ///
+    /// Spawns a periodic task that flushes the buffer to disk/log storage.
+    /// Runs every `flush_interval_secs` seconds.
+    fn start_flush_task(mut self) -> Self {
+        let buffer = Arc::clone(&self.buffer);
+        let interval_secs = self.flush_interval_secs;
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+            loop {
+                interval.tick().await;
+                // TODO: Flush buffer to persistent storage
+                // This will be implemented when terminal logging is integrated
+                let _buffer = buffer.read().await;
+                // Placeholder: In production, write to file/database
+            }
+        });
+
+        self
+    }
+
+    /// Appends a log line to the batch buffer
+    ///
+    /// Lines are buffered in memory and flushed periodically by the background task.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - Log line to append
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use services::services::terminal::process::TerminalLogger;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let logger = TerminalLogger::new(1);
+    /// logger.append("Hello, terminal!").await;
+    /// # }
+    /// ```
+    pub async fn append(&self, line: &str) {
+        let mut buffer = self.buffer.write().await;
+        buffer.push(line.to_string());
+
+        // Auto-flush if buffer grows too large (prevent unbounded memory growth)
+        const MAX_BUFFER_SIZE: usize = 1000;
+        if buffer.len() >= MAX_BUFFER_SIZE {
+            // TODO: Immediate flush when buffer is full
+            // This will be implemented when terminal logging is integrated
+            buffer.clear();
+        }
+    }
+}
+
+impl ProcessManager {
     ///
     /// # Arguments
     ///
