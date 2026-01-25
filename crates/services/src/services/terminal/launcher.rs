@@ -13,9 +13,14 @@ use db::{DBService, models::{
     execution_process::{ExecutionProcess, ExecutionProcessRunReason, CreateExecutionProcess},
     task::Task,
     project::Project,
+    execution_process_repo_state::CreateExecutionProcessRepoState,
 }};
 use uuid::Uuid;
-use executors::actions::ExecutorAction;
+use executors::{
+    actions::{ExecutorAction, ExecutorActionType, coding_agent_initial::CodingAgentInitialRequest},
+    profile::ExecutorProfileId,
+    executors::BaseCodingAgent,
+};
 
 use super::process::{ProcessHandle, ProcessManager};
 use crate::services::cc_switch::CCSwitchService;
@@ -144,19 +149,51 @@ impl TerminalLauncher {
             }
         };
 
-        let session_id = if let Some(ws_id) = workspace_id {
+        let (session_id, execution_process_id) = if let Some(ws_id) = workspace_id {
             match Session::create_for_terminal(&self.db.pool, ws_id, Some("claude-code".to_string()), Some(terminal_id.clone())).await {
                 Ok(session) => {
                     tracing::info!("Created session {} for terminal {}", session.id, terminal_id);
-                    Some(session.id.to_string())
+
+                    // Create ExecutionProcess for tracking this terminal launch
+                    // Create a simple coding agent action
+                    let executor_action = ExecutorAction::new(
+                        ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
+                            prompt: format!("Terminal launched for workflow task: {}", terminal.workflow_task_id),
+                            executor_profile_id: ExecutorProfileId::new(BaseCodingAgent::ClaudeCode),
+                            working_dir: None,
+                        }),
+                        None,
+                    );
+
+                    let create_exec_process = CreateExecutionProcess {
+                        session_id: session.id,
+                        executor_action,
+                        run_reason: ExecutionProcessRunReason::CodingAgent,
+                    };
+
+                    match ExecutionProcess::create(
+                        &self.db.pool,
+                        &create_exec_process,
+                        Uuid::new_v4(),
+                        &[], // Empty repo states for terminal launch
+                    ).await {
+                        Ok(exec_process) => {
+                            tracing::info!("Created execution process {} for terminal {}", exec_process.id, terminal_id);
+                            (Some(session.id.to_string()), Some(exec_process.id.to_string()))
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to create execution process for terminal {}: {}", terminal_id, e);
+                            (Some(session.id.to_string()), None)
+                        }
+                    }
                 }
                 Err(e) => {
                     tracing::error!("Failed to create session for terminal {}: {}", terminal_id, e);
-                    None
+                    (None, None)
                 }
             }
         } else {
-            None
+            (None, None)
         };
 
         // 4. Build launch command
@@ -180,13 +217,13 @@ impl TerminalLauncher {
                 )
                 .await;
 
-                // Update terminal with session binding
-                if let Some(ref sid) = session_id {
+                // Update terminal with session and execution process binding
+                if session_id.is_some() || execution_process_id.is_some() {
                     let _ = Terminal::update_session(
                         &self.db.pool,
                         &terminal_id,
-                        Some(sid),
-                        None, // execution_process_id will be set later when execution process is created
+                        session_id.as_deref(),
+                        execution_process_id.as_deref(),
                     )
                     .await;
                 }

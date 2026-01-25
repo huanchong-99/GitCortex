@@ -113,11 +113,13 @@ async fn test_terminal_launch_creates_session() {
 
     let workflow_task_id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO workflow_task (id, workflow_id, name, order_index, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO workflow_task (id, workflow_id, vk_task_id, name, branch, order_index, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&workflow_task_id)
     .bind(&wf_id)
+    .bind(task_id)  // Link to the task we created earlier
     .bind("task-1")
+    .bind("main")
     .bind(0)
     .bind("pending")
     .bind(Utc::now())
