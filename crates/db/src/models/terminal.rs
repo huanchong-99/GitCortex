@@ -75,6 +75,12 @@ pub struct Terminal {
     /// PTY session ID
     pub pty_session_id: Option<String>,
 
+    /// Associated session ID (NEW FIELD)
+    pub session_id: Option<String>,
+
+    /// Associated execution process ID (NEW FIELD)
+    pub execution_process_id: Option<String>,
+
     /// Associated vibe-kanban session ID
     pub vk_session_id: Option<Uuid>,
 
@@ -308,6 +314,30 @@ impl Terminal {
         )
         .bind(process_id)
         .bind(pty_session_id)
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update terminal session binding
+    pub async fn update_session(
+        pool: &SqlitePool,
+        id: &str,
+        session_id: Option<&str>,
+        execution_process_id: Option<&str>,
+    ) -> sqlx::Result<()> {
+        let now = Utc::now();
+        sqlx::query(
+            r"
+            UPDATE terminal
+            SET session_id = ?, execution_process_id = ?, updated_at = ?
+            WHERE id = ?
+            "
+        )
+        .bind(session_id)
+        .bind(execution_process_id)
         .bind(now)
         .bind(id)
         .execute(pool)

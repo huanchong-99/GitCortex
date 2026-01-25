@@ -9,6 +9,8 @@ use axum::{
 use db::models::{CliType, ModelConfig, CliDetectionStatus, CliType as CliTypeModel};
 use deployment::Deployment;
 use crate::{error::ApiError, DeploymentImpl};
+use services::terminal::detector::CliDetector;
+use std::sync::Arc;
 
 /// Create CLI types router
 pub fn cli_types_routes() -> Router<DeploymentImpl> {
@@ -32,71 +34,13 @@ async fn list_cli_types(
 async fn detect_cli_types(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<Vec<CliDetectionStatus>>, ApiError> {
-    let cli_types = CliTypeModel::find_all(&deployment.db().pool).await?;
-    let mut results = Vec::new();
+    let db = Arc::new(deployment.db());
+    let detector = CliDetector::new(db);
 
-    for cli_type in cli_types {
-        let status = detect_single_cli(&cli_type).await;
-        results.push(status);
-    }
+    let results = detector.detect_all().await
+        .map_err(|e| ApiError::Internal(format!("Failed to detect CLIs: {}", e)))?;
 
     Ok(ResponseJson(results))
-}
-
-/// Detect single CLI
-async fn detect_single_cli(cli_type: &CliType) -> CliDetectionStatus {
-    use tokio::process::Command;
-
-    // Parse detect command
-    let parts: Vec<&str> = cli_type.detect_command.split_whitespace().collect();
-    if parts.is_empty() {
-        return CliDetectionStatus {
-            cli_type_id: cli_type.id.clone(),
-            name: cli_type.name.clone(),
-            display_name: cli_type.display_name.clone(),
-            installed: false,
-            version: None,
-            executable_path: None,
-            install_guide_url: cli_type.install_guide_url.clone(),
-        };
-    }
-
-    let cmd = parts[0];
-    let args = &parts[1..];
-
-    // Execute detect command
-    let result = Command::new(cmd)
-        .args(args)
-        .output()
-        .await;
-
-    match result {
-        Ok(output) if output.status.success() => {
-            let version = String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .next()
-                .map(|s| s.trim().to_string());
-
-            CliDetectionStatus {
-                cli_type_id: cli_type.id.clone(),
-                name: cli_type.name.clone(),
-                display_name: cli_type.display_name.clone(),
-                installed: true,
-                version,
-                executable_path: None,  // Skip which for now
-                install_guide_url: cli_type.install_guide_url.clone(),
-            }
-        }
-        _ => CliDetectionStatus {
-            cli_type_id: cli_type.id.clone(),
-            name: cli_type.name.clone(),
-            display_name: cli_type.display_name.clone(),
-            installed: false,
-            version: None,
-            executable_path: None,
-            install_guide_url: cli_type.install_guide_url.clone(),
-        },
-    }
 }
 
 /// GET /api/cli_types/:cli_type_id/models
