@@ -5,13 +5,13 @@
 use std::{collections::HashMap, path::Path, sync::Arc};
 
 use tokio::{
-    process::{Child, Command},
+    process::{Child, Command, ChildStdout, ChildStderr, ChildStdin},
     sync::RwLock,
 };
 use uuid::Uuid;
 
 /// Process handle for tracking spawned processes
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ProcessHandle {
     /// Process ID
     pub pid: u32,
@@ -19,6 +19,12 @@ pub struct ProcessHandle {
     pub session_id: String,
     /// Associated terminal ID
     pub terminal_id: String,
+    /// Stdout reader (for WebSocket forwarding)
+    pub stdout: Option<ChildStdout>,
+    /// Stderr reader (for WebSocket forwarding)
+    pub stderr: Option<ChildStderr>,
+    /// Stdin writer (for WebSocket input)
+    pub stdin: Option<ChildStdin>,
 }
 
 /// Process manager for terminal lifecycle
@@ -99,6 +105,11 @@ impl ProcessManager {
             .ok_or_else(|| anyhow::anyhow!("Failed to get process ID"))?;
         let session_id = Uuid::new_v4().to_string();
 
+        // Extract I/O handles for PTY communication
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+        let stdin = child.stdin.take();
+
         let mut processes = self.processes.write().await;
         processes.insert(terminal_id.to_string(), child);
 
@@ -106,6 +117,9 @@ impl ProcessManager {
             pid,
             session_id,
             terminal_id: terminal_id.to_string(),
+            stdout,
+            stderr,
+            stdin,
         })
     }
 
