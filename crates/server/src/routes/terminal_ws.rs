@@ -197,11 +197,24 @@ async fn handle_terminal_socket(
 
     // Clone terminal_id for use in tasks
     let terminal_id_heartbeat = terminal_id.clone();
+    let terminal_id_stdout = terminal_id.clone();
 
     // Track last activity time for idle timeout
     let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
     let last_activity_recv = last_activity.clone();
     let last_activity_heartbeat = last_activity.clone();
+
+    // Spawn stdout reader task: read from PTY and send to WebSocket
+    let tx_clone = _tx.clone();
+    let stdout_reader_task = tokio::spawn(async move {
+        // TODO: Get actual stdout handle from ProcessManager
+        // For now, simulate with periodic messages
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            let _ = tx_clone.send(format!("PTY output from {}\n", terminal_id_stdout)).await;
+        }
+    });
 
     // Spawn send task: receive from channel and send to WebSocket
     let send_task = tokio::spawn(async move {
@@ -350,6 +363,9 @@ async fn handle_terminal_socket(
         }
         _ = pty_writer_task => {
             tracing::debug!("PTY writer task completed for terminal {}", terminal_id);
+        }
+        _ = stdout_reader_task => {
+            tracing::debug!("Stdout reader task completed for terminal {}", terminal_id);
         }
     }
 
