@@ -13,6 +13,42 @@ import type {
 // Create Request Types (not in generated types yet)
 // ============================================================================
 
+export type WorkflowStatusEnum =
+  | 'created'
+  | 'ready'
+  | 'starting'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface WorkflowActions {
+  canStart: boolean;
+  canPause: boolean;
+  canStop: boolean;
+  canDelete: boolean;
+}
+
+export const WORKFLOW_STATUS_TRANSITIONS: Record<WorkflowStatusEnum, WorkflowActions> = {
+  created: { canStart: false, canPause: false, canStop: false, canDelete: true },
+  ready: { canStart: true, canPause: false, canStop: false, canDelete: true },
+  starting: { canStart: false, canPause: false, canStop: true, canDelete: false },
+  running: { canStart: false, canPause: true, canStop: true, canDelete: false },
+  paused: { canStart: true, canPause: false, canStop: true, canDelete: true },
+  completed: { canStart: false, canPause: false, canStop: false, canDelete: true },
+  failed: { canStart: true, canPause: false, canStop: false, canDelete: true },
+  cancelled: { canStart: false, canPause: false, canStop: false, canDelete: true },
+};
+
+export function getWorkflowActions(status: WorkflowStatusEnum): WorkflowActions {
+  return WORKFLOW_STATUS_TRANSITIONS[status] ?? WORKFLOW_STATUS_TRANSITIONS.created;
+}
+
+// ============================================================================
+// Create Request Types (not in generated types yet)
+// ============================================================================
+
 export interface CreateWorkflowRequest {
   projectId: string;
   name: string;

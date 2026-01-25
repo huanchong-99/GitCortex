@@ -2,14 +2,17 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Play, Trash2, Edit } from 'lucide-react';
+import { Plus, Play, Pause, Square, Trash2, Edit } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import {
   useWorkflows,
   useCreateWorkflow,
   useStartWorkflow,
+  usePauseWorkflow,
+  useStopWorkflow,
   useDeleteWorkflow,
   useWorkflow,
+  getWorkflowActions,
 } from '@/hooks/useWorkflows';
 import type { WorkflowTaskDto } from 'shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
@@ -30,6 +33,8 @@ export function Workflows() {
   const { data: workflows, isLoading, error } = useWorkflows(projectId || '');
   const createMutation = useCreateWorkflow();
   const startMutation = useStartWorkflow();
+  const pauseMutation = usePauseWorkflow();
+  const stopMutation = useStopWorkflow();
   const deleteMutation = useDeleteWorkflow();
 
   // Fetch workflow detail when selected
@@ -108,6 +113,24 @@ export function Workflows() {
     await startMutation.mutateAsync({ workflow_id: workflowId });
   };
 
+  const handlePauseWorkflow = async (workflowId: string) => {
+    await pauseMutation.mutateAsync({ workflow_id: workflowId });
+  };
+
+  const handleStopWorkflow = async (workflowId: string) => {
+    const result = await ConfirmDialog.show({
+      title: 'Stop Workflow',
+      message: 'Are you sure you want to stop this workflow?',
+      confirmText: 'Stop',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+
+    if (result === 'confirmed') {
+      await stopMutation.mutateAsync({ workflow_id: workflowId });
+    }
+  };
+
   const handleDeleteWorkflow = async (workflowId: string) => {
     const result = await ConfirmDialog.show({
       title: 'Delete Workflow',
@@ -123,6 +146,8 @@ export function Workflows() {
   };
 
   if (selectedWorkflowDetail && selectedWorkflowId) {
+    const actions = getWorkflowActions(selectedWorkflowDetail.status as any);
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -130,27 +155,44 @@ export function Workflows() {
             ← Back to Workflows
           </Button>
           <div className="flex gap-2">
-            <Button
-              onClick={() => handleStartWorkflow(selectedWorkflowDetail.id)}
-              disabled={startMutation.isPending}
-            >
-              <Play className="w-4 h-4 mr-2" />
-              Start Workflow
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowWizard(true)}
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => handleDeleteWorkflow(selectedWorkflowDetail.id)}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </Button>
+            {actions.canStart && (
+              <Button
+                onClick={() => handleStartWorkflow(selectedWorkflowDetail.id)}
+                disabled={startMutation.isPending}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Start Workflow
+              </Button>
+            )}
+            {actions.canPause && (
+              <Button
+                variant="outline"
+                onClick={() => handlePauseWorkflow(selectedWorkflowDetail.id)}
+                disabled={pauseMutation.isPending}
+              >
+                <Pause className="w-4 h-4 mr-2" />
+                Pause
+              </Button>
+            )}
+            {actions.canStop && (
+              <Button
+                variant="destructive"
+                onClick={() => handleStopWorkflow(selectedWorkflowDetail.id)}
+                disabled={stopMutation.isPending}
+              >
+                <Square className="w-4 h-4 mr-2" />
+                Stop
+              </Button>
+            )}
+            {actions.canDelete && (
+              <Button
+                variant="outline"
+                onClick={() => handleDeleteWorkflow(selectedWorkflowDetail.id)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
           </div>
         </div>
 
