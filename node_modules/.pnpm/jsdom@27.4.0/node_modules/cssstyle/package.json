@@ -1,0 +1,53 @@
+{
+  "name": "cssstyle",
+  "description": "An implementation of the CSSStyleDeclaration class from the CSS Object Model specification",
+  "keywords": [
+    "CSS",
+    "CSSStyleDeclaration",
+    "StyleSheet"
+  ],
+  "version": "5.3.7",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jsdom/cssstyle.git"
+  },
+  "files": [
+    "lib/"
+  ],
+  "main": "./lib/CSSStyleDeclaration.js",
+  "dependencies": {
+    "@asamuzakjp/css-color": "^4.1.1",
+    "@csstools/css-syntax-patches-for-csstree": "^1.0.21",
+    "css-tree": "^3.1.0",
+    "lru-cache": "^11.2.4"
+  },
+  "devDependencies": {
+    "@babel/generator": "^7.28.5",
+    "@babel/parser": "^7.28.5",
+    "@babel/traverse": "^7.28.5",
+    "@babel/types": "^7.28.5",
+    "@domenic/eslint-config": "^4.0.1",
+    "@webref/css": "^8.1.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.5.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.7.4",
+    "resolve": "^1.22.11"
+  },
+  "scripts": {
+    "download": "node ./scripts/downloadLatestProperties.mjs",
+    "lint": "eslint --max-warnings 0",
+    "lint:fix": "eslint --fix --max-warnings 0",
+    "prepare": "run-p prepare:*",
+    "prepare:implemented_properties": "node ./scripts/generateImplementedProperties.mjs",
+    "prepare:properties": "node ./scripts/generateProperties.js",
+    "prepare:propertyDefinitions": "node ./scripts/generatePropertyDefinitions.mjs",
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

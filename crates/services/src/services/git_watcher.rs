@@ -13,19 +13,6 @@ use tokio::sync::Mutex;
 
 use crate::services::orchestrator::{BusMessage, MessageBus, TerminalCompletionEvent, TerminalCompletionStatus, CommitMetadata as OrchestratorCommitMetadata, CodeIssue};
 
-// Convert our Issue to orchestrator's CodeIssue
-impl From<Issue> for CodeIssue {
-    fn from(issue: Issue) -> Self {
-        CodeIssue {
-            severity: issue.severity,
-            file: issue.file,
-            line: issue.line,
-            message: issue.message,
-            suggestion: issue.suggestion,
-        }
-    }
-}
-
 /// Configuration for GitWatcher
 #[derive(Clone, Debug)]
 pub struct GitWatcherConfig {
@@ -63,19 +50,9 @@ pub struct CommitMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reviewed_terminal: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub issues: Option<Vec<Issue>>,
+    pub issues: Option<Vec<CodeIssue>>,
     #[serde(default)]
     pub next_action: String,
-}
-
-/// Code issue reported in a commit
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Issue {
-    pub severity: String,
-    pub file: String,
-    pub line: Option<i32>,
-    pub message: String,
-    pub suggestion: Option<String>,
 }
 
 impl CommitMetadata {
@@ -179,15 +156,6 @@ pub struct ParsedCommit {
     pub metadata: Option<CommitMetadata>,
 }
 
-/// Convenience function to parse commit metadata
-/// This is a re-export of CommitMetadata::parse for easier use
-pub fn parse_commit_metadata(message: &str) -> Option<CommitMetadata> {
-    CommitMetadata::parse(message)
-}
-
-/// Re-export CodeIssue as Issue for compatibility
-pub use crate::services::orchestrator::CodeIssue as Issue;
-
 /// GitWatcher service for monitoring git repositories
 pub struct GitWatcher {
     config: GitWatcherConfig,
@@ -197,31 +165,30 @@ pub struct GitWatcher {
 }
 
 impl GitWatcher {
-    /// Create a new GitWatcher with path validation
+    /// Create a new GitWatcher
     pub fn new(config: GitWatcherConfig, message_bus: MessageBus) -> Result<Self> {
-        let repo_path = &config.repo_path;
-
-        // Validate path exists and is a directory
-        if !repo_path.exists() {
+        // Validate path exists
+        if !config.repo_path.exists() {
             return Err(anyhow::anyhow!(
                 "Repository path does not exist: {}",
-                repo_path.display()
+                config.repo_path.display()
             ));
         }
 
-        if !repo_path.is_dir() {
+        // Validate it's a directory
+        if !config.repo_path.is_dir() {
             return Err(anyhow::anyhow!(
                 "Repository path is not a directory: {}",
-                repo_path.display()
+                config.repo_path.display()
             ));
         }
 
         // Validate it's a git repository
-        let git_dir = repo_path.join(".git");
+        let git_dir = config.repo_path.join(".git");
         if !git_dir.exists() {
             return Err(anyhow::anyhow!(
                 "Not a git repository (missing .git directory): {}",
-                repo_path.display()
+                config.repo_path.display()
             ));
         }
 
@@ -255,8 +222,10 @@ impl GitWatcher {
 
         // Get initial HEAD commit
         if let Ok(initial_commit) = self.get_latest_commit(&repo_path).await {
-            let mut last_hash = self.last_commit_hash.lock().await;
-            *last_hash = Some(initial_commit.hash.clone());
+            {
+                let mut hash = self.last_commit_hash.lock().await;
+                *hash = Some(initial_commit.hash.clone());
+            }
             tracing::info!("Initial commit: {}", initial_commit.hash);
         }
 
@@ -266,7 +235,7 @@ impl GitWatcher {
 
             // Check for new commits
             if let Ok(latest_commit) = self.get_latest_commit(&repo_path).await {
-                // Check if this is a new commit - now with proper synchronization
+                // Check if this is a new commit
                 let new_hash = latest_commit.hash.clone();
                 let should_process = {
                     let mut last_hash = self.last_commit_hash.lock().await;
@@ -281,7 +250,10 @@ impl GitWatcher {
                 };
 
                 if should_process {
-                    tracing::info!("New commit detected: {}", new_hash);
+                    tracing::info!(
+                        "New commit detected: {}",
+                        latest_commit.hash
+                    );
 
                     // Process the new commit
                     if let Err(e) = self.handle_new_commit(latest_commit).await {
@@ -313,26 +285,18 @@ impl GitWatcher {
             .await
             .context(format!(
                 "Failed to get latest commit from {}",
-                repo_path.display()
+                self.config.repo_path.display()
             ))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!(
-                "git log failed for {}: {}",
-                repo_path.display(),
-                stderr
-            );
+            anyhow::bail!("git log failed: {}", String::from_utf8_lossy(&output.stderr));
         }
 
         let result = String::from_utf8_lossy(&output.stdout);
         let parts: Vec<&str> = result.trim().split('|').collect();
 
         if parts.len() < 2 {
-            anyhow::bail!(
-                "Invalid git log output format from {}",
-                repo_path.display()
-            );
+            anyhow::bail!("Invalid git log output format");
         }
 
         let hash = parts[0].to_string();
@@ -347,17 +311,8 @@ impl GitWatcher {
             .await
             .context(format!(
                 "Failed to get commit body from {}",
-                repo_path.display()
+                self.config.repo_path.display()
             ))?;
-
-        if !full_output.status.success() {
-            let stderr = String::from_utf8_lossy(&full_output.stderr);
-            anyhow::bail!(
-                "git log (body) failed for {}: {}",
-                repo_path.display(),
-                stderr
-            );
-        }
 
         let full_message = String::from_utf8_lossy(&full_output.stdout).to_string();
         let metadata = CommitMetadata::parse(&full_message);
@@ -414,14 +369,11 @@ impl GitWatcher {
             metadata: Some(metadata.to_orchestrator_metadata()),
         };
 
-        // Publish to message bus with proper error handling
+        // Publish to message bus
         self.message_bus
             .publish_terminal_completed(event)
             .await
-            .context(format!(
-                "Failed to publish terminal completion event for workflow {}",
-                metadata.workflow_id
-            ))?;
+            .context("Failed to publish terminal completion event")?;
 
         tracing::info!(
             "Published TerminalCompleted event for terminal {}",

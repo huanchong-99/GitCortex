@@ -3,12 +3,23 @@
 //! 封装 cc-switch crate，提供与 vibe-kanban 集成的接口。
 
 use std::sync::Arc;
+use async_trait::async_trait;
 
 use cc_switch::{CliType as CcCliType, ModelSwitcher, SwitchConfig};
 use db::{
     DBService,
     models::{CliType, ModelConfig, Terminal},
 };
+
+/// CC-Switch trait for dependency injection and testing
+#[async_trait]
+pub trait CCSwitch: Send + Sync {
+    /// Switch model configuration for a terminal
+    async fn switch_for_terminal(
+        &self,
+        terminal: &Terminal,
+    ) -> anyhow::Result<()>;
+}
 
 /// CC-Switch 服务
 pub struct CCSwitchService {
@@ -23,11 +34,14 @@ impl CCSwitchService {
             switcher: ModelSwitcher::new(),
         }
     }
+}
 
+#[async_trait]
+impl CCSwitch for CCSwitchService {
     /// 为终端切换模型
     ///
     /// 根据终端配置切换对应 CLI 的模型。
-    pub async fn switch_for_terminal(&self, terminal: &Terminal) -> anyhow::Result<()> {
+    async fn switch_for_terminal(&self, terminal: &Terminal) -> anyhow::Result<()> {
         // 获取 CLI 类型信息
         let cli_type = CliType::find_by_id(&self.db.pool, &terminal.cli_type_id)
             .await?

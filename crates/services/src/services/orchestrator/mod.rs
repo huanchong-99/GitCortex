@@ -7,7 +7,10 @@ pub mod config;
 pub mod constants;
 pub mod llm;
 pub mod message_bus;
+pub mod persistence;
+pub mod runtime;
 pub mod state;
+pub mod terminal_coordinator;
 pub mod types;
 
 pub use agent::OrchestratorAgent;
@@ -16,8 +19,11 @@ pub use llm::{LLMClient, OpenAICompatibleClient, create_llm_client, build_termin
 #[cfg(test)]
 pub use llm::MockLLMClient;
 pub use message_bus::{BusMessage, MessageBus, SharedMessageBus};
+pub use runtime::{OrchestratorRuntime, RuntimeConfig};
 pub use state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState};
+pub use terminal_coordinator::TerminalCoordinator;
 pub use types::*;
 
 #[cfg(test)]
 mod tests;
+mod terminal_coordinator_test;

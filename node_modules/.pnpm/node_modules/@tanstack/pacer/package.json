@@ -1,0 +1,187 @@
+{
+  "name": "@tanstack/pacer",
+  "version": "0.15.4",
+  "description": "Utilities for debouncing, throttling, rate-limiting, queuing, and more.",
+  "author": "Tanner Linsley",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TanStack/pacer.git",
+    "directory": "packages/pacer"
+  },
+  "homepage": "https://tanstack.com/pacer",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/tannerlinsley"
+  },
+  "keywords": [
+    "debounce",
+    "throttle",
+    "rate-limit",
+    "queuer",
+    "queue",
+    "pacer"
+  ],
+  "type": "module",
+  "types": "dist/esm/index.d.ts",
+  "main": "dist/cjs/index.cjs",
+  "module": "dist/esm/index.js",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.cts",
+        "default": "./dist/cjs/index.cjs"
+      }
+    },
+    "./async-batcher": {
+      "import": {
+        "types": "./dist/esm/async-batcher.d.ts",
+        "default": "./dist/esm/async-batcher.js"
+      },
+      "require": {
+        "types": "./dist/cjs/async-batcher.d.cts",
+        "default": "./dist/cjs/async-batcher.cjs"
+      }
+    },
+    "./async-debouncer": {
+      "import": {
+        "types": "./dist/esm/async-debouncer.d.ts",
+        "default": "./dist/esm/async-debouncer.js"
+      },
+      "require": {
+        "types": "./dist/cjs/async-debouncer.d.cts",
+        "default": "./dist/cjs/async-debouncer.cjs"
+      }
+    },
+    "./async-queuer": {
+      "import": {
+        "types": "./dist/esm/async-queuer.d.ts",
+        "default": "./dist/esm/async-queuer.js"
+      },
+      "require": {
+        "types": "./dist/cjs/async-queuer.d.cts",
+        "default": "./dist/cjs/async-queuer.cjs"
+      }
+    },
+    "./async-rate-limiter": {
+      "import": {
+        "types": "./dist/esm/async-rate-limiter.d.ts",
+        "default": "./dist/esm/async-rate-limiter.js"
+      },
+      "require": {
+        "types": "./dist/cjs/async-rate-limiter.d.cts",
+        "default": "./dist/cjs/async-rate-limiter.cjs"
+      }
+    },
+    "./async-throttler": {
+      "import": {
+        "types": "./dist/esm/async-throttler.d.ts",
+        "default": "./dist/esm/async-throttler.js"
+      },
+      "require": {
+        "types": "./dist/cjs/async-throttler.d.cts",
+        "default": "./dist/cjs/async-throttler.cjs"
+      }
+    },
+    "./batcher": {
+      "import": {
+        "types": "./dist/esm/batcher.d.ts",
+        "default": "./dist/esm/batcher.js"
+      },
+      "require": {
+        "types": "./dist/cjs/batcher.d.cts",
+        "default": "./dist/cjs/batcher.cjs"
+      }
+    },
+    "./debouncer": {
+      "import": {
+        "types": "./dist/esm/debouncer.d.ts",
+        "default": "./dist/esm/debouncer.js"
+      },
+      "require": {
+        "types": "./dist/cjs/debouncer.d.cts",
+        "default": "./dist/cjs/debouncer.cjs"
+      }
+    },
+    "./queuer": {
+      "import": {
+        "types": "./dist/esm/queuer.d.ts",
+        "default": "./dist/esm/queuer.js"
+      },
+      "require": {
+        "types": "./dist/cjs/queuer.d.cts",
+        "default": "./dist/cjs/queuer.cjs"
+      }
+    },
+    "./rate-limiter": {
+      "import": {
+        "types": "./dist/esm/rate-limiter.d.ts",
+        "default": "./dist/esm/rate-limiter.js"
+      },
+      "require": {
+        "types": "./dist/cjs/rate-limiter.d.cts",
+        "default": "./dist/cjs/rate-limiter.cjs"
+      }
+    },
+    "./throttler": {
+      "import": {
+        "types": "./dist/esm/throttler.d.ts",
+        "default": "./dist/esm/throttler.js"
+      },
+      "require": {
+        "types": "./dist/cjs/throttler.d.cts",
+        "default": "./dist/cjs/throttler.cjs"
+      }
+    },
+    "./types": {
+      "types": "./dist/esm/types.d.ts"
+    },
+    "./utils": {
+      "import": {
+        "types": "./dist/esm/utils.d.ts",
+        "default": "./dist/esm/utils.js"
+      },
+      "require": {
+        "types": "./dist/cjs/utils.d.cts",
+        "default": "./dist/cjs/utils.cjs"
+      }
+    },
+    "./event-client": {
+      "import": {
+        "types": "./dist/esm/event-client.d.ts",
+        "default": "./dist/esm/event-client.js"
+      },
+      "require": {
+        "types": "./dist/cjs/event-client.d.cts",
+        "default": "./dist/cjs/event-client.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist/",
+    "src"
+  ],
+  "dependencies": {
+    "@tanstack/devtools-event-client": "^0.3.2",
+    "@tanstack/store": "^0.7.5"
+  },
+  "scripts": {
+    "clean": "premove ./build ./dist",
+    "lint:fix": "eslint ./src --fix",
+    "test:eslint": "eslint ./src",
+    "test:lib": "vitest",
+    "test:lib:dev": "pnpm test:lib --watch",
+    "test:types": "tsc",
+    "test:build": "publint --strict",
+    "build": "vite build"
+  }
+}

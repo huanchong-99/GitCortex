@@ -38,6 +38,7 @@ use services::services::{
     filesystem_watcher::FilesystemWatcherError,
     git::{GitService, GitServiceError},
     image::{ImageError, ImageService},
+    orchestrator::OrchestratorRuntime,
     pr_monitor::PrMonitorService,
     project::ProjectService,
     queued_message::QueuedMessageService,
@@ -118,6 +119,8 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     fn queued_message_service(&self) -> &QueuedMessageService;
 
     fn auth_context(&self) -> &AuthContext;
+
+    fn orchestrator_runtime(&self) -> &OrchestratorRuntime;
 
     async fn update_sentry_scope(&self) -> Result<(), DeploymentError> {
         let user_id = self.user_id();

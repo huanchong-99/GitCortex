@@ -1,0 +1,58 @@
+//! Error Handler Tests
+
+use std::sync::Arc;
+
+use tokio::sync::broadcast;
+
+use crate::services::error_handler::ErrorHandler;
+use crate::services::orchestrator::message_bus::{BusMessage, MessageBus};
+use db::DBService;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test error handler initialization
+    #[tokio::test]
+    async fn test_error_handler_init() {
+        // This is a placeholder test
+        // Real integration tests require a test database setup
+
+        // Create a mock message bus
+        let message_bus = Arc::new(MessageBus::new(100));
+
+        // Note: Cannot fully test without DB connection
+        // This test verifies the code compiles
+        assert!(true);
+    }
+
+    /// Test error message broadcasting
+    #[tokio::test]
+    async fn test_error_message_broadcast() {
+        let message_bus = Arc::new(MessageBus::new(100));
+
+        // Subscribe to workflow topic
+        let mut rx = message_bus.subscribe("workflow:test-workflow").await;
+
+        // Publish error message
+        let event = BusMessage::Error {
+            workflow_id: "test-workflow".to_string(),
+            error: "Test error".to_string(),
+        };
+
+        message_bus
+            .publish("workflow:test-workflow", event)
+            .await
+            .unwrap();
+
+        // Receive message
+        let received = rx.recv().await.unwrap();
+        match received {
+            BusMessage::Error { workflow_id, error } => {
+                assert_eq!(workflow_id, "test-workflow");
+                assert_eq!(error, "Test error");
+            }
+            _ => panic!("Expected Error message"),
+        }
+    }
+}

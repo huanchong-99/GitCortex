@@ -27,6 +27,7 @@ use services::services::{
     git::GitService,
     image::ImageService,
     oauth_credentials::OAuthCredentials,
+    orchestrator::{MessageBus, OrchestratorRuntime},
     project::ProjectService,
     queued_message::QueuedMessageService,
     repo::RepoService,
@@ -62,6 +63,7 @@ pub struct LocalDeployment {
     queued_message_service: QueuedMessageService,
     auth_context: AuthContext,
     oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
+    orchestrator_runtime: OrchestratorRuntime,
 }
 
 #[derive(Debug, Clone)]
@@ -165,6 +167,10 @@ impl Deployment for LocalDeployment {
 
         let file_search_cache = Arc::new(FileSearchCache::new());
 
+        // Create message bus and orchestrator runtime
+        let message_bus = Arc::new(MessageBus::new(1000));
+        let orchestrator_runtime = OrchestratorRuntime::new(db.clone(), message_bus);
+
         let deployment = Self {
             config,
             user_id,
@@ -182,6 +188,7 @@ impl Deployment for LocalDeployment {
             queued_message_service,
             auth_context,
             oauth_handoffs,
+            orchestrator_runtime,
         };
 
         Ok(deployment)
@@ -245,6 +252,10 @@ impl Deployment for LocalDeployment {
 
     fn auth_context(&self) -> &AuthContext {
         &self.auth_context
+    }
+
+    fn orchestrator_runtime(&self) -> &OrchestratorRuntime {
+        &self.orchestrator_runtime
     }
 }
 

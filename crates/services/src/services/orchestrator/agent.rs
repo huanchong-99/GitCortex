@@ -1,6 +1,7 @@
 //! Orchestrator agent loop and event handling.
 
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use anyhow::anyhow;
 use db::DBService;
@@ -11,13 +12,14 @@ use super::{
     constants::{
         TERMINAL_STATUS_COMPLETED, TERMINAL_STATUS_FAILED, TERMINAL_STATUS_REVIEW_PASSED,
         TERMINAL_STATUS_REVIEW_REJECTED, WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
-        WORKFLOW_TOPIC_PREFIX,
+        WORKFLOW_STATUS_MERGING, WORKFLOW_TOPIC_PREFIX,
     },
     llm::{LLMClient, build_terminal_completion_prompt, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
     types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus},
 };
+use crate::services::error_handler::ErrorHandler;
 
 /// Coordinates workflow execution, message handling, and LLM interactions.
 pub struct OrchestratorAgent {
@@ -26,6 +28,7 @@ pub struct OrchestratorAgent {
     message_bus: SharedMessageBus,
     llm_client: Box<dyn LLMClient>,
     db: Arc<DBService>,
+    error_handler: ErrorHandler,
 }
 
 impl OrchestratorAgent {
@@ -38,6 +41,7 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<Self> {
         let llm_client = create_llm_client(&config)?;
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
+        let error_handler = ErrorHandler::new(db.clone(), message_bus.clone());
 
         Ok(Self {
             config,
@@ -45,6 +49,7 @@ impl OrchestratorAgent {
             message_bus,
             llm_client,
             db,
+            error_handler,
         })
     }
 
@@ -58,6 +63,7 @@ impl OrchestratorAgent {
         llm_client: Box<dyn LLMClient>,
     ) -> anyhow::Result<Self> {
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
+        let error_handler = ErrorHandler::new(db.clone(), message_bus.clone());
 
         Ok(Self {
             config,
@@ -65,6 +71,7 @@ impl OrchestratorAgent {
             message_bus,
             llm_client,
             db,
+            error_handler,
         })
     }
 
@@ -525,5 +532,271 @@ impl OrchestratorAgent {
             }
         }
         Ok(())
+    }
+
+    /// Broadcast workflow status update
+    ///
+    /// Updates the workflow status in the database and broadcasts
+    /// a StatusUpdate message to the workflow's message bus topic.
+    pub async fn broadcast_workflow_status(&self, status: &str) -> anyhow::Result<()> {
+        // 1. Get workflow_id
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        // 2. Update database (synchronously await result)
+        db::models::Workflow::update_status(
+            &self.db.pool,
+            &workflow_id,
+            status,
+        ).await?;
+
+        // 3. Publish to message bus (synchronously await result)
+        let message = BusMessage::StatusUpdate {
+            workflow_id: workflow_id.clone(),
+            status: status.to_string(),
+        };
+        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+        self.message_bus.publish(&topic, message).await?;
+
+        tracing::debug!(
+            "Broadcast workflow status: {} -> {}",
+            workflow_id,
+            status
+        );
+
+        Ok(())
+    }
+
+    /// Broadcast terminal status update
+    ///
+    /// Updates the terminal status in the database and broadcasts
+    /// a TerminalStatusUpdate message to the workflow's message bus topic.
+    pub async fn broadcast_terminal_status(&self, terminal_id: &str, status: &str) -> anyhow::Result<()> {
+        // 1. Get workflow_id
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        // 2. Update database (synchronously await result)
+        db::models::Terminal::update_status(
+            &self.db.pool,
+            terminal_id,
+            status,
+        ).await?;
+
+        // 3. Publish to message bus (synchronously await result)
+        let message = BusMessage::TerminalStatusUpdate {
+            workflow_id: workflow_id.clone(),
+            terminal_id: terminal_id.to_string(),
+            status: status.to_string(),
+        };
+        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+        self.message_bus.publish(&topic, message).await?;
+
+        tracing::debug!(
+            "Broadcast terminal status: {} -> {}",
+            terminal_id,
+            status
+        );
+
+        Ok(())
+    }
+
+    /// Broadcast task status update
+    ///
+    /// Updates the task status in the database and broadcasts
+    /// a TaskStatusUpdate message to the workflow's message bus topic.
+    pub async fn broadcast_task_status(&self, task_id: &str, status: &str) -> anyhow::Result<()> {
+        // 1. Get workflow_id
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        // 2. Update database (synchronously await result)
+        db::models::WorkflowTask::update_status(
+            &self.db.pool,
+            task_id,
+            status,
+        ).await?;
+
+        // 3. Publish to message bus (synchronously await result)
+        let message = BusMessage::TaskStatusUpdate {
+            workflow_id: workflow_id.clone(),
+            task_id: task_id.to_string(),
+            status: status.to_string(),
+        };
+        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+        self.message_bus.publish(&topic, message).await?;
+
+        tracing::debug!(
+            "Broadcast task status: {} -> {}",
+            task_id,
+            status
+        );
+
+        Ok(())
+    }
+
+    /// Triggers merge of all completed task branches into the target branch.
+    ///
+    /// Called when all terminals for a task have completed successfully.
+    /// Merges each task branch into the target branch using squash merge.
+    ///
+    /// # Arguments
+    /// * `task_branches` - Map of task_id to branch name for all completed tasks
+    /// * `base_repo_path` - Path to the base repository
+    /// * `target_branch` - Target branch name (e.g., "main")
+    ///
+    /// # Returns
+    /// * `Ok(())` - All merges completed successfully
+    /// * `Err(anyhow::Error)` - If any merge fails
+    pub async fn trigger_merge(
+        &self,
+        task_branches: HashMap<String, String>,
+        base_repo_path: &str,
+        target_branch: &str,
+    ) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        tracing::info!(
+            "Triggering merge for {} task branches into {}",
+            task_branches.len(),
+            target_branch
+        );
+
+        let base_repo_path = std::path::Path::new(base_repo_path);
+        let git_service = crate::services::git::GitService::new();
+
+        // Merge each task branch
+        for (task_id, task_branch) in task_branches {
+            tracing::info!(
+                "Merging task branch {} for task {}",
+                task_branch,
+                task_id
+            );
+
+            // Determine task worktree path
+            let task_worktree_path = base_repo_path.join("worktrees").join(&task_branch);
+
+            // Perform the merge
+            let commit_message = format!("Merge task {} ({})", task_id, task_branch);
+            match git_service.merge_changes(
+                base_repo_path,
+                &task_worktree_path,
+                &task_branch,
+                target_branch,
+                &commit_message,
+            ) {
+                Ok(commit_sha) => {
+                    tracing::info!(
+                        "Successfully merged task branch {}: {}",
+                        task_branch,
+                        commit_sha
+                    );
+
+                    // Broadcast merge success for this task
+                    let message = BusMessage::StatusUpdate {
+                        workflow_id: workflow_id.clone(),
+                        status: WORKFLOW_STATUS_COMPLETED.to_string(),
+                    };
+                    let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+                    self.message_bus.publish(&topic, message).await?;
+                }
+                Err(e) => {
+                    // Check if this is a merge conflict
+                    let is_conflict = matches!(
+                        e,
+                        crate::services::git::GitServiceError::MergeConflicts(_)
+                    );
+
+                    if is_conflict {
+                        tracing::warn!(
+                            "Merge conflict detected for task branch {}: {}",
+                            task_branch,
+                            e
+                        );
+
+                        // Update workflow status to "merging"
+                        db::models::Workflow::update_status(
+                            &self.db.pool,
+                            &workflow_id,
+                            WORKFLOW_STATUS_MERGING
+                        ).await?;
+
+                        // Broadcast merging status
+                        let message = BusMessage::StatusUpdate {
+                            workflow_id: workflow_id.clone(),
+                            status: WORKFLOW_STATUS_MERGING.to_string(),
+                        };
+                        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+                        self.message_bus.publish(&topic, message).await?;
+
+                        return Err(e.context(format!(
+                            "Merge conflict detected for task branch {}",
+                            task_branch
+                        )));
+                    }
+
+                    // Other error - fail workflow
+                    tracing::error!(
+                        "Merge failed for task branch {}: {}",
+                        task_branch,
+                        e
+                    );
+
+                    db::models::Workflow::update_status(
+                        &self.db.pool,
+                        &workflow_id,
+                        WORKFLOW_STATUS_FAILED
+                    ).await?;
+
+                    let message = BusMessage::Error {
+                        workflow_id: workflow_id.clone(),
+                        error: format!("Merge failed for task {}: {}", task_id, e),
+                    };
+                    let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+                    self.message_bus.publish(&topic, message).await?;
+
+                    return Err(e.context(format!(
+                        "Merge failed for task branch {}",
+                        task_branch
+                    )));
+                }
+            }
+        }
+
+        tracing::info!(
+            "All task branches merged successfully into {}",
+            target_branch
+        );
+
+        Ok(())
+    }
+
+    /// Handle terminal failure
+    ///
+    /// Wrapper around ErrorHandler::handle_terminal_failure that uses
+    /// the agent's workflow_id, message_bus, and db.
+    pub async fn handle_terminal_failure(
+        &self,
+        task_id: &str,
+        terminal_id: &str,
+        error_message: &str,
+    ) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        self.error_handler
+            .handle_terminal_failure(&workflow_id, task_id, terminal_id, error_message)
+            .await
     }
 }

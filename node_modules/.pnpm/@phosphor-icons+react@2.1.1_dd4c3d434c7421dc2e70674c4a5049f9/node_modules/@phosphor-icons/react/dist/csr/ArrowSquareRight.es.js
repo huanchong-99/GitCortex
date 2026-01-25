@@ -1,0 +1,10 @@
+import * as r from "react";
+import a from "../lib/IconBase.es.js";
+import i from "../defs/ArrowSquareRight.es.js";
+const o = r.forwardRef((e, t) => /* @__PURE__ */ r.createElement(a, { ref: t, ...e, weights: i }));
+o.displayName = "ArrowSquareRightIcon";
+const s = o;
+export {
+  s as ArrowSquareRight,
+  o as ArrowSquareRightIcon
+};
