@@ -78,6 +78,7 @@ export function TerminalCard({ terminal, onClick }: TerminalCardProps) {
 
   return (
     <div
+      role="button"
       onClick={onClick}
       className={cn(
         'w-32 rounded-lg border-2 p-base flex flex-col items-center gap-half',

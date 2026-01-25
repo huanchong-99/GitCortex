@@ -2,44 +2,113 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { PipelineView } from './PipelineView';
 import type { Terminal } from './TerminalCard';
+import type { WorkflowDetailDto, WorkflowTaskDto, TerminalDto } from '@/shared/types';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('PipelineView', () => {
+  // Create realistic DTO-based mock data
+  const mockTerminalDto1: TerminalDto = {
+    id: 'terminal-1',
+    workflowTaskId: 'task-1',
+    cliTypeId: 'claude-code',
+    modelConfigId: 'model-1',
+    customBaseUrl: null,
+    customApiKey: null,
+    role: 'Developer',
+    roleDescription: null,
+    orderIndex: 0,
+    status: 'completed',
+    createdAt: '2025-01-25T10:00:00Z',
+    updatedAt: '2025-01-25T10:05:00Z',
+  };
+
+  const mockTerminalDto2: TerminalDto = {
+    id: 'terminal-2',
+    workflowTaskId: 'task-1',
+    cliTypeId: 'gemini-cli',
+    modelConfigId: 'model-2',
+    customBaseUrl: null,
+    customApiKey: null,
+    role: 'Reviewer',
+    roleDescription: null,
+    orderIndex: 1,
+    status: 'working',
+    createdAt: '2025-01-25T10:05:00Z',
+    updatedAt: '2025-01-25T10:10:00Z',
+  };
+
+  const mockTerminalDto3: TerminalDto = {
+    id: 'terminal-3',
+    workflowTaskId: 'task-2',
+    cliTypeId: 'codex',
+    modelConfigId: 'model-3',
+    customBaseUrl: null,
+    customApiKey: null,
+    role: null,
+    roleDescription: null,
+    orderIndex: 0,
+    status: 'not_started',
+    createdAt: '2025-01-25T10:10:00Z',
+    updatedAt: '2025-01-25T10:10:00Z',
+  };
+
+  const mockWorkflowTaskDto1: WorkflowTaskDto = {
+    id: 'task-1',
+    workflowId: 'workflow-1',
+    vkTaskId: null,
+    name: 'Implement Authentication',
+    description: 'Add login and signup functionality',
+    branch: 'feat/auth',
+    status: 'in_progress',
+    orderIndex: 0,
+    startedAt: '2025-01-25T10:00:00Z',
+    completedAt: null,
+    createdAt: '2025-01-25T09:00:00Z',
+    updatedAt: '2025-01-25T10:05:00Z',
+    terminals: [mockTerminalDto1, mockTerminalDto2],
+  };
+
+  const mockWorkflowTaskDto2: WorkflowTaskDto = {
+    id: 'task-2',
+    workflowId: 'workflow-1',
+    vkTaskId: null,
+    name: 'Add Database Integration',
+    description: 'Set up PostgreSQL database',
+    branch: 'feat/database',
+    status: 'pending',
+    orderIndex: 1,
+    startedAt: null,
+    completedAt: null,
+    createdAt: '2025-01-25T09:00:00Z',
+    updatedAt: '2025-01-25T09:00:00Z',
+    terminals: [mockTerminalDto3],
+  };
+
+  // Convert DTOs to component props format
   const mockTasks = [
     {
-      id: 'task-1',
-      name: 'Implement Authentication',
-      branch: 'feat/auth',
-      terminals: [
-        {
-          id: 'terminal-1',
-          orderIndex: 0,
-          cliTypeId: 'claude-code',
-          role: 'Developer',
-          status: 'completed' as Terminal['status'],
-        },
-        {
-          id: 'terminal-2',
-          orderIndex: 1,
-          cliTypeId: 'gemini-cli',
-          role: 'Reviewer',
-          status: 'working' as Terminal['status'],
-        },
-      ],
+      id: mockWorkflowTaskDto1.id,
+      name: mockWorkflowTaskDto1.name,
+      branch: mockWorkflowTaskDto1.branch,
+      terminals: mockWorkflowTaskDto1.terminals.map((dto) => ({
+        id: dto.id,
+        orderIndex: dto.orderIndex,
+        cliTypeId: dto.cliTypeId,
+        role: dto.role ?? undefined,
+        status: dto.status as Terminal['status'],
+      })),
     },
     {
-      id: 'task-2',
-      name: 'Add Database Integration',
-      branch: 'feat/database',
-      terminals: [
-        {
-          id: 'terminal-3',
-          orderIndex: 0,
-          cliTypeId: 'codex',
-          role: 'DB Expert',
-          status: 'not_started' as Terminal['status'],
-        },
-      ],
+      id: mockWorkflowTaskDto2.id,
+      name: mockWorkflowTaskDto2.name,
+      branch: mockWorkflowTaskDto2.branch,
+      terminals: mockWorkflowTaskDto2.terminals.map((dto) => ({
+        id: dto.id,
+        orderIndex: dto.orderIndex,
+        cliTypeId: dto.cliTypeId,
+        role: dto.role ?? undefined,
+        status: dto.status as Terminal['status'],
+      })),
     },
   ];
 
