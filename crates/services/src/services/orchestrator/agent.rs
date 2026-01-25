@@ -19,7 +19,7 @@ use super::{
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
     types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus},
 };
-use crate::services::error_handler::ErrorHandler;
+use crate::services::{error_handler::ErrorHandler, template_renderer::{TemplateRenderer, WorkflowContext}};
 
 /// Coordinates workflow execution, message handling, and LLM interactions.
 pub struct OrchestratorAgent {
@@ -93,6 +93,12 @@ impl OrchestratorAgent {
             let mut state = self.state.write().await;
             state.add_message("system", &self.config.system_prompt, &self.config);
             state.run_state = OrchestratorRunState::Idle;
+        }
+
+        // Execute slash commands if enabled for this workflow
+        if let Err(e) = self.execute_slash_commands().await {
+            tracing::error!("Failed to execute slash commands: {}", e);
+            // Don't fail the workflow, just log the error
         }
 
         // 事件循环
@@ -798,5 +804,113 @@ impl OrchestratorAgent {
         self.error_handler
             .handle_terminal_failure(&workflow_id, task_id, terminal_id, error_message)
             .await
+    }
+
+    /// Execute slash commands for this workflow
+    ///
+    /// Loads all slash commands associated with the workflow, renders their
+    /// templates with custom parameters and workflow context, and sends the
+    /// rendered prompts to the LLM.
+    ///
+    /// This should be called once when the agent starts, before processing
+    /// any terminal events.
+    pub async fn execute_slash_commands(&self) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        // Load workflow to check if slash commands are enabled
+        let workflow = db::models::Workflow::find_by_id(&self.db.pool, &workflow_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Workflow {} not found", workflow_id))?;
+
+        if !workflow.use_slash_commands {
+            tracing::info!("Slash commands disabled for workflow {}", workflow_id);
+            return Ok(());
+        }
+
+        // Load workflow commands
+        let commands = db::models::WorkflowCommand::find_by_workflow(&self.db.pool, &workflow_id).await?;
+
+        if commands.is_empty() {
+            tracing::info!("No slash commands configured for workflow {}", workflow_id);
+            return Ok(());
+        }
+
+        // Load all presets
+        let all_presets = db::models::SlashCommandPreset::find_all(&self.db.pool).await?;
+
+        tracing::info!("Executing {} slash command(s) for workflow {}", commands.len(), workflow_id);
+
+        // Create template renderer
+        let renderer = TemplateRenderer::new();
+
+        // Create workflow context
+        let workflow_ctx = WorkflowContext::new(
+            workflow.name.clone(),
+            workflow.description.clone(),
+            workflow.target_branch.clone(),
+        );
+
+        // Execute each command in order
+        for (index, cmd) in commands.iter().enumerate() {
+            // Find the preset for this command
+            let preset = all_presets
+                .iter()
+                .find(|p| p.id == cmd.preset_id)
+                .ok_or_else(|| anyhow::anyhow!("Preset {} not found for command", cmd.preset_id))?;
+
+            let template = preset.prompt_template.as_deref().unwrap_or("");
+
+            // Render the template with custom params and workflow context
+            let rendered_prompt = renderer.render(
+                template,
+                cmd.custom_params.as_deref(),
+                Some(&workflow_ctx),
+            ).map_err(|e| anyhow::anyhow!(
+                "Failed to render template for command {}: {} (index {})",
+                preset.command,
+                e,
+                index
+            ))?;
+
+            tracing::info!(
+                "Executing slash command {}: {} (index {})",
+                preset.command,
+                index,
+                cmd.order_index
+            );
+
+            // Add rendered prompt as user message to conversation
+            {
+                let mut state = self.state.write().await;
+                state.add_message("user", &rendered_prompt, &self.config);
+            }
+
+            // Send to LLM and get response
+            let response = self.llm_client.chat({
+                let state = self.state.read().await;
+                state.conversation_history.clone()
+            }).await?;
+
+            // Add assistant response to conversation
+            {
+                let mut state = self.state.write().await;
+                state.add_message("assistant", &response.content, &self.config);
+                if let Some(usage) = &response.usage {
+                    state.total_tokens_used += i64::from(usage.total_tokens);
+                }
+            }
+
+            tracing::info!(
+                "Slash command {} completed. LLM response: {} chars",
+                preset.command,
+                response.content.len()
+            );
+        }
+
+        tracing::info!("All slash commands executed for workflow {}", workflow_id);
+        Ok(())
     }
 }
