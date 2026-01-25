@@ -10,6 +10,18 @@ use tokio::{
 };
 use uuid::Uuid;
 
+/// Terminal idle timeout in seconds (10 minutes)
+///
+/// Sessions without user activity (input/output) for this duration
+/// will be automatically terminated to free resources.
+const TERMINAL_IDLE_TIMEOUT_SECS: u64 = 600;
+
+/// Terminal hard timeout in seconds (30 minutes)
+///
+/// Maximum lifetime for any terminal session, regardless of activity.
+/// After this duration, the session will be forcibly terminated.
+const TERMINAL_HARD_TIMEOUT_SECS: u64 = 1800;
+
 /// Process handle for tracking spawned processes
 #[derive(Debug)]
 pub struct ProcessHandle {
