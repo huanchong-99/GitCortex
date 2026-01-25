@@ -272,6 +272,25 @@
       "targetBranchRequired": "请输入目标分支"
     }
   },
+  "empty": {
+    "title": "还没有工作流",
+    "description": "创建您的第一个工作流以开始并行任务执行",
+    "button": "创建第一个工作流"
+  },
+  "errors": {
+    "loadFailed": "加载工作流失败",
+    "startFailed": "启动工作流失败",
+    "pauseFailed": "暂停工作流失败",
+    "stopFailed": "停止工作流失败",
+    "deleteFailed": "删除工作流失败",
+    "deleteConfirm": "确定要删除此工作流吗？此操作无法撤销。"
+  },
+  "success": {
+    "start": "工作流已启动",
+    "pause": "工作流已暂停",
+    "stop": "工作流已停止",
+    "delete": "工作流已删除"
+  },
   "pipeline": {
     "status": {
       "idle": "未开始",

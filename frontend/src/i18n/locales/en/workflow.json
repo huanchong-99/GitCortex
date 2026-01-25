@@ -272,6 +272,25 @@
       "targetBranchRequired": "Target branch is required"
     }
   },
+  "empty": {
+    "title": "No workflows yet",
+    "description": "Create your first workflow to start parallel task execution",
+    "button": "Create Your First Workflow"
+  },
+  "errors": {
+    "loadFailed": "Failed to load workflows",
+    "startFailed": "Failed to start workflow",
+    "pauseFailed": "Failed to pause workflow",
+    "stopFailed": "Failed to stop workflow",
+    "deleteFailed": "Failed to delete workflow",
+    "deleteConfirm": "Are you sure you want to delete this workflow? This action cannot be undone."
+  },
+  "success": {
+    "start": "Workflow started",
+    "pause": "Workflow paused",
+    "stop": "Workflow stopped",
+    "delete": "Workflow deleted"
+  },
   "pipeline": {
     "status": {
       "idle": "Idle",

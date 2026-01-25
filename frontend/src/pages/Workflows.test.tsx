@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workflows } from './Workflows';
 import type { WorkflowListItemDto } from 'shared/types';
+import { I18nextProvider } from 'react-i18next';
+import { i18n } from '@/test/renderWithI18n';
 
 // ============================================================================
 // Test Utilities
@@ -22,13 +24,15 @@ const createMockQueryClient = () =>
   });
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <QueryClientProvider client={createMockQueryClient()}>
-    <MemoryRouter initialEntries={['/projects/proj-1/workflows']}>
-      <Routes>
-        <Route path="/projects/:projectId/workflows" element={children} />
-      </Routes>
-    </MemoryRouter>
-  </QueryClientProvider>
+  <I18nextProvider i18n={i18n}>
+    <QueryClientProvider client={createMockQueryClient()}>
+      <MemoryRouter initialEntries={['/projects/proj-1/workflows']}>
+        <Routes>
+          <Route path="/projects/:projectId/workflows" element={children} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  </I18nextProvider>
 );
 
 // Mock workflow list data matching WorkflowListItemDto

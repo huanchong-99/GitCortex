@@ -23,8 +23,10 @@ import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
+import { useTranslation } from 'react-i18next';
 
 export function Workflows() {
+  const { t } = useTranslation('workflow');
   const { projectId } = useParams<{ projectId: string }>();
 
   const [showWizard, setShowWizard] = useState(false);
@@ -87,7 +89,8 @@ export function Workflows() {
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="max-w-md">
           <CardContent className="pt-6">
-            <p className="text-error">Failed to load workflows: {error.message}</p>
+            <p className="text-error mb-4">{t('errors.loadFailed')}</p>
+            <p className="text-sm text-low">{error.message}</p>
           </CardContent>
         </Card>
       </div>
@@ -120,7 +123,7 @@ export function Workflows() {
   const handleStopWorkflow = async (workflowId: string) => {
     const result = await ConfirmDialog.show({
       title: 'Stop Workflow',
-      message: 'Are you sure you want to stop this workflow?',
+      message: t('errors.deleteConfirm'),
       confirmText: 'Stop',
       cancelText: 'Cancel',
       variant: 'destructive',
@@ -134,7 +137,7 @@ export function Workflows() {
   const handleDeleteWorkflow = async (workflowId: string) => {
     const result = await ConfirmDialog.show({
       title: 'Delete Workflow',
-      message: 'Are you sure you want to delete this workflow? This action cannot be undone.',
+      message: t('errors.deleteConfirm'),
       confirmText: 'Delete',
       cancelText: 'Cancel',
       variant: 'destructive',
@@ -235,10 +238,11 @@ export function Workflows() {
 
       {!workflows || workflows.length === 0 ? (
         <Card className="p-12 text-center">
-          <p className="text-low mb-4">No workflows yet</p>
+          <h3 className="text-lg font-semibold mb-2">{t('empty.title')}</h3>
+          <p className="text-low mb-6">{t('empty.description')}</p>
           <Button onClick={() => setShowWizard(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Create Your First Workflow
+            {t('empty.button')}
           </Button>
         </Card>
       ) : (
