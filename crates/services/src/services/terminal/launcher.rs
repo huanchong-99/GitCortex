@@ -6,7 +6,7 @@ use std::{path::PathBuf, sync::Arc};
 
 // Re-export types
 pub use db::models::Terminal;
-use db::{DBService, models::cli_type};
+use db::{DBService, models::{cli_type, session::Session, workspace::Workspace}};
 
 use super::process::{ProcessHandle, ProcessManager};
 use crate::services::cc_switch::CCSwitchService;
@@ -85,7 +85,7 @@ impl TerminalLauncher {
     ///
     /// # Returns
     /// A launch result indicating success or failure
-    async fn launch_terminal(&self, terminal: &Terminal) -> LaunchResult {
+    pub async fn launch_terminal(&self, terminal: &Terminal) -> LaunchResult {
         let terminal_id = terminal.id.clone();
 
         // 1. Switch model configuration
@@ -121,10 +121,39 @@ impl TerminalLauncher {
                 }
             };
 
-        // 3. Build launch command
+        // 3. Create Session for execution context tracking
+        // Get workflow task to find associated workspace
+        let workspace_id = match self.get_workspace_for_terminal(&terminal.workflow_task_id).await {
+            Ok(Some(id)) => Some(id),
+            Ok(None) => {
+                tracing::warn!("No workspace found for terminal {}", terminal_id);
+                None
+            }
+            Err(e) => {
+                tracing::error!("Failed to get workspace for terminal {}: {}", terminal_id, e);
+                None
+            }
+        };
+
+        let session_id = if let Some(ws_id) = workspace_id {
+            match Session::create_for_terminal(&self.db.pool, ws_id, Some("claude-code".to_string()), Some(terminal_id.clone())).await {
+                Ok(session) => {
+                    tracing::info!("Created session {} for terminal {}", session.id, terminal_id);
+                    Some(session.id.to_string())
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create session for terminal {}: {}", terminal_id, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // 4. Build launch command
         let cmd = self.build_launch_command(&cli_type.name);
 
-        // 4. Spawn process
+        // 5. Spawn process
         match self
             .process_manager
             .spawn(&terminal_id, cmd, &self.working_dir)
@@ -141,6 +170,17 @@ impl TerminalLauncher {
                     Some(&handle.session_id),
                 )
                 .await;
+
+                // Update terminal with session binding
+                if let Some(ref sid) = session_id {
+                    let _ = Terminal::update_session(
+                        &self.db.pool,
+                        &terminal_id,
+                        Some(sid),
+                        None, // execution_process_id will be set later when execution process is created
+                    )
+                    .await;
+                }
 
                 tracing::info!("Terminal {} started with PID {}", terminal_id, handle.pid);
 
@@ -188,6 +228,47 @@ impl TerminalLauncher {
         cmd.kill_on_drop(true);
 
         cmd
+    }
+
+    /// Get workspace ID for a terminal by traversing workflow_task -> task -> workspace
+    async fn get_workspace_for_terminal(
+        &self,
+        workflow_task_id: &str,
+    ) -> anyhow::Result<Option<uuid::Uuid>> {
+        use sqlx::Row as _;
+
+        // Get vk_task_id from workflow_task
+        let task_id: Option<String> = sqlx::query_scalar(
+            "SELECT vk_task_id FROM workflow_task WHERE id = ?"
+        )
+        .bind(workflow_task_id)
+        .fetch_optional(&self.db.pool)
+        .await?
+        .flatten();
+
+        let Some(task_id_str) = task_id else {
+            return Ok(None);
+        };
+
+        // Parse task_id as UUID
+        let task_uuid = uuid::Uuid::parse_str(&task_id_str)?;
+
+        // Get workspace_id from workspace table
+        let workspace_id: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM workspaces WHERE task_id = ? LIMIT 1"
+        )
+        .bind(task_uuid)
+        .fetch_optional(&self.db.pool)
+        .await?
+        .flatten();
+
+        match workspace_id {
+            Some(ws_id_str) => {
+                let ws_uuid = uuid::Uuid::parse_str(&ws_id_str)?;
+                Ok(Some(ws_uuid))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Stop all terminals for a workflow

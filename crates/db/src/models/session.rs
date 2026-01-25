@@ -21,6 +21,7 @@ pub struct Session {
     pub id: Uuid,
     pub workspace_id: Uuid,
     pub executor: Option<String>,
+    pub terminal_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -38,6 +39,7 @@ impl Session {
             r#"SELECT id AS "id!: Uuid",
                       workspace_id AS "workspace_id!: Uuid",
                       executor,
+                      terminal_id,
                       created_at AS "created_at!: DateTime<Utc>",
                       updated_at AS "updated_at!: DateTime<Utc>"
                FROM sessions
@@ -60,6 +62,7 @@ impl Session {
             r#"SELECT s.id AS "id!: Uuid",
                       s.workspace_id AS "workspace_id!: Uuid",
                       s.executor,
+                      s.terminal_id,
                       s.created_at AS "created_at!: DateTime<Utc>",
                       s.updated_at AS "updated_at!: DateTime<Utc>"
                FROM sessions s
@@ -89,6 +92,7 @@ impl Session {
             r#"SELECT s.id AS "id!: Uuid",
                       s.workspace_id AS "workspace_id!: Uuid",
                       s.executor,
+                      s.terminal_id,
                       s.created_at AS "created_at!: DateTime<Utc>",
                       s.updated_at AS "updated_at!: DateTime<Utc>"
                FROM sessions s
@@ -120,6 +124,7 @@ impl Session {
                RETURNING id AS "id!: Uuid",
                          workspace_id AS "workspace_id!: Uuid",
                          executor,
+                         terminal_id,
                          created_at AS "created_at!: DateTime<Utc>",
                          updated_at AS "updated_at!: DateTime<Utc>""#,
             id,
@@ -129,4 +134,31 @@ impl Session {
         .fetch_one(pool)
         .await?)
     }
-}
+
+    /// Create a session for a terminal execution
+    pub async fn create_for_terminal(
+        pool: &SqlitePool,
+        workspace_id: Uuid,
+        executor: Option<String>,
+        terminal_id: Option<String>,
+    ) -> Result<Self, SessionError> {
+        let id = Uuid::new_v4();
+        let session = sqlx::query_as!(
+            Session,
+            r#"INSERT INTO sessions (id, workspace_id, executor, terminal_id)
+               VALUES ($1, $2, $3, $4)
+               RETURNING id AS "id!: Uuid",
+                         workspace_id AS "workspace_id!: Uuid",
+                         executor,
+                         terminal_id,
+                         created_at AS "created_at!: DateTime<Utc>",
+                         updated_at AS "updated_at!: DateTime<Utc>""#,
+            id,
+            workspace_id,
+            executor,
+            terminal_id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(session)
+    }
