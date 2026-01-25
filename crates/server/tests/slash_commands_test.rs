@@ -37,7 +37,7 @@ async fn test_list_command_presets() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -82,7 +82,7 @@ async fn test_create_command_preset_success() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -126,7 +126,7 @@ async fn test_create_command_preset_missing_leading_slash() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -167,7 +167,7 @@ async fn test_create_command_preset_duplicate_command() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -183,7 +183,7 @@ async fn test_create_command_preset_duplicate_command() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -216,7 +216,7 @@ async fn test_create_command_preset_missing_description() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -251,7 +251,7 @@ async fn test_update_command_preset() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -274,7 +274,7 @@ async fn test_update_command_preset() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(&format!("/api/commands/{}", command_id))
+                .uri(&format!("/api/workflows/presets/commands/{}", command_id))
                 .header("content-type", "application/json")
                 .body(Body::from(update_command.to_string()))
                 .unwrap(),
@@ -318,7 +318,7 @@ async fn test_delete_command_preset() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .header("content-type", "application/json")
                 .body(Body::from(new_command.to_string()))
                 .unwrap(),
@@ -336,7 +336,7 @@ async fn test_delete_command_preset() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(&format!("/api/commands/{}", command_id))
+                .uri(&format!("/api/workflows/presets/commands/{}", command_id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -350,7 +350,7 @@ async fn test_delete_command_preset() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/commands")
+                .uri("/api/workflows/presets/commands")
                 .body(Body::empty())
                 .unwrap(),
         )
