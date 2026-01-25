@@ -309,6 +309,7 @@
     "start": "开始",
     "pause": "暂停",
     "stop": "停止",
+    "confirmStop": "确定要停止此工作流吗？",
     "tabs": {
       "pipeline": "流水线视图",
       "terminals": "终端调试"

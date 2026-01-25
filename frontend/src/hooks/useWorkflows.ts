@@ -66,6 +66,14 @@ export interface StartWorkflowRequest {
   workflow_id: string; // Note: API still uses snake_case for IDs
 }
 
+export interface PauseWorkflowRequest {
+  workflow_id: string;
+}
+
+export interface StopWorkflowRequest {
+  workflow_id: string;
+}
+
 export interface WorkflowExecution {
   execution_id: string;
   workflow_id: string;
@@ -123,6 +131,28 @@ const workflowsApi = {
    */
   start: async (data: StartWorkflowRequest): Promise<WorkflowExecution> => {
     const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return handleApiResponse<WorkflowExecution>(response);
+  },
+
+  /**
+   * Pause a running workflow
+   */
+  pause: async (data: PauseWorkflowRequest): Promise<WorkflowExecution> => {
+    const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/pause`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return handleApiResponse<WorkflowExecution>(response);
+  },
+
+  /**
+   * Stop a workflow
+   */
+  stop: async (data: StopWorkflowRequest): Promise<WorkflowExecution> => {
+    const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -215,6 +245,46 @@ export function useStartWorkflow() {
     },
     onError: (error) => {
       logApiError('Failed to start workflow:', error);
+    },
+  });
+}
+
+/**
+ * Hook to pause a workflow
+ * @returns Mutation object for pausing workflows
+ */
+export function usePauseWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: PauseWorkflowRequest) => workflowsApi.pause(data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(variables.workflow_id),
+      });
+    },
+    onError: (error) => {
+      logApiError('Failed to pause workflow:', error);
+    },
+  });
+}
+
+/**
+ * Hook to stop a workflow
+ * @returns Mutation object for stopping workflows
+ */
+export function useStopWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: StopWorkflowRequest) => workflowsApi.stop(data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(variables.workflow_id),
+      });
+    },
+    onError: (error) => {
+      logApiError('Failed to stop workflow:', error);
     },
   });
 }

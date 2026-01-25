@@ -309,6 +309,7 @@
     "start": "Start",
     "pause": "Pause",
     "stop": "Stop",
+    "confirmStop": "Are you sure you want to stop this workflow?",
     "tabs": {
       "pipeline": "Pipeline view",
       "terminals": "Terminal debug"

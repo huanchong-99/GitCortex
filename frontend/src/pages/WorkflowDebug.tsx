@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useWorkflow } from '@/hooks/useWorkflows';
+import { useWorkflow, useStartWorkflow, usePauseWorkflow, useStopWorkflow } from '@/hooks/useWorkflows';
 import { TerminalDebugView } from '@/components/terminal/TerminalDebugView';
 import { PipelineView } from '@/components/workflow/PipelineView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,6 +34,29 @@ export function WorkflowDebugPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const { data, isLoading, error } = useWorkflow(workflowId ?? '');
 
+  // Workflow control hooks
+  const startMutation = useStartWorkflow();
+  const pauseMutation = usePauseWorkflow();
+  const stopMutation = useStopWorkflow();
+
+  const handleStart = () => {
+    if (workflowId) {
+      startMutation.mutate({ workflow_id: workflowId });
+    }
+  };
+
+  const handlePause = () => {
+    if (workflowId) {
+      pauseMutation.mutate({ workflow_id: workflowId });
+    }
+  };
+
+  const handleStop = () => {
+    if (workflowId && confirm(t('workflowDebug.confirmStop'))) {
+      stopMutation.mutate({ workflow_id: workflowId });
+    }
+  };
+
   if (isLoading) {
     return <div className="p-8 text-center">{t('workflowDebug.loading')}</div>;
   }
@@ -46,25 +69,44 @@ export function WorkflowDebugPage() {
   const defaultRoleLabel = t('terminalCard.defaultRole');
 
   // Map DTO tasks to internal WorkflowTask format
+  // NOTE: terminals are embedded within each task in the DTO (not at root level)
   const tasks: WorkflowTask[] = data.tasks.map((taskDto) => ({
     id: taskDto.id,
     name: taskDto.name,
     branch: taskDto.branch ?? null,
-    terminals: data.terminals
-      .filter((termDto) => termDto.taskId === taskDto.id)
-      .map(
-        (termDto): Terminal => ({
-          id: termDto.id,
-          cliTypeId: termDto.cliTypeId,
-          modelConfigId: termDto.modelConfigId,
-          role: termDto.role?.trim()
-            ? termDto.role
-            : `${defaultRoleLabel} ${termDto.orderIndex + 1}`,
-          orderIndex: termDto.orderIndex,
-          status: 'not_started' as const,
-        })
-      ),
+    terminals: taskDto.terminals.map(
+      (termDto): Terminal => ({
+        id: termDto.id,
+        cliTypeId: termDto.cliTypeId,
+        modelConfigId: termDto.modelConfigId,
+        role: termDto.role?.trim()
+          ? termDto.role
+          : `${defaultRoleLabel} ${termDto.orderIndex + 1}`,
+        orderIndex: termDto.orderIndex,
+        status: mapTerminalStatus(termDto.status),
+      })
+    ),
   }));
+
+  // Map terminal status from DTO to internal format
+  function mapTerminalStatus(status: string): Terminal['status'] {
+    switch (status) {
+      case 'idle':
+      case 'not_started':
+        return 'not_started';
+      case 'starting':
+        return 'starting';
+      case 'running':
+      case 'working':
+        return 'working';
+      case 'completed':
+        return 'completed';
+      case 'failed':
+        return 'failed';
+      default:
+        return 'not_started';
+    }
+  }
 
   const pipelineStatus = mapWorkflowStatus(data.status);
 
@@ -85,17 +127,31 @@ export function WorkflowDebugPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {data.status === 'created' && (
-            <Button size="sm">
+          {data.status === 'ready' && (
+            <Button
+              size="sm"
+              onClick={handleStart}
+              disabled={startMutation.isPending}
+            >
               <Play className="w-4 h-4 mr-2" /> {t('workflowDebug.start')}
             </Button>
           )}
           {data.status === 'running' && (
             <>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePause}
+                disabled={pauseMutation.isPending}
+              >
                 <Pause className="w-4 h-4 mr-2" /> {t('workflowDebug.pause')}
               </Button>
-              <Button variant="destructive" size="sm">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleStop}
+                disabled={stopMutation.isPending}
+              >
                 <Square className="w-4 h-4 mr-2" /> {t('workflowDebug.stop')}
               </Button>
             </>

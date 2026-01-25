@@ -9,10 +9,14 @@ import { setTestLanguage, i18n } from '@/test/renderWithI18n';
 import type { ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { Workflow } from '@/hooks/useWorkflows';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('@/hooks/useWorkflows');
 
 const useWorkflow = vi.spyOn(useWorkflowsModule, 'useWorkflow');
+const useStartWorkflow = vi.spyOn(useWorkflowsModule, 'useStartWorkflow');
+const usePauseWorkflow = vi.spyOn(useWorkflowsModule, 'usePauseWorkflow');
+const useStopWorkflow = vi.spyOn(useWorkflowsModule, 'useStopWorkflow');
 
 type UseWorkflowResult = UseQueryResult<Workflow>;
 
@@ -59,14 +63,60 @@ const baseWorkflow: Workflow = {
   completedAt: null,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
-  tasks: [],
-  terminals: [],
+  tasks: [
+    {
+      id: 'task-1',
+      workflowId: 'wf-1',
+      vkTaskId: null,
+      name: 'Task 1',
+      description: 'First task',
+      branch: 'feat/task-1',
+      status: 'pending',
+      orderIndex: 0,
+      startedAt: null,
+      completedAt: null,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+      terminals: [
+        {
+          id: 'term-1',
+          workflowTaskId: 'task-1',
+          cliTypeId: 'claude-code',
+          modelConfigId: 'model-1',
+          customBaseUrl: null,
+          customApiKey: null,
+          role: 'Expert',
+          roleDescription: null,
+          orderIndex: 0,
+          status: 'idle',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ],
+    },
+  ],
   commands: [],
 };
 
 describe('WorkflowDebugPage', () => {
   beforeEach(async () => {
     await setTestLanguage();
+    // Reset mocks
+    useStartWorkflow.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as any);
+    usePauseWorkflow.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as any);
+    useStopWorkflow.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as any);
   });
 
   describe('Loading State', () => {
@@ -120,7 +170,7 @@ describe('WorkflowDebugPage', () => {
 
     it('should show start button when workflow is ready', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'created' } })
+        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'ready' } })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
@@ -145,7 +195,7 @@ describe('WorkflowDebugPage', () => {
 
     it('should render tabs for pipeline and terminals views', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'created' } })
+        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'ready' } })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
