@@ -30,6 +30,7 @@ pub mod terminals;
 pub mod terminal_ws;
 pub mod workflows;
 pub mod workflows_dto;
+pub mod slash_commands;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
@@ -53,6 +54,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .nest("/images", images::routes())
         .nest("/cli_types", cli_types::cli_types_routes())
         .nest("/workflows", workflows::workflows_routes())
+        .nest("/workflows", slash_commands::slash_commands_routes())
         .nest("/terminal", terminal_ws::terminal_ws_routes())
         .nest("/terminals", terminals::terminal_routes())
         .with_state(deployment);
