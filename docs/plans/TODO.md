@@ -391,8 +391,27 @@
 
 **计划文件:** `2026-01-23-phase-18-release-readiness.md`
 
+> **基线修复完成 (2026-01-28):**
+> - ✅ 修复20个编译错误，建立干净测试基线
+> - ✅ 零编译错误达成，20个警告（可接受）
+> - ✅ CI/CD 保护就位（GitHub Actions + Pre-commit hooks）
+> - ✅ 完整文档：`docs/plans/2026-01-28-baseline-fix-summary.md`
+> - ✅ 提交历史：16个提交，全部合并到主分支
+>
+> **修复详情:**
+> 1. Task 1: 添加 WORKFLOW_STATUS_READY 常量
+> 2. Task 2: 修复 cc_switch trait 可见性错误
+> 3. Task 3: 修复 terminal_coordinator 导入路径
+> 4. Task 4: 实现 parse_commit_metadata 函数
+> 5. Task 5: 修复 Issue 类型使用
+> 6. Task 6: 修复 SQLx query! 宏错误
+> 7. Task 7-10: 验证、清理、回归防护、文档
+>
+> **下一步:** 开始 Phase 18 实际功能开发
+
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
+| 18.0 | 基线修复 - 编译错误清理与测试环境准备 | ✅ | 2026-01-28 |
 | 18.1 | 端到端全流程测试（创建->启动->执行->合并） | ⬜ |  |
 | 18.2 | 并发/失败/恢复场景测试 | ⬜ |  |
 | 18.3 | 性能与稳定性压测（终端/WS/DB） | ⬜ |  |
