@@ -17,6 +17,7 @@ use super::{
     persistence::StatePersistence,
 };
 use db::DBService;
+use sqlx::Row;
 
 /// Configuration for the OrchestratorRuntime
 #[derive(Debug, Clone)]
@@ -262,7 +263,7 @@ impl OrchestratorRuntime {
         let pool = &self.db.pool;
 
         // Direct SQL query to find running workflows
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT id
             FROM workflow
@@ -280,11 +281,11 @@ impl OrchestratorRuntime {
         warn!("Found {} running workflows to recover", rows.len());
 
         for row in rows {
-            let workflow_id: &str = &row.id;
+            let workflow_id: String = row.get("id");
             warn!("Recovering workflow {}", workflow_id);
 
             // Try to load persisted state
-            match self.persistence.recover_workflow(workflow_id).await {
+            match self.persistence.recover_workflow(&workflow_id).await {
                 Ok(Some(state)) => {
                     info!(
                         "Successfully recovered state for workflow {} with {} tasks and {} messages",
@@ -298,7 +299,7 @@ impl OrchestratorRuntime {
                     // In the future, this could restart the workflow with the recovered state
                     if let Err(e) = db::models::Workflow::update_status(
                         pool,
-                        workflow_id,
+                        &workflow_id,
                         WORKFLOW_STATUS_FAILED,
                     )
                     .await
@@ -317,7 +318,7 @@ impl OrchestratorRuntime {
                     // Mark as failed since we can't recover without state
                     if let Err(e) = db::models::Workflow::update_status(
                         pool,
-                        workflow_id,
+                        &workflow_id,
                         WORKFLOW_STATUS_FAILED,
                     )
                     .await
@@ -339,7 +340,7 @@ impl OrchestratorRuntime {
                     // Still mark as failed even if state recovery failed
                     if let Err(e) = db::models::Workflow::update_status(
                         pool,
-                        workflow_id,
+                        &workflow_id,
                         WORKFLOW_STATUS_FAILED,
                     )
                     .await
