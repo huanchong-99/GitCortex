@@ -97,7 +97,7 @@ impl CommitMetadata {
                 let key = &line[..pos].trim();
                 let value = &line[pos + 1..].trim();
 
-                match key {
+                match *key {
                     "workflow_id" => metadata.workflow_id = value.to_string(),
                     "task_id" => metadata.task_id = value.to_string(),
                     "terminal_id" => metadata.terminal_id = value.to_string(),
@@ -372,8 +372,7 @@ impl GitWatcher {
         // Publish to message bus
         self.message_bus
             .publish_terminal_completed(event)
-            .await
-            .context("Failed to publish terminal completion event")?;
+            .await;
 
         tracing::info!(
             "Published TerminalCompleted event for terminal {}",

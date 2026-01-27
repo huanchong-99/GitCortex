@@ -21,7 +21,7 @@ use db::{
 
 // Helper function to create test database
 async fn setup_test_db() -> DBService {
-    let db = DBService::new_in_memory().await.expect("Failed to create test DB");
+    let db = DBService::new().await.expect("Failed to create test DB");
 
     // Initialize schema
     sqlx::query(
@@ -135,22 +135,28 @@ async fn create_cli_and_model(
         name: cli_name.to_string(),
         display_name: format!("{} CLI", cli_name.to_uppercase()),
         detect_command: format!("which {}", cli_name),
+        install_command: None,
+        install_guide_url: None,
+        config_file_path: None,
+        is_system: false,
         created_at: now,
-        updated_at: now,
     };
 
     sqlx::query(
         r"
-        INSERT INTO cli_type (id, name, display_name, detect_command, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        INSERT INTO cli_type (id, name, display_name, detect_command, install_command, install_guide_url, config_file_path, is_system, created_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
         "
     )
     .bind(&cli.id)
     .bind(&cli.name)
     .bind(&cli.display_name)
     .bind(&cli.detect_command)
+    .bind(&cli.install_command)
+    .bind(&cli.install_guide_url)
+    .bind(&cli.config_file_path)
+    .bind(&cli.is_system)
     .bind(cli.created_at)
-    .bind(cli.updated_at)
     .execute(&db.pool)
     .await
     .expect("Failed to create CLI type");
@@ -161,14 +167,16 @@ async fn create_cli_and_model(
         name: model_name.to_string(),
         display_name: format!("{} Model", model_name),
         api_model_id: Some(format!("{}-api-id", model_name)),
+        is_default: true,
+        is_official: true,
         created_at: now,
         updated_at: now,
     };
 
     sqlx::query(
         r"
-        INSERT INTO model_config (id, cli_type_id, name, display_name, api_model_id, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        INSERT INTO model_config (id, cli_type_id, name, display_name, api_model_id, is_default, is_official, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
         "
     )
     .bind(&model.id)
@@ -176,6 +184,8 @@ async fn create_cli_and_model(
     .bind(&model.name)
     .bind(&model.display_name)
     .bind(&model.api_model_id)
+    .bind(model.is_default)
+    .bind(model.is_official)
     .bind(model.created_at)
     .bind(model.updated_at)
     .execute(&db.pool)
@@ -306,6 +316,7 @@ struct MockCCSwitch {
     switch_calls: Arc<Mutex<Vec<SwitchCall>>>,
 }
 
+#[derive(Debug, Clone)]
 struct SwitchCall {
     terminal_id: String,
     cli_type_id: String,

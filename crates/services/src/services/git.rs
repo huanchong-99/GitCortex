@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use git2::{
     BranchType, Delta, DiffFindOptions, DiffOptions, Error as GitError, Reference, Remote,

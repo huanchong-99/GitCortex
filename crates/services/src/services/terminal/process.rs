@@ -109,7 +109,7 @@ impl ProcessManager {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
-        let child = cmd
+        let mut child = cmd
             .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {e}"))?;
         let pid = child

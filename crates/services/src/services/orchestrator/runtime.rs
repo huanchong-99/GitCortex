@@ -46,6 +46,7 @@ struct RunningWorkflow {
 /// Orchestrator Runtime Service
 ///
 /// Manages the lifecycle of orchestrator agents for multiple workflows.
+#[derive(Clone)]
 pub struct OrchestratorRuntime {
     db: Arc<DBService>,
     message_bus: SharedMessageBus,
@@ -152,9 +153,10 @@ impl OrchestratorRuntime {
 
         // Spawn agent task
         let agent_clone = agent.clone();
+        let workflow_id_owned = workflow_id.to_string();
         let task_handle = tokio::spawn(async move {
             if let Err(e) = agent_clone.run().await {
-                error!("Orchestrator agent failed for workflow {}: {}", workflow_id, e);
+                error!("Orchestrator agent failed for workflow {}: {}", workflow_id_owned, e);
             }
         });
 
@@ -196,7 +198,8 @@ impl OrchestratorRuntime {
         info!("Shutdown signal sent for workflow {}", workflow_id);
 
         // Wait for graceful shutdown (5 second timeout)
-        let shutdown_result = timeout(Duration::from_secs(5), running_workflow.task_handle).await;
+        let mut task_handle = running_workflow.task_handle;
+        let shutdown_result = timeout(Duration::from_secs(5), &mut task_handle).await;
 
         match shutdown_result {
             Ok(Ok(())) => {
@@ -207,8 +210,8 @@ impl OrchestratorRuntime {
             }
             Err(_) => {
                 warn!("Workflow {} shutdown timeout, aborting", workflow_id);
-                running_workflow.task_handle.abort();
-                running_workflow.task_handle.await.ok(); // Await the abort
+                task_handle.abort();
+                task_handle.await.ok(); // Await the abort
             }
         }
 

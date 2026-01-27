@@ -96,9 +96,27 @@ impl From<OrchestratorState> for PersistedState {
     }
 }
 
+impl From<&OrchestratorState> for PersistedState {
+    fn from(state: &OrchestratorState) -> Self {
+        Self {
+            workflow_id: state.workflow_id.clone(),
+            task_states: state
+                .task_states
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone().into()))
+                .collect(),
+            conversation_history: state.conversation_history.clone(),
+            total_tokens_used: state.total_tokens_used,
+            error_count: state.error_count,
+            updated_at: Utc::now(),
+        }
+    }
+}
+
 /// State Persistence Service
 ///
 /// Manages persistence and recovery of orchestrator state.
+#[derive(Clone)]
 pub struct StatePersistence {
     db: Arc<DBService>,
 }
@@ -114,7 +132,7 @@ impl StatePersistence {
     /// Persists the current orchestrator state to the database.
     pub async fn save_state(&self, state: &OrchestratorState) -> Result<()> {
         let workflow_id = &state.workflow_id;
-        let persisted: PersistedState = state.clone().into();
+        let persisted: PersistedState = state.to_owned().into();
         let state_json =
             serde_json::to_string(&persisted)
                 .map_err(|e| anyhow!("Failed to serialize state: {}", e))?;
@@ -155,7 +173,7 @@ impl StatePersistence {
             WHERE id = ?1
         "#;
 
-        let row = sqlx::query_as::<_, (Option<String>)>(query)
+        let row: Option<(Option<String>,)> = sqlx::query_as(query)
             .bind(workflow_id)
             .fetch_optional(&self.db.pool)
             .await

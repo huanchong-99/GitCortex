@@ -744,10 +744,10 @@ impl OrchestratorAgent {
                         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
                         self.message_bus.publish(&topic, message).await?;
 
-                        return Err(e.context(format!(
-                            "Merge conflict detected for task branch {}",
-                            task_branch
-                        )));
+                        return Err(anyhow::anyhow!(
+                            "Merge conflict detected for task branch {}: {}",
+                            task_branch, e
+                        ));
                     }
 
                     // Other error - fail workflow
@@ -770,10 +770,10 @@ impl OrchestratorAgent {
                     let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
                     self.message_bus.publish(&topic, message).await?;
 
-                    return Err(e.context(format!(
-                        "Merge failed for task branch {}",
-                        task_branch
-                    )));
+                    return Err(anyhow::anyhow!(
+                        "Merge failed for task branch {}: {}",
+                        task_branch, e
+                    ));
                 }
             }
         }
