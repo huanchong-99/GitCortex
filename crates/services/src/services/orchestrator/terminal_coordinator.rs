@@ -7,7 +7,7 @@ use anyhow::Result;
 use tracing::{info, error, instrument};
 
 use db::{DBService, models::{workflow::WorkflowTask, terminal::Terminal}};
-use services::services::cc_switch::CCSwitch;
+use crate::services::cc_switch::CCSwitch;
 
 /// Terminal Coordinator
 ///
