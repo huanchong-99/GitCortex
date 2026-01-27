@@ -169,7 +169,7 @@ impl Deployment for LocalDeployment {
 
         // Create message bus and orchestrator runtime
         let message_bus = Arc::new(MessageBus::new(1000));
-        let orchestrator_runtime = OrchestratorRuntime::new(db.clone(), message_bus);
+        let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus);
 
         let deployment = Self {
             config,

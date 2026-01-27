@@ -30,7 +30,28 @@ pub const TERMINAL_STATUS_REVIEW_REJECTED: &str = "review_rejected";
 
 /// Workflow status values
 pub const WORKFLOW_STATUS_PENDING: &str = "pending";
+pub const WORKFLOW_STATUS_READY: &str = "ready";
 pub const WORKFLOW_STATUS_RUNNING: &str = "running";
 pub const WORKFLOW_STATUS_COMPLETED: &str = "completed";
 pub const WORKFLOW_STATUS_FAILED: &str = "failed";
 pub const WORKFLOW_STATUS_MERGING: &str = "merging";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_workflow_status_constants_exist() {
+        let _ = WORKFLOW_STATUS_PENDING;
+        let _ = WORKFLOW_STATUS_READY;      // This is missing
+        let _ = WORKFLOW_STATUS_RUNNING;
+        let _ = WORKFLOW_STATUS_COMPLETED;
+        let _ = WORKFLOW_STATUS_FAILED;
+        let _ = WORKFLOW_STATUS_MERGING;
+    }
+
+    #[test]
+    fn test_workflow_status_ready_value() {
+        assert_eq!(WORKFLOW_STATUS_READY, "ready");
+    }
+}

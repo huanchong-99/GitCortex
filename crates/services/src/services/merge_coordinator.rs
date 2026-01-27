@@ -117,7 +117,7 @@ impl MergeCoordinator {
                     self.handle_merge_conflict(workflow_id, task_id, &e.to_string())
                         .await?;
 
-                    return Err(e.context("Merge conflicts detected"));
+                    return Err(anyhow::anyhow!("Merge conflicts detected: {}", e));
                 }
 
                 // Other error - broadcast failure
@@ -130,7 +130,7 @@ impl MergeCoordinator {
                 self.broadcast_merge_failure(workflow_id, task_id, &e.to_string())
                     .await?;
 
-                Err(e)
+                Err(anyhow::anyhow!("Merge failed: {}", e))
             }
         }
     }

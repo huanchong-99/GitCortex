@@ -23,7 +23,7 @@ use executors::{
 };
 
 use super::process::{ProcessHandle, ProcessManager};
-use crate::services::cc_switch::CCSwitchService;
+use crate::services::cc_switch::{CCSwitchService, CCSwitch};
 
 /// Terminal launcher for serial terminal startup
 pub struct TerminalLauncher {

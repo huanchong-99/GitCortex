@@ -12,7 +12,6 @@ use uuid::Uuid;
 use db::DBService;
 use crate::services::orchestrator::constants::WORKFLOW_STATUS_FAILED;
 use crate::services::orchestrator::message_bus::{BusMessage, SharedMessageBus};
-use crate::services::orchestrator::types::TerminalCompletionEvent;
 
 /// Error Handler Service
 ///

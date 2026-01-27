@@ -17,7 +17,7 @@ use super::{
     llm::{LLMClient, build_terminal_completion_prompt, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
-    types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus},
+    types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus, CodeIssue},
 };
 use crate::services::{error_handler::ErrorHandler, template_renderer::{TemplateRenderer, WorkflowContext}};
 
@@ -323,7 +323,7 @@ impl OrchestratorAgent {
         reviewer_terminal_id: &str,
         _task_id: &str,
         reviewed_terminal_id: &str,
-        issues: &[crate::services::git_watcher::Issue],
+        issues: &[CodeIssue],
     ) -> anyhow::Result<()> {
         tracing::warn!(
             "Terminal {} rejected work from {}: {} issues found",
@@ -744,10 +744,10 @@ impl OrchestratorAgent {
                         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
                         self.message_bus.publish(&topic, message).await?;
 
-                        return Err(e.context(format!(
-                            "Merge conflict detected for task branch {}",
-                            task_branch
-                        )));
+                        return Err(anyhow::anyhow!(
+                            "Merge conflict detected for task branch {}: {}",
+                            task_branch, e
+                        ));
                     }
 
                     // Other error - fail workflow
@@ -770,10 +770,10 @@ impl OrchestratorAgent {
                     let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
                     self.message_bus.publish(&topic, message).await?;
 
-                    return Err(e.context(format!(
-                        "Merge failed for task branch {}",
-                        task_branch
-                    )));
+                    return Err(anyhow::anyhow!(
+                        "Merge failed for task branch {}: {}",
+                        task_branch, e
+                    ));
                 }
             }
         }

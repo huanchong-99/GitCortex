@@ -1,0 +1,60 @@
+name: Baseline Check
+
+on:
+  push:
+    branches: [ main, phase-18-release-readiness ]
+  pull_request:
+    branches: [ main, phase-18-release-readiness ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check Baseline
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run cargo check
+      run: cargo check --workspace --all-targets
+
+    - name: Check for compilation errors
+      run: |
+        ERRORS=$(cargo check --workspace 2>&1 | grep "^error" | wc -l)
+        if [ "$ERRORS" -ne 0 ]; then
+          echo "❌ Found $ERRORS compilation errors"
+          exit 1
+        fi
+        echo "✅ Zero compilation errors"
+
+    - name: Run cargo test
+      run: cargo test --workspace
+
+    - name: Verify services crate
+      run: |
+        echo "Verifying services crate specifically..."
+        cargo check -p services
+        ERRORS=$(cargo check -p services 2>&1 | grep "^error" | wc -l)
+        if [ "$ERRORS" -ne 0 ]; then
+          echo "❌ Services crate has $ERRORS errors"
+          exit 1
+        fi
+        echo "✅ Services crate clean"

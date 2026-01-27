@@ -202,4 +202,18 @@ impl ModelConfig {
         .fetch_optional(pool)
         .await
     }
+
+    /// Get all model configs
+    pub async fn find_all(pool: &SqlitePool) -> sqlx::Result<Vec<Self>> {
+        sqlx::query_as::<_, ModelConfig>(
+            r"
+            SELECT id, cli_type_id, name, display_name, api_model_id,
+                   is_default, is_official, created_at, updated_at
+            FROM model_config
+            ORDER BY cli_type_id, is_default DESC, name ASC
+            "
+        )
+        .fetch_all(pool)
+        .await
+    }
 }
