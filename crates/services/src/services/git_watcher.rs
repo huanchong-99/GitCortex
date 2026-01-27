@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, anyhow};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -384,6 +384,19 @@ impl GitWatcher {
     }
 }
 
+/// Parse commit metadata from commit message (standalone function)
+///
+/// This is a wrapper around CommitMetadata::parse that converts Option to Result.
+/// It can be used when you need Result-based error handling instead of Option.
+///
+/// Format: "commit message\n---METADATA---\nkey-value pairs"
+///
+/// Returns error if metadata separator is not found or required fields are missing.
+pub fn parse_commit_metadata(message: &str) -> Result<CommitMetadata> {
+    CommitMetadata::parse(message)
+        .ok_or_else(|| anyhow!("Failed to parse commit metadata: separator not found or required fields missing"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478,5 +491,72 @@ task_id: task-456
 
         let metadata = CommitMetadata::parse(message);
         assert!(metadata.is_none(), "Should return None for commits without metadata");
+    }
+
+    // Tests for the standalone parse_commit_metadata function
+    #[test]
+    fn test_parse_commit_metadata_standalone_valid() {
+        let message = r#"Complete feature implementation
+
+---METADATA---
+workflow_id: abc-123
+task_id: task-456
+terminal_id: terminal-789
+status: completed"#;
+
+        let result = parse_commit_metadata(message);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.workflow_id, "abc-123");
+        assert_eq!(metadata.task_id, "task-456");
+        assert_eq!(metadata.terminal_id, "terminal-789");
+        assert_eq!(metadata.status, "completed");
+    }
+
+    #[test]
+    fn test_parse_commit_metadata_standalone_no_metadata() {
+        let message = "Simple commit message without metadata";
+        let result = parse_commit_metadata(message);
+        assert!(result.is_err()); // Should return error, not empty metadata
+    }
+
+    #[test]
+    fn test_parse_commit_metadata_standalone_missing_required_fields() {
+        let message = r#"Incomplete commit
+
+---METADATA---
+workflow_id: wf-123
+task_id: task-456
+# missing terminal_id and status"#;
+
+        let result = parse_commit_metadata(message);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_commit_metadata_standalone_with_optional_fields() {
+        let message = r#"Complete with all fields
+
+---METADATA---
+workflow_id: wf-123
+task_id: task-456
+terminal_id: terminal-789
+terminal_order: 1
+cli: claude-code
+model: sonnet-4.5
+status: completed
+severity: info
+reviewed_terminal: terminal-001
+next_action: continue"#;
+
+        let result = parse_commit_metadata(message);
+        assert!(result.is_ok());
+        let metadata = result.unwrap();
+        assert_eq!(metadata.terminal_order, 1);
+        assert_eq!(metadata.cli, "claude-code");
+        assert_eq!(metadata.model, "sonnet-4.5");
+        assert_eq!(metadata.severity, Some("info".to_string()));
+        assert_eq!(metadata.reviewed_terminal, Some("terminal-001".to_string()));
+        assert_eq!(metadata.next_action, "continue");
     }
 }
