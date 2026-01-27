@@ -114,3 +114,29 @@ impl CCSwitch for CCSwitchService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use db::DBService;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_switch_for_terminals_method_exists() {
+        let db = Arc::new(DBService::new().await.unwrap());
+        let service = CCSwitchService::new(db);
+
+        // Verify method exists (compile-time check)
+        let terminals: Vec<db::models::Terminal> = vec![];
+        let _ = service.switch_for_terminals(&terminals).await;
+    }
+
+    #[tokio::test]
+    async fn test_detect_cli_method_exists() {
+        let db = Arc::new(DBService::new().await.unwrap());
+        let service = CCSwitchService::new(db);
+
+        // Verify method exists (compile-time check)
+        let _ = service.detect_cli("cursor").await;
+    }
+}
