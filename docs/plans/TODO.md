@@ -404,7 +404,7 @@
 
 ## Phase 17.5: Docker 环境适配 ✅
 
-**计划文件:** `2026-01-25-phase-17.5-docker-adaptation.md`
+**计划文件:** ~~`2026-01-25-phase-17.5-docker-adaptation.md`~~ → 已重定位为 Phase 19
 
 > **说明 (2026-01-27):** 此 Phase 已重新定位为 Phase 19（Docker 容器化部署）。
 > **已完成任务:**
@@ -413,13 +413,13 @@
 > **当前状态:**
 > - CMake 编译问题已解决，Windows 原生开发环境可用
 > - Docker 适配延后至 Phase 18 完成后执行
-> - 详见 `2026-01-25-phase-17.5-docker-adaptation.md`（已重定位为 Phase 19）
+> - 详见 `2026-01-27-phase-19-docker-deployment.md`
 
 ---
 
 ## Phase 19: Docker 容器化部署（开源发布优化）
 
-**计划文件:** `2026-01-25-phase-17.5-docker-adaptation.md`（已重定位）
+**计划文件:** `2026-01-27-phase-19-docker-deployment.md`
 
 > **状态:** 📦 延后实施（Phase 18 完成后执行）
 > **优先级:** 🚀 中（开源部署便利性）
