@@ -6,12 +6,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Result, Context, anyhow};
-use regex::Regex;
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::services::orchestrator::{BusMessage, MessageBus, TerminalCompletionEvent, TerminalCompletionStatus, CommitMetadata as OrchestratorCommitMetadata, CodeIssue};
+use crate::services::orchestrator::{MessageBus, TerminalCompletionEvent, TerminalCompletionStatus, CommitMetadata as OrchestratorCommitMetadata, CodeIssue};
 
 /// Configuration for GitWatcher
 #[derive(Clone, Debug)]

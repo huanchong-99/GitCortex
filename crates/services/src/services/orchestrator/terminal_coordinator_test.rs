@@ -8,12 +8,10 @@ use chrono::Utc;
 use tokio::sync::Mutex;
 use async_trait::async_trait;
 
-use crate::services::orchestrator::terminal_coordinator::TerminalCoordinator;
 use crate::services::cc_switch::CCSwitch;
 use db::{
     DBService,
     models::{
-        workflow::{Workflow, WorkflowTask},
         terminal::Terminal,
         cli_type::{CliType, ModelConfig},
     },
