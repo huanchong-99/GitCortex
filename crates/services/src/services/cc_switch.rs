@@ -83,10 +83,12 @@ impl CCSwitch for CCSwitchService {
 
         Ok(())
     }
+}
 
-    /// 批量切换模型（用于工作流启动）
+impl CCSwitchService {
+    /// Batch switch models for workflow startup
     ///
-    /// 按顺序为所有终端切换模型配置。
+    /// Switches model configuration for all terminals in sequence.
     pub async fn switch_for_terminals(&self, terminals: &[Terminal]) -> anyhow::Result<()> {
         for terminal in terminals {
             self.switch_for_terminal(terminal).await?;
@@ -94,7 +96,7 @@ impl CCSwitch for CCSwitchService {
         Ok(())
     }
 
-    /// 检测 CLI 安装状态
+    /// Detect CLI installation status
     pub async fn detect_cli(&self, cli_name: &str) -> anyhow::Result<bool> {
         use tokio::process::Command;
 
