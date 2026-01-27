@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Result, anyhow};
+use anyhow::{Result, Context, anyhow};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
