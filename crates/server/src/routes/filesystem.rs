@@ -28,6 +28,9 @@ pub async fn list_directory(
         Err(FilesystemError::PathIsNotDirectory) => {
             Ok(ResponseJson(ApiResponse::error("Path is not a directory")))
         }
+        Err(FilesystemError::PathOutsideAllowedRoots) => {
+            Ok(ResponseJson(ApiResponse::error("Path is not allowed")))
+        }
         Err(FilesystemError::Io(e)) => {
             tracing::error!("Failed to read directory: {e}");
             Ok(ResponseJson(ApiResponse::error(&format!(
@@ -59,6 +62,9 @@ pub async fn list_git_repos(
         }
         Err(FilesystemError::PathIsNotDirectory) => {
             Ok(ResponseJson(ApiResponse::error("Path is not a directory")))
+        }
+        Err(FilesystemError::PathOutsideAllowedRoots) => {
+            Ok(ResponseJson(ApiResponse::error("Path is not allowed")))
         }
         Err(FilesystemError::Io(e)) => {
             tracing::error!("Failed to read directory: {e}");

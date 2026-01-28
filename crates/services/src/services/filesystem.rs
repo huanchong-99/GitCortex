@@ -14,7 +14,9 @@ use tokio_util::sync::CancellationToken;
 use ts_rs::TS;
 
 #[derive(Clone)]
-pub struct FilesystemService {}
+pub struct FilesystemService {
+    allowed_roots: Vec<PathBuf>,
+}
 
 #[derive(Debug, Error)]
 pub enum FilesystemError {
@@ -22,6 +24,8 @@ pub enum FilesystemError {
     DirectoryDoesNotExist,
     #[error("Path is not a directory")]
     PathIsNotDirectory,
+    #[error("Path is outside allowed roots")]
+    PathOutsideAllowedRoots,
     #[error("Failed to read directory: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -48,7 +52,32 @@ impl Default for FilesystemService {
 
 impl FilesystemService {
     pub fn new() -> Self {
-        FilesystemService {}
+        let mut allowed_roots = vec![Self::get_home_directory()];
+        if let Ok(cwd) = std::env::current_dir() {
+            allowed_roots.push(cwd);
+        }
+        Self::new_with_roots(allowed_roots)
+    }
+
+    pub fn new_with_roots(allowed_roots: Vec<PathBuf>) -> Self {
+        let normalized_roots = Self::normalize_allowed_roots(allowed_roots);
+        FilesystemService {
+            allowed_roots: normalized_roots,
+        }
+    }
+
+    fn normalize_allowed_roots(allowed_roots: Vec<PathBuf>) -> Vec<PathBuf> {
+        let mut normalized = Vec::new();
+        for root in allowed_roots {
+            if root.as_os_str().is_empty() {
+                continue;
+            }
+            let canonical = fs::canonicalize(&root).unwrap_or(root);
+            if !normalized.iter().any(|existing| existing == &canonical) {
+                normalized.push(canonical);
+            }
+        }
+        normalized
     }
 
     #[cfg(not(feature = "qa-mode"))]
@@ -108,6 +137,7 @@ impl FilesystemService {
         {
             let base_path = path.map_or_else(Self::get_home_directory, PathBuf::from);
             Self::verify_directory(&base_path)?;
+            let base_path = self.resolve_path(&base_path)?;
             self.list_git_repos_with_timeout(
                 vec![base_path],
                 timeout_ms,
@@ -177,21 +207,44 @@ impl FilesystemService {
         #[cfg(not(feature = "qa-mode"))]
         {
             let search_strings = ["repos", "dev", "work", "code", "projects"];
-            let home_dir = Self::get_home_directory();
-            let mut paths: Vec<PathBuf> = search_strings
-                .iter()
-                .map(|s| home_dir.join(s))
-                .filter(|p| p.exists() && p.is_dir())
-                .collect();
-            paths.insert(0, home_dir);
-            if let Some(cwd) = std::env::current_dir().ok()
-                && cwd.exists()
-                && cwd.is_dir()
-            {
-                paths.insert(0, cwd);
+            let mut paths = Vec::new();
+            for root in &self.allowed_roots {
+                if !root.exists() || !root.is_dir() {
+                    continue;
+                }
+                paths.push(root.clone());
+                for name in &search_strings {
+                    let candidate = root.join(name);
+                    if candidate.exists() && candidate.is_dir() {
+                        paths.push(candidate);
+                    }
+                }
             }
-            self.list_git_repos_with_timeout(paths, timeout_ms, hard_timeout_ms, max_depth)
-                .await
+
+            let mut resolved_paths = Vec::new();
+            for path in paths {
+                match self.resolve_path(&path) {
+                    Ok(resolved) => {
+                        if !resolved_paths.iter().any(|existing| existing == &resolved) {
+                            resolved_paths.push(resolved);
+                        }
+                    }
+                    Err(FilesystemError::PathOutsideAllowedRoots) => {}
+                    Err(e) => return Err(e),
+                }
+            }
+
+            if resolved_paths.is_empty() {
+                return Err(FilesystemError::PathOutsideAllowedRoots);
+            }
+
+            self.list_git_repos_with_timeout(
+                resolved_paths,
+                timeout_ms,
+                hard_timeout_ms,
+                max_depth,
+            )
+            .await
         }
     }
 
@@ -304,12 +357,25 @@ impl FilesystemService {
         Ok(())
     }
 
+    fn resolve_path(&self, path: &Path) -> Result<PathBuf, FilesystemError> {
+        let canonical_path = fs::canonicalize(path)?;
+        let allowed = self
+            .allowed_roots
+            .iter()
+            .any(|root| canonical_path.starts_with(root));
+        if !allowed {
+            return Err(FilesystemError::PathOutsideAllowedRoots);
+        }
+        Ok(canonical_path)
+    }
+
     pub fn list_directory(
         &self,
         path: Option<String>,
     ) -> Result<DirectoryListResponse, FilesystemError> {
         let path = path.map_or_else(Self::get_home_directory, PathBuf::from);
         Self::verify_directory(&path)?;
+        let path = self.resolve_path(&path)?;
 
         let entries = fs::read_dir(&path)?;
         let mut directory_entries = Vec::new();
