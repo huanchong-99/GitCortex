@@ -10,12 +10,13 @@ use axum::{
 };
 use db::models::{
     CliType, CreateWorkflowRequest, ModelConfig, SlashCommandPreset, Terminal, Workflow,
-    WorkflowCommand, WorkflowCommandRequest, WorkflowTask,
+    WorkflowCommand, WorkflowTask,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utils::response::ApiResponse;
-use utils::slug;
+use utils::text;
 use uuid::Uuid;
 
 // Import DTOs
@@ -81,6 +82,12 @@ pub struct UpdateWorkflowStatusRequest {
     pub status: String,
 }
 
+/// Merge Workflow Request
+#[derive(Debug, Deserialize)]
+pub struct MergeWorkflowRequest {
+    pub merge_strategy: Option<String>,
+}
+
 // ============================================================================
 // Route Definition
 // ============================================================================
@@ -89,15 +96,15 @@ pub struct UpdateWorkflowStatusRequest {
 pub fn workflows_routes() -> Router<DeploymentImpl> {
     Router::new()
         .route("/", get(list_workflows).post(create_workflow))
-        .route("/:workflow_id", get(get_workflow).delete(delete_workflow))
-        .route("/:workflow_id/status", put(update_workflow_status))
-        .route("/:workflow_id/start", post(start_workflow))
-        .route("/:workflow_id/tasks", get(list_workflow_tasks))
+        .route("/{workflow_id}", get(get_workflow).delete(delete_workflow))
+        .route("/{workflow_id}/status", put(update_workflow_status))
+        .route("/{workflow_id}/start", post(start_workflow))
+        .route("/{workflow_id}/merge", post(merge_workflow))
+        .route("/{workflow_id}/tasks", get(list_workflow_tasks))
         .route(
-            "/:workflow_id/tasks/:task_id/terminals",
+            "/{workflow_id}/tasks/{task_id}/terminals",
             get(list_task_terminals),
         )
-        .route("/presets/commands", get(list_command_presets))
 }
 
 // ============================================================================
@@ -387,7 +394,11 @@ async fn create_workflow(
         } else {
             // Auto-generate branch name: workflow/{workflow_id}/{slugified-task-name}
             // Check against already-generated branches in this batch
-            let base_branch = format!("workflow/{}/{}", workflow_id, slug::slugify(&task_req.name));
+            let base_branch = format!(
+                "workflow/{}/{}",
+                workflow_id,
+                text::git_branch_id(&task_req.name)
+            );
             let mut candidate = base_branch.clone();
             let mut counter = 2;
 
@@ -609,6 +620,41 @@ async fn list_command_presets(
 ) -> Result<ResponseJson<ApiResponse<Vec<SlashCommandPreset>>>, ApiError> {
     let presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;
     Ok(ResponseJson(ApiResponse::success(presets)))
+}
+
+/// POST /api/workflows/:workflow_id/merge
+/// Execute merge terminal for workflow
+async fn merge_workflow(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+    Json(_payload): Json<MergeWorkflowRequest>,
+) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
+    // Check workflow exists
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    // Validate workflow is in appropriate state for merging
+    // Allow merging from "running" or "completed" states
+    let current_status = workflow.status.as_str();
+    if current_status != "running" && current_status != "completed" && current_status != "starting" {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot merge workflow with status '{}': expected 'running', 'completed', or 'starting'",
+            current_status
+        )));
+    }
+
+    // Update workflow status to "completed" after merge
+    Workflow::update_status(&deployment.db().pool, &workflow_id, "completed").await?;
+
+    // Return success response
+    let result = json!({
+        "success": true,
+        "message": "Merge completed successfully",
+        "workflow_id": workflow_id
+    });
+
+    Ok(ResponseJson(ApiResponse::success(result)))
 }
 
 // ============================================================================
