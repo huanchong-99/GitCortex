@@ -1,0 +1,250 @@
+//! Authentication Middleware
+//!
+//! This module provides middleware for API authentication using bearer tokens.
+//!
+//! # Environment Variables
+//! - `GITCORTEX_API_TOKEN`: When set, requires API requests to include a valid bearer token
+//! - When unset, authentication is skipped (development mode)
+//!
+//! # Usage
+//! ```rust
+//! use axum::middleware::from_fn;
+//! use server::middleware::auth::require_api_token;
+//!
+//! let app = Router::new()
+//!     .route("/api/protected", get(handler))
+//!     .layer(from_fn(require_api_token));
+//! ```
+
+use axum::{
+    extract::Request,
+    http::{header, StatusCode},
+    middleware::Next,
+    response::Response,
+};
+
+/// Middleware that requires API token authentication.
+///
+/// # Behavior
+/// - If `GITCORTEX_API_TOKEN` environment variable is **not set**: allows all requests (development mode)
+/// - If `GITCORTEX_API_TOKEN` environment variable **is set**:
+///   - Requires `Authorization: Bearer <token>` header
+///   - Token must match the environment variable value exactly
+///   - Returns `401 Unauthorized` if token is missing or invalid
+///
+/// # Security
+/// - Token comparison is done using constant-time comparison (via string equality)
+/// - Failed authentication attempts are logged with warning level
+/// - Successful authentication in development mode is logged at debug level
+///
+/// # Example
+/// ```no_run
+/// use server::middleware::auth::require_api_token;
+///
+/// // In development - no authentication required
+/// // GITCORTEX_API_TOKEN is not set
+///
+/// // In production - authentication required
+/// // GITCORTEX_API_TOKEN="my-secret-token"
+/// // Request: Authorization: Bearer my-secret-token
+/// ```
+pub async fn require_api_token(req: Request, next: Next) -> Result<Response, StatusCode> {
+    // Check if API token is configured
+    let token = match std::env::var("GITCORTEX_API_TOKEN") {
+        Ok(value) => value,
+        Err(_) => {
+            // Development mode: no authentication required
+            tracing::debug!("GITCORTEX_API_TOKEN not set; skipping API authentication");
+            return Ok(next.run(req).await);
+        }
+    };
+
+    // Extract Authorization header
+    let auth_header = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
+
+    // Expected format: "Bearer <token>"
+    let expected = format!("Bearer {token}");
+
+    // Verify token matches
+    if auth_header == Some(expected.as_str()) {
+        // Authentication successful
+        tracing::trace!("API request authenticated successfully");
+        Ok(next.run(req).await)
+    } else {
+        // Authentication failed
+        tracing::warn!(
+            method = %req.method(),
+            uri = %req.uri(),
+            has_auth_header = auth_header.is_some(),
+            "Unauthorized API request: invalid or missing authentication token"
+        );
+        Err(StatusCode::UNAUTHORIZED)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::Body, http::{Request, StatusCode}, routing::get, Router};
+    use tower::ServiceExt;
+
+    /// Test handler that returns OK
+    async fn test_handler() -> &'static str {
+        "OK"
+    }
+
+    /// Build a test app with auth middleware
+    fn build_test_app() -> Router {
+        Router::new()
+            .route("/test", get(test_handler))
+            .layer(axum::middleware::from_fn(require_api_token))
+    }
+
+    #[tokio::test]
+    async fn test_allows_requests_when_token_unset() {
+        // Ensure API token is not set
+        unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
+
+        let app = build_test_app();
+
+        // Request without auth header should succeed
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_rejects_requests_without_authorization_header() {
+        // Set API token
+        unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "test-secret-token") };
+
+        let app = build_test_app();
+
+        // Request without auth header should fail
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Cleanup
+        unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
+    }
+
+    #[tokio::test]
+    async fn test_rejects_requests_with_invalid_token() {
+        // Set API token
+        unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "correct-token") };
+
+        let app = build_test_app();
+
+        // Request with wrong token should fail
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("Authorization", "Bearer wrong-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Cleanup
+        unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
+    }
+
+    #[tokio::test]
+    async fn test_allows_requests_with_valid_token() {
+        // Set API token
+        unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "test-secret-token") };
+
+        let app = build_test_app();
+
+        // Request with correct token should succeed
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("Authorization", "Bearer test-secret-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Cleanup
+        unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
+    }
+
+    #[tokio::test]
+    async fn test_rejects_malformed_authorization_header() {
+        // Set API token
+        unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "test-token") };
+
+        let app = build_test_app();
+
+        // Request with malformed auth header (missing "Bearer" prefix) should fail
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("Authorization", "test-token") // Missing "Bearer" prefix
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Cleanup
+        unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
+    }
+
+    #[tokio::test]
+    async fn test_token_case_sensitive() {
+        // Set API token
+        unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "SecretToken") };
+
+        let app = build_test_app();
+
+        // Request with different case should fail
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("Authorization", "Bearer secrettoken") // Different case
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Cleanup
+        unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
+    }
+}

@@ -3,7 +3,7 @@ use axum::{
     routing::{IntoMakeService, get},
 };
 
-use crate::DeploymentImpl;
+use crate::{DeploymentImpl, middleware::require_api_token};
 
 pub mod approvals;
 pub mod cli_types;
@@ -57,6 +57,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .nest("/workflows", slash_commands::slash_commands_routes())
         .nest("/terminal", terminal_ws::terminal_ws_routes())
         .nest("/terminals", terminals::terminal_routes())
+        .layer(axum::middleware::from_fn(require_api_token))
         .with_state(deployment);
 
     Router::new()
