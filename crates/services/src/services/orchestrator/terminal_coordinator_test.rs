@@ -9,6 +9,7 @@ use tokio::sync::Mutex;
 use async_trait::async_trait;
 
 use crate::services::cc_switch::CCSwitch;
+use crate::services::orchestrator::TerminalCoordinator;
 use db::{
     DBService,
     models::{
@@ -364,7 +365,7 @@ async fn test_terminal_startup_sequence_succeeds() {
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 2, 2).await;
 
     // Start terminals for workflow
-    let result = coordinator.start_terminals_for_workflow(&workflow_id).await;
+    let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
     assert!(result.is_ok(), "Terminal startup should succeed with mock service");
@@ -393,7 +394,7 @@ async fn test_terminal_startup_switches_models_serially() {
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 2, 2).await;
 
     // Start terminals for workflow
-    let result = coordinator.start_terminals_for_workflow(&workflow_id).await;
+    let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
     assert!(result.is_ok(), "Terminal startup should succeed");
@@ -476,7 +477,7 @@ async fn test_single_terminal_startup() {
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 1, 1).await;
 
     // Start terminals for workflow
-    let result = coordinator.start_terminals_for_workflow(&workflow_id).await;
+    let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
     assert!(result.is_ok(), "Single terminal startup should succeed");

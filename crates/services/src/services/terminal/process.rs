@@ -39,9 +39,22 @@ pub struct ProcessHandle {
     pub stdin: Option<ChildStdin>,
 }
 
+/// Tracked process with child and I/O handles
+#[derive(Debug)]
+struct TrackedProcess {
+    /// Child process for lifecycle management
+    child: Child,
+    /// Stdout reader (for WebSocket forwarding)
+    stdout: Option<ChildStdout>,
+    /// Stderr reader (for WebSocket forwarding)
+    stderr: Option<ChildStderr>,
+    /// Stdin writer (for WebSocket input)
+    stdin: Option<ChildStdin>,
+}
+
 /// Process manager for terminal lifecycle
 pub struct ProcessManager {
-    processes: Arc<RwLock<HashMap<String, Child>>>,
+    processes: Arc<RwLock<HashMap<String, TrackedProcess>>>,
 }
 
 impl ProcessManager {
@@ -123,15 +136,20 @@ impl ProcessManager {
         let stdin = child.stdin.take();
 
         let mut processes = self.processes.write().await;
-        processes.insert(terminal_id.to_string(), child);
+        processes.insert(terminal_id.to_string(), TrackedProcess {
+            child,
+            stdout,
+            stderr,
+            stdin,
+        });
 
         Ok(ProcessHandle {
             pid,
             session_id,
             terminal_id: terminal_id.to_string(),
-            stdout,
-            stderr,
-            stdin,
+            stdout: None, // Will be provided by get_handle
+            stderr: None,
+            stdin: None,
         })
     }
 
@@ -305,7 +323,7 @@ impl ProcessManager {
         let processes = self.processes.read().await;
         processes
             .get(terminal_id)
-            .is_some_and(|child| child.id().is_some())
+            .is_some_and(|tracked| tracked.child.id().is_some())
     }
 
     /// Lists all currently tracked terminal IDs
@@ -354,8 +372,8 @@ impl ProcessManager {
         // Collect IDs of dead processes
         let dead_ids: Vec<String> = processes
             .iter_mut()
-            .filter_map(|(id, child)| {
-                match child.try_wait() {
+            .filter_map(|(id, tracked)| {
+                match tracked.child.try_wait() {
                     Ok(Some(_)) => Some(id.clone()), // Process exited
                     _ => None,                       // Still running or error
                 }
@@ -370,13 +388,17 @@ impl ProcessManager {
 
     /// Get process handle by terminal ID
     ///
+    /// Returns a ProcessHandle containing the I/O handles for the terminal process.
+    /// This is a one-time operation - the handles are moved out of storage.
+    ///
     /// # Arguments
     ///
     /// * `terminal_id` - Terminal ID to look up
     ///
     /// # Returns
     ///
-    /// `Some(ProcessHandle)` if the terminal process exists, `None` otherwise.
+    /// `Some(ProcessHandle)` if the terminal process exists and handles are available,
+    /// `None` if the terminal doesn't exist or handles were already taken.
     ///
     /// # Examples
     ///
@@ -390,11 +412,36 @@ impl ProcessManager {
     /// # }
     /// ```
     pub async fn get_handle(&self, terminal_id: &str) -> Option<ProcessHandle> {
-        let processes = self.processes.read().await;
-        // ProcessHandle now contains I/O handles but Child is stored
-        // We need to refactor to store I/O handles separately
-        // For now, return None
-        None
+        let mut processes = self.processes.write().await;
+
+        if let Some(tracked) = processes.get_mut(terminal_id) {
+            // Check if process is still running
+            let pid = tracked.child.id()?;
+
+            // Check if handles are still available (not yet taken)
+            if tracked.stdout.is_none() && tracked.stderr.is_none() && tracked.stdin.is_none() {
+                // All handles have been taken
+                return None;
+            }
+
+            let session_id = Uuid::new_v4().to_string();
+
+            // Take I/O handles (one-time operation)
+            let stdout = tracked.stdout.take();
+            let stderr = tracked.stderr.take();
+            let stdin = tracked.stdin.take();
+
+            Some(ProcessHandle {
+                pid,
+                session_id,
+                terminal_id: terminal_id.to_string(),
+                stdout,
+                stderr,
+                stdin,
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -519,5 +566,35 @@ mod tests {
 
         let running_after = manager.list_running().await;
         assert_eq!(running_after.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_handle_returns_io_handles() {
+        let manager = ProcessManager::new();
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        let _ = manager
+            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
+            .await;
+
+        // First call should return handles
+        let handle1 = manager.get_handle("test-terminal").await;
+        assert!(handle1.is_some());
+        let handle1 = handle1.unwrap();
+        assert!(handle1.stdin.is_some());
+        assert!(handle1.stdout.is_some());
+        assert!(handle1.stderr.is_some());
+
+        // Second call should return None (handles were taken)
+        let handle2 = manager.get_handle("test-terminal").await;
+        assert!(handle2.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_handle_for_nonexistent_terminal() {
+        let manager = ProcessManager::new();
+
+        let handle = manager.get_handle("non-existent").await;
+        assert!(handle.is_none());
     }
 }
