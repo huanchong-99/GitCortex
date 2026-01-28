@@ -9,7 +9,7 @@ use axum::{
 use db::models::{CliType, ModelConfig, CliDetectionStatus, CliType as CliTypeModel};
 use deployment::Deployment;
 use crate::{error::ApiError, DeploymentImpl};
-use services::terminal::detector::CliDetector;
+use services::services::terminal::detector::CliDetector;
 use std::sync::Arc;
 
 /// Create CLI types router
@@ -34,7 +34,7 @@ async fn list_cli_types(
 async fn detect_cli_types(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<Vec<CliDetectionStatus>>, ApiError> {
-    let db = Arc::new(deployment.db());
+    let db = Arc::new(deployment.db().clone());
     let detector = CliDetector::new(db);
 
     let results = detector.detect_all().await
