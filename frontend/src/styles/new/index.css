@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 /* 1) THEME TOKENS scoped to .new-design */
+/* GitCortex Design System Theme Tokens */
 @layer base {
   /* Light defaults - New Design */
   .new-design {
