@@ -258,11 +258,7 @@ impl TerminalLauncher {
     /// A configured Command for the CLI
     fn build_launch_command(&self, cli_name: &str) -> tokio::process::Command {
         let mut cmd = match cli_name {
-            "claude-code" => {
-                let mut c = tokio::process::Command::new("claude");
-                c.arg("--dangerously-skip-permissions");
-                c
-            }
+            "claude-code" => tokio::process::Command::new("claude"),
             "gemini-cli" => tokio::process::Command::new("gemini"),
             "codex" => tokio::process::Command::new("codex"),
             "amp" => tokio::process::Command::new("amp"),
@@ -379,8 +375,20 @@ mod tests {
     #[tokio::test]
     async fn test_build_launch_command_claude() {
         let (launcher, _) = setup_launcher().await;
-        let _cmd = launcher.build_launch_command("claude-code");
-        // Verify command was built without panic
+        let cmd = launcher.build_launch_command("claude-code");
+
+        // Security: Verify --dangerously-skip-permissions flag is NOT present
+        // The launcher must NOT force this dangerous flag
+        let std_cmd = cmd.as_std();
+        let args: Vec<String> = std_cmd.get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+
+        assert!(
+            !args.iter().any(|a| a.contains("--dangerously-skip-permissions")),
+            "claude-code launch command must NOT force --dangerously-skip-permissions flag. Args found: {:?}",
+            args
+        );
     }
 
     #[tokio::test]
