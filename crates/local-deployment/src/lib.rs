@@ -31,6 +31,7 @@ use services::services::{
     project::ProjectService,
     queued_message::QueuedMessageService,
     repo::RepoService,
+    terminal::process::ProcessManager,
 };
 use tokio::sync::RwLock;
 use utils::{
@@ -64,6 +65,7 @@ pub struct LocalDeployment {
     auth_context: AuthContext,
     oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
     orchestrator_runtime: OrchestratorRuntime,
+    process_manager: Arc<ProcessManager>,
 }
 
 #[derive(Debug, Clone)]
@@ -171,6 +173,8 @@ impl Deployment for LocalDeployment {
         let message_bus = Arc::new(MessageBus::new(1000));
         let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus);
 
+        let process_manager = Arc::new(ProcessManager::new());
+
         let deployment = Self {
             config,
             user_id,
@@ -189,6 +193,7 @@ impl Deployment for LocalDeployment {
             auth_context,
             oauth_handoffs,
             orchestrator_runtime,
+            process_manager,
         };
 
         Ok(deployment)
@@ -256,6 +261,10 @@ impl Deployment for LocalDeployment {
 
     fn orchestrator_runtime(&self) -> &OrchestratorRuntime {
         &self.orchestrator_runtime
+    }
+
+    fn process_manager(&self) -> &Arc<ProcessManager> {
+        &self.process_manager
     }
 }
 

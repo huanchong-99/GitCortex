@@ -43,6 +43,7 @@ use services::services::{
     project::ProjectService,
     queued_message::QueuedMessageService,
     repo::RepoService,
+    terminal::process::ProcessManager,
     worktree_manager::WorktreeError,
 };
 use sqlx::Error as SqlxError;
@@ -121,6 +122,8 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     fn auth_context(&self) -> &AuthContext;
 
     fn orchestrator_runtime(&self) -> &OrchestratorRuntime;
+
+    fn process_manager(&self) -> &Arc<ProcessManager>;
 
     async fn update_sentry_scope(&self) -> Result<(), DeploymentError> {
         let user_id = self.user_id();
