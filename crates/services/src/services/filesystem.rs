@@ -369,6 +369,21 @@ impl FilesystemService {
         Ok(canonical_path)
     }
 
+    /// Async version of list_directory for use in async contexts
+    ///
+    /// This uses `tokio::task::spawn_blocking` to offload the blocking
+    /// filesystem I/O to a dedicated thread pool, preventing the async runtime
+    /// from being blocked.
+    pub async fn list_directory_async(
+        &self,
+        path: Option<String>,
+    ) -> Result<DirectoryListResponse, FilesystemError> {
+        let self_clone = self.clone();
+        tokio::task::spawn_blocking(move || self_clone.list_directory(path))
+            .await
+            .map_err(|e| FilesystemError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+    }
+
     pub fn list_directory(
         &self,
         path: Option<String>,

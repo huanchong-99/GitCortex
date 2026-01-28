@@ -20,7 +20,7 @@ pub async fn list_directory(
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<ListDirectoryQuery>,
 ) -> Result<ResponseJson<ApiResponse<DirectoryListResponse>>, ApiError> {
-    match deployment.filesystem().list_directory(query.path) {
+    match deployment.filesystem().list_directory_async(query.path).await {
         Ok(response) => Ok(ResponseJson(ApiResponse::success(response))),
         Err(FilesystemError::DirectoryDoesNotExist) => {
             Ok(ResponseJson(ApiResponse::error("Directory does not exist")))
