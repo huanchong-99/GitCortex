@@ -13,6 +13,7 @@ use uuid::Uuid;
 use chrono::Utc;
 
 use crate::{DeploymentImpl, error::ApiError};
+use deployment::Deployment;
 
 // ============================================================================
 // Request/Response Types
@@ -48,7 +49,7 @@ pub struct UpdateSlashCommandRequest {
 pub async fn list_command_presets(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<Vec<SlashCommandPreset>>>, ApiError> {
-    let presets = SlashCommandPreset::find_all(&deployment.pool)
+    let presets = SlashCommandPreset::find_all(&deployment.db().pool)
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to fetch command presets: {}", e).into()))?;
 
@@ -103,7 +104,7 @@ pub async fn create_command_preset(
     .bind(preset.is_system)
     .bind(preset.created_at)
     .bind(preset.updated_at)
-    .execute(&deployment.pool)
+    .execute(&deployment.db().pool)
     .await
     .map_err(|e| {
         // Check for unique constraint violation
@@ -130,7 +131,7 @@ pub async fn update_command_preset(
         "SELECT * FROM slash_command_preset WHERE id = ?"
     )
     .bind(&id)
-    .fetch_optional(&deployment.pool)
+    .fetch_optional(&deployment.db().pool)
     .await
     .map_err(|e| ApiError::Internal(format!("Failed to fetch command preset: {}", e).into()))?
     .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
@@ -146,7 +147,7 @@ pub async fn update_command_preset(
 
     // Build update query dynamically based on provided fields
     let description = req.description.unwrap_or_else(|| existing.description.clone());
-    let prompt_template = req.prompt_template.unwrap_or_else(|| existing.prompt_template.clone());
+    let prompt_template = req.prompt_template.or_else(|| existing.prompt_template.clone());
 
     sqlx::query(
         r"
@@ -159,7 +160,7 @@ pub async fn update_command_preset(
     .bind(&prompt_template)
     .bind(now)
     .bind(&id)
-    .execute(&deployment.pool)
+    .execute(&deployment.db().pool)
     .await
     .map_err(|e| ApiError::Internal(format!("Failed to update command preset: {}", e).into()))?;
 
@@ -168,7 +169,7 @@ pub async fn update_command_preset(
         "SELECT * FROM slash_command_preset WHERE id = ?"
     )
     .bind(&id)
-    .fetch_one(&deployment.pool)
+    .fetch_one(&deployment.db().pool)
     .await
     .map_err(|e| ApiError::Internal(format!("Failed to fetch updated command preset: {}", e).into()))?;
 
@@ -187,7 +188,7 @@ pub async fn delete_command_preset(
         "SELECT * FROM slash_command_preset WHERE id = ?"
     )
     .bind(&id)
-    .fetch_optional(&deployment.pool)
+    .fetch_optional(&deployment.db().pool)
     .await
     .map_err(|e| ApiError::Internal(format!("Failed to fetch command preset: {}", e).into()))?
     .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
@@ -202,7 +203,7 @@ pub async fn delete_command_preset(
     // Delete the preset
     let result = sqlx::query("DELETE FROM slash_command_preset WHERE id = ?")
         .bind(&id)
-        .execute(&deployment.pool)
+        .execute(&deployment.db().pool)
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to delete command preset: {}", e).into()))?;
 
