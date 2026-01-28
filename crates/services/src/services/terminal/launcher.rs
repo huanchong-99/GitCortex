@@ -150,7 +150,7 @@ impl TerminalLauncher {
         };
 
         let (session_id, execution_process_id) = if let Some(ws_id) = workspace_id {
-            match Session::create_for_terminal(&self.db.pool, ws_id, Some("claude-code".to_string()), Some(terminal_id.clone())).await {
+            match Session::create_for_terminal(&self.db.pool, ws_id, Some(cli_type.name.clone()), Some(terminal_id.clone())).await {
                 Ok(session) => {
                     tracing::info!("Created session {} for terminal {}", session.id, terminal_id);
 
