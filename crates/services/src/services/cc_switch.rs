@@ -58,13 +58,15 @@ impl CCSwitch for CCSwitchService {
         let cli = CcCliType::parse(&cli_type.name)
             .ok_or_else(|| anyhow::anyhow!("Unsupported CLI: {}", cli_type.name))?;
 
+        // 解密并获取 API key
+        let api_key = terminal
+            .get_custom_api_key()?
+            .ok_or_else(|| anyhow::anyhow!("API key not configured for terminal"))?;
+
         // 构建切换配置
         let config = SwitchConfig {
             base_url: terminal.custom_base_url.clone(),
-            api_key: terminal
-                .custom_api_key
-                .clone()
-                .ok_or_else(|| anyhow::anyhow!("API key not configured for terminal"))?,
+            api_key,
             model: model_config
                 .api_model_id
                 .clone()

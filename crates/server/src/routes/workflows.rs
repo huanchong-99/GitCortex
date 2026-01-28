@@ -438,13 +438,13 @@ async fn create_workflow(
         let mut terminals: Vec<Terminal> = Vec::new();
 
         for terminal_req in &task_req.terminals {
-            let terminal = Terminal {
+            let mut terminal = Terminal {
                 id: Uuid::new_v4().to_string(),
                 workflow_task_id: task_id.clone(),
                 cli_type_id: terminal_req.cli_type_id.clone(),
                 model_config_id: terminal_req.model_config_id.clone(),
                 custom_base_url: terminal_req.custom_base_url.clone(),
-                custom_api_key: terminal_req.custom_api_key.clone(),
+                custom_api_key: None, // Will be set encrypted below
                 role: terminal_req.role.clone(),
                 role_description: terminal_req.role_description.clone(),
                 order_index: terminal_req.order_index,
@@ -461,6 +461,16 @@ async fn create_workflow(
                 created_at: now,
                 updated_at: now,
             };
+
+            // Encrypt and store API key if provided
+            if let Some(custom_api_key) = terminal_req.custom_api_key.as_deref() {
+                terminal
+                    .set_custom_api_key(custom_api_key)
+                    .map_err(|e| ApiError::BadRequest(format!(
+                        "Failed to encrypt terminal API key: {e}"
+                    )))?;
+            }
+
             terminals.push(terminal);
         }
 

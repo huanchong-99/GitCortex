@@ -2,6 +2,11 @@
 //!
 //! Stores terminal configuration and state for each task.
 
+use aes_gcm::{
+    Aes256Gcm, Nonce,
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+};
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool, Type};
@@ -55,6 +60,8 @@ pub struct Terminal {
     pub custom_base_url: Option<String>,
 
     /// Custom API Key (encrypted storage)
+    #[serde(skip)]
+    #[ts(skip)]
     pub custom_api_key: Option<String>,
 
     /// Role, e.g., 'coder', 'reviewer', 'fixer'
@@ -212,6 +219,81 @@ pub struct CreateTerminalRequest {
 }
 
 impl Terminal {
+    const ENCRYPTION_KEY_ENV: &str = "GITCORTEX_ENCRYPTION_KEY";
+
+    /// Get encryption key from environment variable
+    fn get_encryption_key() -> anyhow::Result<[u8; 32]> {
+        let key_str = std::env::var(Self::ENCRYPTION_KEY_ENV)
+            .map_err(|_| anyhow::anyhow!(
+                "Encryption key not found. Please set {} environment variable with a 32-byte value.",
+                Self::ENCRYPTION_KEY_ENV
+            ))?;
+
+        // Check length FIRST before conversion to prevent zero-padding
+        if key_str.len() != 32 {
+            return Err(anyhow::anyhow!(
+                "Invalid encryption key length: got {} bytes, expected exactly 32 bytes",
+                key_str.len()
+            ));
+        }
+
+        key_str
+            .as_bytes()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))
+    }
+
+    /// Set custom API key with encryption
+    pub fn set_custom_api_key(&mut self, plaintext: &str) -> anyhow::Result<()> {
+        let key = Self::get_encryption_key()?;
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext.as_bytes())
+            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
+
+        // Combine nonce + ciphertext
+        let mut combined = nonce.to_vec();
+        combined.extend_from_slice(&ciphertext);
+
+        // Base64 encode
+        self.custom_api_key = Some(general_purpose::STANDARD.encode(&combined));
+        Ok(())
+    }
+
+    /// Get custom API key with decryption
+    pub fn get_custom_api_key(&self) -> anyhow::Result<Option<String>> {
+        match &self.custom_api_key {
+            None => Ok(None),
+            Some(encoded) => {
+                let key = Self::get_encryption_key()?;
+                let combined = general_purpose::STANDARD
+                    .decode(encoded)
+                    .map_err(|e| anyhow::anyhow!("Base64 decode failed: {e}"))?;
+
+                if combined.len() < 12 {
+                    return Err(anyhow::anyhow!("Invalid encrypted data length"));
+                }
+
+                let (nonce_bytes, ciphertext) = combined.split_at(12);
+                #[allow(deprecated)]
+                let nonce = Nonce::from_slice(nonce_bytes);
+                let cipher = Aes256Gcm::new_from_slice(&key)
+                    .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
+
+                let plaintext_bytes = cipher
+                    .decrypt(nonce, ciphertext)
+                    .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
+
+                Ok(Some(String::from_utf8(plaintext_bytes).map_err(|e| {
+                    anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}")
+                })?))
+            }
+        }
+    }
+
     /// Create terminal
     pub async fn create(pool: &SqlitePool, terminal: &Terminal) -> sqlx::Result<Self> {
         sqlx::query_as::<_, Terminal>(
@@ -452,6 +534,287 @@ impl TerminalLog {
         .bind(limit)
         .fetch_all(pool)
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    fn with_var<F>(key: &str, value: Option<&str>, f: F)
+    where
+        F: FnOnce(),
+    {
+        if let Some(v) = value {
+            unsafe { std::env::set_var(key, v) };
+        } else {
+            unsafe { std::env::remove_var(key) };
+        }
+        f();
+        if value.is_some() {
+            unsafe { std::env::remove_var(key) };
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_custom_api_key_encryption_roundtrip() {
+        with_var(
+            "GITCORTEX_ENCRYPTION_KEY",
+            Some("12345678901234567890123456789012"),
+            || {
+                let mut terminal = Terminal {
+                    id: Uuid::new_v4().to_string(),
+                    workflow_task_id: "task-1".to_string(),
+                    cli_type_id: "cli-1".to_string(),
+                    model_config_id: "model-1".to_string(),
+                    custom_base_url: Some("https://api.test.com".to_string()),
+                    custom_api_key: None,
+                    role: Some("coder".to_string()),
+                    role_description: None,
+                    order_index: 0,
+                    status: "not_started".to_string(),
+                    process_id: None,
+                    pty_session_id: None,
+                    session_id: None,
+                    execution_process_id: None,
+                    vk_session_id: None,
+                    last_commit_hash: None,
+                    last_commit_message: None,
+                    started_at: None,
+                    completed_at: None,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                };
+
+                let original_key = "sk-test-terminal-key-12345";
+
+                // Encrypt the API key
+                terminal
+                    .set_custom_api_key(original_key)
+                    .expect("Encryption should succeed");
+
+                // Verify the stored value is encrypted (not plaintext)
+                assert!(terminal.custom_api_key.is_some());
+                let stored = terminal.custom_api_key.as_ref().unwrap();
+                assert_ne!(stored, original_key);
+                assert!(!stored.contains("sk-test"));
+
+                // Decrypt and verify
+                let decrypted_key = terminal
+                    .get_custom_api_key()
+                    .expect("Decryption should succeed")
+                    .expect("Decrypted key should exist");
+                assert_eq!(decrypted_key, original_key);
+            },
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_custom_api_key_encryption_missing_env_key() {
+        with_var("GITCORTEX_ENCRYPTION_KEY", Option::<&str>::None, || {
+            let mut terminal = Terminal {
+                id: Uuid::new_v4().to_string(),
+                workflow_task_id: "task-1".to_string(),
+                cli_type_id: "cli-1".to_string(),
+                model_config_id: "model-1".to_string(),
+                custom_base_url: None,
+                custom_api_key: None,
+                role: None,
+                role_description: None,
+                order_index: 0,
+                status: "not_started".to_string(),
+                process_id: None,
+                pty_session_id: None,
+                session_id: None,
+                execution_process_id: None,
+                vk_session_id: None,
+                last_commit_hash: None,
+                last_commit_message: None,
+                started_at: None,
+                completed_at: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+
+            // Should fail without encryption key
+            let result = terminal.set_custom_api_key("sk-test");
+            assert!(result.is_err());
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("GITCORTEX_ENCRYPTION_KEY"));
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_custom_api_key_encryption_invalid_key_length() {
+        with_var("GITCORTEX_ENCRYPTION_KEY", Some("short"), || {
+            let mut terminal = Terminal {
+                id: Uuid::new_v4().to_string(),
+                workflow_task_id: "task-1".to_string(),
+                cli_type_id: "cli-1".to_string(),
+                model_config_id: "model-1".to_string(),
+                custom_base_url: None,
+                custom_api_key: None,
+                role: None,
+                role_description: None,
+                order_index: 0,
+                status: "not_started".to_string(),
+                process_id: None,
+                pty_session_id: None,
+                session_id: None,
+                execution_process_id: None,
+                vk_session_id: None,
+                last_commit_hash: None,
+                last_commit_message: None,
+                started_at: None,
+                completed_at: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+
+            let result = terminal.set_custom_api_key("sk-test");
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("32 bytes"));
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_custom_api_key_none_returns_none() {
+        with_var(
+            "GITCORTEX_ENCRYPTION_KEY",
+            Some("12345678901234567890123456789012"),
+            || {
+                let terminal = Terminal {
+                    id: Uuid::new_v4().to_string(),
+                    workflow_task_id: "task-1".to_string(),
+                    cli_type_id: "cli-1".to_string(),
+                    model_config_id: "model-1".to_string(),
+                    custom_base_url: None,
+                    custom_api_key: None,
+                    role: None,
+                    role_description: None,
+                    order_index: 0,
+                    status: "not_started".to_string(),
+                    process_id: None,
+                    pty_session_id: None,
+                    session_id: None,
+                    execution_process_id: None,
+                    vk_session_id: None,
+                    last_commit_hash: None,
+                    last_commit_message: None,
+                    started_at: None,
+                    completed_at: None,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                };
+
+                let key = terminal.get_custom_api_key().unwrap();
+                assert!(key.is_none());
+            },
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_custom_api_key_serialization_skips_encrypted() {
+        with_var(
+            "GITCORTEX_ENCRYPTION_KEY",
+            Some("12345678901234567890123456789012"),
+            || {
+                let mut terminal = Terminal {
+                    id: Uuid::new_v4().to_string(),
+                    workflow_task_id: "task-1".to_string(),
+                    cli_type_id: "cli-1".to_string(),
+                    model_config_id: "model-1".to_string(),
+                    custom_base_url: None,
+                    custom_api_key: None,
+                    role: None,
+                    role_description: None,
+                    order_index: 0,
+                    status: "not_started".to_string(),
+                    process_id: None,
+                    pty_session_id: None,
+                    session_id: None,
+                    execution_process_id: None,
+                    vk_session_id: None,
+                    last_commit_hash: None,
+                    last_commit_message: None,
+                    started_at: None,
+                    completed_at: None,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                };
+
+                terminal.set_custom_api_key("sk-test").unwrap();
+
+                // Serialize to JSON
+                let json = serde_json::to_string(&terminal).unwrap();
+
+                // Encrypted field should not be in JSON (due to #[serde(skip)])
+                assert!(!json.contains("custom_api_key"));
+                assert!(!json.contains("sk-test"));
+            },
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_custom_api_key_dto_masks_sensitive_data() {
+        // Test that DTO never exposes API keys
+        // Note: This test will be implemented in the server crate where TerminalDto is defined
+        // Here we just verify the encryption/decryption works
+
+        with_var(
+            "GITCORTEX_ENCRYPTION_KEY",
+            Some("12345678901234567890123456789012"),
+            || {
+                let mut terminal = Terminal {
+                    id: "term-1".to_string(),
+                    workflow_task_id: "task-1".to_string(),
+                    cli_type_id: "cli-1".to_string(),
+                    model_config_id: "model-1".to_string(),
+                    custom_base_url: Some("https://api.test.com".to_string()),
+                    custom_api_key: None,
+                    role: Some("coder".to_string()),
+                    role_description: None,
+                    order_index: 0,
+                    status: "not_started".to_string(),
+                    process_id: None,
+                    pty_session_id: None,
+                    session_id: None,
+                    execution_process_id: None,
+                    vk_session_id: None,
+                    last_commit_hash: None,
+                    last_commit_message: None,
+                    started_at: None,
+                    completed_at: None,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                };
+
+                terminal.set_custom_api_key("sk-secret-key").unwrap();
+
+                // Verify the key is encrypted in storage
+                assert!(terminal.custom_api_key.is_some());
+                let stored = terminal.custom_api_key.as_ref().unwrap();
+                assert!(!stored.contains("sk-secret-key"));
+
+                // Verify we can decrypt it
+                let decrypted = terminal.get_custom_api_key().unwrap().unwrap();
+                assert_eq!(decrypted, "sk-secret-key");
+
+                // Verify serialization doesn't expose it (due to #[serde(skip)])
+                let json = serde_json::to_string(&terminal).unwrap();
+                assert!(!json.contains("sk-secret-key"));
+                assert!(!json.contains("custom_api_key"));
+            },
+        );
     }
 }
 

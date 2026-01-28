@@ -72,6 +72,7 @@ pub struct TerminalDto {
     pub cli_type_id: String,
     pub model_config_id: String,
     pub custom_base_url: Option<String>,
+    #[serde(skip_serializing)]
     pub custom_api_key: Option<String>,
     pub role: Option<String>,
     pub role_description: Option<String>,
@@ -248,7 +249,7 @@ impl TerminalDto {
             cli_type_id: terminal.cli_type_id.clone(),
             model_config_id: terminal.model_config_id.clone(),
             custom_base_url: terminal.custom_base_url.clone(),
-            custom_api_key: terminal.custom_api_key.clone(),
+            custom_api_key: None, // Never expose API keys in DTOs
             role: terminal.role.clone(),
             role_description: terminal.role_description.clone(),
             order_index: terminal.order_index,
