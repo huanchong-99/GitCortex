@@ -9,6 +9,7 @@ use axum::{
     Router,
 };
 use db::models::terminal::{Terminal, TerminalLog};
+use deployment::Deployment;
 use serde::Deserialize;
 use services::services::terminal::process::ProcessManager;
 use utils::response::ApiResponse;
@@ -31,7 +32,7 @@ pub async fn get_terminal_logs(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
     Query(query): Query<TerminalLogsQuery>,
-) -> Result<ResponseJson<ApiResponse<Vec<TerminalLog>>, ApiError>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<Vec<TerminalLog>>>, ApiError> {
     // Fetch logs from database (already in DESC order by created_at)
     let mut logs = TerminalLog::find_by_terminal(&deployment.db().pool, &id, query.limit).await?;
 
@@ -49,7 +50,7 @@ pub async fn get_terminal_logs(
 pub async fn stop_terminal(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
-) -> Result<ResponseJson<ApiResponse<String>, ApiError>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<String>>, ApiError> {
     // Fetch terminal from database
     let terminal = Terminal::find_by_id(&deployment.db().pool, &id)
         .await?
