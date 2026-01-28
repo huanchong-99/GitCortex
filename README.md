@@ -28,6 +28,8 @@ GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编�
 | **终端调试视图** | 启动后可进入原生终端验证环境配置 |
 | **工作流持久化** | 完整的 Workflow/Task/Terminal 三层数据模型 |
 | **斜杠命令系统** | 可复用的提示词预设，支持模板变量替换 |
+| **多模型支持** | 支持 Claude、Gemini、OpenAI 等多种 AI 模型 |
+| **Git 集成** | 深度集成 Git，自动管理分支和合并 |
 
 ### 架构概览
 
@@ -64,9 +66,11 @@ GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编�
 
 | 工具 | 版本要求 | 说明 |
 |------|----------|------|
-| **Rust** | `nightly-2025-12-04` | 定义在 `rust-toolchain.toml` |
-| **Node.js** | >= 18 | 前端运行时 |
+| **Rust** | 1.75+ 或 nightly-2025-12-04 | 定义在 `rust-toolchain.toml` |
+| **Node.js** | >= 20 | 前端运行时 |
 | **pnpm** | 10.13.1 | 包管理器 |
+| **CMake** | 最新版 | 构建工具（某些系统需要） |
+| **SQLite** | 3.x | 数据库（通常内置） |
 
 ### 安装
 
@@ -126,6 +130,9 @@ export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 # 运行数据库迁移
 pnpm run db:migrate
 
+# 构建后端（Rust）
+cargo build --release
+
 # 启动开发服务器
 pnpm run dev
 ```
@@ -133,6 +140,8 @@ pnpm run dev
 访问：
 - 前端：http://localhost:3000
 - 后端 API：http://localhost:3001/api
+
+**详细运维指南：** 查看 [Operations Manual](docs/ops/runbook.md) 了解生产部署、监控、升级等详细操作。
 
 ### 从现有仓库恢复
 
@@ -356,6 +365,23 @@ CC-Switch 提供原子写入机制，安全切换 CLI 模型配置：
 4. 添加任务与终端
 5. 选择模型与 CLI
 6. 启动工作流
+
+### 运维操作
+
+对于生产环境部署、数据库管理、监控和故障排查，请参阅：
+
+- **运维手册：** [docs/ops/runbook.md](docs/ops/runbook.md)
+  - 启动服务器（开发/生产模式）
+  - 数据库管理（备份/恢复/迁移）
+  - 监控与性能调优
+  - 升级和回滚流程
+
+- **故障排查：** [docs/ops/troubleshooting.md](docs/ops/troubleshooting.md)
+  - 服务器无法启动
+  - 工作流卡住
+  - API 密钥问题
+  - 终端无输出
+  - 数据库锁定
 
 ### 测试与构建
 

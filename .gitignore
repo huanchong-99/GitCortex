@@ -3,6 +3,10 @@
 worktrees/
 GitCortex/
 
+# Environment
+.env
+.env.*
+
 # Rust
 target/
 **/*.rs.bk

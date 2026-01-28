@@ -129,7 +129,7 @@ pub struct Workflow {
     pub orchestrator_base_url: Option<String>,
 
     /// Main Agent API Key (encrypted storage)
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub orchestrator_api_key: Option<String>,
 
     /// Main Agent model
@@ -1035,7 +1035,7 @@ mod encryption_tests {
                 // Serialize to JSON
                 let json = serde_json::to_string(&workflow).unwrap();
 
-                // Encrypted field should not be in JSON (due to #[serde(skip_serializing)])
+                // Encrypted field should not be in JSON (due to #[serde(skip)])
                 assert!(!json.contains("orchestrator_api_key"));
                 assert!(!json.contains("sk-test"));
             },
