@@ -502,3 +502,83 @@ async fn test_runtime_enforces_concurrent_limit() {
     // Verify only 2 workflows are running
     assert_eq!(runtime.running_count().await, 2, "Should have 2 running workflows");
 }
+
+#[tokio::test]
+async fn test_start_workflow_rolls_back_on_agent_creation_failure() {
+    // Setup in-memory database
+    let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+    sqlx::query(r"
+        CREATE TABLE workflow (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            status TEXT NOT NULL,
+            use_slash_commands INTEGER NOT NULL DEFAULT 0,
+            orchestrator_enabled INTEGER NOT NULL DEFAULT 0,
+            orchestrator_api_type TEXT,
+            orchestrator_base_url TEXT,
+            orchestrator_api_key TEXT,
+            orchestrator_model TEXT,
+            error_terminal_enabled INTEGER NOT NULL DEFAULT 0,
+            error_terminal_cli_id TEXT,
+            error_terminal_model_id TEXT,
+            merge_terminal_cli_id TEXT NOT NULL,
+            merge_terminal_model_id TEXT NOT NULL,
+            target_branch TEXT NOT NULL,
+            ready_at TEXT,
+            started_at TEXT,
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    ").execute(&pool).await.unwrap();
+
+    let db = Arc::new(DBService::new(pool.clone()));
+    let message_bus = Arc::new(super::MessageBus::new(1000));
+
+    let runtime = OrchestratorRuntime::new(db.clone(), message_bus);
+
+    // Create a workflow with invalid orchestrator config (missing API key)
+    let workflow_id = Uuid::new_v4().to_string();
+    let workflow = Workflow {
+        id: workflow_id.clone(),
+        project_id: "test-project".to_string(),
+        name: "Invalid Workflow".to_string(),
+        description: None,
+        status: "ready".to_string(),
+        use_slash_commands: false,
+        orchestrator_enabled: true, // Enabled but config is invalid
+        orchestrator_api_type: Some("openai".to_string()),
+        orchestrator_base_url: Some("https://api.openai.com/v1".to_string()),
+        orchestrator_api_key: None, // Missing API key - agent creation will fail
+        orchestrator_model: Some("gpt-4".to_string()),
+        error_terminal_enabled: false,
+        error_terminal_cli_id: None,
+        error_terminal_model_id: None,
+        merge_terminal_cli_id: "default-cli".to_string(),
+        merge_terminal_model_id: "default-model".to_string(),
+        target_branch: "main".to_string(),
+        ready_at: Some(Utc::now()),
+        started_at: None,
+        completed_at: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    workflow.create(&pool).await.unwrap();
+
+    // Try to start workflow - should fail during agent creation
+    let result = runtime.start_workflow(&workflow_id).await;
+    assert!(result.is_err(), "Should fail when agent creation fails");
+
+    // Verify workflow status is still "ready" (not "running")
+    let updated_workflow = Workflow::find_by_id(&pool, &workflow_id).await.unwrap().unwrap();
+    assert_eq!(updated_workflow.status, "ready",
+               "Workflow should remain in 'ready' status after agent creation failure");
+
+    // Verify no running workflows
+    assert_eq!(runtime.running_count().await, 0,
+               "Should have no running workflows after failed start");
+}
+

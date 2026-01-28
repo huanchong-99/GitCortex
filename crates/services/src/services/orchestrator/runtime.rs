@@ -138,20 +138,27 @@ impl OrchestratorRuntime {
             None
         };
 
-        // Update workflow status to running
-        db::models::Workflow::set_started(&self.db.pool, workflow_id).await?;
-        info!("Workflow {} marked as started", workflow_id);
-
-        // Create orchestrator agent
+        // Create orchestrator agent FIRST before changing status
         let config = orchestrator_config.unwrap_or_default();
-        let agent = Arc::new(OrchestratorAgent::new(
+        let agent = match OrchestratorAgent::new(
             config,
             workflow_id.to_string(),
             self.message_bus.clone(),
             self.db.clone(),
-        )?);
+        ) {
+            Ok(agent) => Arc::new(agent),
+            Err(e) => {
+                // Agent creation failed, workflow stays in ready state
+                error!("Failed to create orchestrator agent for workflow {}: {}", workflow_id, e);
+                return Err(e.context("Failed to create orchestrator agent"));
+            }
+        };
 
-        // Spawn agent task
+        // Update workflow status to running AFTER agent is successfully created
+        db::models::Workflow::set_started(&self.db.pool, workflow_id).await?;
+        info!("Workflow {} marked as started", workflow_id);
+
+        // Spawn agent task with error handling
         let agent_clone = agent.clone();
         let workflow_id_owned = workflow_id.to_string();
         let task_handle = tokio::spawn(async move {
