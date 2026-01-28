@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 // CSS is now imported by design scope components (LegacyDesignScope, NewDesignScope)
 import { ClickToComponent } from 'click-to-react-component';
-import { VibeKanbanWebCompanion } from 'vibe-kanban-web-companion';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
 import i18n from './i18n';
@@ -71,7 +70,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           showDialog
         >
           <ClickToComponent />
-          <VibeKanbanWebCompanion />
           <App />
           {/*<TanStackDevtools plugins={[FormDevtoolsPlugin()]} />*/}
           {/* <ReactQueryDevtools initialIsOpen={false} /> */}
