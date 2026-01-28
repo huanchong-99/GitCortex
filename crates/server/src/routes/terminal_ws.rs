@@ -130,52 +130,16 @@ async fn handle_terminal_socket(
     let terminal_id_clone = terminal_id.clone();
     let terminal_id_pty = terminal_id.clone();
 
-    // Spawn PTY writer task: receive from channel and write to PTY stdin
-    let pty_writer_task = tokio::spawn(async move {
-        while let Some(data) = pty_input_rx.recv().await {
-            // TODO: Write to actual PTY stdin
-            // For now, just log
-            tracing::debug!(
-                "PTY {} stdin: {} bytes",
-                terminal_id_pty,
-                data.len()
-            );
-        }
-    });
+    // Get process handle from ProcessManager
+    let process_handle = deployment.process_manager()
+        .get_handle(&terminal_id)
+        .await;
 
-    // Get terminal from database with timeout
-    let terminal_result = timeout(
-        Duration::from_secs(WS_CONNECT_TIMEOUT_SECS),
-        Terminal::find_by_id(&deployment.db().pool, &terminal_id)
-    ).await;
-
-    let terminal = match terminal_result {
-        Ok(Ok(Some(t))) => t,
-        Ok(Ok(None)) => {
+    let mut stdin = match process_handle {
+        Some(handle) => handle,
+        None => {
             let msg = WsMessage::Error {
-                message: "Terminal not found".to_string(),
-            };
-            let _ = ws_sender
-                .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
-                .await;
-            let _ = ws_sender.close().await;
-            return;
-        }
-        Ok(Err(e)) => {
-            tracing::error!("Database error fetching terminal: {}", e);
-            let msg = WsMessage::Error {
-                message: format!("Database error: {e}"),
-            };
-            let _ = ws_sender
-                .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
-                .await;
-            let _ = ws_sender.close().await;
-            return;
-        }
-        Err(_) => {
-            tracing::error!("Connection timeout while fetching terminal {}", terminal_id);
-            let msg = WsMessage::Error {
-                message: format!("Connection timeout after {WS_CONNECT_TIMEOUT_SECS}s"),
+                message: "Terminal process not running".to_string(),
             };
             let _ = ws_sender
                 .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
@@ -185,50 +149,50 @@ async fn handle_terminal_socket(
         }
     };
 
-    tracing::debug!(
-        "Terminal found: {} (task: {}, status: {})",
-        terminal_id,
-        terminal.workflow_task_id,
-        terminal.status
-    );
+    // Clone for tasks
+    let terminal_id_stdin = terminal_id.clone();
+    let terminal_id_stdout = terminal_id.clone();
 
-    // Get process handle from ProcessManager
-    let process_handle = deployment.process_manager()
-        .get_handle(&terminal_id)
-        .await;
-
-    if process_handle.is_none() {
-        let msg = WsMessage::Error {
-            message: "Terminal process not running".to_string(),
-        };
-        let _ = ws_sender
-            .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
-            .await;
-        let _ = ws_sender.close().await;
-        return;
-    }
+    // Spawn stdin writer task: receive from channel and write to process stdin
+    let mut stdin_writer = tokio::spawn(async move {
+        while let Some(data) = pty_input_rx.recv().await {
+            if let Some(mut stdin_handle) = stdin.stdin.as_mut() {
+                use tokio::io::AsyncWriteExt;
+                if let Err(e) = stdin_handle.write_all(&data).await {
+                    tracing::error!("Failed to write to stdin {}: {}", terminal_id_stdin, e);
+                    break;
+                }
+            }
+        }
+    });
 
     // Create channel for bi-directional communication
     let (_tx, mut rx) = mpsc::channel::<String>(100);
 
     // Clone terminal_id for use in tasks
     let terminal_id_heartbeat = terminal_id.clone();
-    let terminal_id_stdout = terminal_id.clone();
+    let terminal_id_stdout2 = terminal_id_stdout.clone();
 
     // Track last activity time for idle timeout
     let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
     let last_activity_recv = last_activity.clone();
     let last_activity_heartbeat = last_activity.clone();
 
-    // Spawn stdout reader task: read from PTY and send to WebSocket
-    let tx_clone = _tx.clone();
+    // We need to get the process handle again for stdout reading
+    // Note: This is a limitation of the current one-time-take design
+    // In production, we'd restructure to share handles or use channels
+    let tx_clone2 = _tx.clone();
+
+    // Spawn stdout reader task: read from process stdout and send to WebSocket
     let stdout_reader_task = tokio::spawn(async move {
-        // TODO: Get actual stdout handle from ProcessManager
-        // For now, simulate with periodic messages
+        // Since we can't get the handle again (one-time take), use a placeholder
+        // Real PTY integration would use channels or shared handles
         let mut interval = tokio::time::interval(Duration::from_secs(1));
         loop {
             interval.tick().await;
-            let _ = tx_clone.send(format!("PTY output from {}\n", terminal_id_stdout)).await;
+            // TODO: Read from actual stdout handle
+            // For now, send placeholder to keep connection alive
+            let _ = tx_clone2.send(format!("[Terminal output from {}]\n", terminal_id_stdout2)).await;
         }
     });
 
@@ -304,13 +268,15 @@ async fn handle_terminal_socket(
                                             }
                                         }
                                         WsMessage::Resize { cols, rows } => {
-                                            // TODO: Resize PTY
-                                            tracing::debug!(
-                                                "Terminal {} resize: {}x{}",
+                                            // Resize requires PTY support (portable-pty crate)
+                                            // For now, log the resize request
+                                            tracing::info!(
+                                                "Terminal {} resize request: {}x{} (PTY resize not yet implemented)",
                                                 terminal_id_clone,
                                                 cols,
                                                 rows
                                             );
+                                            // TODO: Implement PTY resize when PTY integration is complete
                                         }
                                         WsMessage::Output { .. } => {
                                             tracing::warn!(
@@ -377,8 +343,8 @@ async fn handle_terminal_socket(
         _ = heartbeat_task => {
             tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
         }
-        _ = pty_writer_task => {
-            tracing::debug!("PTY writer task completed for terminal {}", terminal_id);
+        _ = stdin_writer => {
+            tracing::debug!("Stdin writer task completed for terminal {}", terminal_id);
         }
         _ = stdout_reader_task => {
             tracing::debug!("Stdout reader task completed for terminal {}", terminal_id);
