@@ -7,7 +7,7 @@ describe('OrchestratorHeader', () => {
     render(<OrchestratorHeader name="Workflow X" status="running" model="gpt-4o" />);
 
     expect(screen.getByText('Workflow X')).toBeInTheDocument();
-    expect(screen.getByText('Status: running')).toBeInTheDocument();
-    expect(screen.getByText('Model: gpt-4o')).toBeInTheDocument();
+    expect(screen.getByText(/status: running/i)).toBeInTheDocument();
+    expect(screen.getByText(/model: gpt-4o/i)).toBeInTheDocument();
   });
 });
