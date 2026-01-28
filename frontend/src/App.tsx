@@ -2,12 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '@/i18n';
-import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
-import { Workflows } from '@/pages/Workflows';
-import { WorkflowDebugPage } from '@/pages/WorkflowDebug';
 import { SlashCommands } from '@/pages/SlashCommands';
-import { NormalLayout } from '@/components/layout/NormalLayout';
-import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
 import { usePostHog } from 'posthog-js/react';
 import { useAuth } from '@/hooks';
 import { usePreviousPath } from '@/hooks/usePreviousPath';
@@ -36,9 +31,15 @@ import { OnboardingDialog } from '@/components/dialogs/global/OnboardingDialog';
 import { ReleaseNotesDialog } from '@/components/dialogs/global/ReleaseNotesDialog';
 import { ClickedElementsProvider } from './contexts/ClickedElementsProvider';
 
-// Design scope components
 import { LegacyDesignScope } from '@/components/legacy-design/LegacyDesignScope';
 import { NewDesignScope } from '@/components/ui-new/scope/NewDesignScope';
+import { NormalLayout } from '@/components/layout/NormalLayout';
+import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
+
+// GitCortex pages
+import { Board } from '@/pages/Board';
+import { Pipeline } from '@/pages/Pipeline';
+import { WorkflowDebugPage } from '@/pages/WorkflowDebugPage';
 
 // New design pages
 import { Workspaces } from '@/pages/ui-new/Workspaces';
@@ -51,10 +52,8 @@ function AppContent() {
   const posthog = usePostHog();
   const { isSignedIn } = useAuth();
 
-  // Track previous path for back navigation
   usePreviousPath();
 
-  // Handle opt-in/opt-out and user identification when config loads
   useEffect(() => {
     if (!posthog || !analyticsUserId) return;
 
@@ -73,7 +72,6 @@ function AppContent() {
     let cancelled = false;
 
     const showNextStep = async () => {
-      // 1) Disclaimer - first step
       if (!config.disclaimer_acknowledged) {
         await DisclaimerDialog.show();
         if (!cancelled) {
@@ -83,7 +81,6 @@ function AppContent() {
         return;
       }
 
-      // 2) Onboarding - configure executor and editor
       if (!config.onboarding_acknowledged) {
         const result = await OnboardingDialog.show();
         if (!cancelled) {
@@ -97,7 +94,6 @@ function AppContent() {
         return;
       }
 
-      // 3) Release notes - last step
       if (config.show_release_notes) {
         await ReleaseNotesDialog.show();
         if (!cancelled) {
@@ -115,21 +111,27 @@ function AppContent() {
     };
   }, [config, isSignedIn, updateAndSaveConfig]);
 
-  // TODO: Disabled while developing FE only
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen bg-background flex items-center justify-center">
-  //       <Loader message="Loading..." size={32} />
-  //     </div>
-  //   );
-  // }
-
   return (
     <I18nextProvider i18n={i18n}>
       <ThemeProvider initialTheme={config?.theme || ThemeMode.SYSTEM}>
         <SearchProvider>
           <SentryRoutes>
-            {/* ========== LEGACY DESIGN ROUTES ========== */}
+            {/* ========== GITCORTEX DESIGN ROUTES ========== */}
+            <Route
+              path="/"
+              element={
+                <NewDesignScope>
+                  <NewDesignLayout />
+                </NewDesignScope>
+              }
+            >
+              <Route index element={<Navigate to="/board" replace />} />
+              <Route path="board" element={<Board />} />
+              <Route path="pipeline/:workflowId" element={<Pipeline />} />
+              <Route path="debug/:workflowId" element={<WorkflowDebugPage />} />
+            </Route>
+
+            {/* ========== LEGACY DESIGN ROUTES (Settings) ========== */}
             <Route
               element={
                 <LegacyDesignScope>
@@ -154,13 +156,9 @@ function AppContent() {
                 path="/mcp-servers"
                 element={<Navigate to="/settings/mcp" replace />}
               />
-              <Route
-                path="/workflows/:workflowId/debug"
-                element={<WorkflowDebugPage />}
-              />
             </Route>
 
-            {/* ========== NEW DESIGN ROUTES ========== */}
+            {/* ========== NEW DESIGN ROUTES (Workspaces) ========== */}
             <Route
               path="/workspaces"
               element={
