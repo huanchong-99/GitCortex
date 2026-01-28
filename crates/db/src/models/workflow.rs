@@ -526,6 +526,66 @@ impl Workflow {
 
         result
     }
+}
+
+/// Workflow with task and terminal counts (optimized for list view)
+#[derive(Debug, Clone, FromRow)]
+pub struct WorkflowWithCounts {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub created_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
+    pub tasks_count: i64,
+    pub terminals_count: i64,
+}
+
+impl Workflow {
+    /// Find workflows by project ID with task and terminal counts (optimized single query)
+    ///
+    /// This avoids the N+1 query problem by using LEFT JOIN and COUNT in a single query.
+    #[instrument(skip(pool), fields(project_id))]
+    pub async fn find_by_project_with_counts(
+        pool: &SqlitePool,
+        project_id: &str,
+    ) -> sqlx::Result<Vec<WorkflowWithCounts>> {
+        let start = std::time::Instant::now();
+        let result = sqlx::query_as::<_, WorkflowWithCounts>(
+            r"
+            SELECT
+                w.id,
+                w.project_id,
+                w.name,
+                w.description,
+                w.status,
+                w.created_at,
+                w.updated_at,
+                COUNT(DISTINCT t.id) as tasks_count,
+                COUNT(DISTINCT term.id) as terminals_count
+            FROM workflow w
+            LEFT JOIN workflow_task t ON w.id = t.workflow_id
+            LEFT JOIN terminal term ON t.id = term.workflow_task_id
+            WHERE w.project_id = ?
+            GROUP BY w.id
+            ORDER BY w.created_at DESC
+            ",
+        )
+        .bind(project_id)
+        .fetch_all(pool)
+        .await;
+
+        let elapsed = start.elapsed();
+        debug!(
+            project_id = %project_id,
+            count = result.as_ref().map_or(0, Vec::len),
+            duration_ms = elapsed.as_millis(),
+            "find_by_project_with_counts query completed"
+        );
+
+        result
+    }
 
     /// Update workflow status
     pub async fn update_status(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
