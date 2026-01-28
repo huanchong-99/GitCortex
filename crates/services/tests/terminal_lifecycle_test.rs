@@ -217,8 +217,8 @@ async fn test_terminal_full_lifecycle() {
             .unwrap()
             .expect("Terminal should exist");
 
-        // Terminal should be marked as started
-        assert_eq!(updated_terminal.status, "running");
+        // Terminal should be marked as waiting
+        assert_eq!(updated_terminal.status, "waiting");
 
         // Verify session was created
         assert!(

@@ -454,13 +454,15 @@ impl Terminal {
     /// Set terminal started
     pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         let now = Utc::now();
+        let status = TerminalStatus::Waiting.to_string();
         sqlx::query(
             r"
             UPDATE terminal
-            SET status = 'waiting', started_at = ?, updated_at = ?
+            SET status = ?, started_at = ?, updated_at = ?
             WHERE id = ?
             "
         )
+        .bind(status)
         .bind(now)
         .bind(now)
         .bind(id)
