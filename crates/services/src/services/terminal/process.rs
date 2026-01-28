@@ -4,6 +4,7 @@
 
 use std::{collections::HashMap, path::Path, sync::Arc};
 
+use db::DBService;
 use tokio::{
     process::{Child, Command, ChildStdout, ChildStderr, ChildStdin},
     sync::RwLock,
@@ -214,11 +215,21 @@ impl ProcessManager {
 ///
 /// Batches log lines and flushes them every second to reduce I/O overhead.
 /// Uses an in-memory buffer and periodic background task for efficient logging.
+pub const DEFAULT_MAX_BUFFER_SIZE: usize = 1000;
+
 pub struct TerminalLogger {
     /// Batch buffer for log lines
     buffer: Arc<RwLock<Vec<String>>>,
     /// Flush interval in seconds
     flush_interval_secs: u64,
+    /// Maximum number of buffered log lines before forcing a flush
+    max_buffer_size: usize,
+    /// Database service for persistence
+    db: Arc<DBService>,
+    /// Associated terminal ID
+    terminal_id: String,
+    /// Log type (stdout/stderr/system/etc.)
+    log_type: String,
 }
 
 impl TerminalLogger {
@@ -226,21 +237,69 @@ impl TerminalLogger {
     ///
     /// # Arguments
     ///
+    /// * `db` - Database service for log persistence
+    /// * `terminal_id` - Terminal ID for log association
+    /// * `log_type` - Log type for storage (stdout/stderr/system/etc.)
     /// * `flush_interval_secs` - Seconds between automatic flushes (default: 1)
     ///
     /// # Examples
     ///
     /// ```no_run
+    /// use std::sync::Arc;
+    /// use db::DBService;
     /// use services::services::terminal::process::TerminalLogger;
     ///
-    /// let logger = TerminalLogger::new(1);
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let db = Arc::new(DBService::new().await?);
+    /// let logger = TerminalLogger::new(db, "terminal-id", "stdout", 1);
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn new(flush_interval_secs: u64) -> Self {
+    pub fn new(
+        db: Arc<DBService>,
+        terminal_id: impl Into<String>,
+        log_type: impl Into<String>,
+        flush_interval_secs: u64,
+    ) -> Self {
+        Self::with_max_buffer_size(
+            db,
+            terminal_id,
+            log_type,
+            flush_interval_secs,
+            DEFAULT_MAX_BUFFER_SIZE,
+        )
+    }
+
+    pub fn with_max_buffer_size(
+        db: Arc<DBService>,
+        terminal_id: impl Into<String>,
+        log_type: impl Into<String>,
+        flush_interval_secs: u64,
+        max_buffer_size: usize,
+    ) -> Self {
         Self {
             buffer: Arc::new(RwLock::new(Vec::new())),
             flush_interval_secs,
+            max_buffer_size: max_buffer_size.max(1),
+            db,
+            terminal_id: terminal_id.into(),
+            log_type: log_type.into(),
         }
         .start_flush_task()
+    }
+
+    async fn persist_entries(
+        db: &DBService,
+        terminal_id: &str,
+        log_type: &str,
+        entries: &[String],
+    ) -> anyhow::Result<()> {
+        use db::models::terminal::TerminalLog;
+        for line in entries {
+            TerminalLog::create(&db.pool, terminal_id, log_type, line).await?;
+        }
+        Ok(())
     }
 
     /// Starts the background flush task
@@ -250,15 +309,33 @@ impl TerminalLogger {
     fn start_flush_task(mut self) -> Self {
         let buffer = Arc::clone(&self.buffer);
         let interval_secs = self.flush_interval_secs;
+        let db = Arc::clone(&self.db);
+        let terminal_id = self.terminal_id.clone();
+        let log_type = self.log_type.clone();
 
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
             loop {
                 interval.tick().await;
-                // TODO: Flush buffer to persistent storage
-                // This will be implemented when terminal logging is integrated
-                let _buffer = buffer.read().await;
-                // Placeholder: In production, write to file/database
+                let entries = {
+                    let mut buffer = buffer.write().await;
+                    if buffer.is_empty() {
+                        Vec::new()
+                    } else {
+                        buffer.drain(..).collect::<Vec<_>>()
+                    }
+                };
+
+                if entries.is_empty() {
+                    continue;
+                }
+
+                if let Err(e) = Self::persist_entries(&db, &terminal_id, &log_type, &entries).await {
+                    tracing::error!("Failed to persist terminal logs: {e}");
+                    // Re-queue failed entries at the beginning of buffer
+                    let mut buffer = buffer.write().await;
+                    buffer.splice(0..0, entries);
+                }
             }
         });
 
@@ -276,24 +353,35 @@ impl TerminalLogger {
     /// # Examples
     ///
     /// ```no_run
+    /// use std::sync::Arc;
+    /// use db::DBService;
     /// use services::services::terminal::process::TerminalLogger;
     ///
     /// # #[tokio::main]
-    /// # async fn main() {
-    /// let logger = TerminalLogger::new(1);
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let db = Arc::new(DBService::new().await?);
+    /// let logger = TerminalLogger::new(db, "terminal-id", "stdout", 1);
     /// logger.append("Hello, terminal!").await;
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn append(&self, line: &str) {
-        let mut buffer = self.buffer.write().await;
-        buffer.push(line.to_string());
+        let entries = {
+            let mut buffer = self.buffer.write().await;
+            buffer.push(line.to_string());
 
-        // Auto-flush if buffer grows too large (prevent unbounded memory growth)
-        const MAX_BUFFER_SIZE: usize = 1000;
-        if buffer.len() >= MAX_BUFFER_SIZE {
-            // TODO: Immediate flush when buffer is full
-            // This will be implemented when terminal logging is integrated
-            buffer.clear();
+            if buffer.len() < self.max_buffer_size {
+                return;
+            }
+
+            buffer.drain(..).collect::<Vec<_>>()
+        };
+
+        if let Err(e) = Self::persist_entries(&self.db, &self.terminal_id, &self.log_type, &entries).await {
+            tracing::error!("Failed to persist terminal logs: {e}");
+            // Re-queue failed entries at the beginning of buffer
+            let mut buffer = self.buffer.write().await;
+            buffer.splice(0..0, entries);
         }
     }
 }
