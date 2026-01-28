@@ -1,10 +1,12 @@
 export const paths = {
-  projects: () => '/projects',
-  projectTasks: (projectId: string) => `/projects/${projectId}/tasks`,
-  task: (projectId: string, taskId: string) =>
-    `/projects/${projectId}/tasks/${taskId}`,
-  attempt: (projectId: string, taskId: string, attemptId: string) =>
-    `/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}`,
-  attemptFull: (projectId: string, taskId: string, attemptId: string) =>
-    `/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/full`,
+  // GitCortex paths
+  board: () => '/board',
+  pipeline: (workflowId: string) => `/pipeline/${workflowId}`,
+  debug: (workflowId: string) => `/debug/${workflowId}`,
+
+  // Settings paths
+  settings: (section?: string) => (section ? `/settings/${section}` : '/settings'),
+
+  // Workspaces paths
+  workspaces: (page?: string) => (page ? `/workspaces/${page}` : '/workspaces'),
 };
