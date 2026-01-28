@@ -56,9 +56,7 @@ async fn main() -> Result<(), VibeKanbanError> {
         .init();
 
     // Create asset directory if it doesn't exist
-    if !asset_dir().exists() {
-        std::fs::create_dir_all(asset_dir())?;
-    }
+    let _asset_dir = asset_dir()?;
 
     let deployment = DeploymentImpl::new().await?;
     deployment.update_sentry_scope().await?;

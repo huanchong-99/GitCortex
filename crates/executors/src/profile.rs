@@ -210,7 +210,13 @@ impl ExecutorConfigs {
 
     /// Load executor profiles from file or defaults
     pub fn load() -> Self {
-        let profiles_path = workspace_utils::assets::profiles_path();
+        let profiles_path = match workspace_utils::assets::profiles_path() {
+            Ok(path) => path,
+            Err(e) => {
+                tracing::warn!("Failed to resolve profiles path: {}", e);
+                return Self::from_defaults();
+            }
+        };
 
         // Load defaults first
         let mut defaults = Self::from_defaults();
@@ -241,7 +247,7 @@ impl ExecutorConfigs {
 
     /// Save user profile overrides to file (only saves what differs from defaults)
     pub fn save_overrides(&self) -> Result<(), ProfileError> {
-        let profiles_path = workspace_utils::assets::profiles_path();
+        let profiles_path = workspace_utils::assets::profiles_path()?;
         let mut defaults = Self::from_defaults();
         defaults.canonicalise();
 

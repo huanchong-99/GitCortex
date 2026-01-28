@@ -85,10 +85,8 @@ pub struct DBService {
 
 impl DBService {
     pub async fn new() -> Result<DBService, Error> {
-        let database_url = format!(
-            "sqlite://{}",
-            asset_dir().join("db.sqlite").to_string_lossy()
-        );
+        let database_path = asset_dir()?.join("db.sqlite");
+        let database_url = format!("sqlite://{}", database_path.to_string_lossy());
         let options = SqliteConnectOptions::from_str(&database_url)?
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Delete);
@@ -121,10 +119,8 @@ impl DBService {
             + Sync
             + 'static,
     {
-        let database_url = format!(
-            "sqlite://{}",
-            asset_dir().join("db.sqlite").to_string_lossy()
-        );
+        let database_path = asset_dir()?.join("db.sqlite");
+        let database_url = format!("sqlite://{}", database_path.to_string_lossy());
         let options = SqliteConnectOptions::from_str(&database_url)?
             .create_if_missing(true)
             .journal_mode(SqliteJournalMode::Delete);

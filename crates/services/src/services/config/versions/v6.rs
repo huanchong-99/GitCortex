@@ -56,22 +56,34 @@ impl Config {
         };
 
         // Backup custom profiles.json if it exists (v6 migration may break compatibility)
-        let profiles_path = utils::assets::profiles_path();
-        if profiles_path.exists() {
-            let backup_name = format!(
-                "profiles_v5_backup_{}.json",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-            );
-            let backup_path = profiles_path.parent().unwrap().join(backup_name);
-
-            if let Err(e) = std::fs::rename(&profiles_path, &backup_path) {
-                tracing::warn!("Failed to backup profiles.json: {}", e);
-            } else {
-                tracing::info!("Custom profiles.json backed up to {:?}", backup_path);
-                tracing::info!("Please review your custom profiles after migration to v6");
+        match utils::assets::profiles_path() {
+            Ok(profiles_path) => {
+                if profiles_path.exists() {
+                    let backup_name = format!(
+                        "profiles_v5_backup_{}.json",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                    );
+                    if let Some(parent) = profiles_path.parent() {
+                        let backup_path = parent.join(backup_name);
+                        if let Err(e) = std::fs::rename(&profiles_path, &backup_path) {
+                            tracing::warn!("Failed to backup profiles.json: {}", e);
+                        } else {
+                            tracing::info!("Custom profiles.json backed up to {:?}", backup_path);
+                            tracing::info!("Please review your custom profiles after migration to v6");
+                        }
+                    } else {
+                        tracing::warn!(
+                            "Failed to resolve profiles backup directory for {:?}",
+                            profiles_path
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to resolve profiles path for backup: {}", e);
             }
         }
 

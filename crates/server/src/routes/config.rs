@@ -118,7 +118,14 @@ async fn update_config(
     State(deployment): State<DeploymentImpl>,
     Json(new_config): Json<Config>,
 ) -> ResponseJson<ApiResponse<Config>> {
-    let config_path = config_path();
+    let config_path = match config_path() {
+        Ok(path) => path,
+        Err(e) => {
+            return ResponseJson(ApiResponse::error(&format!(
+                "Failed to resolve config path: {e}"
+            )));
+        }
+    };
 
     // Validate git branch prefix
     if !utils::git::is_valid_branch_prefix(&new_config.git_branch_prefix) {
@@ -387,7 +394,14 @@ pub struct ProfilesContent {
 async fn get_profiles(
     State(_deployment): State<DeploymentImpl>,
 ) -> ResponseJson<ApiResponse<ProfilesContent>> {
-    let profiles_path = utils::assets::profiles_path();
+    let profiles_path = match utils::assets::profiles_path() {
+        Ok(path) => path,
+        Err(e) => {
+            return ResponseJson(ApiResponse::error(&format!(
+                "Failed to resolve profiles path: {e}"
+            )));
+        }
+    };
 
     // Use cached data to ensure consistency with runtime and PUT updates
     let profiles = ExecutorConfigs::get_cached();
