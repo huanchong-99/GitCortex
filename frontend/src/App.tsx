@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '@/i18n';
-import { Projects } from '@/pages/Projects';
-import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
 import { Workflows } from '@/pages/Workflows';
 import { WorkflowDebugPage } from '@/pages/WorkflowDebug';
@@ -132,16 +130,6 @@ function AppContent() {
         <SearchProvider>
           <SentryRoutes>
             {/* ========== LEGACY DESIGN ROUTES ========== */}
-            {/* VS Code full-page logs route (outside NormalLayout for minimal UI) */}
-            <Route
-              path="/projects/:projectId/tasks/:taskId/attempts/:attemptId/full"
-              element={
-                <LegacyDesignScope>
-                  <FullAttemptLogsPage />
-                </LegacyDesignScope>
-              }
-            />
-
             <Route
               element={
                 <LegacyDesignScope>
@@ -149,13 +137,6 @@ function AppContent() {
                 </LegacyDesignScope>
               }
             >
-              <Route path="/" element={<Projects />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/projects/:projectId" element={<Projects />} />
-              <Route
-                path="/projects/:projectId/tasks"
-                element={<ProjectTasks />}
-              />
               <Route path="/commands" element={<SlashCommands />} />
               <Route path="/settings/*" element={<SettingsLayout />}>
                 <Route index element={<Navigate to="general" replace />} />
@@ -172,18 +153,6 @@ function AppContent() {
               <Route
                 path="/mcp-servers"
                 element={<Navigate to="/settings/mcp" replace />}
-              />
-              <Route
-                path="/projects/:projectId/tasks/:taskId"
-                element={<ProjectTasks />}
-              />
-              <Route
-                path="/projects/:projectId/tasks/:taskId/attempts/:attemptId"
-                element={<ProjectTasks />}
-              />
-              <Route
-                path="/projects/:projectId/workflows"
-                element={<Workflows />}
               />
               <Route
                 path="/workflows/:workflowId/debug"
