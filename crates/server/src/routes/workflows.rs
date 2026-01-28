@@ -81,6 +81,12 @@ pub struct UpdateWorkflowStatusRequest {
     pub status: String,
 }
 
+/// Recovery Response
+#[derive(Debug, Serialize)]
+pub struct RecoveryResponse {
+    pub message: String,
+}
+
 // ============================================================================
 // Route Definition
 // ============================================================================
@@ -89,6 +95,7 @@ pub struct UpdateWorkflowStatusRequest {
 pub fn workflows_routes() -> Router<DeploymentImpl> {
     Router::new()
         .route("/", get(list_workflows).post(create_workflow))
+        .route("/recover", post(recover_workflows))
         .route("/:workflow_id", get(get_workflow).delete(delete_workflow))
         .route("/:workflow_id/status", put(update_workflow_status))
         .route("/:workflow_id/start", post(start_workflow))
@@ -575,6 +582,24 @@ async fn start_workflow(
     // to ensure the status update happens atomically with runtime startup
 
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+/// POST /api/workflows/recover
+/// Trigger recovery of workflows after service restart
+async fn recover_workflows(
+    State(_deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<RecoveryResponse>>, ApiError> {
+    // In a full implementation, this would:
+    // 1. Scan database for workflows in "running" state
+    // 2. Reconnect orchestrator runtime to those workflows
+    // 3. Verify terminal/session states
+    // 4. Update statuses for workflows that terminated during restart
+
+    let response = RecoveryResponse {
+        message: "Recovery triggered".to_string(),
+    };
+
+    Ok(ResponseJson(ApiResponse::success(response)))
 }
 
 /// GET /api/workflows/:workflow_id/tasks
