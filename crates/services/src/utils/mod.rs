@@ -2,8 +2,8 @@
 ///
 /// Rules:
 /// - Convert to lowercase
-/// - Replace spaces with hyphens
-/// - Remove special characters (keep alphanumeric, hyphens)
+/// - Keep only ASCII alphanumeric characters
+/// - Replace all other characters (spaces, special chars, CJK) with hyphens
 /// - Remove consecutive hyphens
 /// - Trim hyphens from start and end
 pub fn slugify(input: &str) -> String {
@@ -11,12 +11,11 @@ pub fn slugify(input: &str) -> String {
         .to_lowercase()
         .chars()
         .fold(String::new(), |mut acc, c| {
-            if c.is_alphanumeric() {
+            if c.is_ascii_alphanumeric() {
                 acc.push(c);
-            } else if c.is_whitespace() {
-                if !acc.ends_with('-') {
-                    acc.push('-');
-                }
+            } else if !acc.ends_with('-') && !acc.is_empty() {
+                // Non-ASCII-alphanumeric characters become hyphens (deduplicated)
+                acc.push('-');
             }
             acc
         })
@@ -56,7 +55,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "TODO: Fix slugify special chars handling"]
     fn test_slugify_special_chars() {
         assert_eq!(slugify("Hello@World!"), "hello-world");
         assert_eq!(slugify("Test#1$Feature"), "test-1-feature");
@@ -73,7 +71,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "TODO: Fix slugify Chinese chars handling"]
     fn test_slugify_chinese_chars() {
         // Chinese characters should be removed (not alphanumeric)
         assert_eq!(slugify("用户登录 User Login"), "user-login");

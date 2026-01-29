@@ -54,11 +54,10 @@ async fn create_test_terminal_data(
 ) -> (String, String, String) {
     let project_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO project (id, name, base_dir, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)"
     )
     .bind(project_id)
     .bind("test-project")
-    .bind("/tmp/test")
     .bind(Utc::now())
     .bind(Utc::now())
     .execute(&db.pool)
@@ -67,12 +66,12 @@ async fn create_test_terminal_data(
 
     let task_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO task (id, project_id, user_prompt, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO tasks (id, project_id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
     )
     .bind(task_id)
     .bind(project_id)
-    .bind("test prompt")
-    .bind("created")
+    .bind("test task")
+    .bind("todo")
     .bind(Utc::now())
     .bind(Utc::now())
     .execute(&db.pool)
@@ -81,7 +80,7 @@ async fn create_test_terminal_data(
 
     let workspace_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO workspace (id, task_id, branch, created_at, updated_at, archived, pinned) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO workspaces (id, task_id, branch, created_at, updated_at, archived, pinned) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(workspace_id)
     .bind(task_id)
@@ -96,13 +95,14 @@ async fn create_test_terminal_data(
 
     let workflow_id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO workflow (id, project_id, name, base_dir, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO workflow (id, project_id, name, status, merge_terminal_cli_id, merge_terminal_model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&workflow_id)
     .bind(project_id)
     .bind("test-wf")
-    .bind("/tmp/test")
     .bind("created")
+    .bind("cli-claude-code")
+    .bind("model-claude-sonnet")
     .bind(Utc::now())
     .bind(Utc::now())
     .execute(&db.pool)
@@ -179,7 +179,7 @@ async fn test_terminal_full_lifecycle() {
     let launcher = TerminalLauncher::new(
         Arc::clone(&db),
         cc_switch,
-        process_manager,
+        process_manager.clone(),
         working_dir.path().to_path_buf(),
     );
 

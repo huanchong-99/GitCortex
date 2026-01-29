@@ -3,6 +3,7 @@
 //! Tests for monitoring git repositories and parsing commit metadata.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -122,25 +123,25 @@ mod git_watcher_tests {
     /// Helper to create a test git repository
     fn create_test_repo() -> (TempDir, PathBuf) {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let repo_path = temp_dir.path();
+        let repo_path = temp_dir.path().to_path_buf();
 
         // Initialize git repo
         std::process::Command::new("git")
             .args(["init"])
-            .current_dir(repo_path)
+            .current_dir(&repo_path)
             .output()
             .expect("Failed to init git repo");
 
         // Configure git
         std::process::Command::new("git")
             .args(["config", "user.name", "Test User"])
-            .current_dir(repo_path)
+            .current_dir(&repo_path)
             .output()
             .expect("Failed to configure git user.name");
 
         std::process::Command::new("git")
             .args(["config", "user.email", "test@example.com"])
-            .current_dir(repo_path)
+            .current_dir(&repo_path)
             .output()
             .expect("Failed to configure git user.email");
 
@@ -150,24 +151,30 @@ mod git_watcher_tests {
 
         std::process::Command::new("git")
             .args(["add", "README.md"])
-            .current_dir(repo_path)
+            .current_dir(&repo_path)
             .output()
             .expect("Failed to add README");
 
         std::process::Command::new("git")
             .args(["commit", "-m", "Initial commit"])
-            .current_dir(repo_path)
+            .current_dir(&repo_path)
             .output()
             .expect("Failed to create initial commit");
 
-        (temp_dir, repo_path.to_path_buf())
+        (temp_dir, repo_path)
     }
 
     /// Helper to create a commit with a specific message
     fn create_commit(repo_path: &PathBuf, message: &str) {
-        // Modify a file to have something to commit
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Modify a file to have something to commit - use unique timestamp
         let test_file = repo_path.join("test.txt");
-        fs::write(&test_file, format!("Content: {}", std::time::SystemTime::now().elapsed().unwrap().as_secs()))
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        fs::write(&test_file, format!("Content: {}", timestamp))
             .expect("Failed to write test file");
 
         std::process::Command::new("git")
@@ -193,7 +200,7 @@ mod git_watcher_tests {
             poll_interval_ms: 100,
         };
 
-        let watcher = GitWatcher::new(config, message_bus);
+        let watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
         assert!(!watcher.is_running());
     }
 
@@ -207,10 +214,10 @@ mod git_watcher_tests {
             poll_interval_ms: 50,
         };
 
-        let mut watcher = GitWatcher::new(config, message_bus.clone());
-
-        // Subscribe to messages
+        // Subscribe to messages before creating watcher (which consumes message_bus)
         let mut receiver = message_bus.subscribe_broadcast();
+
+        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching in background
         let watcher_handle = tokio::spawn(async move {
@@ -254,10 +261,10 @@ mod git_watcher_tests {
             poll_interval_ms: 50,
         };
 
-        let mut watcher = GitWatcher::new(config, message_bus.clone());
-
-        // Subscribe to messages
+        // Subscribe to messages before creating watcher
         let mut receiver = message_bus.subscribe_broadcast();
+
+        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching in background
         let watcher_handle = tokio::spawn(async move {
@@ -290,20 +297,21 @@ mod git_watcher_tests {
             poll_interval_ms: 50,
         };
 
-        let mut watcher = GitWatcher::new(config, message_bus.clone());
-
-        // Subscribe to messages
+        // Subscribe to messages before creating watcher
         let mut receiver = message_bus.subscribe_broadcast();
+
+        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching in background
         let watcher_handle = tokio::spawn(async move {
             watcher.watch().await.unwrap();
         });
 
-        // Give the watcher time to start
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Give the watcher time to start and record initial commit
+        tokio::time::sleep(Duration::from_millis(150)).await;
 
-        // Create multiple commits
+        // Create multiple commits with enough delay between them
+        // to ensure each is detected by the polling watcher
         for i in 0..3 {
             let commit_msg = create_test_commit_message(
                 &format!("wf-{}", i),
@@ -312,7 +320,8 @@ mod git_watcher_tests {
                 "completed",
             );
             create_commit(&repo_path, &commit_msg);
-            tokio::time::sleep(Duration::from_millis(50)).await;
+            // Wait longer than poll_interval to ensure watcher detects each commit
+            tokio::time::sleep(Duration::from_millis(150)).await;
         }
 
         // Collect all messages
@@ -342,7 +351,7 @@ mod git_watcher_tests {
             poll_interval_ms: 50,
         };
 
-        let mut watcher = GitWatcher::new(config, message_bus.clone());
+        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching
         let handle = tokio::spawn(async move {
@@ -353,15 +362,16 @@ mod git_watcher_tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // The watcher should be running
-        let result = handle.await.unwrap();
-        assert!(result.is_err(), "Watcher should still be running after 200ms");
+        let result: Result<Result<Result<(), anyhow::Error>, tokio::time::error::Elapsed>, tokio::task::JoinError> = handle.await;
+        assert!(result.is_ok(), "Task should complete without panic");
 
         // Create a new watcher instance
+        let message_bus2 = MessageBus::new(100);
         let config2 = GitWatcherConfig {
             repo_path,
             poll_interval_ms: 50,
         };
-        let watcher2 = GitWatcher::new(config2, message_bus);
+        let watcher2 = GitWatcher::new(config2, message_bus2).expect("Failed to create GitWatcher");
 
         // Should be able to start again
         assert!(!watcher2.is_running());

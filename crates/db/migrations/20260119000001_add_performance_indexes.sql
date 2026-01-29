@@ -88,17 +88,17 @@ WHERE process_status = 'processed' AND processed_at IS NOT NULL;
 -- Terminal Log Table Indexes
 -- ----------------------------------------------------------------------------
 
--- Index for streaming recent logs (last 1 hour)
--- Optimizes: SELECT * FROM terminal_log WHERE terminal_id = ? AND created_at > datetime('now', '-1 hour') ORDER BY created_at DESC
+-- Composite index for streaming logs by terminal (sorted by time)
+-- Optimizes: SELECT * FROM terminal_log WHERE terminal_id = ? ORDER BY created_at DESC
+-- Note: Partial indexes with datetime() are not supported in SQLite (non-deterministic)
 CREATE INDEX IF NOT EXISTS idx_terminal_log_streaming
-ON terminal_log(terminal_id, created_at DESC)
-WHERE created_at > datetime('now', '-1 hour');
+ON terminal_log(terminal_id, created_at DESC);
 
--- Index for cleanup of old logs (older than 7 days)
--- Optimizes: DELETE FROM terminal_log WHERE created_at < datetime('now', '-7 days')
+-- Index for cleanup operations on logs (sorted by time)
+-- Optimizes: DELETE FROM terminal_log WHERE created_at < ?
+-- Note: Partial indexes with datetime() are not supported in SQLite (non-deterministic)
 CREATE INDEX IF NOT EXISTS idx_terminal_log_cleanup
-ON terminal_log(created_at)
-WHERE created_at < datetime('now', '-7 days');
+ON terminal_log(created_at);
 
 -- ----------------------------------------------------------------------------
 -- Update Table Statistics

@@ -7,6 +7,7 @@ use uuid::Uuid;
 use chrono::Utc;
 use tokio::sync::Mutex;
 use async_trait::async_trait;
+use sqlx::sqlite::SqlitePoolOptions;
 
 use crate::services::cc_switch::CCSwitch;
 use crate::services::orchestrator::TerminalCoordinator;
@@ -18,105 +19,28 @@ use db::{
     },
 };
 
-// Helper function to create test database
+// Helper function to create test database with real migrations
 async fn setup_test_db() -> DBService {
-    let db = DBService::new().await.expect("Failed to create test DB");
+    // Create in-memory SQLite pool
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .expect("Failed to create in-memory pool");
 
-    // Initialize schema
-    sqlx::query(
-        r"
-        CREATE TABLE workflow (
-            id TEXT PRIMARY KEY,
-            project_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT,
-            status TEXT NOT NULL DEFAULT 'created',
-            use_slash_commands INTEGER NOT NULL DEFAULT 0,
-            orchestrator_enabled INTEGER NOT NULL DEFAULT 0,
-            orchestrator_api_type TEXT,
-            orchestrator_base_url TEXT,
-            orchestrator_api_key TEXT,
-            orchestrator_model TEXT,
-            error_terminal_enabled INTEGER NOT NULL DEFAULT 0,
-            error_terminal_cli_id TEXT,
-            error_terminal_model_id TEXT,
-            merge_terminal_cli_id TEXT NOT NULL,
-            merge_terminal_model_id TEXT NOT NULL,
-            target_branch TEXT NOT NULL DEFAULT 'main',
-            ready_at TEXT,
-            started_at TEXT,
-            completed_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
+    // Run real migrations from db crate
+    let migrations_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../db/migrations");
 
-        CREATE TABLE workflow_task (
-            id TEXT PRIMARY KEY,
-            workflow_id TEXT NOT NULL,
-            vk_task_id TEXT,
-            name TEXT NOT NULL,
-            description TEXT,
-            branch TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending',
-            order_index INTEGER NOT NULL,
-            started_at TEXT,
-            completed_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (workflow_id) REFERENCES workflow(id)
-        );
+    let migrator = sqlx::migrate::Migrator::new(migrations_path)
+        .await
+        .expect("Failed to load migrations");
 
-        CREATE TABLE cli_type (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            display_name TEXT NOT NULL,
-            detect_command TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
+    migrator.run(&pool)
+        .await
+        .expect("Failed to run migrations");
 
-        CREATE TABLE model_config (
-            id TEXT PRIMARY KEY,
-            cli_type_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            display_name TEXT NOT NULL,
-            api_model_id TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (cli_type_id) REFERENCES cli_type(id)
-        );
-
-        CREATE TABLE terminal (
-            id TEXT PRIMARY KEY,
-            workflow_task_id TEXT NOT NULL,
-            cli_type_id TEXT NOT NULL,
-            model_config_id TEXT NOT NULL,
-            custom_base_url TEXT,
-            custom_api_key TEXT,
-            role TEXT,
-            role_description TEXT,
-            order_index INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'not_started',
-            process_id INTEGER,
-            pty_session_id TEXT,
-            vk_session_id TEXT,
-            last_commit_hash TEXT,
-            last_commit_message TEXT,
-            started_at TEXT,
-            completed_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (workflow_task_id) REFERENCES workflow_task(id),
-            FOREIGN KEY (cli_type_id) REFERENCES cli_type(id),
-            FOREIGN KEY (model_config_id) REFERENCES model_config(id)
-        );
-        "
-    )
-    .execute(&db.pool)
-    .await
-    .expect("Failed to create schema");
-
-    db
+    DBService { pool }
 }
 
 // Helper function to create CLI type and model config
@@ -201,7 +125,24 @@ async fn create_workflow_with_terminals(
     terminals_per_task: usize,
 ) -> (String, Vec<String>) {
     let workflow_id = Uuid::new_v4().to_string();
+    let project_id = Uuid::new_v4();
     let now = Utc::now();
+
+    // First create a project (required by workflow foreign key)
+    sqlx::query(
+        r"INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+    )
+    .bind(project_id)
+    .bind("Test Project")
+    .bind(now)
+    .bind(now)
+    .execute(&db.pool)
+    .await
+    .expect("Failed to create project");
+
+    // Use pre-seeded cli_type and model_config from migrations
+    let merge_cli_id = "cli-claude-code";
+    let merge_model_id = "model-claude-sonnet";
 
     // Create workflow
     sqlx::query(
@@ -218,7 +159,7 @@ async fn create_workflow_with_terminals(
         "
     )
     .bind(&workflow_id)
-    .bind("test-project")
+    .bind(project_id)
     .bind("Test Workflow")
     .bind("Test Description")
     .bind("created")
@@ -231,8 +172,8 @@ async fn create_workflow_with_terminals(
     .bind(false)
     .bind::<Option<String>>(None)
     .bind::<Option<String>>(None)
-    .bind("merge-cli")
-    .bind("merge-model")
+    .bind(merge_cli_id)
+    .bind(merge_model_id)
     .bind("main")
     .bind(now)
     .bind(now)
@@ -269,14 +210,12 @@ async fn create_workflow_with_terminals(
         .await
         .expect("Failed to create task");
 
-        // Create terminals for this task
+        // Create terminals for this task using pre-seeded cli_type and model_config
         for term_idx in 0..terminals_per_task {
             let terminal_id = Uuid::new_v4().to_string();
-            let (cli, model) = create_cli_and_model(
-                db,
-                &format!("cli-{}", task_idx),
-                &format!("model-{}", term_idx),
-            ).await;
+            // Use pre-seeded cli_type and model_config from migrations
+            let cli_type_id = "cli-claude-code";
+            let model_config_id = "model-claude-sonnet";
 
             sqlx::query(
                 r"
@@ -289,8 +228,8 @@ async fn create_workflow_with_terminals(
             )
             .bind(&terminal_id)
             .bind(&task_id)
-            .bind(&cli.id)
-            .bind(&model.id)
+            .bind(cli_type_id)
+            .bind(model_config_id)
             .bind("https://api.test.com")
             .bind("test-api-key")
             .bind(format!("role-{}", term_idx))
@@ -355,7 +294,6 @@ impl MockCCSwitch {
 }
 
 #[tokio::test]
-#[ignore = "TODO: Fix terminal coordinator test"]
 async fn test_terminal_startup_sequence_succeeds() {
     let db = setup_test_db().await;
     let mock_cc_switch = Arc::new(MockCCSwitch::new());
@@ -385,7 +323,6 @@ async fn test_terminal_startup_sequence_succeeds() {
 }
 
 #[tokio::test]
-#[ignore = "TODO: Fix terminal coordinator test"]
 async fn test_terminal_startup_switches_models_serially() {
     let db = setup_test_db().await;
     let mock_cc_switch = Arc::new(MockCCSwitch::new());
@@ -418,7 +355,6 @@ async fn test_terminal_startup_switches_models_serially() {
 }
 
 #[tokio::test]
-#[ignore = "TODO: Fix terminal coordinator test"]
 async fn test_empty_workflow_no_terminals() {
     let db = setup_test_db().await;
     let mock_cc_switch = Arc::new(MockCCSwitch::new());
@@ -426,7 +362,24 @@ async fn test_empty_workflow_no_terminals() {
 
     // Create workflow with no tasks
     let workflow_id = Uuid::new_v4().to_string();
+    let project_id = Uuid::new_v4();
     let now = Utc::now();
+
+    // First create a project (required by workflow foreign key)
+    sqlx::query(
+        r"INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+    )
+    .bind(project_id)
+    .bind("Test Project")
+    .bind(now)
+    .bind(now)
+    .execute(&db.pool)
+    .await
+    .expect("Failed to create project");
+
+    // Use pre-seeded cli_type and model_config from migrations
+    let merge_cli_id = "cli-claude-code";
+    let merge_model_id = "model-claude-sonnet";
 
     sqlx::query(
         r"
@@ -442,7 +395,7 @@ async fn test_empty_workflow_no_terminals() {
         "
     )
     .bind(&workflow_id)
-    .bind("test-project")
+    .bind(project_id)
     .bind("Test Workflow")
     .bind("Test Description")
     .bind("created")
@@ -455,8 +408,8 @@ async fn test_empty_workflow_no_terminals() {
     .bind(false)
     .bind::<Option<String>>(None)
     .bind::<Option<String>>(None)
-    .bind("merge-cli")
-    .bind("merge-model")
+    .bind(merge_cli_id)
+    .bind(merge_model_id)
     .bind("main")
     .bind(now)
     .bind(now)
@@ -470,7 +423,6 @@ async fn test_empty_workflow_no_terminals() {
 }
 
 #[tokio::test]
-#[ignore = "TODO: Fix terminal coordinator test"]
 async fn test_single_terminal_startup() {
     let db = setup_test_db().await;
     let mock_cc_switch = Arc::new(MockCCSwitch::new());

@@ -171,12 +171,14 @@ impl TerminalLauncher {
                         run_reason: ExecutionProcessRunReason::CodingAgent,
                     };
 
-                    match ExecutionProcess::create(
+                    let exec_process_result = ExecutionProcess::create(
                         &self.db.pool,
                         &create_exec_process,
                         Uuid::new_v4(),
                         &[], // Empty repo states for terminal launch
-                    ).await {
+                    ).await;
+
+                    let (sess_id, exec_id) = match exec_process_result {
                         Ok(exec_process) => {
                             tracing::info!("Created execution process {} for terminal {}", exec_process.id, terminal_id);
                             (Some(session.id.to_string()), Some(exec_process.id.to_string()))
@@ -185,7 +187,20 @@ impl TerminalLauncher {
                             tracing::error!("Failed to create execution process for terminal {}: {}", terminal_id, e);
                             (Some(session.id.to_string()), None)
                         }
+                    };
+
+                    // Update terminal with session binding immediately after creation
+                    // This ensures session is bound even if process spawn fails later
+                    if let Err(e) = Terminal::update_session(
+                        &self.db.pool,
+                        &terminal_id,
+                        sess_id.as_deref(),
+                        exec_id.as_deref(),
+                    ).await {
+                        tracing::error!("Failed to update terminal session binding: {}", e);
                     }
+
+                    (sess_id, exec_id)
                 }
                 Err(e) => {
                     tracing::error!("Failed to create session for terminal {}: {}", terminal_id, e);
@@ -277,10 +292,8 @@ impl TerminalLauncher {
         &self,
         workflow_task_id: &str,
     ) -> anyhow::Result<Option<uuid::Uuid>> {
-        use sqlx::Row as _;
-
-        // Get vk_task_id from workflow_task
-        let task_id: Option<String> = sqlx::query_scalar(
+        // Get vk_task_id from workflow_task - stored as BLOB (UUID bytes)
+        let task_id: Option<uuid::Uuid> = sqlx::query_scalar(
             "SELECT vk_task_id FROM workflow_task WHERE id = ?"
         )
         .bind(workflow_task_id)
@@ -288,15 +301,12 @@ impl TerminalLauncher {
         .await?
         .flatten();
 
-        let Some(task_id_str) = task_id else {
+        let Some(task_uuid) = task_id else {
             return Ok(None);
         };
 
-        // Parse task_id as UUID
-        let task_uuid = uuid::Uuid::parse_str(&task_id_str)?;
-
-        // Get workspace_id from workspace table
-        let workspace_id: Option<String> = sqlx::query_scalar(
+        // Get workspace_id from workspace table - id is also BLOB (UUID bytes)
+        let workspace_id: Option<uuid::Uuid> = sqlx::query_scalar(
             "SELECT id FROM workspaces WHERE task_id = ? LIMIT 1"
         )
         .bind(task_uuid)
@@ -304,13 +314,7 @@ impl TerminalLauncher {
         .await?
         .flatten();
 
-        match workspace_id {
-            Some(ws_id_str) => {
-                let ws_uuid = uuid::Uuid::parse_str(&ws_id_str)?;
-                Ok(Some(ws_uuid))
-            }
-            None => Ok(None),
-        }
+        Ok(workspace_id)
     }
 
     /// Stop all terminals for a workflow

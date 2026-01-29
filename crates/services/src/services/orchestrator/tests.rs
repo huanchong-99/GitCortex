@@ -1210,7 +1210,6 @@ mod orchestrator_tests {
     }
 
     #[tokio::test]
-    #[ignore = "TODO: Fix orchestrator git event test"]
     async fn test_handle_git_event_terminal_completed() {
         let (db, workflow, terminal) = setup_test_workflow().await;
 
@@ -1247,12 +1246,16 @@ mod orchestrator_tests {
             &format!("workflow:{}", workflow.id)
         ).await;
 
-        // Create valid commit message
+        // Create valid commit message (KV format, not JSON)
         let commit_message = format!(
             r#"Terminal completed
 
 ---METADATA---
-{{"workflowId":"{}","taskId":"{}","terminalId":"{}","status":"completed","reviewedTerminal":null,"issues":null,"filesChanged":[{{"path":"src/main.rs","changeType":"modified"}}]}}"#,
+workflow_id: {}
+task_id: {}
+terminal_id: {}
+status: completed
+next_action: continue"#,
             workflow.id, terminal.workflow_task_id, terminal.id
         );
 
@@ -1282,7 +1285,6 @@ mod orchestrator_tests {
     }
 
     #[tokio::test]
-    #[ignore = "TODO: Fix orchestrator git event test"]
     async fn test_handle_git_event_workflow_mismatch() {
         let (db, workflow, _terminal) = setup_test_workflow().await;
 
@@ -1314,13 +1316,15 @@ mod orchestrator_tests {
         )
         .unwrap();
 
-        // Create commit with different workflow ID
-        let commit_message = r#"
-Terminal completed
+        // Create commit with different workflow ID (KV format)
+        let commit_message = r#"Terminal completed
 
 ---METADATA---
-{"workflowId":"different-workflow","taskId":"task-1","terminalId":"term-1","status":"completed","reviewedTerminal":null,"issues":null,"filesChanged":[]}
-"#;
+workflow_id: different-workflow
+task_id: task-1
+terminal_id: term-1
+status: completed
+next_action: continue"#;
 
         // Should succeed but do nothing (workflow mismatch)
         let result = agent.handle_git_event(

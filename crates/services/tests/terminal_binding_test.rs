@@ -3,19 +3,29 @@ use db::{DBService, models::Terminal, models::session::Session, models::executio
 use uuid::Uuid;
 use chrono::Utc;
 use std::sync::Arc;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use std::str::FromStr;
 
 #[tokio::test]
 async fn test_terminal_launch_creates_session() {
-    // Setup: Create in-memory DB and launcher
-    let pool = sqlx::SqlitePoolOptions::new()
-        .connect(":memory:")
+    // Setup encryption key for API key encryption
+    unsafe {
+        std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012");
+    }
+
+    // Setup: Create in-memory DB with migrations
+    let options = SqliteConnectOptions::from_str(":memory:")
+        .unwrap()
+        .pragma("foreign_keys", "0");
+
+    let pool = SqlitePoolOptions::new()
+        .connect_with(options)
         .await
         .unwrap();
 
     // Run migrations
-    let migrations_path = std::path::PathBuf::from("../../crates/db/migrations");
-    let m = sqlx::migrate::Migrator::new(migrations_path).await.unwrap();
-    m.run(&pool).await.unwrap();
+    let migrator = sqlx::migrate!("../db/migrations");
+    migrator.run(&pool).await.unwrap();
 
     let db = Arc::new(DBService { pool: pool.clone() });
     let cc_switch = Arc::new(services::services::cc_switch::CCSwitchService::new(Arc::clone(&db)));
@@ -23,37 +33,38 @@ async fn test_terminal_launch_creates_session() {
     let working_dir = std::env::temp_dir();
     let launcher = TerminalLauncher::new(Arc::clone(&db), cc_switch, process_manager, working_dir);
 
-    // Create test project, task, workspace
+    // Create test project
     let project_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO project (id, name, base_dir, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)"
     )
     .bind(project_id)
     .bind("test-project")
-    .bind("/tmp")
     .bind(Utc::now())
     .bind(Utc::now())
     .execute(&pool)
     .await
     .unwrap();
 
+    // Create task
     let task_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO task (id, project_id, user_prompt, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO tasks (id, project_id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
     )
     .bind(task_id)
     .bind(project_id)
-    .bind("test prompt")
-    .bind("created")
+    .bind("test task")
+    .bind("todo")
     .bind(Utc::now())
     .bind(Utc::now())
     .execute(&pool)
     .await
     .unwrap();
 
+    // Create workspace
     let workspace_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO workspace (id, task_id, branch, created_at, updated_at, archived, pinned) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO workspaces (id, task_id, branch, created_at, updated_at, archived, pinned) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(workspace_id)
     .bind(task_id)
@@ -66,58 +77,35 @@ async fn test_terminal_launch_creates_session() {
     .await
     .unwrap();
 
-    // Create test CLI type
-    let cli_type_id = Uuid::new_v4().to_string();
-    sqlx::query(
-        "INSERT INTO cli_type (id, name, display_name, detect_command, is_system, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    )
-    .bind(&cli_type_id)
-    .bind("echo-cli")
-    .bind("Echo CLI")
-    .bind("echo test")
-    .bind(false)
-    .bind(Utc::now())
-    .execute(&pool)
-    .await
-    .unwrap();
+    // Use pre-seeded CLI type and model config from migrations
+    let cli_type_id = "cli-claude-code";
+    let model_config_id = "model-claude-sonnet";
 
-    // Create model config
-    let model_config_id = Uuid::new_v4().to_string();
-    sqlx::query(
-        "INSERT INTO model_config (id, name, provider, model_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-    )
-    .bind(&model_config_id)
-    .bind("test-model")
-    .bind("openai")
-    .bind("gpt-4")
-    .bind(Utc::now())
-    .bind(Utc::now())
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    // Create workflow and task
+    // Create workflow (requires project_id foreign key)
     let wf_id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO workflow (id, name, base_dir, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO workflow (id, project_id, name, status, merge_terminal_cli_id, merge_terminal_model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&wf_id)
+    .bind(project_id)
     .bind("test-wf")
-    .bind("/tmp")
     .bind("created")
+    .bind(cli_type_id)
+    .bind(model_config_id)
     .bind(Utc::now())
     .bind(Utc::now())
     .execute(&pool)
     .await
     .unwrap();
 
+    // Create workflow task
     let workflow_task_id = Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO workflow_task (id, workflow_id, vk_task_id, name, branch, order_index, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&workflow_task_id)
     .bind(&wf_id)
-    .bind(task_id)  // Link to the task we created earlier
+    .bind(task_id)
     .bind("task-1")
     .bind("main")
     .bind(0)
@@ -130,11 +118,11 @@ async fn test_terminal_launch_creates_session() {
 
     // Create terminal
     let terminal_id = Uuid::new_v4().to_string();
-    let terminal = Terminal {
+    let mut terminal = Terminal {
         id: terminal_id.clone(),
         workflow_task_id,
-        cli_type_id,
-        model_config_id,
+        cli_type_id: cli_type_id.to_string(),
+        model_config_id: model_config_id.to_string(),
         custom_base_url: None,
         custom_api_key: None,
         role: None,
@@ -153,6 +141,8 @@ async fn test_terminal_launch_creates_session() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
+    // Set encrypted API key for cc_switch
+    terminal.set_custom_api_key("test-api-key-12345").expect("Failed to set API key");
     Terminal::create(&pool, &terminal).await.unwrap();
 
     // Execute launch_terminal

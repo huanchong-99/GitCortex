@@ -6,17 +6,22 @@ use services::services::terminal::process::TerminalLogger;
 use uuid::Uuid;
 
 async fn setup_db() -> Arc<DBService> {
-    use sqlx::sqlite::SqlitePoolOptions;
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use std::str::FromStr;
+
+    // Disable foreign keys for testing (simplifies test setup)
+    let options = SqliteConnectOptions::from_str(":memory:")
+        .unwrap()
+        .pragma("foreign_keys", "0");
 
     let pool = SqlitePoolOptions::new()
-        .connect(":memory:")
+        .connect_with(options)
         .await
         .unwrap();
 
-    let m = sqlx::migrate::Migrator::new(std::path::PathBuf::from("../../crates/db/migrations"))
-        .await
-        .unwrap();
-    m.run(&pool).await.unwrap();
+    // Run migrations - path is relative to the crate root (services)
+    let migrator = sqlx::migrate!("../db/migrations");
+    migrator.run(&pool).await.unwrap();
 
     Arc::new(DBService { pool })
 }
@@ -28,10 +33,9 @@ async fn create_terminal(db: &DBService) -> String {
 
     // Create project first (workflow requires project_id)
     let project_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO project (id, name, base_dir, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
         .bind(project_id)
         .bind("test-project")
-        .bind("/tmp/test")
         .bind(Utc::now())
         .bind(Utc::now())
         .execute(&db.pool)
