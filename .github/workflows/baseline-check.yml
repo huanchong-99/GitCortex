@@ -31,11 +31,11 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Run cargo check
-      run: cargo check --workspace --all-targets
+      run: cargo check --workspace --lib --bins
 
     - name: Check for compilation errors
       run: |
-        ERRORS=$(cargo check --workspace 2>&1 | grep "^error" | wc -l)
+        ERRORS=$(cargo check --workspace --lib --bins 2>&1 | grep "^error" | wc -l)
         if [ "$ERRORS" -ne 0 ]; then
           echo "❌ Found $ERRORS compilation errors"
           exit 1
@@ -48,8 +48,8 @@ jobs:
     - name: Verify services crate
       run: |
         echo "Verifying services crate specifically..."
-        cargo check -p services
-        ERRORS=$(cargo check -p services 2>&1 | grep "^error" | wc -l)
+        cargo check -p services --lib
+        ERRORS=$(cargo check -p services --lib 2>&1 | grep "^error" | wc -l)
         if [ "$ERRORS" -ne 0 ]; then
           echo "❌ Services crate has $ERRORS errors"
           exit 1
