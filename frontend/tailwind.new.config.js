@@ -76,6 +76,11 @@ module.exports = {
           repeating-linear-gradient(-45deg, hsl(var(--text-low) / 0.4) 0 2px, transparent 1px 12px),
           linear-gradient(hsl(var(--bg-primary)), hsl(var(--bg-primary)))
         `,
+        'mesh': `
+          radial-gradient(1200px 520px at 10% -10%, hsl(var(--mesh-1) / 0.7), transparent 60%),
+          radial-gradient(900px 480px at 95% 5%, hsl(var(--mesh-2) / 0.6), transparent 55%),
+          radial-gradient(700px 400px at 50% 110%, hsl(var(--mesh-3) / 0.55), transparent 60%)
+        `,
       },
       ringColor: {
         DEFAULT: 'hsl(var(--brand))',
@@ -103,12 +108,21 @@ module.exports = {
         primary: "hsl(var(--bg-primary))",
         secondary: "hsl(var(--bg-secondary))",
         panel: "hsl(var(--bg-panel))",
+        // Surfaces
+        'surface-1': "hsl(var(--surface-1))",
+        'surface-2': "hsl(var(--surface-2))",
+        'surface-3': "hsl(var(--surface-3))",
+        sidebar: "hsl(var(--sidebar))",
+        glass: "hsl(var(--glass))",
         // Accent colors
         brand: "hsl(var(--brand))",
         'brand-hover': "hsl(var(--brand-hover))",
         'brand-secondary': "hsl(var(--brand-secondary))",
         error: "hsl(var(--error))",
         success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        info: "hsl(var(--info))",
+        neutral: "hsl(var(--neutral))",
         // Text on accent
         'on-brand': "hsl(var(--text-on-brand))",
         // shadcn-style colors (used by @apply in CSS base layer)
@@ -129,7 +143,14 @@ module.exports = {
         base: getSize('base'),
         half: getSize('base', 0.5),
       },
+      boxShadow: {
+        soft: 'var(--shadow-soft)',
+        medium: 'var(--shadow-panel)',
+        strong: 'var(--shadow-float)',
+      },
       fontFamily: {
+        display: ['"Space Grotesk"', '"IBM Plex Sans"', '"Noto Emoji"', 'sans-serif'],
+        'space-grotesk': ['"Space Grotesk"', '"IBM Plex Sans"', '"Noto Emoji"', 'sans-serif'],
         'ibm-plex-sans': ['"IBM Plex Sans"', '"Noto Emoji"', 'sans-serif'],
         'ibm-plex-mono': ['"IBM Plex Mono"', 'monospace'],
       },
@@ -156,6 +177,10 @@ module.exports = {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        'float-in': {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -165,6 +190,7 @@ module.exports = {
         'running-dot-2': 'running-dot 1.4s ease-in-out 0.2s infinite',
         'running-dot-3': 'running-dot 1.4s ease-in-out 0.4s infinite',
         'border-flash': 'border-flash 2s linear infinite',
+        'float-in': 'float-in 0.24s ease-out',
       },
     },
   },

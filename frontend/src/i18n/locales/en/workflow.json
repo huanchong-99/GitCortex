@@ -1,4 +1,26 @@
 {
+  "board": {
+    "eyebrow": "Kanban",
+    "title": "Workflow board",
+    "description": "Drag tasks between columns to track progress.",
+    "focus": {
+      "active": "Viewing active workflow",
+      "none": "No workflow selected"
+    }
+  },
+  "status": {
+    "created": "Created",
+    "ready": "Ready",
+    "starting": "Starting",
+    "running": "Running",
+    "paused": "Paused",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "idle": "Idle",
+    "queued": "Queued",
+    "unknown": "Unknown"
+  },
   "wizard": {
     "title": "Create Workflow",
     "buttons": {
@@ -330,8 +352,14 @@
       "starting": "Starting",
       "waiting": "Waiting",
       "working": "Working",
+      "running": "Running",
+      "active": "Active",
+      "paused": "Paused",
       "completed": "Completed",
-      "failed": "Failed"
+      "failed": "Failed",
+      "killed": "Killed",
+      "idle": "Idle",
+      "unknown": "Unknown"
     }
   },
   "workflowDebug": {

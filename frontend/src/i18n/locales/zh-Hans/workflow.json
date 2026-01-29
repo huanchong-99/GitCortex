@@ -1,4 +1,26 @@
 {
+  "board": {
+    "eyebrow": "看板",
+    "title": "工作流看板",
+    "description": "在列之间拖动任务以跟踪进度。",
+    "focus": {
+      "active": "正在查看活动工作流",
+      "none": "未选择工作流"
+    }
+  },
+  "status": {
+    "created": "已创建",
+    "ready": "就绪",
+    "starting": "启动中",
+    "running": "运行中",
+    "paused": "已暂停",
+    "completed": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消",
+    "idle": "未开始",
+    "queued": "排队中",
+    "unknown": "未知"
+  },
   "wizard": {
     "title": "创建工作流",
     "buttons": {
@@ -316,8 +338,14 @@
       "starting": "启动中",
       "waiting": "等待中",
       "working": "执行中",
+      "running": "运行中",
+      "active": "活跃",
+      "paused": "已暂停",
       "completed": "已完成",
-      "failed": "失败"
+      "failed": "失败",
+      "killed": "已终止",
+      "idle": "未开始",
+      "unknown": "未知"
     }
   },
   "workflowDebug": {

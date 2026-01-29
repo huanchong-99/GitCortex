@@ -92,12 +92,13 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
+    lng: 'zh-Hans', // Set Chinese as default language (user requirement)
     fallbackLng: {
       'zh-TW': ['zh-Hant'],
       'zh-HK': ['zh-Hant'],
       'zh-MO': ['zh-Hant'],
       zh: ['zh-Hans'], // Map generic Chinese to Simplified Chinese
-      default: ['en'],
+      default: ['zh-Hans'], // Changed to default to Chinese (user requirement)
     },
     defaultNS: 'common',
     debug: isDev,
