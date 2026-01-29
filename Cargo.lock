@@ -4945,6 +4945,8 @@ dependencies = [
  "executors",
  "futures-util",
  "git2",
+ "http-body-util",
+ "hyper",
  "ignore",
  "local-deployment",
  "mime_guess",
@@ -4969,6 +4971,7 @@ dependencies = [
  "sqlx",
  "strip-ansi-escapes",
  "strum",
+ "tempfile",
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",
@@ -4979,6 +4982,7 @@ dependencies = [
  "url",
  "utils",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]

@@ -55,6 +55,11 @@ dotenv = "0.15"
 
 [dev-dependencies]
 serial_test = "3.0"
+wiremock = "0.6"
+tower = { version = "0.5", features = ["util"] }
+hyper = "1.0"
+http-body-util = "0.1"
+tempfile = "3.10"
 
 [features]
 default = []
