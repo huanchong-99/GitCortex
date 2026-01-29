@@ -9,6 +9,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: true
+  # Required for aws-lc-sys compilation from source
+  AWS_LC_SYS_NO_PREGENERATED_SRC: "1"
+  # Force libgit2-sys to use system library
+  LIBGIT2_SYS_USE_PKG_CONFIG: "1"
 
 jobs:
   check:
@@ -18,8 +22,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # Install system dependencies required for native crates
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          pkg-config \
+          libsqlite3-dev \
+          libgit2-dev \
+          zlib1g-dev \
+          cmake \
+          ninja-build \
+          clang \
+          libclang-dev \
+          perl \
+          nasm \
+          libssl-dev
+
+    # Use the toolchain specified in rust-toolchain.toml (nightly-2025-12-04)
     - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly-2025-12-04
+        components: rustfmt, clippy
 
     - name: Cache dependencies
       uses: actions/cache@v4
@@ -33,25 +58,5 @@ jobs:
     - name: Run cargo check
       run: cargo check --workspace --lib --bins
 
-    - name: Check for compilation errors
-      run: |
-        ERRORS=$(cargo check --workspace --lib --bins 2>&1 | grep "^error" | wc -l)
-        if [ "$ERRORS" -ne 0 ]; then
-          echo "❌ Found $ERRORS compilation errors"
-          exit 1
-        fi
-        echo "✅ Zero compilation errors"
-
     - name: Run cargo test
       run: cargo test --workspace --lib
-
-    - name: Verify services crate
-      run: |
-        echo "Verifying services crate specifically..."
-        cargo check -p services --lib
-        ERRORS=$(cargo check -p services --lib 2>&1 | grep "^error" | wc -l)
-        if [ "$ERRORS" -ne 0 ]; then
-          echo "❌ Services crate has $ERRORS errors"
-          exit 1
-        fi
-        echo "✅ Services crate clean"
