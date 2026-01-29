@@ -12,6 +12,7 @@
     "frontend:check": "cd frontend && npm run check",
     "backend:lint": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
     "backend:dev": "BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) npm run backend:dev:watch",
+    "backend:dev:standalone": "cargo run -p server",
     "backend:check": "cargo check",
     "backend:dev:watch": "DISABLE_WORKTREE_ORPHAN_CLEANUP=1 RUST_LOG=debug cargo watch -w crates -x 'run --bin server'",
     "dev:qa": "export FRONTEND_PORT=$(node scripts/setup-dev-environment.js frontend) && export BACKEND_PORT=$(node scripts/setup-dev-environment.js backend) && concurrently \"npm run backend:dev:watch:qa\" \"npm run frontend:dev\"",

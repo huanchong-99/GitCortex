@@ -29,7 +29,7 @@ export function Board() {
             <WorkflowKanbanBoard workflowId={selectedWorkflowId} />
           </div>
         </div>
-        <TerminalActivityPanel />
+        <TerminalActivityPanel workflowId={selectedWorkflowId} />
         <StatusBar />
       </main>
     </div>

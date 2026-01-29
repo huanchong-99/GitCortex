@@ -40,6 +40,7 @@ import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
 import { Board } from '@/pages/Board';
 import { Pipeline } from '@/pages/Pipeline';
 import { WorkflowDebugPage } from '@/pages/WorkflowDebugPage';
+import { Workflows } from '@/pages/Workflows';
 
 // New design pages
 import { Workspaces } from '@/pages/ui-new/Workspaces';
@@ -127,6 +128,7 @@ function AppContent() {
             >
               <Route index element={<Navigate to="/board" replace />} />
               <Route path="board" element={<Board />} />
+              <Route path="wizard" element={<Workflows />} />
               <Route path="pipeline/:workflowId" element={<Pipeline />} />
               <Route path="debug/:workflowId" element={<WorkflowDebugPage />} />
             </Route>
