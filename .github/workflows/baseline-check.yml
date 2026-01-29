@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: true
+  # Force static linking for aws-lc-sys (override .cargo/config.toml)
+  AWS_LC_SYS_STATIC: "1"
   # Required for aws-lc-sys compilation from source
   AWS_LC_SYS_NO_PREGENERATED_SRC: "1"
   # Force libgit2-sys to use system library
