@@ -17,7 +17,7 @@ pub fn cli_types_routes() -> Router<DeploymentImpl> {
     Router::new()
         .route("/", get(list_cli_types))
         .route("/detect", get(detect_cli_types))
-        .route("/:cli_type_id/models", get(list_models_for_cli))
+        .route("/{cli_type_id}/models", get(list_models_for_cli))
 }
 
 /// GET /api/cli_types

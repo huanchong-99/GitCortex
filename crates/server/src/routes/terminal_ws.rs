@@ -90,7 +90,7 @@ pub enum WsMessage {
 
 /// Create terminal WebSocket routes
 pub fn terminal_ws_routes() -> Router<DeploymentImpl> {
-    Router::new().route("/:terminal_id", get(terminal_ws_handler))
+    Router::new().route("/{terminal_id}", get(terminal_ws_handler))
 }
 
 // ============================================================================

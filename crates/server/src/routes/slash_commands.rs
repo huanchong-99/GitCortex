@@ -222,5 +222,5 @@ pub async fn delete_command_preset(
 pub fn slash_commands_routes() -> Router<DeploymentImpl> {
     Router::new()
         .route("/presets/commands", get(list_command_presets).post(create_command_preset))
-        .route("/presets/commands/:id", put(update_command_preset).delete(delete_command_preset))
+        .route("/presets/commands/{id}", put(update_command_preset).delete(delete_command_preset))
 }

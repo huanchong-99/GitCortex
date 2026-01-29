@@ -83,6 +83,6 @@ pub async fn stop_terminal(
 /// Mounts all terminal-related API endpoints
 pub fn terminal_routes() -> Router<DeploymentImpl> {
     Router::new()
-        .route("/:id/logs", get(get_terminal_logs))
-        .route("/:id/stop", post(stop_terminal))
+        .route("/{id}/logs", get(get_terminal_logs))
+        .route("/{id}/stop", post(stop_terminal))
 }
