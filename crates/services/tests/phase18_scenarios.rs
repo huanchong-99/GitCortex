@@ -6,20 +6,43 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::Utc;
-use db::models::{Terminal, Workflow, WorkflowTask};
+use db::models::{CliType, ModelConfig, Terminal, Workflow, WorkflowTask};
 use db::DBService;
+use once_cell::sync::Lazy;
 use services::services::git_watcher::CommitMetadata;
 use services::services::orchestrator::{MessageBus, OrchestratorRuntime, TerminalCompletionEvent, TerminalCompletionStatus, BusMessage};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use tokio::sync::{Mutex, OwnedMutexGuard};
 use uuid::Uuid;
 
-fn set_encryption_key() {
+/// RAII guard for environment variable cleanup with mutex lock
+struct EnvGuard {
+    _lock: OwnedMutexGuard<()>,
+    prev: Option<String>,
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        match self.prev.take() {
+            Some(value) => unsafe { std::env::set_var("GITCORTEX_ENCRYPTION_KEY", value) },
+            None => unsafe { std::env::remove_var("GITCORTEX_ENCRYPTION_KEY") },
+        }
+    }
+}
+
+/// Global mutex to serialize environment variable access across tests
+static ENV_MUTEX: Lazy<Arc<Mutex<()>>> = Lazy::new(|| Arc::new(Mutex::new(())));
+
+async fn set_encryption_key() -> EnvGuard {
+    let lock = ENV_MUTEX.clone().lock_owned().await;
+    let prev = std::env::var("GITCORTEX_ENCRYPTION_KEY").ok();
     unsafe {
         std::env::set_var(
             "GITCORTEX_ENCRYPTION_KEY",
             "12345678901234567890123456789012",
         );
     }
+    EnvGuard { _lock: lock, prev }
 }
 
 async fn setup_db() -> Arc<DBService> {
@@ -66,6 +89,31 @@ async fn seed_project(db: &DBService) -> String {
     project_id.to_string()
 }
 
+/// Assert that CLI type and model config exist in database
+async fn assert_cli_model_exists(
+    db: &DBService,
+    cli_type_id: &str,
+    model_config_id: &str,
+) {
+    let cli_type = CliType::find_by_id(&db.pool, cli_type_id)
+        .await
+        .unwrap();
+    assert!(
+        cli_type.is_some(),
+        "Missing CLI type seed: {}",
+        cli_type_id
+    );
+
+    let model_config = ModelConfig::find_by_id(&db.pool, model_config_id)
+        .await
+        .unwrap();
+    assert!(
+        model_config.is_some(),
+        "Missing model config seed: {}",
+        model_config_id
+    );
+}
+
 async fn create_ready_workflow(
     db: &DBService,
     project_id: &str,
@@ -76,6 +124,9 @@ async fn create_ready_workflow(
     // Use pre-seeded CLI type and model config from migrations
     let cli_type_id = "cli-claude-code";
     let model_config_id = "model-claude-sonnet";
+
+    // Verify seed data exists
+    assert_cli_model_exists(db, cli_type_id, model_config_id).await;
 
     sqlx::query(
         r#"INSERT INTO workflow (
@@ -181,7 +232,7 @@ async fn create_terminal(
 
 #[tokio::test]
 async fn test_workflow_status_transition_created_to_ready() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -219,7 +270,7 @@ async fn test_workflow_status_transition_created_to_ready() {
 
 #[tokio::test]
 async fn test_workflow_with_tasks_and_terminals() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -318,7 +369,7 @@ async fn test_message_bus_terminal_completion_event() {
 
 #[tokio::test]
 async fn test_terminal_status_update_on_failure() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -337,7 +388,7 @@ async fn test_terminal_status_update_on_failure() {
 
 #[tokio::test]
 async fn test_multiple_terminals_in_task() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -361,7 +412,7 @@ async fn test_multiple_terminals_in_task() {
 
 #[tokio::test]
 async fn test_workflow_task_status_transitions() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -385,7 +436,7 @@ async fn test_workflow_task_status_transitions() {
 
 #[tokio::test]
 async fn test_orchestrator_runtime_creation() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let message_bus = Arc::new(MessageBus::new(1000));
 
@@ -398,7 +449,7 @@ async fn test_orchestrator_runtime_creation() {
 
 #[tokio::test]
 async fn test_workflow_find_by_project() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -413,7 +464,7 @@ async fn test_workflow_find_by_project() {
 
 #[tokio::test]
 async fn test_terminal_last_commit_update() {
-    set_encryption_key();
+    let _env = set_encryption_key().await;
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
@@ -435,4 +486,101 @@ async fn test_terminal_last_commit_update() {
     let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
     assert_eq!(terminal.last_commit_hash, Some("abc123def456".to_string()));
     assert_eq!(terminal.last_commit_message, Some("feat: implement feature X".to_string()));
+}
+
+// ============================================================================
+// Task 18.2 Tests - Recovery Scenarios
+// ============================================================================
+
+#[tokio::test]
+async fn test_terminal_recovery_marks_waiting_as_failed() {
+    let _env = set_encryption_key().await;
+    let db = setup_db().await;
+    let project_id = seed_project(&db).await;
+
+    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let task_id = create_workflow_task(&db, &workflow_id, "Recovery Test Task", 0).await;
+    let terminal_id = create_terminal(&db, &task_id, 0).await;
+
+    // Simulate terminal left in "waiting" status (e.g., after crash)
+    // Note: set_started sets status to "waiting" (terminal is waiting for work)
+    Terminal::set_started(&db.pool, &terminal_id).await.unwrap();
+
+    // Verify terminal is in waiting state
+    let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
+    assert_eq!(terminal.status, "waiting");
+    assert!(terminal.started_at.is_some());
+
+    // Simulate recovery: mark orphaned waiting terminals as failed
+    // This would typically be done by OrchestratorRuntime on startup
+    let orphaned_terminals = Terminal::find_by_task(&db.pool, &task_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|t| t.status == "waiting")
+        .collect::<Vec<_>>();
+
+    assert_eq!(orphaned_terminals.len(), 1, "Should have one waiting terminal");
+
+    // Mark as failed (recovery action)
+    for terminal in orphaned_terminals {
+        Terminal::set_completed(&db.pool, &terminal.id, "failed").await.unwrap();
+    }
+
+    // Verify recovery completed
+    let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
+    assert_eq!(terminal.status, "failed");
+    assert!(terminal.completed_at.is_some());
+}
+
+#[tokio::test]
+async fn test_workflow_recovery_with_mixed_terminal_states() {
+    let _env = set_encryption_key().await;
+    let db = setup_db().await;
+    let project_id = seed_project(&db).await;
+
+    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let task_id = create_workflow_task(&db, &workflow_id, "Mixed State Task", 0).await;
+
+    // Create 3 terminals with different states
+    let terminal1_id = create_terminal(&db, &task_id, 0).await;
+    let terminal2_id = create_terminal(&db, &task_id, 1).await;
+    let terminal3_id = create_terminal(&db, &task_id, 2).await;
+
+    // Set different states: completed, waiting (orphaned), not_started
+    Terminal::set_started(&db.pool, &terminal1_id).await.unwrap();
+    Terminal::set_completed(&db.pool, &terminal1_id, "completed").await.unwrap();
+
+    Terminal::set_started(&db.pool, &terminal2_id).await.unwrap();
+    // terminal2 left in "waiting" state (simulating crash)
+
+    // terminal3 stays in "not_started"
+
+    // Verify initial states
+    let t1 = Terminal::find_by_id(&db.pool, &terminal1_id).await.unwrap().unwrap();
+    let t2 = Terminal::find_by_id(&db.pool, &terminal2_id).await.unwrap().unwrap();
+    let t3 = Terminal::find_by_id(&db.pool, &terminal3_id).await.unwrap().unwrap();
+
+    assert_eq!(t1.status, "completed");
+    assert_eq!(t2.status, "waiting");
+    assert_eq!(t3.status, "not_started");
+
+    // Recovery: find and mark orphaned waiting terminals
+    let terminals = Terminal::find_by_task(&db.pool, &task_id).await.unwrap();
+    let orphaned: Vec<_> = terminals.iter().filter(|t| t.status == "waiting").collect();
+
+    assert_eq!(orphaned.len(), 1);
+    assert_eq!(orphaned[0].id, terminal2_id);
+
+    // Mark orphaned as failed
+    Terminal::set_completed(&db.pool, &terminal2_id, "failed").await.unwrap();
+
+    // Verify final states
+    let t1 = Terminal::find_by_id(&db.pool, &terminal1_id).await.unwrap().unwrap();
+    let t2 = Terminal::find_by_id(&db.pool, &terminal2_id).await.unwrap().unwrap();
+    let t3 = Terminal::find_by_id(&db.pool, &terminal3_id).await.unwrap().unwrap();
+
+    assert_eq!(t1.status, "completed", "Completed terminal should remain completed");
+    assert_eq!(t2.status, "failed", "Orphaned waiting terminal should be marked failed");
+    assert_eq!(t3.status, "not_started", "Not started terminal should remain unchanged");
 }
