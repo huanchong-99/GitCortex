@@ -229,7 +229,7 @@ mod tests {
             id: "test-sh".to_string(),
             name: "sh".to_string(),
             display_name: "Shell".to_string(),
-            detect_command: "sh --version".to_string(),
+            detect_command: "sh -c true".to_string(),
             install_command: None,
             install_guide_url: None,
             config_file_path: None,

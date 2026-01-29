@@ -123,11 +123,34 @@ impl CCSwitchService {
 mod tests {
     use super::*;
     use db::DBService;
+    use sqlx::sqlite::SqlitePoolOptions;
     use std::sync::Arc;
+
+    // Test helper to create in-memory database
+    async fn setup_test_db() -> Arc<DBService> {
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
+
+        // Run migrations
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let migrations_dir = manifest_dir
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .join("db/migrations");
+
+        sqlx::migrate::Migrator::new(migrations_dir)
+            .await
+            .unwrap()
+            .run(&pool)
+            .await
+            .unwrap();
+
+        Arc::new(DBService { pool })
+    }
 
     #[tokio::test]
     async fn test_switch_for_terminals_method_exists() {
-        let db = Arc::new(DBService::new().await.unwrap());
+        let db = setup_test_db().await;
         let service = CCSwitchService::new(db);
 
         // Verify method exists (compile-time check)
@@ -137,7 +160,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_cli_method_exists() {
-        let db = Arc::new(DBService::new().await.unwrap());
+        let db = setup_test_db().await;
         let service = CCSwitchService::new(db);
 
         // Verify method exists (compile-time check)
