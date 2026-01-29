@@ -89,6 +89,7 @@ pub async fn require_api_token(req: Request, next: Next) -> Result<Response, Sta
 mod tests {
     use super::*;
     use axum::{body::Body, http::{Request, StatusCode}, routing::get, Router};
+    use serial_test::serial;
     use tower::ServiceExt;
 
     /// Test handler that returns OK
@@ -104,6 +105,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_allows_requests_when_token_unset() {
         // Ensure API token is not set
         unsafe { std::env::remove_var("GITCORTEX_API_TOKEN") };
@@ -125,6 +127,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_rejects_requests_without_authorization_header() {
         // Set API token
         unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "test-secret-token") };
@@ -149,6 +152,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_rejects_requests_with_invalid_token() {
         // Set API token
         unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "correct-token") };
@@ -174,6 +178,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_allows_requests_with_valid_token() {
         // Set API token
         unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "test-secret-token") };
@@ -199,6 +204,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_rejects_malformed_authorization_header() {
         // Set API token
         unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "test-token") };
@@ -224,6 +230,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_token_case_sensitive() {
         // Set API token
         unsafe { std::env::set_var("GITCORTEX_API_TOKEN", "SecretToken") };

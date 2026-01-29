@@ -53,6 +53,9 @@ tower = "0.5"
 [build-dependencies]
 dotenv = "0.15"
 
+[dev-dependencies]
+serial_test = "3.0"
+
 [features]
 default = []
 qa-mode = ["services/qa-mode", "executors/qa-mode"]

@@ -42,7 +42,7 @@ async fn setup_test_db() -> Arc<DBService> {
         .unwrap();
 
     // Run migrations - path is relative to the crate root (services)
-    let migrator = sqlx::migrate!("../../db/migrations");
+    let migrator = sqlx::migrate!("../db/migrations");
     migrator.run(&pool).await.unwrap();
 
     Arc::new(DBService { pool })

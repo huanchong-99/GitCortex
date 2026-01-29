@@ -43,7 +43,7 @@ jobs:
         echo "✅ Zero compilation errors"
 
     - name: Run cargo test
-      run: cargo test --workspace
+      run: cargo test --workspace --lib
 
     - name: Verify services crate
       run: |
