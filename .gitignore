@@ -7,6 +7,17 @@ GitCortex/
 .env
 .env.*
 
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Logs & local data
+logs/
+*.log
+dev_assets/
+*.sqlite
+*.db
+
 # Rust
 target/
 **/*.rs.bk
