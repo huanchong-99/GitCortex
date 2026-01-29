@@ -35,3 +35,7 @@ target/
 # OS
 .DS_Store
 Thumbs.db
+nul
+
+# Local dev config
+.dev-ports.json
