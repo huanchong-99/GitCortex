@@ -25,6 +25,7 @@ pub struct FolderPickerResponse {
 }
 
 /// Opens a native folder picker dialog and returns the selected path.
+#[cfg(windows)]
 pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerResponse>>, ApiError> {
     let result = tokio::task::spawn_blocking(|| {
         let dialog = rfd::FileDialog::new()
@@ -45,6 +46,12 @@ pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerRespon
             cancelled: true,
         }))),
     }
+}
+
+/// Stub for non-Windows platforms - folder picker is not supported.
+#[cfg(not(windows))]
+pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerResponse>>, ApiError> {
+    Err(ApiError::Internal("Folder picker is only supported on Windows".to_string()))
 }
 
 pub async fn list_directory(
