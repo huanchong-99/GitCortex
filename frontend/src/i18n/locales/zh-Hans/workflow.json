@@ -246,6 +246,7 @@
     },
     "params": {
       "title": "自定义参数（JSON 格式）",
+      "advancedTitle": "高级：JSON 参数",
       "description": "可选：配置 JSON 格式的自定义参数，留空则不传递额外参数。",
       "edit": "编辑参数",
       "configured": "已配置",
@@ -257,6 +258,11 @@
         "invalidJson": "JSON 语法错误，请输入有效的 JSON 对象，例如：{\"key\": \"value\"}",
         "notObject": "请输入有效的 JSON 对象，例如：{\"key\": \"value\"}"
       }
+    },
+    "commands": {
+      "title": "附加斜杠命令",
+      "description": "添加在此预设之后执行的额外斜杠命令（每行一个）。",
+      "placeholder": "/compact\n/review"
     }
   },
   "step6": {

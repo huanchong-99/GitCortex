@@ -104,26 +104,38 @@ const formatCommandLabel = (name: string): string =>
 interface PresetEditorModalProps {
   presetLabel: string;
   initialDescription: string;
+  initialCommands: string[];
   initialParams: Record<string, unknown> | null;
-  onSave: (description: string, params: Record<string, unknown>) => void;
+  onSave: (description: string, commands: string[], params: Record<string, unknown>) => void;
   onCancel: () => void;
 }
 
 const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
   presetLabel,
   initialDescription,
+  initialCommands,
   initialParams,
   onSave,
   onCancel,
 }) => {
   const { t } = useTranslation('workflow');
   const [description, setDescription] = useState(initialDescription);
+  const [commandsText, setCommandsText] = useState(initialCommands.join('\n'));
+  const [showAdvanced, setShowAdvanced] = useState(initialParams !== null && Object.keys(initialParams).length > 0);
   const [jsonText, setJsonText] = useState(
     initialParams ? JSON.stringify(initialParams, null, 2) : ''
   );
   const [error, setError] = useState<string | null>(null);
 
   const validateAndSave = () => {
+    // Parse commands (one per line, filter empty lines)
+    const commands = commandsText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => line.startsWith('/') ? line : `/${line}`); // Ensure slash prefix
+
+    // Parse JSON params if provided
     try {
       const trimmedJson = jsonText.trim();
       const parsed = trimmedJson === '' ? {} : JSON.parse(trimmedJson);
@@ -131,7 +143,7 @@ const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
         setError(t('step5.params.error.notObject'));
         return;
       }
-      onSave(description.trim(), parsed as Record<string, unknown>);
+      onSave(description.trim(), commands, parsed as Record<string, unknown>);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('step5.params.error.invalidJson'));
     }
@@ -139,7 +151,7 @@ const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-primary rounded-lg border p-double max-w-2xl w-full mx-4 shadow-lg">
+      <div className="bg-primary rounded-lg border p-double max-w-2xl w-full mx-4 shadow-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-base">
           <h3 className="text-lg text-high font-semibold">
@@ -177,40 +189,68 @@ const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
           </div>
         </div>
 
-        {/* Parameters Section */}
+        {/* Additional Commands Section */}
         <div className="mb-base">
           <label className="block text-sm text-low mb-half">
-            {t('step5.params.title')}
+            {t('step5.commands.title')}
           </label>
           <p className="text-xs text-low mb-half">
-            {t('step5.params.description')}
+            {t('step5.commands.description')}
           </p>
-        </div>
-
-        {/* JSON Editor */}
-        <div className="relative">
           <textarea
-            value={jsonText}
+            value={commandsText}
             onChange={(e) => {
-              setJsonText(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.ctrlKey) {
-                validateAndSave();
-              }
+              setCommandsText(e.target.value);
             }}
             className={cn(
-              'w-full h-48 px-base py-base bg-secondary rounded border text-base text-normal font-ibm-plex-mono',
-              'focus:outline-none focus:ring-1 focus:ring-brand',
-              error && 'border-error'
+              'w-full h-24 px-base py-base bg-secondary rounded border text-base text-normal font-ibm-plex-mono',
+              'focus:outline-none focus:ring-1 focus:ring-brand'
             )}
-            placeholder={'{\n  "key": "value"\n}'}
+            placeholder={t('step5.commands.placeholder')}
             spellCheck={false}
           />
-          {error && (
-            <div className="mt-base text-sm text-error">
-              {error}
+        </div>
+
+        {/* Advanced: JSON Parameters (collapsible) */}
+        <div className="mb-base">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-half text-sm text-low hover:text-normal"
+          >
+            {showAdvanced ? <ChevronUp className="size-icon-sm" /> : <ChevronDown className="size-icon-sm" />}
+            {t('step5.params.advancedTitle')}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-base">
+              <p className="text-xs text-low mb-half">
+                {t('step5.params.description')}
+              </p>
+              <textarea
+                value={jsonText}
+                onChange={(e) => {
+                  setJsonText(e.target.value);
+                  setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.ctrlKey) {
+                    validateAndSave();
+                  }
+                }}
+                className={cn(
+                  'w-full h-32 px-base py-base bg-secondary rounded border text-base text-normal font-ibm-plex-mono',
+                  'focus:outline-none focus:ring-1 focus:ring-brand',
+                  error && 'border-error'
+                )}
+                placeholder={'{\n  "key": "value"\n}'}
+                spellCheck={false}
+              />
+              {error && (
+                <div className="mt-half text-sm text-error">
+                  {error}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -372,6 +412,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
   const handleSavePreset = (
     presetId: string,
     description: string,
+    commands: string[],
     params: Record<string, unknown>
   ) => {
     const preset = allPresets.find((p) => p.id === presetId);
@@ -388,6 +429,17 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
       delete nextDescriptions[presetId];
     }
 
+    // Update additional commands
+    const currentCommands = config.additionalCommands ?? {};
+    const nextCommands = { ...currentCommands };
+
+    // Only store if not empty
+    if (commands.length > 0) {
+      nextCommands[presetId] = commands;
+    } else {
+      delete nextCommands[presetId];
+    }
+
     // Update custom params
     const currentParams = config.customParams ?? {};
     const nextParams = { ...currentParams };
@@ -401,6 +453,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
 
     onUpdate({
       customDescriptions: Object.keys(nextDescriptions).length > 0 ? nextDescriptions : undefined,
+      additionalCommands: Object.keys(nextCommands).length > 0 ? nextCommands : undefined,
       customParams: Object.keys(nextParams).length > 0 ? nextParams : undefined,
     });
     setEditingPresetId(null);
@@ -484,7 +537,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                         <div className="text-base text-high truncate font-ibm-plex-mono">
                           {getPresetLabel(preset)}
                         </div>
-                        {(config.customParams?.[preset.id] || config.customDescriptions?.[preset.id]) && (
+                        {(config.customParams?.[preset.id] || config.customDescriptions?.[preset.id] || config.additionalCommands?.[preset.id]?.length) && (
                           <span className="text-xs text-brand px-half py-quarter rounded border border-brand/30">
                             {t('step5.params.configured')}
                           </span>
@@ -493,6 +546,12 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                       <div className="text-xs text-low truncate">
                         {getPresetDescription(preset)}
                       </div>
+                      {/* Show additional commands if any */}
+                      {config.additionalCommands?.[preset.id]?.length ? (
+                        <div className="text-xs text-low mt-half font-ibm-plex-mono">
+                          + {config.additionalCommands[preset.id].join(', ')}
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Edit Button */}
@@ -695,8 +754,9 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
         <PresetEditorModal
           presetLabel={getPresetLabel(editingPreset)}
           initialDescription={getPresetDescription(editingPreset)}
+          initialCommands={config.additionalCommands?.[editingPreset.id] ?? []}
           initialParams={config.customParams?.[editingPreset.id] ?? null}
-          onSave={(description, params) => handleSavePreset(editingPreset.id, description, params)}
+          onSave={(description, commands, params) => handleSavePreset(editingPreset.id, description, commands, params)}
           onCancel={handleCancelPreset}
         />
       )}

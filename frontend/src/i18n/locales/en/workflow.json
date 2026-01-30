@@ -246,6 +246,7 @@
     },
     "params": {
       "title": "Custom Parameters (JSON format)",
+      "advancedTitle": "Advanced: JSON Parameters",
       "description": "Optional: Configure custom parameters in JSON format. Leave empty to skip.",
       "edit": "Edit parameters",
       "configured": "Configured",
@@ -257,6 +258,11 @@
         "invalidJson": "Invalid JSON syntax. Please enter a valid JSON object, e.g., {\"key\": \"value\"}",
         "notObject": "Value must be a JSON object, e.g., {\"key\": \"value\"}"
       }
+    },
+    "commands": {
+      "title": "Additional Slash Commands",
+      "description": "Add extra slash commands to run after this preset (one per line).",
+      "placeholder": "/compact\n/review"
     }
   },
   "step6": {
