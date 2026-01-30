@@ -103,12 +103,25 @@ impl CliDetector {
         // Use extended PATH for detection
         let extended_path = Self::get_extended_path();
 
-        match Command::new(cmd)
+        // On Windows, use cmd.exe /c to execute commands, which properly handles
+        // .cmd and .bat files (like npm-installed CLIs)
+        #[cfg(windows)]
+        let result = Command::new("cmd")
+            .arg("/c")
+            .arg(cmd)
             .args(args)
             .env("PATH", &extended_path)
             .output()
-            .await
-        {
+            .await;
+
+        #[cfg(not(windows))]
+        let result = Command::new(cmd)
+            .args(args)
+            .env("PATH", &extended_path)
+            .output()
+            .await;
+
+        match result {
             Ok(output) if output.status.success() => {
                 let version = String::from_utf8_lossy(&output.stdout)
                     .lines()
