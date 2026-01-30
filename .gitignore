@@ -37,6 +37,9 @@ target/
 Thumbs.db
 nul
 
+# Build output
+frontend/dist/
+
 # Local dev config
 .dev-ports.json
 .claude/settings.local.json
