@@ -2,11 +2,12 @@ use axum::{
     Router,
     extract::{Query, State},
     response::Json as ResponseJson,
-    routing::get,
+    routing::{get, post},
 };
 use deployment::Deployment;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use services::services::filesystem::{DirectoryEntry, DirectoryListResponse, FilesystemError};
+use ts_rs::TS;
 use utils::response::ApiResponse;
 
 use crate::{DeploymentImpl, error::ApiError};
@@ -14,6 +15,36 @@ use crate::{DeploymentImpl, error::ApiError};
 #[derive(Debug, Deserialize)]
 pub struct ListDirectoryQuery {
     path: Option<String>,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct FolderPickerResponse {
+    pub path: Option<String>,
+    pub cancelled: bool,
+}
+
+/// Opens a native folder picker dialog and returns the selected path.
+pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerResponse>>, ApiError> {
+    let result = tokio::task::spawn_blocking(|| {
+        let dialog = rfd::FileDialog::new()
+            .set_title("Select Project Directory");
+
+        dialog.pick_folder()
+    })
+    .await
+    .map_err(|e| ApiError::Internal(format!("Failed to spawn blocking task: {e}")))?;
+
+    match result {
+        Some(path) => Ok(ResponseJson(ApiResponse::success(FolderPickerResponse {
+            path: Some(path.to_string_lossy().to_string()),
+            cancelled: false,
+        }))),
+        None => Ok(ResponseJson(ApiResponse::success(FolderPickerResponse {
+            path: None,
+            cancelled: true,
+        }))),
+    }
 }
 
 pub async fn list_directory(
@@ -79,4 +110,5 @@ pub fn router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/filesystem/directory", get(list_directory))
         .route("/filesystem/git-repos", get(list_git_repos))
+        .route("/filesystem/pick-folder", post(pick_folder))
 }

@@ -102,13 +102,13 @@ export function WorkflowWizard({
   };
 
   const handleUpdateConfig = (updates: Partial<WizardConfig>) => {
-    setState({
-      ...state,
+    setState((prevState) => ({
+      ...prevState,
       config: {
-        ...config,
+        ...prevState.config,
         ...updates,
       },
-    });
+    }));
   };
 
   const renderStep = () => {
@@ -120,7 +120,13 @@ export function WorkflowWizard({
             errors={errors}
             onError={onError}
             onChange={(updates) => {
-              handleUpdateConfig({ project: { ...config.project, ...updates } });
+              setState((prevState) => ({
+                ...prevState,
+                config: {
+                  ...prevState.config,
+                  project: { ...prevState.config.project, ...updates },
+                },
+              }));
             }}
           />
         );
@@ -252,19 +258,17 @@ export function WorkflowWizard({
               </button>
             ) : null}
 
-            {currentStep > WizardStep.Project && (
-              <button
-                onClick={handlePrimaryButtonClick}
-                disabled={isSubmitting}
-                className={cn(
-                  'px-4 py-2 rounded border text-sm',
-                  'bg-brand text-white hover:opacity-90',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
-                )}
-              >
-                {getButtonText()}
-              </button>
-            )}
+            <button
+              onClick={handlePrimaryButtonClick}
+              disabled={isSubmitting}
+              className={cn(
+                'px-4 py-2 rounded border text-sm',
+                'bg-brand text-white hover:opacity-90',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+            >
+              {getButtonText()}
+            </button>
           </div>
         </div>
 

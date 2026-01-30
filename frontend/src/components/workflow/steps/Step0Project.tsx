@@ -57,13 +57,30 @@ export const Step0Project: React.FC<Step0ProjectProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const handleSelectFolder = () => {
-    // TODO: Integrate with desktop file picker API
-    // For Tauri: use @tauri-apps/plugin-dialog
-    // For Electron: use dialog.showOpenDialog
-    // For web: use File System Access API (window.showDirectoryPicker)
-    // Currently, users can manually type or paste the path
-    console.log('Folder selection - integrate with desktop API');
+  const handleSelectFolder = async () => {
+    // Call backend API to open native folder picker dialog
+    try {
+      const response = await fetch('/api/filesystem/pick-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await parseJson(response);
+      if (response.ok) {
+        const apiResponse = data as { success?: boolean; data?: { path?: string; cancelled?: boolean } };
+        if (apiResponse.success && apiResponse.data?.path && !apiResponse.data?.cancelled) {
+          onChange({ workingDirectory: apiResponse.data.path });
+          setApiError(null);
+          void checkGitStatus(apiResponse.data.path);
+        }
+        // If cancelled, do nothing
+      } else {
+        setApiError(t('step0.errors.folderPicker'));
+      }
+    } catch (error) {
+      notifyError(error, 'selectFolder');
+      setApiError(t('step0.errors.folderPicker'));
+    }
   };
 
   const checkGitStatus = async (path: string) => {
@@ -78,8 +95,11 @@ export const Step0Project: React.FC<Step0ProjectProps> = ({
 
       const data = await parseJson(response);
       if (response.ok) {
-        if (isGitStatus(data)) {
-          onChange({ gitStatus: data });
+        // API returns { success: true, data: GitStatus }
+        const apiResponse = data as { success?: boolean; data?: unknown };
+        const gitStatusData = apiResponse?.data;
+        if (isGitStatus(gitStatusData)) {
+          onChange({ gitStatus: gitStatusData });
         } else {
           setApiError(t('step0.errors.gitStatus'));
         }
@@ -136,6 +156,7 @@ export const Step0Project: React.FC<Step0ProjectProps> = ({
             }}
             placeholder={t('step0.placeholder')}
             className="flex-1"
+            variant="search"
           />
           <PrimaryButton variant="secondary" onClick={handleSelectFolder}>
             {t('step0.browse')}

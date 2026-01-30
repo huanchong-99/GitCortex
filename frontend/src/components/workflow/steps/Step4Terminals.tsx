@@ -31,9 +31,25 @@ const CLI_TYPES: CliType[] = [
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const isCliStatusMap = (value: unknown): value is Record<string, boolean> => {
-  if (!isRecord(value)) return false;
-  return Object.values(value).every((entry) => typeof entry === 'boolean');
+// Type for CLI detection API response
+interface CliDetectResponse {
+  cliTypeId: string;
+  name: string;
+  displayName: string;
+  installed: boolean;
+  version: string | null;
+  executablePath: string | null;
+  installGuideUrl: string;
+}
+
+const isCliDetectResponseArray = (value: unknown): value is CliDetectResponse[] => {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (item) =>
+      isRecord(item) &&
+      typeof item.name === 'string' &&
+      typeof item.installed === 'boolean'
+  );
 };
 
 const parseJson = async (response: Response): Promise<unknown> => {
@@ -97,11 +113,13 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
       try {
         const response = await fetch('/api/cli_types/detect');
         const data = await parseJson(response);
-        if (response.ok && isCliStatusMap(data)) {
+        if (response.ok && isCliDetectResponseArray(data)) {
+          // Convert array response to map by name
+          const statusMap = new Map(data.map((item) => [item.name, item.installed]));
           setCliTypes((prev) =>
             prev.map((cli) => ({
               ...cli,
-              installed: data[cli.id] ?? false,
+              installed: statusMap.get(cli.id) ?? false,
             }))
           );
         }
