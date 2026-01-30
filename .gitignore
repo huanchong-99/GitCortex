@@ -39,3 +39,4 @@ nul
 
 # Local dev config
 .dev-ports.json
+.claude/settings.local.json
