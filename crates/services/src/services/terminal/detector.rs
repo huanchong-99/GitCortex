@@ -42,6 +42,47 @@ impl CliDetector {
         Ok(results)
     }
 
+    /// Get extended PATH with common CLI installation directories
+    #[cfg(windows)]
+    fn get_extended_path() -> String {
+        let current_path = std::env::var("PATH").unwrap_or_default();
+        let mut paths: Vec<String> = vec![current_path];
+
+        // Add common npm global paths
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            paths.push(format!("{}\\npm", appdata));
+        }
+
+        // Add user local bin (for tools like claude)
+        if let Ok(userprofile) = std::env::var("USERPROFILE") {
+            paths.push(format!("{}\\.local\\bin", userprofile));
+        }
+
+        // Add common program files paths
+        if let Ok(programfiles) = std::env::var("ProgramFiles") {
+            paths.push(format!("{}\\nodejs", programfiles));
+        }
+
+        paths.join(";")
+    }
+
+    #[cfg(not(windows))]
+    fn get_extended_path() -> String {
+        let current_path = std::env::var("PATH").unwrap_or_default();
+        let mut paths: Vec<String> = vec![current_path];
+
+        // Add common paths on Unix
+        if let Ok(home) = std::env::var("HOME") {
+            paths.push(format!("{}/.local/bin", home));
+            paths.push(format!("{}/.npm-global/bin", home));
+            paths.push(format!("{}/bin", home));
+        }
+
+        paths.push("/usr/local/bin".to_string());
+
+        paths.join(":")
+    }
+
     /// Detect a single CLI type
     ///
     /// # Arguments
@@ -59,14 +100,22 @@ impl CliDetector {
         let cmd = parts[0];
         let args = &parts[1..];
 
-        match Command::new(cmd).args(args).output().await {
+        // Use extended PATH for detection
+        let extended_path = Self::get_extended_path();
+
+        match Command::new(cmd)
+            .args(args)
+            .env("PATH", &extended_path)
+            .output()
+            .await
+        {
             Ok(output) if output.status.success() => {
                 let version = String::from_utf8_lossy(&output.stdout)
                     .lines()
                     .next()
                     .map(|s| s.trim().to_string());
 
-                let executable_path = self.find_executable(cmd).await;
+                let executable_path = self.find_executable(cmd, &extended_path).await;
 
                 CliDetectionStatus {
                     cli_type_id: cli_type.id.clone(),
@@ -99,14 +148,16 @@ impl CliDetector {
     ///
     /// # Arguments
     /// * `cmd` - The command name to look up
+    /// * `path` - The PATH to search in
     ///
     /// # Returns
     /// The full path to the executable, or None if not found
-    async fn find_executable(&self, cmd: &str) -> Option<String> {
+    async fn find_executable(&self, cmd: &str, path: &str) -> Option<String> {
         #[cfg(unix)]
         {
             Command::new("which")
                 .arg(cmd)
+                .env("PATH", path)
                 .output()
                 .await
                 .ok()
@@ -118,6 +169,7 @@ impl CliDetector {
         {
             Command::new("where")
                 .arg(cmd)
+                .env("PATH", path)
                 .output()
                 .await
                 .ok()
@@ -197,7 +249,8 @@ mod tests {
         #[cfg(unix)]
         {
             let detector = CliDetector::new(setup_test_db().await);
-            let sh_path = detector.find_executable("sh").await;
+            let path = CliDetector::get_extended_path();
+            let sh_path = detector.find_executable("sh", &path).await;
             assert!(sh_path.is_some(), "Should find 'sh' executable");
             assert!(sh_path.unwrap().ends_with("sh"));
         }
@@ -209,7 +262,8 @@ mod tests {
         #[cfg(windows)]
         {
             let detector = CliDetector::new(setup_test_db().await);
-            let cmd_path = detector.find_executable("cmd").await;
+            let path = CliDetector::get_extended_path();
+            let cmd_path = detector.find_executable("cmd", &path).await;
             assert!(cmd_path.is_some(), "Should find 'cmd' executable");
         }
 

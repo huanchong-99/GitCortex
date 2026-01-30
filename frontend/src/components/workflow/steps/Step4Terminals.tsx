@@ -17,16 +17,10 @@ interface Step4TerminalsProps {
 interface CliType {
   id: string;
   name: string;
+  displayName: string;
   installed: boolean;
-  installGuide: string;
+  installGuideUrl: string | null;
 }
-
-const CLI_TYPES: CliType[] = [
-  { id: 'claude-code', name: 'Claude Code', installed: false, installGuide: 'https://claude.ai/code' },
-  { id: 'gemini-cli', name: 'Gemini CLI', installed: false, installGuide: 'https://ai.google.dev/gemini-api/docs/cli' },
-  { id: 'codex', name: 'Codex', installed: false, installGuide: 'https://docs.openai.com/codex' },
-  { id: 'cursor-agent', name: 'Cursor Agent', installed: false, installGuide: 'https://cursor.sh/docs' },
-];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -39,7 +33,7 @@ interface CliDetectResponse {
   installed: boolean;
   version: string | null;
   executablePath: string | null;
-  installGuideUrl: string;
+  installGuideUrl: string | null;
 }
 
 const isCliDetectResponseArray = (value: unknown): value is CliDetectResponse[] => {
@@ -47,6 +41,7 @@ const isCliDetectResponseArray = (value: unknown): value is CliDetectResponse[] 
   return value.every(
     (item) =>
       isRecord(item) &&
+      typeof item.cliTypeId === 'string' &&
       typeof item.name === 'string' &&
       typeof item.installed === 'boolean'
   );
@@ -72,7 +67,8 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   const { notifyError } = useErrorNotification({ onError, context: 'Step4Terminals' });
   const { t } = useTranslation('workflow');
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [cliTypes, setCliTypes] = useState(CLI_TYPES);
+  const [cliTypes, setCliTypes] = useState<CliType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Filter to only installed CLI types
   const availableCliTypes = cliTypes.filter((ct) => ct.installed);
@@ -107,24 +103,28 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
     }
   }, [currentTask, config.terminals, onUpdate]);
 
-  // Detect CLI installation status
+  // Detect CLI installation status from API
   useEffect(() => {
     const detectCliTypes = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch('/api/cli_types/detect');
         const data = await parseJson(response);
         if (response.ok && isCliDetectResponseArray(data)) {
-          // Convert array response to map by name
-          const statusMap = new Map(data.map((item) => [item.name, item.installed]));
-          setCliTypes((prev) =>
-            prev.map((cli) => ({
-              ...cli,
-              installed: statusMap.get(cli.id) ?? false,
-            }))
-          );
+          // Convert API response to CliType array
+          const cliList: CliType[] = data.map((item) => ({
+            id: item.cliTypeId,
+            name: item.name,
+            displayName: item.displayName,
+            installed: item.installed,
+            installGuideUrl: item.installGuideUrl,
+          }));
+          setCliTypes(cliList);
         }
       } catch (error) {
         notifyError(error, 'detectCliTypes');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -176,7 +176,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
       </div>
 
       {/* No CLI Installed Error */}
-      {availableCliTypes.length === 0 && (
+      {!isLoading && availableCliTypes.length === 0 && (
         <ErrorAlert message={t('step4.errors.noCliInstalled')} />
       )}
 
@@ -229,33 +229,37 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
       {/* CLI Installation Status */}
       <div className="bg-secondary border rounded-sm p-base">
         <div className="text-base text-high font-medium mb-base">{t('step4.cliStatusTitle')}</div>
-        <div className="grid grid-cols-2 gap-base">
-          {cliTypes.map((cli) => (
-            <div
-              key={cli.id}
-              className="flex items-center justify-between p-base rounded-sm bg-panel border"
-            >
-              <div className="flex items-center gap-base">
-                {cli.installed ? (
-                  <Check className="size-icon-sm text-success" strokeWidth={3} />
-                ) : (
-                  <X className="size-icon-sm text-error" strokeWidth={3} />
+        {isLoading ? (
+          <div className="text-base text-low">{t('step4.loadingCli')}</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-base">
+            {cliTypes.map((cli) => (
+              <div
+                key={cli.id}
+                className="flex items-center justify-between p-base rounded-sm bg-panel border"
+              >
+                <div className="flex items-center gap-base">
+                  {cli.installed ? (
+                    <Check className="size-icon-sm text-success" strokeWidth={3} />
+                  ) : (
+                    <X className="size-icon-sm text-error" strokeWidth={3} />
+                  )}
+                  <span className="text-base text-normal">{cli.displayName}</span>
+                </div>
+                {!cli.installed && cli.installGuideUrl && (
+                  <a
+                    href={cli.installGuideUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-base text-brand hover:underline"
+                  >
+                    {t('step4.installGuide')}
+                  </a>
                 )}
-                <span className="text-base text-normal">{cli.name}</span>
               </div>
-              {!cli.installed && (
-                <a
-                  href={cli.installGuide}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-base text-brand hover:underline"
-                >
-                  {t('step4.installGuide')}
-                </a>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Terminal Configuration Forms */}
@@ -312,7 +316,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                       ) : (
                         <X className="size-icon-sm text-error" strokeWidth={3} />
                       )}
-                      {cli.name}
+                      {cli.displayName}
                     </button>
                   ))}
                 </div>

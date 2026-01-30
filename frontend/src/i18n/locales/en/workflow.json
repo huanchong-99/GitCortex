@@ -181,6 +181,7 @@
     "taskNameFallback": "Task {{index}}",
     "terminalCount": "This task has {{count}} terminals",
     "cliStatusTitle": "CLI installation status",
+    "loadingCli": "Detecting CLI installation status...",
     "installGuide": "Install guide",
     "terminalLabel": "Terminal {{index}}",
     "cliTypeLabel": "CLI type",
