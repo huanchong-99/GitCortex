@@ -44,7 +44,7 @@ export function useCreateSession() {
     onSuccess: (session) => {
       // Invalidate session queries to refresh the list
       queryClient.invalidateQueries({
-        queryKey: ['workspaceSessions', session.workspace_id],
+        queryKey: ['workspaceSessions', session.workspaceId],
       });
     },
   });

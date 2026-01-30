@@ -6,7 +6,7 @@ import type { ExecutionProcess } from 'shared/types';
 export function getDevServerWorkingDir(
   process: ExecutionProcess
 ): string | null {
-  const typ = process.executor_action?.typ;
+  const typ = process.executorAction?.typ;
   if (typ && 'type' in typ && typ.type === 'ScriptRequest') {
     return (typ as { working_dir: string | null }).working_dir;
   }
@@ -26,7 +26,7 @@ export function deduplicateDevServersByWorkingDir(
     const existing = byWorkingDir.get(workingDir);
     if (
       !existing ||
-      new Date(process.started_at) > new Date(existing.started_at)
+      new Date(process.startedAt as string) > new Date(existing.startedAt as string)
     ) {
       byWorkingDir.set(workingDir, process);
     }
@@ -40,7 +40,7 @@ export function deduplicateDevServersByWorkingDir(
 export function filterDevServerProcesses(
   processes: ExecutionProcess[]
 ): ExecutionProcess[] {
-  return processes.filter((process) => process.run_reason === 'devserver');
+  return processes.filter((process) => process.runReason === 'devserver');
 }
 
 /**
@@ -51,6 +51,6 @@ export function filterRunningDevServers(
 ): ExecutionProcess[] {
   return processes.filter(
     (process) =>
-      process.run_reason === 'devserver' && process.status === 'running'
+      process.runReason === 'devserver' && process.status === 'running'
   );
 }

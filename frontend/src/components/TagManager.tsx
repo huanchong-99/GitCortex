@@ -49,7 +49,7 @@ export function TagManager() {
       if (
         !confirm(
           t('settings.general.tags.manager.deleteConfirm', {
-            tagName: tag.tag_name,
+            tagName: tag.tagName,
           })
         )
       ) {
@@ -113,7 +113,7 @@ export function TagManager() {
                     key={tag.id}
                     className="border-b hover:bg-muted/30 transition-colors"
                   >
-                    <td className="p-2 text-sm font-medium">@{tag.tag_name}</td>
+                    <td className="p-2 text-sm font-medium">@{tag.tagName}</td>
                     <td className="p-2 text-sm">
                       <div
                         className="max-w-[400px] truncate"

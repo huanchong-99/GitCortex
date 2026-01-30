@@ -46,7 +46,7 @@ export function CreateModeProvider({ children }: CreateModeProviderProps) {
   );
 
   const state = useCreateModeState({
-    initialProjectId: lastWorkspaceTask?.project_id,
+    initialProjectId: lastWorkspaceTask?.projectId,
     initialRepos: lastWorkspaceRepos,
   });
 

@@ -41,7 +41,7 @@ export function TaskCard({
   const { remoteFeaturesEnabled } = useUserSystem();
 
   const isRemoteShared =
-    remoteFeaturesEnabled && (Boolean(sharedTask) || Boolean(task.shared_task_id));
+    remoteFeaturesEnabled && (Boolean(sharedTask) || Boolean(task.sharedTaskId));
 
   const handleClick = useCallback(() => {
     onViewDetails(task);
@@ -50,16 +50,16 @@ export function TaskCard({
   const handleParentClick = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (!task.parent_workspace_id || isNavigatingToParent) return;
+      if (!task.parentWorkspaceId || isNavigatingToParent) return;
 
       setIsNavigatingToParent(true);
       try {
-        const parentAttempt = await attemptsApi.get(task.parent_workspace_id);
+        const parentAttempt = await attemptsApi.get(task.parentWorkspaceId);
         navigate(
           paths.attempt(
             projectId,
-            parentAttempt.task_id,
-            task.parent_workspace_id
+            parentAttempt.taskId,
+            task.parentWorkspaceId
           )
         );
       } catch (error) {
@@ -67,7 +67,7 @@ export function TaskCard({
         setIsNavigatingToParent(false);
       }
     },
-    [task.parent_workspace_id, projectId, navigate, isNavigatingToParent]
+    [task.parentWorkspaceId, projectId, navigate, isNavigatingToParent]
   );
 
   const localRef = useRef<HTMLDivElement>(null);
@@ -115,13 +115,13 @@ export function TaskCard({
           }
           right={
             <>
-              {task.has_in_progress_attempt && (
+              {task.hasInProgressAttempt && (
                 <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
               )}
-              {task.last_attempt_failed && (
+              {task.lastAttemptFailed && (
                 <XCircle className="h-4 w-4 text-destructive" />
               )}
-              {task.parent_workspace_id && (
+              {task.parentWorkspaceId && (
                 <Button
                   variant="icon"
                   onClick={handleParentClick}

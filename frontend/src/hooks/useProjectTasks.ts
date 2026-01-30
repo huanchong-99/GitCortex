@@ -44,7 +44,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
   const { project } = useProject();
   const { isSignedIn } = useAuth();
   const { remoteFeaturesEnabled } = useUserSystem();
-  const remoteProjectId = project?.remote_project_id;
+  const remoteProjectId = project?.remoteProjectId;
   const sharedTasksEnabled =
     remoteFeaturesEnabled && Boolean(remoteProjectId) && isSignedIn;
 
@@ -88,10 +88,10 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
       sharedTasksEnabled
         ? new Set(
             Object.values(localTasksById)
-              .map((task) => task.shared_task_id)
+              .map((task) => task.sharedTaskId)
               .filter((id): id is string => Boolean(id))
           )
-        : new Set(),
+        : new Set<string>(),
     [localTasksById, sharedTasksEnabled]
   );
 
@@ -138,15 +138,15 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
 
     const sorted = Object.values(merged).sort(
       (a, b) =>
-        new Date(b.created_at as string).getTime() -
-        new Date(a.created_at as string).getTime()
+        new Date(b.createdAt as string).getTime() -
+        new Date(a.createdAt as string).getTime()
     );
 
     (Object.values(byStatus) as TaskWithAttemptStatus[][]).forEach((list) => {
       list.sort(
         (a, b) =>
-          new Date(b.created_at as string).getTime() -
-          new Date(a.created_at as string).getTime()
+          new Date(b.createdAt as string).getTime() -
+          new Date(a.createdAt as string).getTime()
       );
     });
 
@@ -192,7 +192,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     localTasksById,
     referencedSharedIds,
     isLoading,
-    remoteProjectId: project?.remote_project_id || undefined,
+    remoteProjectId: project?.remoteProjectId || undefined,
     projectId,
     enabled: sharedTasksEnabled,
   });

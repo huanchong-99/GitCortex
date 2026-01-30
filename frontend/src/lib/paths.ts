@@ -9,4 +9,11 @@ export const paths = {
 
   // Workspaces paths
   workspaces: (page?: string) => (page ? `/workspaces/${page}` : '/workspaces'),
+
+  // Task paths
+  task: (projectId: string, taskId: string) => `/projects/${projectId}/tasks/${taskId}`,
+
+  // Attempt paths
+  attempt: (projectId: string, taskId: string, attemptId: string) =>
+    `/projects/${projectId}/tasks/${taskId}/attempts/${attemptId}`,
 };

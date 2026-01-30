@@ -61,7 +61,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       enabled: modal.visible,
     });
 
-    const parentAttemptId = task?.parent_workspace_id ?? undefined;
+    const parentAttemptId = task?.parentWorkspaceId ?? undefined;
     const { data: parentAttempt, isLoading: isLoadingParent } = useAttempt(
       parentAttemptId,
       { enabled: modal.visible && !!parentAttemptId }
@@ -85,7 +85,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
     const latestAttempt = useMemo(() => {
       if (attempts.length === 0) return null;
       return attempts.reduce((latest, attempt) =>
-        new Date(attempt.created_at) > new Date(latest.created_at)
+        new Date(attempt.createdAt) > new Date(latest.createdAt)
           ? attempt
           : latest
       );

@@ -74,7 +74,7 @@ export function TaskFollowUpSection({
   const { projectId } = useProject();
 
   // Derive IDs from session
-  const workspaceId = session?.workspace_id;
+  const workspaceId = session?.workspaceId;
   const sessionId = session?.id;
 
   const { isAttemptRunning, stopExecution, isStopping, processes } =
@@ -153,7 +153,7 @@ export function TaskFollowUpSection({
       processes
         .slice()
         .reverse()
-        .map((p) => extractProfileFromAction(p.executor_action ?? null))
+        .map((p) => extractProfileFromAction(p.executorAction ?? null))
         .find((pid) => pid !== null) ?? null
     );
   }, [processes]);

@@ -24,9 +24,9 @@ export function useCreateWorkspace() {
       queryClient.invalidateQueries({ queryKey: workspaceSummaryKeys.all });
 
       // Invalidate parent's relationships cache if this is a subtask
-      if (task.parent_workspace_id) {
+      if (task.parentWorkspaceId) {
         queryClient.invalidateQueries({
-          queryKey: taskRelationshipsKeys.byAttempt(task.parent_workspace_id),
+          queryKey: taskRelationshipsKeys.byAttempt(task.parentWorkspaceId),
         });
       }
 

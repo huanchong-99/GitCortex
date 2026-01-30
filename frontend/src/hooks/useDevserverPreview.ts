@@ -39,15 +39,15 @@ export function useDevserverPreview(
   const selectedProcess = useMemo(() => {
     const devserverProcesses = executionProcesses.filter(
       (process) =>
-        process.run_reason === 'devserver' && process.status === 'running'
+        process.runReason === 'devserver' && process.status === 'running'
     );
 
     if (devserverProcesses.length === 0) return null;
 
     return devserverProcesses.sort(
       (a, b) =>
-        new Date(b.created_at as unknown as string).getTime() -
-        new Date(a.created_at as unknown as string).getTime()
+        new Date(b.createdAt as unknown as string).getTime() -
+        new Date(a.createdAt as unknown as string).getTime()
     )[0];
   }, [executionProcesses]);
 

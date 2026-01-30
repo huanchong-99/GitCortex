@@ -25,7 +25,7 @@ export async function searchTagsAndFiles(
   // Fetch all tags and filter client-side
   const tags = await tagsApi.list();
   const filteredTags = tags.filter((tag) =>
-    tag.tag_name.toLowerCase().includes(query.toLowerCase())
+    tag.tagName.toLowerCase().includes(query.toLowerCase())
   );
   results.push(...filteredTags.map((tag) => ({ type: 'tag' as const, tag })));
 

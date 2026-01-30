@@ -77,7 +77,8 @@ export type PersistKey =
   | `user:${string}`
   | `system:${string}`
   | `error:${string}`
-  | `entry:${string}`;
+  | `entry:${string}`
+  | `wizard-${string}`;
 
 type State = {
   // UI preferences

@@ -172,8 +172,8 @@ export function WorkflowDebugPage() {
               status={pipelineStatus}
               tasks={tasks}
               mergeTerminal={{
-                cliTypeId: data.mergeTerminalCliId,
-                modelConfigId: data.mergeTerminalModelId,
+                cliTypeId: data.mergeTerminalCliId ?? '',
+                modelConfigId: data.mergeTerminalModelId ?? '',
                 status: 'not_started' as const,
               }}
             />

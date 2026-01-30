@@ -55,7 +55,7 @@ function RepoSelector({
           <div className="flex items-center gap-1.5 w-full min-w-0">
             <FolderGit className="h-3 w-3 flex-shrink-0" />
             <span className="truncate">
-              {selectedRepo?.display_name || effectivePlaceholder}
+              {selectedRepo?.displayName || effectivePlaceholder}
             </span>
           </div>
           {repos.length > 1 && (
@@ -80,7 +80,7 @@ function RepoSelector({
               >
                 <div className="flex items-center gap-2 w-full">
                   <FolderGit className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">{repo.display_name}</span>
+                  <span className="truncate">{repo.displayName}</span>
                 </div>
               </DropdownMenuItem>
             );

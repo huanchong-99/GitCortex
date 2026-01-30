@@ -125,17 +125,17 @@ function GitOperations({
       };
 
     const openPR = selectedRepoStatus.merges.find(
-      (m: Merge) => m.type === 'pr' && m.pr_info.status === 'open'
+      (m: Merge) => m.type === 'pr' && m.prInfo.status === 'open'
     );
 
     const mergedPR = selectedRepoStatus.merges.find(
-      (m: Merge) => m.type === 'pr' && m.pr_info.status === 'merged'
+      (m: Merge) => m.type === 'pr' && m.prInfo.status === 'merged'
     );
 
     const merges = selectedRepoStatus.merges.filter(
       (m: Merge) =>
         m.type === 'direct' ||
-        (m.type === 'pr' && m.pr_info.status === 'merged')
+        (m.type === 'pr' && m.prInfo.status === 'merged')
     );
 
     return {
@@ -311,15 +311,15 @@ function GitOperations({
           const prMerge = mergeInfo.openPR;
           return (
             <button
-              onClick={() => window.open(prMerge.pr_info.url, '_blank')}
+              onClick={() => window.open(prMerge.prInfo.url, '_blank')}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100/60 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:underline truncate max-w-[180px] sm:max-w-none"
               aria-label={t('git.pr.open', {
-                number: Number(prMerge.pr_info.number),
+                number: Number(prMerge.prInfo.number),
               })}
             >
               <GitPullRequest className="h-3.5 w-3.5" />
               {t('git.pr.number', {
-                number: Number(prMerge.pr_info.number),
+                number: Number(prMerge.prInfo.number),
               })}
               <ExternalLink className="h-3.5 w-3.5" />
             </button>

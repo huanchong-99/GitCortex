@@ -87,18 +87,18 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
     const { laterCount, laterCoding, laterSetup, laterCleanup } =
       useMemo(() => {
         const procs = (processes || []).filter(
-          (p) => !p.dropped && shouldShowInLogs(p.run_reason)
+          (p) => !p.dropped && shouldShowInLogs(p.runReason)
         );
         const idx = procs.findIndex((p) => p.id === executionProcessId);
         const later = idx >= 0 ? procs.slice(idx + 1) : [];
         return {
           laterCount: later.length,
-          laterCoding: later.filter((p) => isCodingAgent(p.run_reason)).length,
+          laterCoding: later.filter((p) => isCodingAgent(p.runReason)).length,
           laterSetup: later.filter(
-            (p) => p.run_reason === PROCESS_RUN_REASONS.SETUP_SCRIPT
+            (p) => p.runReason === PROCESS_RUN_REASONS.SETUP_SCRIPT
           ).length,
           laterCleanup: later.filter(
-            (p) => p.run_reason === PROCESS_RUN_REASONS.CLEANUP_SCRIPT
+            (p) => p.runReason === PROCESS_RUN_REASONS.CLEANUP_SCRIPT
           ).length,
         };
       }, [processes, executionProcessId]);
@@ -106,11 +106,11 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
     // Join repo states with branch status to get repo names and compute aggregated values
     const repoInfo = useMemo(() => {
       return repoStates.map((state) => {
-        const bs = branchStatus?.find((b) => b.repo_id === state.repo_id);
+        const bs = branchStatus?.find((b) => b.repo_id === state.repoId);
         return {
-          repoId: state.repo_id,
-          repoName: bs?.repo_name ?? state.repo_id,
-          targetSha: state.before_head_commit,
+          repoId: state.repoId,
+          repoName: bs?.repo_name ?? state.repoId,
+          targetSha: state.beforeHeadCommit,
           headOid: bs?.head_oid ?? null,
           hasUncommitted: bs?.has_uncommitted_changes ?? false,
           uncommittedCount: bs?.uncommitted_count ?? 0,

@@ -119,7 +119,7 @@ export function PreviewPanel() {
   const failedDevServerProcess = devServerProcesses.find(
     (p) =>
       p.status === 'failed' ||
-      (p.status === 'completed' && p.exit_code !== null && p.exit_code !== 0n)
+      (p.status === 'completed' && p.exitCode !== null && p.exitCode !== 0n)
   );
   const hasFailedDevServer = Boolean(failedDevServerProcess);
 
@@ -175,7 +175,7 @@ export function PreviewPanel() {
   const handleFixDevScript = () => {
     if (!attemptId || repos.length === 0) return;
 
-    const sessionId = devServerProcesses[0]?.session_id;
+    const sessionId = devServerProcesses[0]?.sessionId;
 
     ScriptFixerDialog.show({
       scriptType: 'dev_server',

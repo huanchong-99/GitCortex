@@ -908,7 +908,7 @@ function DisplayConversationEntry({
         <NextActionCard
           attemptId={taskAttempt?.id}
           sessionId={taskAttempt?.session?.id}
-          containerRef={taskAttempt?.container_ref}
+          containerRef={taskAttempt?.containerRef}
           failed={entry.entry_type.failed}
           execution_processes={entry.entry_type.execution_processes}
           task={task}

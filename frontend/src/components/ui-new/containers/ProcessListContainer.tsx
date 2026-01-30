@@ -27,11 +27,11 @@ export function ProcessListContainer() {
   const { t } = useTranslation('common');
   const { executionProcessesVisible } = useExecutionProcessesContext();
 
-  // Sort processes by created_at descending (newest first)
+  // Sort processes by createdAt descending (newest first)
   const sortedProcesses = useMemo(() => {
     return [...executionProcessesVisible].sort((a, b) => {
       return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     });
   }, [executionProcessesVisible]);
@@ -132,9 +132,9 @@ export function ProcessListContainer() {
             {sortedProcesses.map((process) => (
               <ProcessListItem
                 key={process.id}
-                runReason={process.run_reason}
+                runReason={process.runReason}
                 status={process.status}
-                startedAt={process.started_at}
+                startedAt={process.startedAt}
                 selected={process.id === selectedProcessId}
                 onClick={() => handleSelectProcess(process.id)}
               />

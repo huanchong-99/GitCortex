@@ -614,7 +614,7 @@ export function SessionChatBox({
                   >
                     {index === 0
                       ? t('conversation.sessions.latest')
-                      : formatDateShortWithTime(s.created_at)}
+                      : formatDateShortWithTime(s.createdAt)}
                   </DropdownMenuItem>
                 ))}
               </>

@@ -42,12 +42,8 @@ export {
 } from './useWorkflows';
 export type {
   Workflow,
-  WorkflowConfig,
-  WorkflowTaskConfig,
-  WorkflowModelConfig,
-  WorkflowTerminalConfig,
-  WorkflowCommandConfig,
-  WorkflowOrchestratorConfig,
+  WorkflowTaskDto,
+  WorkflowCommandDto,
   CreateWorkflowRequest,
   StartWorkflowRequest,
   WorkflowExecution,

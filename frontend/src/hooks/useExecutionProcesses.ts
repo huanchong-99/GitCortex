@@ -50,14 +50,14 @@ export const useExecutionProcesses = (
   const executionProcessesById = data?.execution_processes ?? {};
   const executionProcesses = Object.values(executionProcessesById).sort(
     (a, b) =>
-      new Date(a.created_at as unknown as string).getTime() -
-      new Date(b.created_at as unknown as string).getTime()
+      new Date(a.createdAt as unknown as string).getTime() -
+      new Date(b.createdAt as unknown as string).getTime()
   );
   const isAttemptRunning = executionProcesses.some(
     (process) =>
-      (process.run_reason === 'codingagent' ||
-        process.run_reason === 'setupscript' ||
-        process.run_reason === 'cleanupscript') &&
+      (process.runReason === 'codingagent' ||
+        process.runReason === 'setupscript' ||
+        process.runReason === 'cleanupscript') &&
       process.status === 'running'
   );
   const isLoading = !!sessionId && !isInitialized && !error; // until first snapshot

@@ -219,9 +219,9 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
             >
               <div className="flex items-center gap-base">
                 {cli.installed ? (
-                  <Check className="size-icon-sm text-success" weight="bold" />
+                  <Check className="size-icon-sm text-success" strokeWidth={3} />
                 ) : (
-                  <X className="size-icon-sm text-error" weight="bold" />
+                  <X className="size-icon-sm text-error" strokeWidth={3} />
                 )}
                 <span className="text-base text-normal">{cli.name}</span>
               </div>
@@ -290,9 +290,9 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                       )}
                     >
                       {cli.installed ? (
-                        <Check className="size-icon-sm text-success" weight="bold" />
+                        <Check className="size-icon-sm text-success" strokeWidth={3} />
                       ) : (
-                        <X className="size-icon-sm text-error" weight="bold" />
+                        <X className="size-icon-sm text-error" strokeWidth={3} />
                       )}
                       {cli.name}
                     </button>

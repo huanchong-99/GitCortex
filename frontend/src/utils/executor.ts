@@ -78,7 +78,7 @@ export function getLatestProfileFromProcesses(
     processes
       .slice()
       .reverse()
-      .map((p) => extractProfileFromAction(p.executor_action ?? null))
+      .map((p) => extractProfileFromAction(p.executorAction ?? null))
       .find((pid) => pid !== null) ?? null
   );
 }

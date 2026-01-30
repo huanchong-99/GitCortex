@@ -58,7 +58,7 @@ export function useActionVisibilityContext(): ActionVisibilityContext {
     const hasOpenPR =
       branchStatus?.some((repo) =>
         repo.merges?.some(
-          (m: Merge) => m.type === 'pr' && m.pr_info.status === 'open'
+          (m: Merge) => m.type === 'pr' && m.prInfo.status === 'open'
         )
       ) ?? false;
 

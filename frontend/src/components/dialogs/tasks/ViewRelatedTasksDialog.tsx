@@ -36,8 +36,8 @@ const ViewRelatedTasksDialogImpl =
 
       // Combine parent and children into a single list of related tasks
       const relatedTasks: Task[] = [];
-      if (relationships?.parent_task) {
-        relatedTasks.push(relationships.parent_task);
+      if (relationships?.parentTask) {
+        relatedTasks.push(relationships.parentTask);
       }
       if (relationships?.children) {
         relatedTasks.push(...relationships.children);

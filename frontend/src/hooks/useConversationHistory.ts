@@ -28,9 +28,9 @@ export type OnEntriesUpdated = (
 
 type ExecutionProcessStaticInfo = {
   id: string;
-  created_at: string;
-  updated_at: string;
-  executor_action: ExecutorAction;
+  createdAt: string;
+  updatedAt: string;
+  executorAction: ExecutorAction;
 };
 
 type ExecutionProcessState = {
@@ -116,9 +116,9 @@ export const useConversationHistory = ({
   useEffect(() => {
     executionProcesses.current = executionProcessesRaw.filter(
       (ep) =>
-        ep.run_reason === 'setupscript' ||
-        ep.run_reason === 'cleanupscript' ||
-        ep.run_reason === 'codingagent'
+        ep.runReason === 'setupscript' ||
+        ep.runReason === 'cleanupscript' ||
+        ep.runReason === 'codingagent'
     );
   }, [executionProcessesRaw]);
 
@@ -126,7 +126,7 @@ export const useConversationHistory = ({
     executionProcess: ExecutionProcess
   ) => {
     let url = '';
-    if (executionProcess.executor_action.typ.type === 'ScriptRequest') {
+    if (executionProcess.executorAction.typ.type === 'ScriptRequest') {
       url = `/api/execution-processes/${executionProcess.id}/raw-logs/ws`;
     } else {
       url = `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
@@ -176,18 +176,18 @@ export const useConversationHistory = ({
     return Object.values(executionProcessState)
       .filter(
         (p) =>
-          p.executionProcess.executor_action.typ.type ===
+          p.executionProcess.executorAction.typ.type ===
             'CodingAgentFollowUpRequest' ||
-          p.executionProcess.executor_action.typ.type ===
+          p.executionProcess.executorAction.typ.type ===
             'CodingAgentInitialRequest' ||
-          p.executionProcess.executor_action.typ.type === 'ReviewRequest'
+          p.executionProcess.executorAction.typ.type === 'ReviewRequest'
       )
       .sort(
         (a, b) =>
           new Date(
-            a.executionProcess.created_at as unknown as string
+            a.executionProcess.createdAt as unknown as string
           ).getTime() -
-          new Date(b.executionProcess.created_at as unknown as string).getTime()
+          new Date(b.executionProcess.createdAt as unknown as string).getTime()
       )
       .flatMap((p) => p.entries);
   };
@@ -197,7 +197,7 @@ export const useConversationHistory = ({
       executionProcesses?.current.filter(
         (p) =>
           p.status === ExecutionProcessStatus.running &&
-          p.run_reason !== 'devserver'
+          p.runReason !== 'devserver'
       ) ?? []
     );
   };
@@ -216,23 +216,23 @@ export const useConversationHistory = ({
         .sort(
           (a, b) =>
             new Date(
-              a.executionProcess.created_at as unknown as string
+              a.executionProcess.createdAt as unknown as string
             ).getTime() -
             new Date(
-              b.executionProcess.created_at as unknown as string
+              b.executionProcess.createdAt as unknown as string
             ).getTime()
         )
         .flatMap((p, index) => {
           const entries: PatchTypeWithKey[] = [];
           if (
-            p.executionProcess.executor_action.typ.type ===
+            p.executionProcess.executorAction.typ.type ===
               'CodingAgentInitialRequest' ||
-            p.executionProcess.executor_action.typ.type ===
+            p.executionProcess.executorAction.typ.type ===
               'CodingAgentFollowUpRequest' ||
-            p.executionProcess.executor_action.typ.type === 'ReviewRequest'
+            p.executionProcess.executorAction.typ.type === 'ReviewRequest'
           ) {
             // New user message
-            const actionType = p.executionProcess.executor_action.typ;
+            const actionType = p.executionProcess.executorAction.typ;
             const userNormalizedEntry: NormalizedEntry = {
               entry_type: {
                 type: 'user_message',
@@ -316,11 +316,11 @@ export const useConversationHistory = ({
               entries.push(makeLoadingPatch(p.executionProcess.id));
             }
           } else if (
-            p.executionProcess.executor_action.typ.type === 'ScriptRequest'
+            p.executionProcess.executorAction.typ.type === 'ScriptRequest'
           ) {
             // Add setup and cleanup script as a tool call
             let toolName = '';
-            switch (p.executionProcess.executor_action.typ.context) {
+            switch (p.executionProcess.executorAction.typ.context) {
               case 'SetupScript':
                 toolName = 'Setup Script';
                 break;
@@ -350,7 +350,7 @@ export const useConversationHistory = ({
               lastProcessFailedOrKilled = true;
             }
 
-            const exitCode = Number(executionProcess?.exit_code) || 0;
+            const exitCode = Number(executionProcess?.exitCode) || 0;
             const exit_status: CommandExitStatus | null =
               executionProcess?.status === 'running'
                 ? null
@@ -374,7 +374,7 @@ export const useConversationHistory = ({
                 tool_name: toolName,
                 action_type: {
                   action: 'command_run',
-                  command: p.executionProcess.executor_action.typ.script,
+                  command: p.executionProcess.executorAction.typ.script,
                   result: {
                     output,
                     exit_status,
@@ -449,7 +449,7 @@ export const useConversationHistory = ({
     (executionProcess: ExecutionProcess): Promise<void> => {
       return new Promise((resolve, reject) => {
         let url = '';
-        if (executionProcess.executor_action.typ.type === 'ScriptRequest') {
+        if (executionProcess.executorAction.typ.type === 'ScriptRequest') {
           url = `/api/execution-processes/${executionProcess.id}/raw-logs/ws`;
         } else {
           url = `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
@@ -578,9 +578,9 @@ export const useConversationHistory = ({
         state[p.id] = {
           executionProcess: {
             id: p.id,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            executor_action: p.executor_action,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+            executorAction: p.executorAction,
           },
           entries: [],
         };

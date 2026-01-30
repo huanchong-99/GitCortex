@@ -30,10 +30,10 @@ export function useTaskMutations(projectId?: string) {
     onSuccess: (createdTask: Task) => {
       invalidateQueries();
       // Invalidate parent's relationships cache if this is a subtask
-      if (createdTask.parent_workspace_id) {
+      if (createdTask.parentWorkspaceId) {
         queryClient.invalidateQueries({
           queryKey: taskRelationshipsKeys.byAttempt(
-            createdTask.parent_workspace_id
+            createdTask.parentWorkspaceId
           ),
         });
       }
@@ -52,10 +52,10 @@ export function useTaskMutations(projectId?: string) {
     onSuccess: (createdTask: TaskWithAttemptStatus) => {
       invalidateQueries();
       // Invalidate parent's relationships cache if this is a subtask
-      if (createdTask.parent_workspace_id) {
+      if (createdTask.parentWorkspaceId) {
         queryClient.invalidateQueries({
           queryKey: taskRelationshipsKeys.byAttempt(
-            createdTask.parent_workspace_id
+            createdTask.parentWorkspaceId
           ),
         });
       }

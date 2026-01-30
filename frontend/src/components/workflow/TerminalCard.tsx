@@ -49,11 +49,11 @@ const STATUS_STYLES: Record<
     className: 'text-green-500',
   },
   completed: {
-    icon: <Check className="w-5 h-5 text-green-500" weight="bold" />,
+    icon: <Check className="w-5 h-5 text-green-500" strokeWidth={3} />,
     className: 'text-green-500',
   },
   failed: {
-    icon: <X className="w-5 h-5 text-red-500" weight="bold" />,
+    icon: <X className="w-5 h-5 text-red-500" strokeWidth={3} />,
     className: 'text-red-500',
   },
 };

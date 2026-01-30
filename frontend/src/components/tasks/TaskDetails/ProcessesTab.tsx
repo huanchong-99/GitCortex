@@ -201,7 +201,7 @@ function ProcessesTab({ sessionId }: ProcessesTabProps) {
                       {getStatusIcon(process.status)}
                       <div className="min-w-0">
                         <h3 className="font-medium text-sm">
-                          {process.run_reason}
+                          {process.runReason}
                         </h3>
                         <p
                           className="text-sm text-muted-foreground mt-1 truncate"
@@ -220,15 +220,15 @@ function ProcessesTab({ sessionId }: ProcessesTabProps) {
                         {
                           <p className="text-sm text-muted-foreground mt-1">
                             {t('processes.agent')}{' '}
-                            {process.executor_action.typ.type ===
+                            {process.executorAction.typ.type ===
                               'CodingAgentInitialRequest' ||
-                            process.executor_action.typ.type ===
+                            process.executorAction.typ.type ===
                               'CodingAgentFollowUpRequest' ||
-                            process.executor_action.typ.type ===
+                            process.executorAction.typ.type ===
                               'ReviewRequest' ? (
                               <ProfileVariantBadge
                                 profileVariant={
-                                  process.executor_action.typ
+                                  process.executorAction.typ
                                     .executor_profile_id
                                 }
                               />
@@ -245,10 +245,10 @@ function ProcessesTab({ sessionId }: ProcessesTabProps) {
                       >
                         {process.status}
                       </span>
-                      {process.exit_code !== null && (
+                      {process.exitCode !== null && (
                         <p className="text-xs text-muted-foreground mt-1">
                           {t('processes.exit', {
-                            code: process.exit_code.toString(),
+                            code: process.exitCode.toString(),
                           })}
                         </p>
                       )}
@@ -258,13 +258,13 @@ function ProcessesTab({ sessionId }: ProcessesTabProps) {
                     <div className="flex justify-between">
                       <span>
                         {t('processes.started', {
-                          date: formatDate(process.started_at),
+                          date: formatDate(process.startedAt),
                         })}
                       </span>
-                      {process.completed_at && (
+                      {process.completedAt && (
                         <span>
                           {t('processes.completed', {
-                            date: formatDate(process.completed_at),
+                            date: formatDate(process.completedAt),
                           })}
                         </span>
                       )}

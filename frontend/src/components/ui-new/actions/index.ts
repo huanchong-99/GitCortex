@@ -322,7 +322,7 @@ export const Actions = {
           ? getNextWorkspaceId(ctx.activeWorkspaces, workspaceId)
           : null;
 
-        await tasksApi.delete(workspace.task_id);
+        await tasksApi.delete(workspace.taskId);
         ctx.queryClient.invalidateQueries({ queryKey: taskKeys.all });
         ctx.queryClient.invalidateQueries({
           queryKey: workspaceSummaryKeys.all,
@@ -592,15 +592,15 @@ export const Actions = {
         ctx.queryClient,
         ctx.currentWorkspaceId
       );
-      if (!workspace?.task_id) {
+      if (!workspace?.taskId) {
         ctx.navigate('/');
         return;
       }
 
-      // Fetch task lazily to get project_id
-      const task = await tasksApi.getById(workspace.task_id);
-      if (task?.project_id) {
-        ctx.navigate(`/projects/${task.project_id}/tasks/${workspace.task_id}`);
+      // Fetch task lazily to get projectId
+      const task = await tasksApi.getById(workspace.taskId);
+      if (task?.projectId) {
+        ctx.navigate(`/projects/${task.projectId}/tasks/${workspace.taskId}`);
       } else {
         ctx.navigate('/');
       }
@@ -734,7 +734,7 @@ export const Actions = {
     isVisible: (ctx) => ctx.hasWorkspace && ctx.hasGitRepos,
     execute: async (ctx, workspaceId, repoId) => {
       const workspace = await getWorkspace(ctx.queryClient, workspaceId);
-      const task = await tasksApi.getById(workspace.task_id);
+      const task = await tasksApi.getById(workspace.taskId);
 
       const repos = await attemptsApi.getRepos(workspaceId);
       const repo = repos.find((r) => r.id === repoId);
@@ -743,12 +743,12 @@ export const Actions = {
         attempt: workspace,
         task: {
           ...task,
-          has_in_progress_attempt: false,
-          last_attempt_failed: false,
+          hasInProgressAttempt: false,
+          lastAttemptFailed: false,
           executor: '',
         },
         repoId,
-        targetBranch: repo?.target_branch,
+        targetBranch: repo?.targetBranch,
       });
 
       if (!result.success && result.error) {
@@ -811,7 +811,7 @@ export const Actions = {
             attemptId: workspaceId,
             repoId,
             branches,
-            initialTargetBranch: repo.target_branch,
+            initialTargetBranch: repo.targetBranch,
           });
         }
         return;
@@ -873,7 +873,7 @@ export const Actions = {
         attemptId: workspaceId,
         repoId,
         branches,
-        initialTargetBranch: repo.target_branch,
+        initialTargetBranch: repo.targetBranch,
       });
     },
   },

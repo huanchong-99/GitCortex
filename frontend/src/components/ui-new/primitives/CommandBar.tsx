@@ -115,11 +115,11 @@ export function CommandBar({
                 return (
                   <CommandItem
                     key={item.repo.id}
-                    value={`${item.repo.id} ${item.repo.display_name}`}
+                    value={`${item.repo.id} ${item.repo.displayName}`}
                     onSelect={() => onSelect(item)}
                   >
                     <FolderIcon className="h-4 w-4" weight="regular" />
-                    <span>{item.repo.display_name}</span>
+                    <span>{item.repo.displayName}</span>
                   </CommandItem>
                 );
               } else if (item.type === 'action') {

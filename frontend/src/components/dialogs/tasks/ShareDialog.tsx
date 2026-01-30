@@ -32,7 +32,7 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
   const { loading: systemLoading, remoteFeaturesEnabled } = useUserSystem();
   const { isSignedIn } = useAuth();
   const { project } = useProject();
-  const { shareTask } = useTaskMutations(task.project_id);
+  const { shareTask } = useTaskMutations(task.projectId);
   const { reset: resetShareTask } = shareTask;
 
   const [shareError, setShareError] = useState<string | null>(null);
@@ -102,7 +102,7 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
   const isRemoteDisabled = !systemLoading && !remoteFeaturesEnabled;
   const isShareDisabled =
     systemLoading || shareTask.isPending || isRemoteDisabled;
-  const isProjectLinked = project?.remote_project_id != null;
+  const isProjectLinked = project?.remoteProjectId != null;
   const canShare =
     isSignedIn && isProjectLinked && !shareTask.isSuccess && !isRemoteDisabled;
 

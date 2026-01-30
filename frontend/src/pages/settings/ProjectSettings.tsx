@@ -217,8 +217,8 @@ export function ProjectSettings() {
     setRepoError(null);
     try {
       const newRepo = await projectsApi.addRepository(selectedProjectId, {
-        display_name: repo.display_name,
-        git_repo_path: repo.path,
+        displayName: repo.displayName,
+        gitRepoPath: repo.path,
       });
       setRepositories((prev) => [...prev, newRepo]);
       queryClient.invalidateQueries({
@@ -493,7 +493,7 @@ export function ProjectSettings() {
                       }
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium">{repo.display_name}</div>
+                        <div className="font-medium">{repo.displayName}</div>
                         <div className="text-sm text-muted-foreground truncate">
                           {repo.path}
                         </div>

@@ -28,7 +28,7 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
   const modal = useModal();
   const { t } = useTranslation('settings');
   const [formData, setFormData] = useState({
-    tag_name: '',
+    tagName: '',
     content: '',
   });
   const [saving, setSaving] = useState(false);
@@ -40,12 +40,12 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
   useEffect(() => {
     if (tag) {
       setFormData({
-        tag_name: tag.tag_name,
+        tagName: tag.tagName,
         content: tag.content,
       });
     } else {
       setFormData({
-        tag_name: '',
+        tagName: '',
         content: '',
       });
     }
@@ -54,7 +54,7 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
   }, [tag]);
 
   const handleSave = async () => {
-    if (!formData.tag_name.trim()) {
+    if (!formData.tagName.trim()) {
       setError(t('settings.general.tags.dialog.errors.nameRequired'));
       return;
     }
@@ -65,13 +65,13 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
     try {
       if (isEditMode && tag) {
         const updateData: UpdateTag = {
-          tag_name: formData.tag_name,
+          tagName: formData.tagName,
           content: formData.content || null, // null means "don't update"
         };
         await tagsApi.update(tag.id, updateData);
       } else {
         const createData: CreateTag = {
-          tag_name: formData.tag_name,
+          tagName: formData.tagName,
           content: formData.content,
         };
         await tagsApi.create(createData);
@@ -98,7 +98,7 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
     if (!open) {
       // Reset form data when dialog closes
       setFormData({
-        tag_name: '',
+        tagName: '',
         content: '',
       });
       setError(null);
@@ -126,15 +126,15 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
             </Label>
             <p className="text-xs text-muted-foreground mb-1.5">
               {t('settings.general.tags.dialog.tagName.hint', {
-                tagName: formData.tag_name || 'tag_name',
+                tagName: formData.tagName || 'tag_name',
               })}
             </p>
             <Input
               id="tag-name"
-              value={formData.tag_name}
+              value={formData.tagName}
               onChange={(e) => {
                 const value = e.target.value;
-                setFormData({ ...formData, tag_name: value });
+                setFormData({ ...formData, tagName: value });
 
                 // Validate in real-time for spaces
                 if (value.includes(' ')) {
@@ -166,7 +166,7 @@ const TagEditDialogImpl = NiceModal.create<TagEditDialogProps>(({ tag }) => {
             </Label>
             <p className="text-xs text-muted-foreground mb-1.5">
               {t('settings.general.tags.dialog.content.hint', {
-                tagName: formData.tag_name || 'tag_name',
+                tagName: formData.tagName || 'tag_name',
               })}
             </p>
             <Textarea

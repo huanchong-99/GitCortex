@@ -150,7 +150,7 @@ export function OrganizationSettings() {
 
   // Calculate available local projects (not linked to any remote project)
   const availableLocalProjects = allProjects.filter(
-    (project) => !project.remote_project_id
+    (project) => !project.remoteProjectId
   );
 
   // Project mutations
@@ -472,7 +472,7 @@ export function OrganizationSettings() {
                 {remoteProjects.map((remoteProject) => {
                   // Find the local project linked to this remote project
                   const linkedLocalProject = allProjects.find(
-                    (p) => p.remote_project_id === remoteProject.id
+                    (p) => p.remoteProjectId === remoteProject.id
                   );
 
                   return (

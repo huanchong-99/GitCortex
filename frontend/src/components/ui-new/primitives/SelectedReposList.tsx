@@ -40,7 +40,7 @@ export function SelectedReposList({
       {repos.map((repo) => (
         <RepoCardSimple
           key={repo.id}
-          name={repo.display_name || repo.name}
+          name={repo.displayName || repo.name}
           path={repo.path}
           onRemove={() => onRemove(repo.id)}
           branches={branchesByRepo?.[repo.id]}

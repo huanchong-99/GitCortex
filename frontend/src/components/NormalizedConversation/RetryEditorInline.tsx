@@ -45,8 +45,8 @@ export function RetryEditorInline({
     const process = attemptData.processes?.find(
       (p) => p.id === executionProcessId
     );
-    if (!process?.executor_action) return null;
-    return extractProfileFromAction(process.executor_action)?.variant ?? null;
+    if (!process?.executorAction) return null;
+    return extractProfileFromAction(process.executorAction)?.variant ?? null;
   }, [attemptData.processes, executionProcessId]);
 
   const { selectedVariant, setSelectedVariant } = useVariant({

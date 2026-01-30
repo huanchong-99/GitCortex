@@ -51,7 +51,7 @@ function toSidebarWorkspace(
 ): SidebarWorkspace {
   return {
     id: ws.id,
-    taskId: ws.task_id,
+    taskId: ws.taskId,
     name: ws.name ?? ws.branch, // Use name if available, fallback to branch
     description: '',
     // Use real stats from summary if available
@@ -59,7 +59,7 @@ function toSidebarWorkspace(
     linesAdded: summary?.lines_added ?? undefined,
     linesRemoved: summary?.lines_removed ?? undefined,
     // Real data from stream
-    isRunning: ws.is_running,
+    isRunning: ws.isRunning,
     isPinned: ws.pinned,
     isArchived: ws.archived,
     // Additional data from summary
@@ -179,9 +179,9 @@ export function useWorkspaces(): UseWorkspacesResult {
         if (a.pinned !== b.pinned) {
           return a.pinned ? -1 : 1;
         }
-        // Then by created_at (newest first)
+        // Then by createdAt (newest first)
         return (
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
       })
       .map((ws) => toSidebarWorkspace(ws, activeSummaries.get(ws.id)));
@@ -195,9 +195,9 @@ export function useWorkspaces(): UseWorkspacesResult {
         if (a.pinned !== b.pinned) {
           return a.pinned ? -1 : 1;
         }
-        // Then by created_at (newest first)
+        // Then by createdAt (newest first)
         return (
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
       })
       .map((ws) => toSidebarWorkspace(ws, archivedSummaries.get(ws.id)));

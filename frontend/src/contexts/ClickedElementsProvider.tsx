@@ -329,7 +329,7 @@ export function ClickedElementsProvider({
   attempt,
 }: ClickedElementsProviderProps) {
   const [elements, setElements] = useState<ClickedEntry[]>([]);
-  const workspaceRoot = attempt?.container_ref;
+  const workspaceRoot = attempt?.containerRef;
 
   // Clear elements when attempt changes
   useEffect(() => {

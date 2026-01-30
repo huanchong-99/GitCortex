@@ -117,11 +117,11 @@ export function NextActionCard({
   }, [navigate]);
 
   const handleTryAgain = useCallback(() => {
-    if (!attempt?.task_id) return;
+    if (!attempt?.taskId) return;
     CreateAttemptDialog.show({
-      taskId: attempt.task_id,
+      taskId: attempt.taskId,
     });
-  }, [attempt?.task_id]);
+  }, [attempt?.taskId]);
 
   const handleGitActions = useCallback(() => {
     if (!attemptId) return;
@@ -226,7 +226,7 @@ export function NextActionCard({
                   variant="destructive"
                   size="sm"
                   onClick={handleTryAgain}
-                  disabled={!attempt?.task_id}
+                  disabled={!attempt?.taskId}
                   className="text-sm w-full sm:w-auto"
                   aria-label={t('attempt.tryAgain')}
                 >

@@ -7,7 +7,7 @@ import type {
   TerminalDto,
   WorkflowCommandDto,
   SlashCommandPresetDto,
-} from '@/shared/types';
+} from 'shared/types';
 
 // ============================================================================
 // Create Request Types (not in generated types yet)

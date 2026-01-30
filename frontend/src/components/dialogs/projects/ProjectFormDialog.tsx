@@ -41,11 +41,11 @@ const ProjectFormDialogImpl = NiceModal.create<ProjectFormDialogProps>(() => {
     });
 
     if (repo) {
-      const projectName = repo.display_name || repo.name;
+      const projectName = repo.displayName || repo.name;
 
       const createData: CreateProject = {
         name: projectName,
-        repositories: [{ display_name: projectName, git_repo_path: repo.path }],
+        repositories: [{ displayName: projectName, gitRepoPath: repo.path }],
       };
 
       createProjectMutate(createData);

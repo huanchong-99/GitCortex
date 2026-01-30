@@ -30,22 +30,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Repo, UpdateRepo } from 'shared/types';
 
 interface RepoScriptsFormState {
-  display_name: string;
-  setup_script: string;
-  parallel_setup_script: boolean;
-  cleanup_script: string;
-  copy_files: string;
-  dev_server_script: string;
+  displayName: string;
+  setupScript: string;
+  parallelSetupScript: boolean;
+  cleanupScript: string;
+  copyFiles: string;
+  devServerScript: string;
 }
 
 function repoToFormState(repo: Repo): RepoScriptsFormState {
   return {
-    display_name: repo.display_name,
-    setup_script: repo.setup_script ?? '',
-    parallel_setup_script: repo.parallel_setup_script,
-    cleanup_script: repo.cleanup_script ?? '',
-    copy_files: repo.copy_files ?? '',
-    dev_server_script: repo.dev_server_script ?? '',
+    displayName: repo.displayName,
+    setupScript: repo.setupScript ?? '',
+    parallelSetupScript: repo.parallelSetupScript,
+    cleanupScript: repo.cleanupScript ?? '',
+    copyFiles: repo.copyFiles ?? '',
+    devServerScript: repo.devServerScript ?? '',
   };
 }
 
@@ -176,12 +176,12 @@ export function ReposSettings() {
 
     try {
       const updateData: UpdateRepo = {
-        display_name: draft.display_name.trim() || null,
-        setup_script: draft.setup_script.trim() || null,
-        cleanup_script: draft.cleanup_script.trim() || null,
-        copy_files: draft.copy_files.trim() || null,
-        parallel_setup_script: draft.parallel_setup_script,
-        dev_server_script: draft.dev_server_script.trim() || null,
+        displayName: draft.displayName.trim() || null,
+        setupScript: draft.setupScript.trim() || null,
+        cleanupScript: draft.cleanupScript.trim() || null,
+        copyFiles: draft.copyFiles.trim() || null,
+        parallelSetupScript: draft.parallelSetupScript,
+        devServerScript: draft.devServerScript.trim() || null,
       };
 
       const updatedRepo = await repoApi.update(selectedRepo.id, updateData);
@@ -272,7 +272,7 @@ export function ReposSettings() {
                 {repos && repos.length > 0 ? (
                   repos.map((repo) => (
                     <SelectItem key={repo.id} value={repo.id}>
-                      {repo.display_name}
+                      {repo.displayName}
                     </SelectItem>
                   ))
                 ) : (
@@ -306,9 +306,9 @@ export function ReposSettings() {
                 <Input
                   id="display-name"
                   type="text"
-                  value={draft.display_name}
+                  value={draft.displayName}
                   onChange={(e) =>
-                    updateDraft({ display_name: e.target.value })
+                    updateDraft({ displayName: e.target.value })
                   }
                   placeholder={t(
                     'settings.repos.general.displayName.placeholder'
@@ -342,10 +342,10 @@ export function ReposSettings() {
                 </Label>
                 <AutoExpandingTextarea
                   id="dev-server-script"
-                  value={draft.dev_server_script}
+                  value={draft.devServerScript}
                   onChange={(e) =>
                     updateDraft({
-                      dev_server_script: e.target.value,
+                      devServerScript: e.target.value,
                     })
                   }
                   placeholder={placeholders.dev}
@@ -363,9 +363,9 @@ export function ReposSettings() {
                 </Label>
                 <AutoExpandingTextarea
                   id="setup-script"
-                  value={draft.setup_script}
+                  value={draft.setupScript}
                   onChange={(e) =>
-                    updateDraft({ setup_script: e.target.value })
+                    updateDraft({ setupScript: e.target.value })
                   }
                   placeholder={placeholders.setup}
                   maxRows={12}
@@ -378,13 +378,13 @@ export function ReposSettings() {
                 <div className="flex items-center space-x-2 pt-2">
                   <Checkbox
                     id="parallel-setup-script"
-                    checked={draft.parallel_setup_script}
+                    checked={draft.parallelSetupScript}
                     onCheckedChange={(checked) =>
                       updateDraft({
-                        parallel_setup_script: checked === true,
+                        parallelSetupScript: checked === true,
                       })
                     }
-                    disabled={!draft.setup_script.trim()}
+                    disabled={!draft.setupScript.trim()}
                   />
                   <Label
                     htmlFor="parallel-setup-script"
@@ -404,10 +404,10 @@ export function ReposSettings() {
                 </Label>
                 <AutoExpandingTextarea
                   id="cleanup-script"
-                  value={draft.cleanup_script}
+                  value={draft.cleanupScript}
                   onChange={(e) =>
                     updateDraft({
-                      cleanup_script: e.target.value,
+                      cleanupScript: e.target.value,
                     })
                   }
                   placeholder={placeholders.cleanup}
@@ -424,8 +424,8 @@ export function ReposSettings() {
                   {t('settings.repos.scripts.copyFiles.label')}
                 </Label>
                 <MultiFileSearchTextarea
-                  value={draft.copy_files}
-                  onChange={(value) => updateDraft({ copy_files: value })}
+                  value={draft.copyFiles}
+                  onChange={(value) => updateDraft({ copyFiles: value })}
                   placeholder={t(
                     'settings.repos.scripts.copyFiles.placeholder'
                   )}

@@ -53,12 +53,12 @@ import type {
 
 interface Task {
   id: string;
-  project_id: string;
+  projectId: string;
   title: string;
   description: string | null;
   status: TaskStatus;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type TaskFormDialogProps =
@@ -172,8 +172,8 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
             title: value.title,
             description: value.description,
             status: value.status,
-            parent_workspace_id: null,
-            image_ids: images.length > 0 ? images.map((img) => img.id) : null,
+            parentWorkspaceId: null,
+            imageIds: images.length > 0 ? images.map((img) => img.id) : null,
           },
         },
         { onSuccess: () => modal.remove() }
@@ -182,14 +182,14 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
       const imageIds =
         newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : null;
       const task = {
-        project_id: projectId,
+        projectId: projectId,
         title: value.title,
         description: value.description,
         status: null,
-        parent_workspace_id:
+        parentWorkspaceId:
           mode === 'subtask' ? props.parentTaskAttemptId : null,
-        image_ids: imageIds,
-        shared_task_id: null,
+        imageIds: imageIds,
+        sharedTaskId: null,
       };
       const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current;
       if (shouldAutoStart) {

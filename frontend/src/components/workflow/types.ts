@@ -217,7 +217,9 @@ export function wizardConfigToCreateRequest(
     commands: config.commands.presetIds.map((presetId, index) => ({
       presetId,
       orderIndex: index,
-      customParams: config.commands.customParams?.[presetId] ?? null,
+      customParams: config.commands.customParams?.[presetId]
+        ? JSON.stringify(config.commands.customParams[presetId])
+        : null,
     })),
     orchestratorConfig: {
       apiType: orchestratorModel.apiType,
@@ -267,7 +269,7 @@ export function wizardConfigToCreateRequest(
               customBaseUrl: model.baseUrl !== orchestratorModel.baseUrl ? model.baseUrl : null,
               customApiKey: model.apiKey !== orchestratorModel.apiKey ? model.apiKey : null,
               role: terminal.role,
-              roleDescription: null,
+              roleDescription: undefined,
               orderIndex: terminal.orderIndex,
             };
           }),

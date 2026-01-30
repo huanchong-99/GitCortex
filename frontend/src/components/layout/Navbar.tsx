@@ -101,7 +101,7 @@ export function Navbar() {
     remoteFeaturesEnabled &&
     isTasksRoute &&
     active &&
-    project?.remote_project_id != null;
+    project?.remoteProjectId != null;
 
   const handleSharedToggle = useCallback(
     (checked: boolean) => {

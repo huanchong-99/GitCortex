@@ -64,13 +64,13 @@ export function NoServerContent({
 
     createAndStart.mutate({
       task: {
-        project_id: project.id,
+        projectId: project.id,
         title: COMPANION_INSTALL_TASK_TITLE,
         description: COMPANION_INSTALL_TASK_DESCRIPTION,
         status: null,
-        parent_workspace_id: null,
-        image_ids: null,
-        shared_task_id: null,
+        parentWorkspaceId: null,
+        imageIds: null,
+        sharedTaskId: null,
       },
       executor_profile_id: config.executor_profile,
       repos,

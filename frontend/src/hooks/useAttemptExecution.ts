@@ -18,7 +18,7 @@ export function useAttemptExecution(attemptId?: string, taskId?: string) {
   // Get setup script processes that need detailed info
   const setupProcesses = useMemo(() => {
     if (!executionProcesses.length) return [] as ExecutionProcess[];
-    return executionProcesses.filter((p) => p.run_reason === 'setupscript');
+    return executionProcesses.filter((p) => p.runReason === 'setupscript');
   }, [executionProcesses]);
 
   // Fetch details for setup processes

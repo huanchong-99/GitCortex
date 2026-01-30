@@ -48,9 +48,9 @@ export const ExecutionProcessesProvider: React.FC<{
     () =>
       visible.some(
         (process) =>
-          (process.run_reason === 'codingagent' ||
-            process.run_reason === 'setupscript' ||
-            process.run_reason === 'cleanupscript') &&
+          (process.runReason === 'codingagent' ||
+            process.runReason === 'setupscript' ||
+            process.runReason === 'cleanupscript') &&
           process.status === 'running'
       ),
     [visible]

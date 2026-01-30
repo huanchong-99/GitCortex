@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Play, Pause, Square, Trash2, Edit } from 'lucide-react';
+import { Plus, Play, Pause, Square, Trash2 } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import {
   useWorkflows,
@@ -17,9 +17,8 @@ import {
 import type { WorkflowTaskDto } from 'shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
 import { PipelineView, type WorkflowStatus, type WorkflowTask } from '@/components/workflow/PipelineView';
-import type { WizardConfig } from '@/components/workflow/types';
+import { WizardConfig } from '@/components/workflow/types';
 import { wizardConfigToCreateRequest } from '@/components/workflow/types';
-import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
@@ -204,8 +203,8 @@ export function Workflows() {
           status={mapWorkflowStatus(selectedWorkflowDetail.status)}
           tasks={mapWorkflowTasks(selectedWorkflowDetail.tasks)}
           mergeTerminal={{
-            cliTypeId: selectedWorkflowDetail.mergeTerminalCliId,
-            modelConfigId: selectedWorkflowDetail.mergeTerminalModelId,
+            cliTypeId: selectedWorkflowDetail.mergeTerminalCliId ?? '',
+            modelConfigId: selectedWorkflowDetail.mergeTerminalModelId ?? '',
             status: 'not_started' as TerminalStatus,
           }}
           onTerminalClick={undefined}

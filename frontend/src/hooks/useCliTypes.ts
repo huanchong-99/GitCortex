@@ -99,8 +99,14 @@ export function useCliTypes(
 
   return useQuery({
     queryKey: cliTypesKeys.all,
-    queryFn: () => cliTypesApi.getAll(),
-    onError: (error) => notifyError(error),
+    queryFn: async () => {
+      try {
+        return await cliTypesApi.getAll();
+      } catch (error) {
+        notifyError(error as Error);
+        throw error;
+      }
+    },
     staleTime: 1000 * 60 * 60, // 1 hour - CLI types don't change often
   });
 }
@@ -119,8 +125,14 @@ export function useCliDetection(
 
   return useQuery({
     queryKey: cliTypesKeys.detection,
-    queryFn: () => cliTypesApi.detectInstallation(),
-    onError: (error) => notifyError(error),
+    queryFn: async () => {
+      try {
+        return await cliTypesApi.detectInstallation();
+      } catch (error) {
+        notifyError(error as Error);
+        throw error;
+      }
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes - installation status can change
     refetchOnWindowFocus: true, // Re-check when user returns to tab
   });
@@ -142,9 +154,15 @@ export function useModelsForCli(
 
   return useQuery({
     queryKey: cliTypesKeys.models(cliTypeId),
-    queryFn: () => cliTypesApi.getModels(cliTypeId),
+    queryFn: async () => {
+      try {
+        return await cliTypesApi.getModels(cliTypeId);
+      } catch (error) {
+        notifyError(error as Error);
+        throw error;
+      }
+    },
     enabled: !!cliTypeId,
-    onError: (error) => notifyError(error),
     staleTime: 1000 * 60 * 30, // 30 minutes - available models don't change often
   });
 }

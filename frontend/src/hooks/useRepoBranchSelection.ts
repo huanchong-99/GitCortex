@@ -65,7 +65,7 @@ export function useRepoBranchSelection({
 
       return {
         repoId: repo.id,
-        repoDisplayName: repo.display_name,
+        repoDisplayName: repo.displayName,
         targetBranch,
         branches,
       };

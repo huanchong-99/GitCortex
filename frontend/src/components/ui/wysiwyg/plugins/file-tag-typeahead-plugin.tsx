@@ -227,7 +227,7 @@ export function FileTagTypeaheadPlugin({
                         >
                           <div className="flex items-center gap-2 font-medium">
                             <TagIcon className="h-3.5 w-3.5 text-blue-600" />
-                            <span>@{tag.tag_name}</span>
+                            <span>@{tag.tagName}</span>
                           </div>
                           {tag.content && (
                             <div className="text-xs mt-0.5 truncate">

@@ -62,15 +62,15 @@ export function usePreviewSettings(
   const hasOverride = overrideUrl !== null && overrideUrl.trim() !== '';
 
   const screenSize: ScreenSize =
-    (scratchData?.screen_size as ScreenSize) ?? 'desktop';
+    (scratchData?.screenSize as ScreenSize) ?? 'desktop';
   const responsiveDimensions: ResponsiveDimensions = useMemo(
     () => ({
       width:
-        scratchData?.responsive_width ?? DEFAULT_RESPONSIVE_DIMENSIONS.width,
+        scratchData?.responsiveWidth ?? DEFAULT_RESPONSIVE_DIMENSIONS.width,
       height:
-        scratchData?.responsive_height ?? DEFAULT_RESPONSIVE_DIMENSIONS.height,
+        scratchData?.responsiveHeight ?? DEFAULT_RESPONSIVE_DIMENSIONS.height,
     }),
-    [scratchData?.responsive_width, scratchData?.responsive_height]
+    [scratchData?.responsiveWidth, scratchData?.responsiveHeight]
   );
 
   // Helper to save settings
@@ -84,11 +84,11 @@ export function usePreviewSettings(
             type: 'PREVIEW_SETTINGS',
             data: {
               url: updates.url ?? overrideUrl ?? '',
-              screen_size: updates.screen_size ?? screenSize,
-              responsive_width:
-                updates.responsive_width ?? responsiveDimensions.width,
-              responsive_height:
-                updates.responsive_height ?? responsiveDimensions.height,
+              screenSize: updates.screenSize ?? screenSize,
+              responsiveWidth:
+                updates.responsiveWidth ?? responsiveDimensions.width,
+              responsiveHeight:
+                updates.responsiveHeight ?? responsiveDimensions.height,
             },
           },
         });
@@ -118,8 +118,8 @@ export function usePreviewSettings(
   const { debounced: debouncedSaveDimensions } = useDebouncedCallback(
     async (dimensions: ResponsiveDimensions) => {
       await saveSettings({
-        responsive_width: dimensions.width,
-        responsive_height: dimensions.height,
+        responsiveWidth: dimensions.width,
+        responsiveHeight: dimensions.height,
       });
     },
     300
@@ -134,7 +134,7 @@ export function usePreviewSettings(
 
   const setScreenSize = useCallback(
     (size: ScreenSize) => {
-      saveSettings({ screen_size: size });
+      saveSettings({ screenSize: size });
     },
     [saveSettings]
   );

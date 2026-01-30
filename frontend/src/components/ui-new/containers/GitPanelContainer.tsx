@@ -56,17 +56,17 @@ export function GitPanelContainer({
 
         if (repoStatus?.merges) {
           const openPR = repoStatus.merges.find(
-            (m: Merge) => m.type === 'pr' && m.pr_info.status === 'open'
+            (m: Merge) => m.type === 'pr' && m.prInfo.status === 'open'
           );
           const mergedPR = repoStatus.merges.find(
-            (m: Merge) => m.type === 'pr' && m.pr_info.status === 'merged'
+            (m: Merge) => m.type === 'pr' && m.prInfo.status === 'merged'
           );
 
           const relevantPR = openPR || mergedPR;
           if (relevantPR && relevantPR.type === 'pr') {
-            prNumber = Number(relevantPR.pr_info.number);
-            prUrl = relevantPR.pr_info.url;
-            prStatus = relevantPR.pr_info.status;
+            prNumber = Number(relevantPR.prInfo.number);
+            prUrl = relevantPR.prInfo.url;
+            prStatus = relevantPR.prInfo.status;
           }
         }
 
@@ -83,8 +83,8 @@ export function GitPanelContainer({
 
         return {
           id: repo.id,
-          name: repo.display_name || repo.name,
-          targetBranch: repo.target_branch || 'main',
+          name: repo.displayName || repo.name,
+          targetBranch: repo.targetBranch || 'main',
           commitsAhead: repoStatus?.commits_ahead ?? 0,
           remoteCommitsAhead: repoStatus?.remote_commits_ahead ?? 0,
           filesChanged,

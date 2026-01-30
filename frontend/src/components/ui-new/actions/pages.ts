@@ -31,7 +31,7 @@ export type CommandBarItem = CommandBarGroup;
 // Repo item for dynamic repo selection page
 export interface RepoItem {
   id: string;
-  display_name: string;
+  displayName: string;
 }
 
 // Resolved types (after childPages expansion)

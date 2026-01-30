@@ -122,17 +122,17 @@ export function useCreateModeState({
     }
 
     // Restore project_id only if it still exists
-    if (scratchData.project_id && scratchData.project_id in projectsById) {
-      setSelectedProjectId(scratchData.project_id);
+    if (scratchData.projectId && scratchData.projectId in projectsById) {
+      setSelectedProjectId(scratchData.projectId);
       hasInitializedProject.current = true;
     }
 
     // Restore executor profile only if it's still valid
     if (
-      scratchData.selected_profile &&
-      isValidProfile(scratchData.selected_profile)
+      scratchData.selectedProfile &&
+      isValidProfile(scratchData.selectedProfile)
     ) {
-      setSelectedProfile(scratchData.selected_profile);
+      setSelectedProfile(scratchData.selectedProfile);
     }
 
     // Restore repos (async - fetch any missing from API)
@@ -140,7 +140,7 @@ export function useCreateModeState({
       const restoreRepos = async () => {
         const initialRepoMap = new Map(initialRepos.map((r) => [r.id, r]));
         const missingIds = scratchData.repos
-          .map((r) => r.repo_id)
+          .map((r) => r.repoId)
           .filter((id) => !initialRepoMap.has(id));
 
         let allRepos: (Repo | RepoWithTargetBranch)[] = [...initialRepos];
@@ -158,10 +158,10 @@ export function useCreateModeState({
         const restoredBranches: Record<string, string> = {};
 
         for (const draftRepo of scratchData.repos) {
-          const fullRepo = repoMap.get(draftRepo.repo_id);
+          const fullRepo = repoMap.get(draftRepo.repoId);
           if (fullRepo) {
             restoredRepos.push(fullRepo);
-            restoredBranches[draftRepo.repo_id] = draftRepo.target_branch;
+            restoredBranches[draftRepo.repoId] = draftRepo.targetBranch;
           }
         }
 
@@ -195,7 +195,7 @@ export function useCreateModeState({
       setTargetBranches(
         initialRepos.reduce(
           (acc, repo) => {
-            acc[repo.id] = repo.target_branch;
+            acc[repo.id] = repo.targetBranch;
             return acc;
           },
           {} as Record<string, string>
@@ -234,8 +234,8 @@ export function useCreateModeState({
       // Auto-select the first project (sorted by created_at desc)
       const sortedProjects = [...projectsList].sort(
         (a, b) =>
-          new Date(b.created_at as unknown as string).getTime() -
-          new Date(a.created_at as unknown as string).getTime()
+          new Date(b.createdAt as unknown as string).getTime() -
+          new Date(a.createdAt as unknown as string).getTime()
       );
       setSelectedProjectId(sortedProjects[0].id);
     } else {
@@ -275,9 +275,9 @@ export function useCreateModeState({
     async (data: DraftWorkspaceData) => {
       const isEmpty =
         !data.message.trim() &&
-        !data.project_id &&
+        !data.projectId &&
         data.repos.length === 0 &&
-        !data.selected_profile;
+        !data.selectedProfile;
 
       if (isEmpty && !scratch) return;
 
@@ -301,12 +301,12 @@ export function useCreateModeState({
 
     debouncedSave({
       message,
-      project_id: selectedProjectId,
+      projectId: selectedProjectId,
       repos: repos.map((r) => ({
-        repo_id: r.id,
-        target_branch: targetBranches[r.id] ?? 'main',
+        repoId: r.id,
+        targetBranch: targetBranches[r.id] ?? 'main',
       })),
-      selected_profile: selectedProfile,
+      selectedProfile: selectedProfile,
     });
   }, [
     message,

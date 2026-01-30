@@ -149,13 +149,13 @@ export function CreateChatBoxContainer() {
 
     await createWorkspace.mutateAsync({
       task: {
-        project_id: projectId,
+        projectId: projectId,
         title,
         description,
         status: null,
-        parent_workspace_id: null,
-        image_ids: getImageIds(),
-        shared_task_id: null,
+        parentWorkspaceId: null,
+        imageIds: getImageIds(),
+        sharedTaskId: null,
       },
       executor_profile_id: effectiveProfile,
       repos: repos.map((r) => ({

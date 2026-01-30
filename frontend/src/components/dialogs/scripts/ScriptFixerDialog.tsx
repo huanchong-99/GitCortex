@@ -73,13 +73,13 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
             ? 'cleanupscript'
             : 'devserver';
       const filtered = executionProcesses.filter(
-        (p) => p.run_reason === runReason && !p.dropped
+        (p) => p.runReason === runReason && !p.dropped
       );
-      // Sort by created_at descending and return the first one
+      // Sort by createdAt descending and return the first one
       return filtered.sort(
         (a, b) =>
-          new Date(b.created_at as unknown as string).getTime() -
-          new Date(a.created_at as unknown as string).getTime()
+          new Date(b.createdAt as unknown as string).getTime() -
+          new Date(a.createdAt as unknown as string).getTime()
       )[0];
     }, [executionProcesses, scriptType]);
 
@@ -96,8 +96,8 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
     const isProcessCompleted = latestProcess?.status === 'completed';
     const isProcessKilled = latestProcess?.status === 'killed';
     const isProcessFailed = latestProcess?.status === 'failed';
-    // exit_code can be null, number, or BigInt - convert to Number for comparison
-    const exitCode = latestProcess?.exit_code;
+    // exitCode can be null, number, or BigInt - convert to Number for comparison
+    const exitCode = latestProcess?.exitCode;
     const isExitCodeZero = exitCode == null || Number(exitCode) === 0;
     const isProcessSuccessful = isProcessCompleted && isExitCodeZero;
     const hasProcessError =
@@ -124,10 +124,10 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
 
           const scriptContent =
             scriptType === 'setup'
-              ? (repo.setup_script ?? '')
+              ? (repo.setupScript ?? '')
               : scriptType === 'cleanup'
-                ? (repo.cleanup_script ?? '')
-                : (repo.dev_server_script ?? '');
+                ? (repo.cleanupScript ?? '')
+                : (repo.devServerScript ?? '');
 
           setScript(scriptContent);
           setOriginalScript(scriptContent);
@@ -170,10 +170,10 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
         const scriptValue = script.trim() || null;
         const updateData: Partial<UpdateRepo> =
           scriptType === 'setup'
-            ? { setup_script: scriptValue }
+            ? { setupScript: scriptValue }
             : scriptType === 'cleanup'
-              ? { cleanup_script: scriptValue }
-              : { dev_server_script: scriptValue };
+              ? { cleanupScript: scriptValue }
+              : { devServerScript: scriptValue };
 
         await repoApi.update(selectedRepoId, updateData as UpdateRepo);
 
@@ -203,10 +203,10 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
         const scriptValue = script.trim() || null;
         const updateData: Partial<UpdateRepo> =
           scriptType === 'setup'
-            ? { setup_script: scriptValue }
+            ? { setupScript: scriptValue }
             : scriptType === 'cleanup'
-              ? { cleanup_script: scriptValue }
-              : { dev_server_script: scriptValue };
+              ? { cleanupScript: scriptValue }
+              : { devServerScript: scriptValue };
 
         await repoApi.update(selectedRepoId, updateData as UpdateRepo);
 
@@ -271,7 +271,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
                   <SelectContent>
                     {repos.map((repo) => (
                       <SelectItem key={repo.id} value={repo.id}>
-                        {repo.display_name || repo.path}
+                        {repo.displayName || repo.path}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -334,7 +334,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
                         <span className="size-2 rounded-full bg-destructive bg-error" />
                         <span className="text-destructive text-error">
                           {t('scriptFixer.statusFailed', {
-                            exitCode: Number(latestProcess.exit_code ?? 0),
+                            exitCode: Number(latestProcess.exitCode ?? 0),
                           })}
                         </span>
                       </>

@@ -106,7 +106,7 @@ interface ParamsEditorModalProps {
 }
 
 const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
-  presetId,
+  presetId: _presetId,
   presetName,
   initialParams,
   onSave,
@@ -338,12 +338,6 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
 
   const handleCancelParams = () => {
     setEditingParamsFor(null);
-  };
-
-  const handleClearParams = (presetId: string) => {
-    const currentParams = config.customParams ?? {};
-    const { [presetId]: _, ...rest } = currentParams;
-    onUpdate({ customParams: Object.keys(rest).length > 0 ? rest : undefined });
   };
 
   return (

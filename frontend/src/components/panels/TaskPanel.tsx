@@ -31,7 +31,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
   } = useTaskAttemptsWithSessions(task?.id);
 
   const { data: parentAttempt, isLoading: isParentLoading } =
-    useTaskAttemptWithSession(task?.parent_workspace_id || undefined);
+    useTaskAttemptWithSession(task?.parentWorkspaceId || undefined);
 
   const formatTimeAgo = (iso: string) => {
     const d = new Date(iso);
@@ -64,7 +64,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
 
   const displayedAttempts = [...attempts].sort(
     (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
   if (!task) {
@@ -94,7 +94,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
     {
       id: 'time',
       header: '',
-      accessor: (attempt) => formatTimeAgo(attempt.created_at),
+      accessor: (attempt) => formatTimeAgo(attempt.createdAt),
       className: 'pr-0 text-right',
     },
   ];
@@ -111,7 +111,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
           </div>
 
           <div className="mt-6 flex-shrink-0 space-y-4">
-            {task.parent_workspace_id && (
+            {task.parentWorkspaceId && (
               <DataTable
                 data={parentAttempt ? [parentAttempt] : []}
                 columns={attemptColumns}
@@ -121,7 +121,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
                     navigate(`/workspaces/${attempt.id}`);
                   } else if (projectId) {
                     navigate(
-                      paths.attempt(projectId, attempt.task_id, attempt.id)
+                      paths.attempt(projectId, attempt.taskId, attempt.id)
                     );
                   }
                 }}

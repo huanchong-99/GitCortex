@@ -50,7 +50,7 @@ export function ActionsDropdown({
   const hasAttemptActions = Boolean(attempt);
   const hasTaskActions = Boolean(task);
   const isShared = remoteFeaturesEnabled && Boolean(sharedTask);
-  const hasSharedId = remoteFeaturesEnabled && Boolean(task?.shared_task_id);
+  const hasSharedId = remoteFeaturesEnabled && Boolean(task?.sharedTaskId);
   const canEditShared =
     !remoteFeaturesEnabled || (!isShared && !hasSharedId) || isSignedIn;
 

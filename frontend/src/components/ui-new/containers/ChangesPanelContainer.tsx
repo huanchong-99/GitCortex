@@ -141,8 +141,8 @@ export function ChangesPanelContainer({
   attemptId,
 }: ChangesPanelContainerProps) {
   const { diffs, workspace } = useWorkspaceContext();
-  const { data: task } = useTask(workspace?.task_id, {
-    enabled: !!workspace?.task_id,
+  const { data: task } = useTask(workspace?.taskId, {
+    enabled: !!workspace?.taskId,
   });
   const { selectedFilePath, setFileInView } = useChangesView();
   const diffRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -207,7 +207,7 @@ export function ChangesPanelContainer({
       className={className}
       diffItems={diffItems}
       onDiffRef={handleDiffRef}
-      projectId={task?.project_id}
+      projectId={task?.projectId}
       attemptId={attemptId}
     />
   );

@@ -29,9 +29,9 @@ export function WorkspacesMainContainer({
   const { diffStats } = useWorkspaceContext();
   const containerRef = useRef<HTMLElement>(null);
 
-  // Fetch task to get project_id for file search
-  const { data: task } = useTask(selectedWorkspace?.task_id, {
-    enabled: !!selectedWorkspace?.task_id,
+  // Fetch task to get projectId for file search
+  const { data: task } = useTask(selectedWorkspace?.taskId, {
+    enabled: !!selectedWorkspace?.taskId,
   });
 
   // Create WorkspaceWithSession for ConversationList
@@ -47,7 +47,7 @@ export function WorkspacesMainContainer({
       onSelectSession={onSelectSession}
       isLoading={isLoading}
       containerRef={containerRef}
-      projectId={task?.project_id}
+      projectId={task?.projectId}
       isNewSessionMode={isNewSessionMode}
       onStartNewSession={onStartNewSession}
       diffStats={{

@@ -96,7 +96,7 @@ export function SessionChatBoxContainer({
   onStartNewSession,
   workspaceId: propWorkspaceId,
 }: SessionChatBoxContainerProps) {
-  const workspaceId = propWorkspaceId ?? session?.workspace_id;
+  const workspaceId = propWorkspaceId ?? session?.workspaceId;
   const sessionId = session?.id;
   const queryClient = useQueryClient();
 
