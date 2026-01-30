@@ -28,7 +28,9 @@ pub async fn git_status(
     State(deployment): State<DeploymentImpl>,
     ResponseJson(payload): ResponseJson<GitStatusRequest>,
 ) -> Result<ResponseJson<ApiResponse<GitStatusResponse>>, ApiError> {
-    let repo_path = PathBuf::from(&payload.path);
+    // Normalize path separators for cross-platform compatibility
+    let normalized_path = payload.path.replace('\\', "/");
+    let repo_path = PathBuf::from(&normalized_path);
     let git = deployment.git();
 
     if git.open_repo(&repo_path).is_err() {
@@ -72,9 +74,11 @@ pub async fn git_init(
     State(deployment): State<DeploymentImpl>,
     ResponseJson(payload): ResponseJson<GitInitRequest>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    // Normalize path separators for cross-platform compatibility
+    let normalized_path = payload.path.replace('\\', "/");
     deployment
         .git()
-        .initialize_repo_with_main_branch(std::path::Path::new(&payload.path))?;
+        .initialize_repo_with_main_branch(std::path::Path::new(&normalized_path))?;
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
