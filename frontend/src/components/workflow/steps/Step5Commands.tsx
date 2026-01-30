@@ -114,7 +114,7 @@ const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
 }) => {
   const { t } = useTranslation('workflow');
   const [jsonText, setJsonText] = useState(
-    initialParams ? JSON.stringify(initialParams, null, 2) : '{\n\n}'
+    initialParams ? JSON.stringify(initialParams, null, 2) : ''
   );
   const [error, setError] = useState<string | null>(null);
 
