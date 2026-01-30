@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,11 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
   const { t } = useTranslation('workflow');
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
 
+  // Use ref to store onChange to avoid triggering effect on every render
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Only initialize tasks when taskCount changes and config doesn't match
   useEffect(() => {
     if (config.length !== taskCount) {
       const newTasks: TaskConfig[] = Array.from({ length: taskCount }, (_, i) => ({
@@ -44,9 +49,9 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
         branch: '',
         terminalCount: 1,
       }));
-      onChange(newTasks);
+      onChangeRef.current(newTasks);
     }
-  }, [config.length, taskCount, onChange]);
+  }, [config.length, taskCount]);
 
   const updateTask = (index: number, updates: Partial<TaskConfig>) => {
     const newTasks = [...config];
