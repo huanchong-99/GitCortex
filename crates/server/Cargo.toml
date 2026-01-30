@@ -60,6 +60,13 @@ tower = { version = "0.5", features = ["util"] }
 hyper = "1.0"
 http-body-util = "0.1"
 tempfile = "3.10"
+criterion = { version = "0.5", features = ["async_tokio"] }
+tokio-tungstenite = "0.26"
+sysinfo = "0.33"
+
+[[bench]]
+name = "performance"
+harness = false
 
 [features]
 default = []
