@@ -245,8 +245,8 @@
       "descriptionHint": "Leave blank to use the default description"
     },
     "params": {
-      "title": "Custom Parameters",
-      "description": "Configure custom JSON parameters for this command preset. These parameters will override default values.",
+      "title": "Custom Parameters (JSON format)",
+      "description": "Optional: Configure custom parameters in JSON format. Leave empty to skip.",
       "edit": "Edit parameters",
       "configured": "Configured",
       "cancel": "Cancel",
@@ -254,8 +254,8 @@
       "placeholder": "Enter JSON object...",
       "hint": "Press Ctrl+Enter to save",
       "error": {
-        "invalidJson": "Invalid JSON syntax",
-        "notObject": "Value must be a JSON object (e.g., {\"key\": \"value\"})"
+        "invalidJson": "Invalid JSON syntax. Please enter a valid JSON object, e.g., {\"key\": \"value\"}",
+        "notObject": "Value must be a JSON object, e.g., {\"key\": \"value\"}"
       }
     }
   },

@@ -177,10 +177,15 @@ const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
           </div>
         </div>
 
-        {/* Parameters Description */}
-        <p className="text-base text-low mb-base">
-          {t('step5.params.description')}
-        </p>
+        {/* Parameters Section */}
+        <div className="mb-base">
+          <label className="block text-sm text-low mb-half">
+            {t('step5.params.title')}
+          </label>
+          <p className="text-xs text-low mb-half">
+            {t('step5.params.description')}
+          </p>
+        </div>
 
         {/* JSON Editor */}
         <div className="relative">
@@ -200,7 +205,7 @@ const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
               'focus:outline-none focus:ring-1 focus:ring-brand',
               error && 'border-error'
             )}
-            placeholder={t('step5.params.placeholder')}
+            placeholder={'{\n  "key": "value"\n}'}
             spellCheck={false}
           />
           {error && (

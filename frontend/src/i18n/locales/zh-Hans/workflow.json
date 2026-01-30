@@ -245,8 +245,8 @@
       "descriptionHint": "留空则使用默认描述"
     },
     "params": {
-      "title": "自定义参数",
-      "description": "为此命令预设配置自定义参数，这些参数将覆盖默认值。",
+      "title": "自定义参数（JSON 格式）",
+      "description": "可选：配置 JSON 格式的自定义参数，留空则不传递额外参数。",
       "edit": "编辑参数",
       "configured": "已配置",
       "cancel": "取消",
@@ -254,8 +254,8 @@
       "placeholder": "输入参数...",
       "hint": "按 Ctrl+Enter 保存",
       "error": {
-        "invalidJson": "JSON 语法错误",
-        "notObject": "请输入有效的 JSON 对象"
+        "invalidJson": "JSON 语法错误，请输入有效的 JSON 对象，例如：{\"key\": \"value\"}",
+        "notObject": "请输入有效的 JSON 对象，例如：{\"key\": \"value\"}"
       }
     }
   },
