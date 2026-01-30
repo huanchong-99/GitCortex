@@ -231,7 +231,18 @@
       "refactor": {
         "name": "Refactor code",
         "description": "Refactor code to improve maintainability"
+      },
+      "document": {
+        "name": "Document",
+        "description": "Write documentation"
       }
+    },
+    "edit": "Edit",
+    "editPreset": {
+      "title": "Edit",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Custom description for this command",
+      "descriptionHint": "Leave blank to use the default description"
     },
     "params": {
       "title": "Custom Parameters",

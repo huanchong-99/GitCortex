@@ -114,6 +114,7 @@ export interface TerminalConfig {
 export interface CommandConfig {
   enabled: boolean;
   presetIds: string[];  // 选中的命令预设 ID（按顺序）
+  customDescriptions?: Record<string, string>; // presetId -> 用户自定义描述
   customParams?: Record<string, Record<string, unknown>>; // presetId -> JSON object
 }
 

@@ -15,7 +15,6 @@ interface CommandPreset {
   name: string;
   displayName?: string;
   description?: string;
-  nameKey?: string;
   descriptionKey?: string;
   isSystem: boolean;
 }
@@ -36,36 +35,37 @@ export const SYSTEM_PRESETS: CommandPreset[] = [
   {
     id: 'write-code',
     name: 'write-code',
-    nameKey: 'step5.presets.writeCode.name',
     descriptionKey: 'step5.presets.writeCode.description',
     isSystem: true,
   },
   {
     id: 'review',
     name: 'review',
-    nameKey: 'step5.presets.review.name',
     descriptionKey: 'step5.presets.review.description',
     isSystem: true,
   },
   {
     id: 'fix-issues',
     name: 'fix-issues',
-    nameKey: 'step5.presets.fixIssues.name',
     descriptionKey: 'step5.presets.fixIssues.description',
     isSystem: true,
   },
   {
     id: 'test',
     name: 'test',
-    nameKey: 'step5.presets.test.name',
     descriptionKey: 'step5.presets.test.description',
     isSystem: true,
   },
   {
     id: 'refactor',
     name: 'refactor',
-    nameKey: 'step5.presets.refactor.name',
     descriptionKey: 'step5.presets.refactor.description',
+    isSystem: true,
+  },
+  {
+    id: 'document',
+    name: 'document',
+    descriptionKey: 'step5.presets.document.description',
     isSystem: true,
   },
 ];
@@ -93,26 +93,31 @@ const parseJson = async (response: Response): Promise<unknown> => {
   }
 };
 
+/** Format command name with slash prefix */
+const formatCommandLabel = (name: string): string =>
+  name.startsWith('/') ? name : `/${name}`;
+
 // ============================================================================
-// ParamsEditorModal Component
+// PresetEditorModal Component
 // ============================================================================
 
-interface ParamsEditorModalProps {
-  presetId: string;
-  presetName: string;
+interface PresetEditorModalProps {
+  presetLabel: string;
+  initialDescription: string;
   initialParams: Record<string, unknown> | null;
-  onSave: (params: Record<string, unknown>) => void;
+  onSave: (description: string, params: Record<string, unknown>) => void;
   onCancel: () => void;
 }
 
-const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
-  presetId: _presetId,
-  presetName,
+const PresetEditorModal: React.FC<PresetEditorModalProps> = ({
+  presetLabel,
+  initialDescription,
   initialParams,
   onSave,
   onCancel,
 }) => {
   const { t } = useTranslation('workflow');
+  const [description, setDescription] = useState(initialDescription);
   const [jsonText, setJsonText] = useState(
     initialParams ? JSON.stringify(initialParams, null, 2) : ''
   );
@@ -120,12 +125,13 @@ const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
 
   const validateAndSave = () => {
     try {
-      const parsed = JSON.parse(jsonText);
+      const trimmedJson = jsonText.trim();
+      const parsed = trimmedJson === '' ? {} : JSON.parse(trimmedJson);
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         setError(t('step5.params.error.notObject'));
         return;
       }
-      onSave(parsed as Record<string, unknown>);
+      onSave(description.trim(), parsed as Record<string, unknown>);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('step5.params.error.invalidJson'));
     }
@@ -137,7 +143,7 @@ const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-base">
           <h3 className="text-lg text-high font-semibold">
-            {t('step5.params.title')} - {presetName}
+            {t('step5.editPreset.title')} {presetLabel}
           </h3>
           <button
             type="button"
@@ -149,7 +155,29 @@ const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
           </button>
         </div>
 
-        {/* Description */}
+        {/* Command Description */}
+        <div className="mb-base">
+          <label className="block text-sm text-low mb-half">
+            {t('step5.editPreset.descriptionLabel')}
+          </label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+            }}
+            className={cn(
+              'w-full px-base py-half bg-secondary rounded border text-base text-normal',
+              'focus:outline-none focus:ring-1 focus:ring-brand'
+            )}
+            placeholder={t('step5.editPreset.descriptionPlaceholder')}
+          />
+          <div className="mt-half text-xs text-low">
+            {t('step5.editPreset.descriptionHint')}
+          </div>
+        </div>
+
+        {/* Parameters Description */}
         <p className="text-base text-low mb-base">
           {t('step5.params.description')}
         </p>
@@ -168,7 +196,7 @@ const ParamsEditorModal: React.FC<ParamsEditorModalProps> = ({
               }
             }}
             className={cn(
-              'w-full h-64 px-base py-base bg-secondary rounded border text-base text-normal font-ibm-plex-mono',
+              'w-full h-48 px-base py-base bg-secondary rounded border text-base text-normal font-ibm-plex-mono',
               'focus:outline-none focus:ring-1 focus:ring-brand',
               error && 'border-error'
             )}
@@ -234,13 +262,24 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
   const { t } = useTranslation('workflow');
   const [userPresets, setUserPresets] = useState<CommandPreset[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [editingParamsFor, setEditingParamsFor] = useState<string | null>(null);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
-  const getPresetName = (preset: CommandPreset) =>
-    preset.nameKey ? t(preset.nameKey) : preset.displayName ?? preset.name;
+  /** Get command label with slash prefix */
+  const getPresetLabel = (preset: CommandPreset): string =>
+    formatCommandLabel(preset.name);
 
-  const getPresetDescription = (preset: CommandPreset) =>
+  /** Get default description from translation */
+  const getDefaultDescription = (preset: CommandPreset): string =>
     preset.descriptionKey ? t(preset.descriptionKey) : preset.description ?? '';
+
+  /** Get description (custom or default) */
+  const getPresetDescription = (preset: CommandPreset): string => {
+    const customDescription = config.customDescriptions?.[preset.id];
+    if (customDescription !== undefined && customDescription !== '') {
+      return customDescription;
+    }
+    return getDefaultDescription(preset);
+  };
 
   // Fetch user presets from API
   useEffect(() => {
@@ -321,24 +360,55 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
     onUpdate({ presetIds: newPresetIds });
   };
 
-  const handleEditParams = (presetId: string) => {
-    setEditingParamsFor(presetId);
+  const handleEditPreset = (presetId: string) => {
+    setEditingPresetId(presetId);
   };
 
-  const handleSaveParams = (presetId: string, params: Record<string, unknown>) => {
+  const handleSavePreset = (
+    presetId: string,
+    description: string,
+    params: Record<string, unknown>
+  ) => {
+    const preset = allPresets.find((p) => p.id === presetId);
+    const defaultDescription = preset ? getDefaultDescription(preset) : '';
+
+    // Update custom descriptions
+    const currentDescriptions = config.customDescriptions ?? {};
+    const nextDescriptions = { ...currentDescriptions };
+
+    // Only store if different from default
+    if (description && description !== defaultDescription) {
+      nextDescriptions[presetId] = description;
+    } else {
+      delete nextDescriptions[presetId];
+    }
+
+    // Update custom params
     const currentParams = config.customParams ?? {};
+    const nextParams = { ...currentParams };
+
+    // Only store if not empty
+    if (Object.keys(params).length > 0) {
+      nextParams[presetId] = params;
+    } else {
+      delete nextParams[presetId];
+    }
+
     onUpdate({
-      customParams: {
-        ...currentParams,
-        [presetId]: params,
-      },
+      customDescriptions: Object.keys(nextDescriptions).length > 0 ? nextDescriptions : undefined,
+      customParams: Object.keys(nextParams).length > 0 ? nextParams : undefined,
     });
-    setEditingParamsFor(null);
+    setEditingPresetId(null);
   };
 
-  const handleCancelParams = () => {
-    setEditingParamsFor(null);
+  const handleCancelPreset = () => {
+    setEditingPresetId(null);
   };
+
+  // Get the preset being edited
+  const editingPreset = editingPresetId
+    ? allPresets.find((p) => p.id === editingPresetId) ?? null
+    : null;
 
   return (
     <div className="flex flex-col gap-base">
@@ -406,10 +476,10 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                     {/* Command Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-half">
-                        <div className="text-base text-high truncate">
-                          {getPresetName(preset)}
+                        <div className="text-base text-high truncate font-ibm-plex-mono">
+                          {getPresetLabel(preset)}
                         </div>
-                        {config.customParams?.[preset.id] && (
+                        {(config.customParams?.[preset.id] || config.customDescriptions?.[preset.id]) && (
                           <span className="text-xs text-brand px-half py-quarter rounded border border-brand/30">
                             {t('step5.params.configured')}
                           </span>
@@ -420,18 +490,18 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                       </div>
                     </div>
 
-                    {/* Edit Params Button */}
+                    {/* Edit Button */}
                     <button
                       type="button"
                       onClick={() => {
-                        handleEditParams(preset.id);
+                        handleEditPreset(preset.id);
                       }}
                       className={cn(
                         'flex items-center justify-center p-half rounded border text-low',
                         'hover:text-normal hover:border-brand'
                       )}
-                      aria-label={t('step5.params.edit')}
-                      title={t('step5.params.edit')}
+                      aria-label={t('step5.edit')}
+                      title={t('step5.edit')}
                     >
                       <Edit className="size-icon-sm" />
                     </button>
@@ -533,8 +603,8 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                       )}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-base text-high truncate">
-                          {getPresetName(preset)}
+                        <div className="text-base text-high truncate font-ibm-plex-mono">
+                          {getPresetLabel(preset)}
                         </div>
                         <div className="text-xs text-low truncate">
                           {getPresetDescription(preset)}
@@ -577,8 +647,8 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
                         )}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="text-base text-high truncate">
-                            {getPresetName(preset)}
+                          <div className="text-base text-high truncate font-ibm-plex-mono">
+                            {getPresetLabel(preset)}
                           </div>
                           <div className="text-xs text-low truncate">
                             {getPresetDescription(preset)}
@@ -615,14 +685,14 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
         </>
       )}
 
-      {/* Params Editor Modal */}
-      {editingParamsFor && (
-        <ParamsEditorModal
-          presetId={editingParamsFor}
-          presetName={getPresetName(allPresets.find((p) => p.id === editingParamsFor)!)}
-          initialParams={config.customParams?.[editingParamsFor] ?? null}
-          onSave={(params) => handleSaveParams(editingParamsFor, params)}
-          onCancel={handleCancelParams}
+      {/* Preset Editor Modal */}
+      {editingPreset && (
+        <PresetEditorModal
+          presetLabel={getPresetLabel(editingPreset)}
+          initialDescription={getPresetDescription(editingPreset)}
+          initialParams={config.customParams?.[editingPreset.id] ?? null}
+          onSave={(description, params) => handleSavePreset(editingPreset.id, description, params)}
+          onCancel={handleCancelPreset}
         />
       )}
     </div>

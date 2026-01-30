@@ -231,7 +231,18 @@
       "refactor": {
         "name": "代码重构",
         "description": "重构代码以提高可维护性"
+      },
+      "document": {
+        "name": "编写文档",
+        "description": "编写文档"
       }
+    },
+    "edit": "编辑",
+    "editPreset": {
+      "title": "编辑",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "自定义此命令的描述",
+      "descriptionHint": "留空则使用默认描述"
     },
     "params": {
       "title": "自定义参数",
