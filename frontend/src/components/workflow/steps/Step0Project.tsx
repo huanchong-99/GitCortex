@@ -22,9 +22,9 @@ const isGitStatus = (value: unknown): value is GitStatus => {
   return (
     typeof value.isGitRepo === 'boolean' &&
     typeof value.isDirty === 'boolean' &&
-    (value.currentBranch === undefined || typeof value.currentBranch === 'string') &&
-    (value.remoteUrl === undefined || typeof value.remoteUrl === 'string') &&
-    (value.uncommittedChanges === undefined || typeof value.uncommittedChanges === 'number')
+    (value.currentBranch == null || typeof value.currentBranch === 'string') &&
+    (value.remoteUrl == null || typeof value.remoteUrl === 'string') &&
+    (value.uncommittedChanges == null || typeof value.uncommittedChanges === 'number')
   );
 };
 
