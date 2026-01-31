@@ -12,13 +12,15 @@ import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { getActualTheme } from '@/utils/theme';
 import { defineModal, type NoProps } from '@/lib/modals';
+import { useTranslation } from 'react-i18next';
 
-const RELEASE_NOTES_BASE_URL = 'https://vibekanban.com/release-notes';
+const RELEASE_NOTES_BASE_URL = 'https://gitcortex.com/release-notes';
 
 const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
   const [iframeError, setIframeError] = useState(false);
   const { theme } = useTheme();
+  const { t } = useTranslation('common');
 
   const releaseNotesUrl = useMemo(() => {
     const actualTheme = getActualTheme(theme);
@@ -45,7 +47,7 @@ const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
       <DialogContent className="flex flex-col w-full h-full max-w-7xl max-h-[calc(100dvh-1rem)] p-0">
         <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle className="text-xl font-semibold">
-            We've updated Vibe Kanban! Check out what's new...
+            {t('releaseNotes.title')}
           </DialogTitle>
         </DialogHeader>
 
@@ -54,16 +56,15 @@ const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
             <AlertCircle className="h-12 w-12 text-muted-foreground" />
             <div className="space-y-2">
               <h3 className="text-lg font-medium">
-                Unable to load release notes
+                {t('releaseNotes.unableToLoad')}
               </h3>
               <p className="text-sm text-muted-foreground max-w-md">
-                We couldn't display the release notes in this window. Click
-                below to view them in your browser.
+                {t('releaseNotes.unableToLoadDescription')}
               </p>
             </div>
             <Button onClick={handleOpenInBrowser} className="mt-4">
               <ExternalLink className="h-4 w-4 mr-2" />
-              Open Release Notes in Browser
+              {t('releaseNotes.openInBrowser')}
             </Button>
           </div>
         ) : (
@@ -72,7 +73,7 @@ const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
             className="flex-1 w-full border-0"
             sandbox="allow-scripts allow-same-origin allow-popups"
             referrerPolicy="no-referrer"
-            title="Release Notes"
+            title={t('releaseNotes.title')}
             onError={handleIframeError}
             onLoad={(e) => {
               // Check if iframe content loaded successfully
@@ -92,7 +93,7 @@ const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
         <DialogFooter className="p-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleOpenInBrowser}>
             <ExternalLink className="h-4 w-4 mr-2" />
-            Open in Browser
+            {t('releaseNotes.openInBrowser')}
           </Button>
         </DialogFooter>
       </DialogContent>

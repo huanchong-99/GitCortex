@@ -95,7 +95,7 @@
     "banner": "開発モード - これは開発ビルドです"
   },
   "oauth": {
-    "title": "Vibe Kanbanにサインイン",
+    "title": "GitCortexにサインイン",
     "description": "サインインして組織に参加し、チームとタスクを共有します",
     "continueWithGitHub": "GitHubで続行",
     "continueWithGoogle": "Googleで続行",
@@ -213,7 +213,7 @@
   },
   "betaWorkspaces": {
     "title": "新しいUIを試す",
-    "intro": "Vibe KanbanのUIをゼロから再構築しました。あなたは試用に招待されています。",
+    "intro": "GitCortexのUIをゼロから再構築しました。あなたは試用に招待されています。",
     "newUiDescription": "新しいUIは日常業務に最適化されています：エージェントの管理、変更のプレビュー、コードのレビュー。また、旧UIでは利用できない機能も利用可能になります：",
     "newFeatures": {
       "multiRepo": "複数のリポジトリを同時に編集",
@@ -234,7 +234,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "ようこそ",
-      "content": "Vibe Kanbanの新しいUIであるWorkspacesへようこそ。早期フィードバックのために一部のユーザーに先行公開しています。ナビバーのフィードバックアイコンからいつでもご意見をお聞かせください。"
+      "content": "GitCortexの新しいUIであるWorkspacesへようこそ。早期フィードバックのために一部のユーザーに先行公開しています。ナビバーのフィードバックアイコンからいつでもご意見をお聞かせください。"
     },
     "commandBar": {
       "title": "コマンドバー",

@@ -31,6 +31,7 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import { toPrettyCase } from '@/utils/string';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
+import { useTranslation } from 'react-i18next';
 import { useEditorAvailability } from '@/hooks/useEditorAvailability';
 import { EditorAvailabilityIndicator } from '@/components/EditorAvailabilityIndicator';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
@@ -44,6 +45,8 @@ export type OnboardingResult = {
 const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
   const { profiles, config } = useUserSystem();
+  const { t } = useTranslation(['common', 'settings']);
+  const defaultLabel = t('defaultLabel', { ns: 'settings' });
 
   const [profile, setProfile] = useState<ExecutorProfileId>(
     config?.executor_profile || {
@@ -80,20 +83,19 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <HandMetal className="h-6 w-6 text-primary text-primary-foreground" />
-            <DialogTitle>Welcome to Vibe Kanban</DialogTitle>
+            <DialogTitle>{t('onboarding.title')}</DialogTitle>
           </div>
           <DialogDescription className="text-left pt-2">
-            Let's set up your coding preferences. You can always change these
-            later in Settings.
+            {t('onboarding.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <h2 className="text-xl flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
-            Choose Your Coding Agent
+            {t('onboarding.chooseAgent')}
           </h2>
           <div className="space-y-2">
-            <Label htmlFor="profile">Default Agent</Label>
+            <Label htmlFor="profile">{t('onboarding.defaultAgent')}</Label>
             <div className="flex gap-2">
               <Select
                 value={profile.executor}
@@ -102,7 +104,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
                 }
               >
                 <SelectTrigger id="profile" className="flex-1">
-                  <SelectValue placeholder="Select your preferred coding agent" />
+                  <SelectValue placeholder={t('onboarding.selectAgentPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {profiles &&
@@ -131,7 +133,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
                           className="w-24 px-2 flex items-center justify-between"
                         >
                           <span className="text-xs truncate flex-1 text-left">
-                            {profile.variant || 'DEFAULT'}
+                            {profile.variant || defaultLabel.toUpperCase()}
                           </span>
                           <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />
                         </Button>
@@ -165,7 +167,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
                       disabled
                     >
                       <span className="text-xs truncate flex-1 text-left">
-                        Default
+                        {defaultLabel}
                       </span>
                     </Button>
                   );
@@ -180,17 +182,17 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
         <div className="space-y-2">
           <h2 className="text-xl flex items-center gap-2">
             <Code className="h-4 w-4" />
-            Choose Your Code Editor
+            {t('onboarding.chooseEditor')}
           </h2>
 
           <div className="space-y-2">
-            <Label htmlFor="editor">Preferred Editor</Label>
+            <Label htmlFor="editor">{t('onboarding.preferredEditor')}</Label>
             <Select
               value={editorType}
               onValueChange={(value: EditorType) => setEditorType(value)}
             >
               <SelectTrigger id="editor">
-                <SelectValue placeholder="Select your preferred editor" />
+                <SelectValue placeholder={t('onboarding.selectEditorPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {Object.values(EditorType).map((type) => (
@@ -207,21 +209,20 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
             )}
 
             <p className="text-sm text-muted-foreground">
-              This editor will be used to open task attempts and project files.
+              {t('onboarding.editorDescription')}
             </p>
 
             {editorType === EditorType.CUSTOM && (
               <div className="space-y-2">
-                <Label htmlFor="custom-command">Custom Command</Label>
+                <Label htmlFor="custom-command">{t('onboarding.customCommand')}</Label>
                 <Input
                   id="custom-command"
-                  placeholder="e.g., code, subl, vim"
+                  placeholder={t('onboarding.customCommandPlaceholder')}
                   value={customCommand}
                   onChange={(e) => setCustomCommand(e.target.value)}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Enter the command to run your custom editor. Use spaces for
-                  arguments (e.g., "code --wait").
+                  {t('onboarding.customCommandDescription')}
                 </p>
               </div>
             )}
@@ -234,7 +235,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
             disabled={!isValid}
             className="w-full"
           >
-            Continue
+            {t('buttons.continue')}
           </Button>
         </DialogFooter>
       </DialogContent>

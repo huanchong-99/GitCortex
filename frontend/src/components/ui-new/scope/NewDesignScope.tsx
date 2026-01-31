@@ -44,7 +44,7 @@ export function NewDesignScope({ children }: NewDesignScopeProps) {
   }, [posthog]);
 
   return (
-    <div ref={ref} className="new-design h-full">
+    <div ref={ref} className="new-design">
       <PortalContainerContext.Provider value={ref}>
         <WorkspaceProvider>
           <ExecutionProcessesProviderWrapper>

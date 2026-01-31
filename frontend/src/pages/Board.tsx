@@ -11,13 +11,13 @@ export function Board() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
 
   return (
-    <div className="app-canvas flex h-screen w-full">
+    <div className="app-canvas flex h-full min-h-0 w-full">
       <WorkflowSidebar
         selectedWorkflowId={selectedWorkflowId}
         onSelectWorkflow={setSelectedWorkflowId}
       />
-      <main className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 pt-6">
+      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 pt-6 overflow-hidden">
           <ViewHeader
             eyebrow={t('board.eyebrow', { defaultValue: 'Kanban' })}
             title={t('board.title', { defaultValue: 'Workflow board' })}
@@ -25,7 +25,7 @@ export function Board() {
               defaultValue: 'Drag tasks between columns to track progress.',
             })}
           />
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 overflow-auto">
             <WorkflowKanbanBoard workflowId={selectedWorkflowId} />
           </div>
         </div>

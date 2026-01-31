@@ -95,7 +95,7 @@
     "banner": "开发模式 - 这是开发版本"
   },
   "oauth": {
-    "title": "登录 Vibe Kanban",
+    "title": "登录 GitCortex",
     "description": "登录以加入组织并与团队共享任务",
     "continueWithGitHub": "使用 GitHub 继续",
     "continueWithGoogle": "使用 Google 继续",
@@ -213,7 +213,7 @@
   },
   "betaWorkspaces": {
     "title": "试用新界面",
-    "intro": "我们从头重建了 Vibe Kanban 的界面，您已被邀请试用。",
+    "intro": "我们从头重建了 GitCortex 的界面，您已被邀请试用。",
     "newUiDescription": "新界面针对日常工作进行了优化：管理代理、预览更改和审查代码。它还解锁了旧界面中不可用的功能：",
     "newFeatures": {
       "multiRepo": "同时编辑多个仓库",
@@ -234,7 +234,7 @@
   "workspacesGuide": {
     "welcome": {
       "title": "欢迎",
-      "content": "欢迎使用 Workspaces，这是 Vibe Kanban 的全新设计界面。我们正在向部分用户推出以获取早期反馈。您可以随时通过导航栏中的反馈图标分享您的想法。"
+      "content": "欢迎使用 Workspaces，这是 GitCortex 的全新设计界面。我们正在向部分用户推出以获取早期反馈。您可以随时通过导航栏中的反馈图标分享您的想法。"
     },
     "commandBar": {
       "title": "命令栏",
@@ -282,9 +282,29 @@
   },
   "disclaimer": {
     "title": "安全提示",
-    "description1": "Vibe Kanban 默认以 <code>--dangerously-skip-permissions</code> / <code>--yolo</code> 模式运行 AI 编程代理，这将赋予它们在您系统上执行代码和运行命令的无限制访问权限。",
+    "description1": "GitCortex 默认以 <code>--dangerously-skip-permissions</code> / <code>--yolo</code> 模式运行 AI 编程代理，这将赋予它们在您系统上执行代码和运行命令的无限制访问权限。",
     "description2": "<strong>重要提示：</strong>请始终审查代理的操作，并确保您已备份重要工作。此软件为实验性质 - 请谨慎使用。",
     "learnMore": "了解更多请访问",
     "accept": "我已了解，继续"
+  },
+  "onboarding": {
+    "title": "欢迎使用 GitCortex",
+    "description": "让我们设置您的编码偏好。您可以随时在设置中更改这些选项。",
+    "chooseAgent": "选择您的编码代理",
+    "defaultAgent": "默认代理",
+    "selectAgentPlaceholder": "选择您偏好的编码代理",
+    "chooseEditor": "选择您的代码编辑器",
+    "preferredEditor": "首选编辑器",
+    "selectEditorPlaceholder": "选择您偏好的编辑器",
+    "editorDescription": "此编辑器将用于打开任务尝试和项目文件。",
+    "customCommand": "自定义命令",
+    "customCommandPlaceholder": "例如：code, subl, vim",
+    "customCommandDescription": "输入运行自定义编辑器的命令。使用空格分隔参数（例如：\"code --wait\"）。"
+  },
+  "releaseNotes": {
+    "title": "GitCortex 已更新！查看新功能...",
+    "unableToLoad": "无法加载更新日志",
+    "unableToLoadDescription": "我们无法在此窗口中显示更新日志。请点击下方按钮在浏览器中查看。",
+    "openInBrowser": "在浏览器中打开更新日志"
   }
 }
