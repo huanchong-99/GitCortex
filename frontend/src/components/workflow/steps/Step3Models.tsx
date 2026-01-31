@@ -4,6 +4,7 @@ import {
   PencilSimpleIcon,
   TrashIcon,
   CheckCircleIcon,
+  ArrowsClockwiseIcon,
 } from '@phosphor-icons/react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import {
@@ -18,6 +19,7 @@ import { IconButton } from '../../ui-new/primitives/IconButton';
 import { cn } from '@/lib/utils';
 import type { WizardConfig, ModelConfig, ApiType } from '../types';
 import { useTranslation } from 'react-i18next';
+import { useModelStore } from '@/stores/modelStore';
 
 interface Step3ModelsProps {
   config: WizardConfig;
@@ -126,7 +128,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setAvailableModels([...config.defaultModels]);
   };
 
-  const handleFetchModels = () => {
+  const handleFetchModels = async () => {
     if (!formData.apiKey.trim()) {
       setFormErrors({ apiKey: t('step3.errors.apiKeyRequired') });
       return;
@@ -135,11 +137,23 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setIsFetching(true);
     setFormErrors({});
 
-    // TODO: Implement actual API call to fetch models
-    // For now, use default models based on API type
-    const defaultModels = API_TYPES[formData.apiType].defaultModels;
-    setAvailableModels([...defaultModels]);
-    setIsFetching(false);
+    try {
+      // Use modelStore to fetch models from API
+      const { fetchModels } = useModelStore.getState();
+      const models = await fetchModels(
+        formData.apiType,
+        formData.apiKey,
+        formData.apiType === 'openai-compatible' ? formData.baseUrl : undefined
+      );
+      setAvailableModels(models);
+    } catch (error) {
+      // Fallback to default models on error
+      const defaultModels = API_TYPES[formData.apiType].defaultModels;
+      setAvailableModels([...defaultModels]);
+      setFormErrors({ fetch: t('step3.errors.fetchFailed') });
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const handleVerify = async () => {
@@ -152,12 +166,26 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setFormErrors({});
 
     try {
-      // TODO: Implement actual API verification
-      // For now, simulate successful verification
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setFormErrors({});
-      // Show success indication
-      alert(t('step3.messages.verifySuccess'));
+      // Use modelStore to verify model connection
+      const { verifyModel } = useModelStore.getState();
+      const tempModel: ModelConfig = {
+        id: editingModel?.id ?? `temp-${Date.now()}`,
+        displayName: formData.displayName || 'Temp',
+        apiType: formData.apiType,
+        baseUrl: formData.baseUrl,
+        apiKey: formData.apiKey,
+        modelId: formData.modelId,
+        isVerified: false,
+      };
+
+      const verified = await verifyModel(tempModel);
+
+      if (verified) {
+        // Update form to indicate verification success
+        setFormErrors({});
+      } else {
+        setFormErrors({ verify: t('step3.errors.verifyFailed') });
+      }
     } catch (error) {
       setFormErrors({ verify: t('step3.errors.verifyFailed') });
     } finally {
@@ -399,7 +427,9 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             <Field>
               <button
                 type="button"
-                onClick={handleFetchModels}
+                onClick={() => {
+                  void handleFetchModels();
+                }}
                 disabled={isFetching || !formData.apiKey}
                 className={cn(
                   'flex items-center justify-center gap-half w-full px-base py-half rounded-sm border text-base',
@@ -408,6 +438,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   'bg-secondary text-normal'
                 )}
               >
+                {isFetching && <ArrowsClockwiseIcon className="size-icon-sm animate-spin" />}
                 {isFetching ? t('step3.actions.fetching') : t('step3.actions.fetchModels')}
               </button>
               {formErrors.fetch && <FieldError>{formErrors.fetch}</FieldError>}

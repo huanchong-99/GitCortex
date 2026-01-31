@@ -5,7 +5,12 @@ import { cn } from '@/lib/utils';
 import type { TaskConfig } from '../types';
 import { useTranslation } from 'react-i18next';
 
-const TERMINAL_COUNT_OPTIONS = [1, 2, 3];
+/** Quick select options for terminal count */
+const TERMINAL_COUNT_QUICK_OPTIONS = [1, 2, 3, 4, 5];
+/** Maximum allowed terminal count */
+const MAX_TERMINAL_COUNT = 10;
+/** Minimum allowed terminal count */
+const MIN_TERMINAL_COUNT = 1;
 
 function slugify(text: string): string {
   return text
@@ -78,7 +83,16 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
   };
 
   const handleTerminalCountSelect = (index: number, count: number) => {
-    updateTask(index, { terminalCount: count });
+    // Clamp value to valid range
+    const clampedCount = Math.max(MIN_TERMINAL_COUNT, Math.min(MAX_TERMINAL_COUNT, count));
+    updateTask(index, { terminalCount: clampedCount });
+  };
+
+  const handleCustomTerminalCount = (index: number, value: string) => {
+    const count = parseInt(value, 10);
+    if (!isNaN(count)) {
+      handleTerminalCountSelect(index, count);
+    }
   };
 
   const goToPreviousTask = () => {
@@ -238,9 +252,14 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
         </Field>
 
         <Field>
-          <FieldLabel>{t('step2.terminalCountLabel')}</FieldLabel>
-          <div className="flex flex-wrap gap-base">
-            {TERMINAL_COUNT_OPTIONS.map((count) => (
+          <FieldLabel>
+            {t('step2.terminalCountLabel')}
+            <span className="ml-2 text-low font-normal text-sm">
+              ({MIN_TERMINAL_COUNT}-{MAX_TERMINAL_COUNT})
+            </span>
+          </FieldLabel>
+          <div className="flex flex-wrap items-center gap-base">
+            {TERMINAL_COUNT_QUICK_OPTIONS.map((count) => (
               <button
                 key={count}
                 type="button"
@@ -255,9 +274,26 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
                     : 'border-border text-normal bg-secondary'
                 )}
               >
-                {t('step2.terminalCountOption', { count })}
+                {count}
               </button>
             ))}
+            <div className="flex items-center gap-half">
+              <span className="text-low text-sm">{t('step2.customCount', { defaultValue: 'Custom:' })}</span>
+              <input
+                type="number"
+                min={MIN_TERMINAL_COUNT}
+                max={MAX_TERMINAL_COUNT}
+                value={currentTask.terminalCount}
+                onChange={(e) => {
+                  handleCustomTerminalCount(currentTaskIndex, e.target.value);
+                }}
+                className={cn(
+                  'w-16 bg-secondary rounded-sm border px-half py-half text-base text-high text-center',
+                  'focus:outline-none focus:ring-1 focus:ring-brand',
+                  'border-border'
+                )}
+              />
+            </div>
           </div>
           {errors[`task-${currentTaskIndex}-terminalCount`] && (
             <FieldError>{t(errors[`task-${currentTaskIndex}-terminalCount`])}</FieldError>
