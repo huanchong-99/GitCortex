@@ -393,5 +393,36 @@
       "pipeline": "Pipeline view",
       "terminals": "Terminal debug"
     }
+  },
+  "viewSwitcher": {
+    "kanban": "Kanban",
+    "pipeline": "Pipeline",
+    "debug": "Debug",
+    "selectWorkflowFirst": "Select a workflow first"
+  },
+  "kanban": {
+    "columns": {
+      "pending": "Pending",
+      "running": "Running",
+      "review_pending": "Review",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "selectWorkflow": "Select a workflow",
+    "loading": "Loading..."
+  },
+  "terminalActivity": {
+    "title": "Terminal Activity",
+    "active": "{{count}} active",
+    "selectWorkflow": "Select a workflow to view terminal activity.",
+    "loading": "Loading terminal activity...",
+    "noActive": "No active terminals.",
+    "defaultLabel": "Terminal",
+    "timeAgo": {
+      "seconds": "{{count}}s ago",
+      "minutes": "{{count}}m ago",
+      "hours": "{{count}}h ago"
+    }
   }
 }

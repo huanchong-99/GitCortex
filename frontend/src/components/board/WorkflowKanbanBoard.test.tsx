@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import type { WorkflowDetailDto } from 'shared/types';
 import { WorkflowKanbanBoard } from './WorkflowKanbanBoard';
+import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 // Mock the hooks
 vi.mock('@/hooks/useWorkflows', () => ({
@@ -71,8 +72,9 @@ const workflow: WorkflowDetailDto = {
 };
 
 describe('WorkflowKanbanBoard', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await setTestLanguage();
     vi.mocked(useUpdateTaskStatus).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
@@ -86,7 +88,7 @@ describe('WorkflowKanbanBoard', () => {
       error: null,
     } as any);
 
-    render(<WorkflowKanbanBoard workflowId="wf-1" />);
+    renderWithI18n(<WorkflowKanbanBoard workflowId="wf-1" />);
 
     const pendingColumn = screen.getByTestId('kanban-column-pending');
     const runningColumn = screen.getByTestId('kanban-column-running');
@@ -102,9 +104,9 @@ describe('WorkflowKanbanBoard', () => {
       error: null,
     } as any);
 
-    render(<WorkflowKanbanBoard workflowId="wf-1" />);
+    renderWithI18n(<WorkflowKanbanBoard workflowId="wf-1" />);
 
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:kanban.loading'))).toBeInTheDocument();
   });
 
   it('shows select workflow message when no workflowId', () => {
@@ -114,9 +116,9 @@ describe('WorkflowKanbanBoard', () => {
       error: null,
     } as any);
 
-    render(<WorkflowKanbanBoard workflowId={null} />);
+    renderWithI18n(<WorkflowKanbanBoard workflowId={null} />);
 
-    expect(screen.getByText('Select a workflow')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('workflow:kanban.selectWorkflow'))).toBeInTheDocument();
   });
 
   it('renders all six columns', () => {
@@ -126,7 +128,7 @@ describe('WorkflowKanbanBoard', () => {
       error: null,
     } as any);
 
-    render(<WorkflowKanbanBoard workflowId="wf-1" />);
+    renderWithI18n(<WorkflowKanbanBoard workflowId="wf-1" />);
 
     expect(screen.getByTestId('kanban-column-pending')).toBeInTheDocument();
     expect(screen.getByTestId('kanban-column-running')).toBeInTheDocument();
@@ -143,7 +145,7 @@ describe('WorkflowKanbanBoard', () => {
       error: null,
     } as any);
 
-    render(<WorkflowKanbanBoard workflowId="wf-1" />);
+    renderWithI18n(<WorkflowKanbanBoard workflowId="wf-1" />);
 
     const pendingColumn = screen.getByTestId('kanban-column-pending');
     const runningColumn = screen.getByTestId('kanban-column-running');
@@ -159,7 +161,7 @@ describe('WorkflowKanbanBoard', () => {
       error: null,
     } as any);
 
-    render(<WorkflowKanbanBoard workflowId="wf-1" />);
+    renderWithI18n(<WorkflowKanbanBoard workflowId="wf-1" />);
 
     // Find the task card by looking for the element with cursor-grab class
     const taskCards = document.querySelectorAll('.cursor-grab');

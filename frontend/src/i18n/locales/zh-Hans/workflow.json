@@ -393,5 +393,36 @@
       "pipeline": "流水线视图",
       "terminals": "终端调试"
     }
+  },
+  "viewSwitcher": {
+    "kanban": "看板",
+    "pipeline": "流水线",
+    "debug": "调试",
+    "selectWorkflowFirst": "请先选择工作流"
+  },
+  "kanban": {
+    "columns": {
+      "pending": "待处理",
+      "running": "运行中",
+      "review_pending": "待审核",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "selectWorkflow": "选择工作流",
+    "loading": "加载中..."
+  },
+  "terminalActivity": {
+    "title": "终端活动",
+    "active": "{{count}} 个活跃",
+    "selectWorkflow": "选择工作流以查看终端活动",
+    "loading": "加载终端活动中...",
+    "noActive": "没有活跃的终端",
+    "defaultLabel": "终端",
+    "timeAgo": {
+      "seconds": "{{count}}秒前",
+      "minutes": "{{count}}分钟前",
+      "hours": "{{count}}小时前"
+    }
   }
 }

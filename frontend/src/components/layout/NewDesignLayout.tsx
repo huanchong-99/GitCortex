@@ -1,12 +1,13 @@
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LayoutGrid, GitBranch, Bug } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 type ViewType = 'kanban' | 'pipeline' | 'debug';
 
 interface ViewOption {
   id: ViewType;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
   path: (workflowId?: string) => string;
   requiresWorkflow: boolean;
@@ -21,21 +22,21 @@ interface ViewOption {
 const VIEW_OPTIONS: ViewOption[] = [
   {
     id: 'kanban',
-    label: 'Kanban',
+    labelKey: 'viewSwitcher.kanban',
     icon: LayoutGrid,
     path: () => '/board',
     requiresWorkflow: false,
   },
   {
     id: 'pipeline',
-    label: 'Pipeline',
+    labelKey: 'viewSwitcher.pipeline',
     icon: GitBranch,
     path: (workflowId) => workflowId ? `/pipeline/${workflowId}` : '/board',
     requiresWorkflow: true,
   },
   {
     id: 'debug',
-    label: 'Debug',
+    labelKey: 'viewSwitcher.debug',
     icon: Bug,
     path: (workflowId) => workflowId ? `/debug/${workflowId}` : '/board',
     requiresWorkflow: true,
@@ -52,6 +53,7 @@ function getCurrentView(pathname: string): ViewType {
 }
 
 export function NewDesignLayout() {
+  const { t } = useTranslation('workflow');
   const location = useLocation();
   const navigate = useNavigate();
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -94,10 +96,10 @@ export function NewDesignLayout() {
                     ? 'text-low/50 cursor-not-allowed'
                     : 'text-low hover:text-high hover:bg-secondary'
                 )}
-                title={isDisabled ? 'Select a workflow first' : undefined}
+                title={isDisabled ? t('viewSwitcher.selectWorkflowFirst') : undefined}
               >
                 <Icon className="w-4 h-4" />
-                {option.label}
+                {t(option.labelKey)}
               </button>
             );
           })}

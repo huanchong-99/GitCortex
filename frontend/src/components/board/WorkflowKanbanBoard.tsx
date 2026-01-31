@@ -1,4 +1,5 @@
 import { DndContext, type DragEndEvent, useDroppable } from '@dnd-kit/core';
+import { useTranslation } from 'react-i18next';
 import { useWorkflow, useUpdateTaskStatus } from '@/hooks/useWorkflows';
 import type { WorkflowTaskDto } from 'shared/types';
 import { TaskCard } from './TaskCard';
@@ -9,7 +10,7 @@ interface WorkflowKanbanBoardProps {
 
 interface Column {
   id: string;
-  title: string;
+  titleKey: string;
 }
 
 /**
@@ -17,12 +18,12 @@ interface Column {
  * pending, running, review_pending, completed, failed, cancelled
  */
 const columns: Column[] = [
-  { id: 'pending', title: 'Pending' },
-  { id: 'running', title: 'Running' },
-  { id: 'review_pending', title: 'Review' },
-  { id: 'completed', title: 'Completed' },
-  { id: 'failed', title: 'Failed' },
-  { id: 'cancelled', title: 'Cancelled' },
+  { id: 'pending', titleKey: 'kanban.columns.pending' },
+  { id: 'running', titleKey: 'kanban.columns.running' },
+  { id: 'review_pending', titleKey: 'kanban.columns.review_pending' },
+  { id: 'completed', titleKey: 'kanban.columns.completed' },
+  { id: 'failed', titleKey: 'kanban.columns.failed' },
+  { id: 'cancelled', titleKey: 'kanban.columns.cancelled' },
 ];
 
 interface KanbanColumnProps {
@@ -34,6 +35,7 @@ interface KanbanColumnProps {
  * Droppable column for the Kanban board
  */
 function KanbanColumn({ column, tasks }: KanbanColumnProps) {
+  const { t } = useTranslation('workflow');
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const columnTasks = tasks.filter((task) => task.status === column.id);
 
@@ -46,7 +48,7 @@ function KanbanColumn({ column, tasks }: KanbanColumnProps) {
       }`}
     >
       <div className="text-sm font-semibold mb-3">
-        {column.title}
+        {t(column.titleKey)}
         <span className="ml-2 text-low font-normal">({columnTasks.length})</span>
       </div>
       <div className="space-y-2 min-h-[100px]">
@@ -59,6 +61,7 @@ function KanbanColumn({ column, tasks }: KanbanColumnProps) {
 }
 
 export function WorkflowKanbanBoard({ workflowId }: WorkflowKanbanBoardProps) {
+  const { t } = useTranslation('workflow');
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');
   const updateTaskStatus = useUpdateTaskStatus();
 
@@ -86,11 +89,11 @@ export function WorkflowKanbanBoard({ workflowId }: WorkflowKanbanBoardProps) {
   };
 
   if (!workflowId) {
-    return <div className="p-6 text-low">Select a workflow</div>;
+    return <div className="p-6 text-low">{t('kanban.selectWorkflow')}</div>;
   }
 
   if (isLoading) {
-    return <div className="p-6 text-low">Loading...</div>;
+    return <div className="p-6 text-low">{t('kanban.loading')}</div>;
   }
 
   return (
