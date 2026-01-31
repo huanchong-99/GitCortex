@@ -132,6 +132,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       modelId: '',
     });
     setAvailableModels([...config.defaultModels]);
+    // Clear verification state when API type changes
+    setIsFormVerified(false);
   };
 
   const handleFetchModels = async () => {
@@ -324,7 +326,11 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       )}
 
       {/* Add/Edit Model Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseDialog();
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -397,6 +403,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                 value={formData.baseUrl}
                 onChange={(e) => {
                   setFormData({ ...formData, baseUrl: e.target.value });
+                  setIsFormVerified(false);
                 }}
                 placeholder={t('step3.fields.baseUrl.placeholder')}
                 disabled={formData.apiType !== 'openai-compatible'}
@@ -421,6 +428,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   value={formData.apiKey}
                   onChange={(e) => {
                     setFormData({ ...formData, apiKey: e.target.value });
+                    setIsFormVerified(false);
                   }}
                   placeholder={t('step3.fields.apiKey.placeholder')}
                   className={cn(
@@ -476,6 +484,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   value={formData.modelId}
                   onChange={(e) => {
                     setFormData({ ...formData, modelId: e.target.value });
+                    setIsFormVerified(false);
                   }}
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
@@ -497,6 +506,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   value={formData.modelId}
                   onChange={(e) => {
                     setFormData({ ...formData, modelId: e.target.value });
+                    setIsFormVerified(false);
                   }}
                   placeholder={t('step3.fields.modelId.placeholder')}
                   className={cn(
