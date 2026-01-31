@@ -1,6 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useWorkflow } from '@/hooks/useWorkflows';
+import { useRecentTerminalOutput } from '@/stores/terminalStore';
+import { cn } from '@/lib/utils';
 
 interface TerminalActivityPanelProps {
   workflowId: string | null;
@@ -8,54 +11,160 @@ interface TerminalActivityPanelProps {
 
 interface ActivityItem {
   id: string;
+  taskId: string;
   label: string;
   status: string;
   orderIndex: number;
+  lastActivity?: Date | null;
+}
+
+/** Status values that indicate active terminals */
+const ACTIVE_STATUSES = ['working', 'waiting', 'running', 'starting'];
+
+/**
+ * Format relative time for last activity
+ */
+function formatRelativeTime(date: Date | null | undefined): string {
+  if (!date) return '';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  return `${diffHour}h ago`;
+}
+
+/**
+ * Single terminal activity item with recent output preview
+ */
+function TerminalActivityItem({
+  item,
+  workflowId
+}: {
+  item: ActivityItem;
+  workflowId: string;
+}) {
+  const recentOutput = useRecentTerminalOutput(item.id, 3);
+
+  return (
+    <Link
+      to={`/debug/${workflowId}`}
+      className="block rounded border border-border px-2 py-1 text-left transition-colors hover:bg-secondary"
+    >
+      <div className="flex items-center gap-2 text-xs">
+        <StatusIndicator status={item.status} />
+        <span className="font-medium text-foreground">[T{item.orderIndex + 1}]</span>
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {item.lastActivity && (
+          <span className="text-low text-[10px]">{formatRelativeTime(item.lastActivity)}</span>
+        )}
+      </div>
+      {recentOutput.length > 0 && (
+        <div className="mt-1 pl-4 text-[10px] font-mono text-low max-h-12 overflow-hidden">
+          {recentOutput.slice(-3).map((line, i) => (
+            <div key={i} className="truncate">{line || '\u00A0'}</div>
+          ))}
+        </div>
+      )}
+    </Link>
+  );
+}
+
+/**
+ * Status indicator dot with animation for active states
+ */
+function StatusIndicator({ status }: { status: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-block w-2 h-2 rounded-full',
+        status === 'working' || status === 'running' ? 'bg-green-500 animate-pulse' :
+        status === 'waiting' ? 'bg-blue-500' :
+        status === 'starting' ? 'bg-yellow-500' :
+        'bg-gray-400'
+      )}
+      title={status}
+    />
+  );
 }
 
 export function TerminalActivityPanel({ workflowId }: TerminalActivityPanelProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');
 
+  // Filter to only show active terminals (working/waiting)
   const activityItems = useMemo<ActivityItem[]>(() => {
     if (!workflow) return [];
 
     return workflow.tasks.flatMap((task) =>
-      task.terminals.map((terminal) => ({
-        id: terminal.id,
-        label: terminal.role?.trim() || task.name || 'Terminal',
-        status: terminal.status,
-        orderIndex: terminal.orderIndex,
-      }))
+      task.terminals
+        .filter((terminal) => ACTIVE_STATUSES.includes(terminal.status))
+        .map((terminal) => ({
+          id: terminal.id,
+          taskId: task.id,
+          label: terminal.role?.trim() || task.name || 'Terminal',
+          status: terminal.status,
+          orderIndex: terminal.orderIndex,
+          lastActivity: null, // Will be populated from terminalStore
+        }))
     );
   }, [workflow]);
 
+  const toggleCollapse = () => setIsCollapsed(!isCollapsed);
+
   return (
-    <div className="h-32 bg-panel border-t border-border p-4">
-      <div className="text-sm font-semibold mb-2">Terminal Activity</div>
-      {!workflowId && (
-        <div className="text-xs text-low">
-          Select a workflow to view terminal activity.
-        </div>
-      )}
-      {workflowId && isLoading && (
-        <div className="text-xs text-low">Loading terminal activity...</div>
-      )}
-      {workflowId && !isLoading && activityItems.length === 0 && (
-        <div className="text-xs text-low">No terminal activity yet.</div>
-      )}
-      {workflowId && !isLoading && activityItems.length > 0 && (
-        <div className="space-y-1 text-xs font-mono">
-          {activityItems.map((item) => (
-            <Link
-              key={item.id}
-              to={`/debug/${workflowId}`}
-              className="flex items-center gap-2 rounded border border-border px-2 py-1 text-left text-low transition-colors hover:bg-secondary"
-            >
-              <span className="text-foreground">[T{item.orderIndex + 1}]</span>
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              <span className="text-low">{item.status}</span>
-            </Link>
-          ))}
+    <div className={cn(
+      'bg-panel border-t border-border transition-all',
+      isCollapsed ? 'h-10' : 'h-auto min-h-[8rem]'
+    )}>
+      {/* Header with collapse toggle */}
+      <button
+        onClick={toggleCollapse}
+        className="w-full px-4 py-2 flex items-center justify-between text-sm font-semibold hover:bg-secondary/50 transition-colors"
+      >
+        <span>
+          Terminal Activity
+          {activityItems.length > 0 && (
+            <span className="ml-2 text-xs font-normal text-low">
+              ({activityItems.length} active)
+            </span>
+          )}
+        </span>
+        {isCollapsed ? (
+          <ChevronUp className="w-4 h-4 text-low" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-low" />
+        )}
+      </button>
+
+      {/* Content */}
+      {!isCollapsed && (
+        <div className="px-4 pb-3">
+          {!workflowId && (
+            <div className="text-xs text-low">
+              Select a workflow to view terminal activity.
+            </div>
+          )}
+          {workflowId && isLoading && (
+            <div className="text-xs text-low">Loading terminal activity...</div>
+          )}
+          {workflowId && !isLoading && activityItems.length === 0 && (
+            <div className="text-xs text-low">No active terminals.</div>
+          )}
+          {workflowId && !isLoading && activityItems.length > 0 && (
+            <div className="space-y-1">
+              {activityItems.map((item) => (
+                <TerminalActivityItem
+                  key={item.id}
+                  item={item}
+                  workflowId={workflowId}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
