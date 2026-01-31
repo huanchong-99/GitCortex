@@ -5,6 +5,8 @@ import {
   TrashIcon,
   CheckCircleIcon,
   ArrowsClockwiseIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@phosphor-icons/react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import {
@@ -80,6 +82,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const handleOpenAddDialog = () => {
     setEditingModel(null);
@@ -405,21 +408,35 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             {/* API Key */}
             <Field>
               <FieldLabel htmlFor="apiKey">{t('step3.fields.apiKey.label')}</FieldLabel>
-              <input
-                id="apiKey"
-                type="password"
-                value={formData.apiKey}
-                onChange={(e) => {
-                  setFormData({ ...formData, apiKey: e.target.value });
-                }}
-                placeholder={t('step3.fields.apiKey.placeholder')}
-                className={cn(
-                  'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
-                  'placeholder:text-low placeholder:opacity-80',
-                  'focus:outline-none focus:ring-1 focus:ring-brand',
-                  formErrors.apiKey && 'border-error'
-                )}
-              />
+              <div className="relative">
+                <input
+                  id="apiKey"
+                  type={showApiKey ? 'text' : 'password'}
+                  value={formData.apiKey}
+                  onChange={(e) => {
+                    setFormData({ ...formData, apiKey: e.target.value });
+                  }}
+                  placeholder={t('step3.fields.apiKey.placeholder')}
+                  className={cn(
+                    'w-full bg-secondary rounded-sm border px-base py-half pr-10 text-base text-high',
+                    'placeholder:text-low placeholder:opacity-80',
+                    'focus:outline-none focus:ring-1 focus:ring-brand',
+                    formErrors.apiKey && 'border-error'
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-low hover:text-high transition-colors"
+                  aria-label={showApiKey ? t('step3.fields.apiKey.hide') : t('step3.fields.apiKey.show')}
+                >
+                  {showApiKey ? (
+                    <EyeSlashIcon className="size-icon-sm" />
+                  ) : (
+                    <EyeIcon className="size-icon-sm" />
+                  )}
+                </button>
+              </div>
               {formErrors.apiKey && <FieldError>{formErrors.apiKey}</FieldError>}
             </Field>
 
