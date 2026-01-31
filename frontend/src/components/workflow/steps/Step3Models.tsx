@@ -83,6 +83,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   const [isFetching, setIsFetching] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isFormVerified, setIsFormVerified] = useState(false);
 
   const handleOpenAddDialog = () => {
     setEditingModel(null);
@@ -118,6 +119,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setFormData(initialFormData);
     setAvailableModels([]);
     setFormErrors({});
+    setShowApiKey(false);
+    setIsFormVerified(false);
   };
 
   const handleApiTypeChange = (apiType: ApiType) => {
@@ -184,12 +187,15 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       const verified = await verifyModel(tempModel);
 
       if (verified) {
-        // Update form to indicate verification success
+        // Update form verification state for use when saving
+        setIsFormVerified(true);
         setFormErrors({});
       } else {
+        setIsFormVerified(false);
         setFormErrors({ verify: t('step3.errors.verifyFailed') });
       }
     } catch (error) {
+      setIsFormVerified(false);
       setFormErrors({ verify: t('step3.errors.verifyFailed') });
     } finally {
       setIsVerifying(false);
@@ -228,7 +234,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       baseUrl: formData.baseUrl,
       apiKey: formData.apiKey,
       modelId: formData.modelId,
-      isVerified: editingModel?.isVerified ?? false,
+      isVerified: isFormVerified || (editingModel?.isVerified ?? false),
     };
 
     let updatedModels: ModelConfig[];

@@ -21,6 +21,8 @@ const columns: Column[] = [
   { id: 'running', title: 'Running' },
   { id: 'review_pending', title: 'Review' },
   { id: 'completed', title: 'Completed' },
+  { id: 'failed', title: 'Failed' },
+  { id: 'cancelled', title: 'Cancelled' },
 ];
 
 interface KanbanColumnProps {
@@ -93,7 +95,7 @@ export function WorkflowKanbanBoard({ workflowId }: WorkflowKanbanBoardProps) {
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-      <div className="flex-1 p-6 grid grid-cols-4 gap-4">
+      <div className="flex-1 p-6 grid grid-cols-6 gap-4">
         {columns.map((column) => (
           <KanbanColumn key={column.id} column={column} tasks={tasks} />
         ))}

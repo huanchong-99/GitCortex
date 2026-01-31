@@ -119,7 +119,7 @@ describe('WorkflowKanbanBoard', () => {
     expect(screen.getByText('Select a workflow')).toBeInTheDocument();
   });
 
-  it('renders all four columns', () => {
+  it('renders all six columns', () => {
     vi.mocked(useWorkflow).mockReturnValue({
       data: workflow,
       isLoading: false,
@@ -132,6 +132,8 @@ describe('WorkflowKanbanBoard', () => {
     expect(screen.getByTestId('kanban-column-running')).toBeInTheDocument();
     expect(screen.getByTestId('kanban-column-review_pending')).toBeInTheDocument();
     expect(screen.getByTestId('kanban-column-completed')).toBeInTheDocument();
+    expect(screen.getByTestId('kanban-column-failed')).toBeInTheDocument();
+    expect(screen.getByTestId('kanban-column-cancelled')).toBeInTheDocument();
   });
 
   it('displays task count in column headers', () => {

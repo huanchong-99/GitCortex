@@ -44,6 +44,13 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  // Reset currentTaskIndex if it's out of bounds when taskCount changes
+  useEffect(() => {
+    if (currentTaskIndex >= taskCount && taskCount > 0) {
+      setCurrentTaskIndex(taskCount - 1);
+    }
+  }, [currentTaskIndex, taskCount]);
+
   // Only initialize tasks when taskCount changes and config doesn't match
   useEffect(() => {
     if (config.length !== taskCount) {
