@@ -204,6 +204,25 @@ const workflowsApi = {
     });
     return handleApiResponse<void>(response);
   },
+
+  /**
+   * Update a task's status within a workflow
+   */
+  updateTaskStatus: async (
+    workflowId: string,
+    taskId: string,
+    status: string
+  ): Promise<WorkflowTaskDto> => {
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(workflowId)}/tasks/${encodeURIComponent(taskId)}/status`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      }
+    );
+    return handleApiResponse<WorkflowTaskDto>(response);
+  },
 };
 
 // ============================================================================
@@ -346,6 +365,61 @@ export function useDeleteWorkflow() {
     },
     onError: (error) => {
       logApiError('Failed to delete workflow:', error);
+    },
+  });
+}
+
+/**
+ * Hook to update a task's status within a workflow (for Kanban drag-and-drop)
+ * @returns Mutation object for updating task status
+ */
+export function useUpdateTaskStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      workflowId,
+      taskId,
+      status,
+    }: {
+      workflowId: string;
+      taskId: string;
+      status: string;
+    }) => workflowsApi.updateTaskStatus(workflowId, taskId, status),
+    onMutate: async ({ workflowId, taskId, status }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: workflowKeys.byId(workflowId) });
+
+      // Snapshot the previous value
+      const previousWorkflow = queryClient.getQueryData<Workflow>(
+        workflowKeys.byId(workflowId)
+      );
+
+      // Optimistically update the cache
+      if (previousWorkflow) {
+        queryClient.setQueryData<Workflow>(workflowKeys.byId(workflowId), {
+          ...previousWorkflow,
+          tasks: previousWorkflow.tasks.map((task) =>
+            task.id === taskId ? { ...task, status } : task
+          ),
+        });
+      }
+
+      return { previousWorkflow };
+    },
+    onError: (error, { workflowId }, context) => {
+      // Rollback on error
+      if (context?.previousWorkflow) {
+        queryClient.setQueryData(
+          workflowKeys.byId(workflowId),
+          context.previousWorkflow
+        );
+      }
+      logApiError('Failed to update task status:', error);
+    },
+    onSettled: (_, __, { workflowId }) => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: workflowKeys.byId(workflowId) });
     },
   });
 }

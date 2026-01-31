@@ -4,6 +4,9 @@ import {
   PencilSimpleIcon,
   TrashIcon,
   CheckCircleIcon,
+  ArrowsClockwiseIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@phosphor-icons/react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import {
@@ -18,6 +21,7 @@ import { IconButton } from '../../ui-new/primitives/IconButton';
 import { cn } from '@/lib/utils';
 import type { WizardConfig, ModelConfig, ApiType } from '../types';
 import { useTranslation } from 'react-i18next';
+import { useModelStore } from '@/stores/modelStore';
 
 interface Step3ModelsProps {
   config: WizardConfig;
@@ -78,6 +82,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isFormVerified, setIsFormVerified] = useState(false);
 
   const handleOpenAddDialog = () => {
     setEditingModel(null);
@@ -104,6 +110,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     });
     setAvailableModels([...API_TYPES[model.apiType].defaultModels]);
     setFormErrors({});
+    // Initialize verification state from the model being edited
+    setIsFormVerified(model.isVerified);
     setIsDialogOpen(true);
   };
 
@@ -113,6 +121,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setFormData(initialFormData);
     setAvailableModels([]);
     setFormErrors({});
+    setShowApiKey(false);
+    setIsFormVerified(false);
   };
 
   const handleApiTypeChange = (apiType: ApiType) => {
@@ -124,9 +134,11 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       modelId: '',
     });
     setAvailableModels([...config.defaultModels]);
+    // Clear verification state when API type changes
+    setIsFormVerified(false);
   };
 
-  const handleFetchModels = () => {
+  const handleFetchModels = async () => {
     if (!formData.apiKey.trim()) {
       setFormErrors({ apiKey: t('step3.errors.apiKeyRequired') });
       return;
@@ -135,11 +147,23 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setIsFetching(true);
     setFormErrors({});
 
-    // TODO: Implement actual API call to fetch models
-    // For now, use default models based on API type
-    const defaultModels = API_TYPES[formData.apiType].defaultModels;
-    setAvailableModels([...defaultModels]);
-    setIsFetching(false);
+    try {
+      // Use modelStore to fetch models from API
+      const { fetchModels } = useModelStore.getState();
+      const models = await fetchModels(
+        formData.apiType,
+        formData.apiKey,
+        formData.apiType === 'openai-compatible' ? formData.baseUrl : undefined
+      );
+      setAvailableModels(models);
+    } catch (error) {
+      // Fallback to default models on error
+      const defaultModels = API_TYPES[formData.apiType].defaultModels;
+      setAvailableModels([...defaultModels]);
+      setFormErrors({ fetch: t('step3.errors.fetchFailed') });
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const handleVerify = async () => {
@@ -152,13 +176,30 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     setFormErrors({});
 
     try {
-      // TODO: Implement actual API verification
-      // For now, simulate successful verification
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setFormErrors({});
-      // Show success indication
-      alert(t('step3.messages.verifySuccess'));
+      // Use modelStore to verify model connection
+      const { verifyModel } = useModelStore.getState();
+      const tempModel: ModelConfig = {
+        id: editingModel?.id ?? `temp-${Date.now()}`,
+        displayName: formData.displayName || 'Temp',
+        apiType: formData.apiType,
+        baseUrl: formData.baseUrl,
+        apiKey: formData.apiKey,
+        modelId: formData.modelId,
+        isVerified: false,
+      };
+
+      const verified = await verifyModel(tempModel);
+
+      if (verified) {
+        // Update form verification state for use when saving
+        setIsFormVerified(true);
+        setFormErrors({});
+      } else {
+        setIsFormVerified(false);
+        setFormErrors({ verify: t('step3.errors.verifyFailed') });
+      }
     } catch (error) {
+      setIsFormVerified(false);
       setFormErrors({ verify: t('step3.errors.verifyFailed') });
     } finally {
       setIsVerifying(false);
@@ -197,7 +238,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       baseUrl: formData.baseUrl,
       apiKey: formData.apiKey,
       modelId: formData.modelId,
-      isVerified: editingModel?.isVerified ?? false,
+      isVerified: isFormVerified,
     };
 
     let updatedModels: ModelConfig[];
@@ -287,7 +328,11 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       )}
 
       {/* Add/Edit Model Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseDialog();
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -360,6 +405,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                 value={formData.baseUrl}
                 onChange={(e) => {
                   setFormData({ ...formData, baseUrl: e.target.value });
+                  setIsFormVerified(false);
                 }}
                 placeholder={t('step3.fields.baseUrl.placeholder')}
                 disabled={formData.apiType !== 'openai-compatible'}
@@ -377,21 +423,36 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             {/* API Key */}
             <Field>
               <FieldLabel htmlFor="apiKey">{t('step3.fields.apiKey.label')}</FieldLabel>
-              <input
-                id="apiKey"
-                type="password"
-                value={formData.apiKey}
-                onChange={(e) => {
-                  setFormData({ ...formData, apiKey: e.target.value });
-                }}
-                placeholder={t('step3.fields.apiKey.placeholder')}
-                className={cn(
-                  'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
-                  'placeholder:text-low placeholder:opacity-80',
-                  'focus:outline-none focus:ring-1 focus:ring-brand',
-                  formErrors.apiKey && 'border-error'
-                )}
-              />
+              <div className="relative">
+                <input
+                  id="apiKey"
+                  type={showApiKey ? 'text' : 'password'}
+                  value={formData.apiKey}
+                  onChange={(e) => {
+                    setFormData({ ...formData, apiKey: e.target.value });
+                    setIsFormVerified(false);
+                  }}
+                  placeholder={t('step3.fields.apiKey.placeholder')}
+                  className={cn(
+                    'w-full bg-secondary rounded-sm border px-base py-half pr-10 text-base text-high',
+                    'placeholder:text-low placeholder:opacity-80',
+                    'focus:outline-none focus:ring-1 focus:ring-brand',
+                    formErrors.apiKey && 'border-error'
+                  )}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-low hover:text-high transition-colors"
+                  aria-label={showApiKey ? t('step3.fields.apiKey.hide') : t('step3.fields.apiKey.show')}
+                >
+                  {showApiKey ? (
+                    <EyeSlashIcon className="size-icon-sm" />
+                  ) : (
+                    <EyeIcon className="size-icon-sm" />
+                  )}
+                </button>
+              </div>
               {formErrors.apiKey && <FieldError>{formErrors.apiKey}</FieldError>}
             </Field>
 
@@ -399,7 +460,9 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             <Field>
               <button
                 type="button"
-                onClick={handleFetchModels}
+                onClick={() => {
+                  void handleFetchModels();
+                }}
                 disabled={isFetching || !formData.apiKey}
                 className={cn(
                   'flex items-center justify-center gap-half w-full px-base py-half rounded-sm border text-base',
@@ -408,6 +471,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   'bg-secondary text-normal'
                 )}
               >
+                {isFetching && <ArrowsClockwiseIcon className="size-icon-sm animate-spin" />}
                 {isFetching ? t('step3.actions.fetching') : t('step3.actions.fetchModels')}
               </button>
               {formErrors.fetch && <FieldError>{formErrors.fetch}</FieldError>}
@@ -422,6 +486,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   value={formData.modelId}
                   onChange={(e) => {
                     setFormData({ ...formData, modelId: e.target.value });
+                    setIsFormVerified(false);
                   }}
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
@@ -443,6 +508,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   value={formData.modelId}
                   onChange={(e) => {
                     setFormData({ ...formData, modelId: e.target.value });
+                    setIsFormVerified(false);
                   }}
                   placeholder={t('step3.fields.modelId.placeholder')}
                   className={cn(

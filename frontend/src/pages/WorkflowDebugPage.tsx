@@ -1,33 +1,67 @@
 import { useParams } from 'react-router-dom';
-import { useState } from 'react';
 import { useWorkflow } from '@/hooks/useWorkflows';
-import { TerminalSidebar } from '@/components/debug/TerminalSidebar';
-import { TerminalDebugView } from '@/components/debug/TerminalDebugView';
-import type { TerminalDto } from 'shared/types';
+import { TerminalDebugView } from '@/components/terminal/TerminalDebugView';
+import type { Terminal, TerminalStatus } from '@/components/workflow/TerminalCard';
+import type { WorkflowTask } from '@/components/workflow/PipelineView';
+
+/**
+ * Maps backend terminal status string to frontend TerminalStatus type
+ */
+function mapTerminalStatus(status: string): TerminalStatus {
+  switch (status) {
+    case 'idle':
+    case 'not_started':
+      return 'not_started';
+    case 'starting':
+      return 'starting';
+    case 'waiting':
+      return 'waiting';
+    case 'running':
+    case 'working':
+      return 'working';
+    case 'completed':
+      return 'completed';
+    case 'failed':
+    case 'cancelled':
+      return 'failed';
+    default:
+      return 'not_started';
+  }
+}
 
 export function WorkflowDebugPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');
-  const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
 
   if (isLoading) return <div className="p-6 text-low">Loading...</div>;
   if (!workflow) return <div className="p-6 text-low">Workflow not found</div>;
 
-  // Flatten terminals from all tasks
-  const terminals: TerminalDto[] = workflow.tasks.flatMap(task => task.terminals);
+  // Construct WebSocket URL for PTY connection
+  // TerminalEmulator appends `/terminal/${terminalId}` to this base URL
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsUrl = `${wsProtocol}://${window.location.host}/api`;
+
+  // Map WorkflowTaskDto to WorkflowTask with Terminal type conversion
+  const tasks: (WorkflowTask & { terminals: Terminal[] })[] = workflow.tasks.map((taskDto) => ({
+    id: taskDto.id,
+    name: taskDto.name,
+    branch: taskDto.branch,
+    terminals: taskDto.terminals.map(
+      (termDto): Terminal => ({
+        id: termDto.id,
+        workflowTaskId: termDto.workflowTaskId,
+        cliTypeId: termDto.cliTypeId,
+        modelConfigId: termDto.modelConfigId ?? undefined,
+        role: termDto.role ?? undefined,
+        orderIndex: termDto.orderIndex,
+        status: mapTerminalStatus(termDto.status),
+      })
+    ),
+  }));
 
   return (
     <div className="flex h-screen bg-primary">
-      <TerminalSidebar
-        terminals={terminals}
-        selectedTerminalId={selectedTerminalId}
-        onSelect={setSelectedTerminalId}
-      />
-      <TerminalDebugView
-        terminalId={selectedTerminalId}
-        terminals={terminals}
-        onClose={() => setSelectedTerminalId(null)}
-      />
+      <TerminalDebugView tasks={tasks} wsUrl={wsUrl} />
     </div>
   );
 }
