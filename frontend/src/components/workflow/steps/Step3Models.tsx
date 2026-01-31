@@ -110,6 +110,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     });
     setAvailableModels([...API_TYPES[model.apiType].defaultModels]);
     setFormErrors({});
+    // Initialize verification state from the model being edited
+    setIsFormVerified(model.isVerified);
     setIsDialogOpen(true);
   };
 
@@ -236,7 +238,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       baseUrl: formData.baseUrl,
       apiKey: formData.apiKey,
       modelId: formData.modelId,
-      isVerified: isFormVerified || (editingModel?.isVerified ?? false),
+      isVerified: isFormVerified,
     };
 
     let updatedModels: ModelConfig[];
