@@ -279,5 +279,12 @@
   "search": {
     "matchCount": "{{current}} of {{total}}",
     "noMatches": "No matches"
+  },
+  "disclaimer": {
+    "title": "Safety Notice",
+    "description1": "Vibe Kanban runs AI coding agents with <code>--dangerously-skip-permissions</code> / <code>--yolo</code> by default, giving them unrestricted access to execute code and run commands on your system.",
+    "description2": "<strong>Important:</strong> Always review what agents are doing and ensure you have backups of important work. This software is experimental - use it responsibly.",
+    "learnMore": "Learn more at",
+    "accept": "I Understand, Continue"
   }
 }

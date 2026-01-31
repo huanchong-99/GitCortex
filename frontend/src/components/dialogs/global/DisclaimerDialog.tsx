@@ -10,9 +10,11 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
 import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal, type NoProps } from '@/lib/modals';
+import { useTranslation, Trans } from 'react-i18next';
 
 const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();
+  const { t } = useTranslation('common');
 
   const handleAccept = () => {
     modal.resolve('accepted');
@@ -24,22 +26,25 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
         <DialogHeader>
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-6 w-6 text-destructive" />
-            <DialogTitle>Safety Notice</DialogTitle>
+            <DialogTitle>{t('disclaimer.title')}</DialogTitle>
           </div>
           <DialogDescription className="text-left space-y-4 pt-4">
             <p>
-              Vibe Kanban runs AI coding agents with{' '}
-              <code>--dangerously-skip-permissions</code> / <code>--yolo</code>{' '}
-              by default, giving them unrestricted access to execute code and
-              run commands on your system.
+              <Trans
+                i18nKey="disclaimer.description1"
+                ns="common"
+                components={{ code: <code /> }}
+              />
             </p>
             <p>
-              <strong>Important:</strong> Always review what agents are doing
-              and ensure you have backups of important work. This software is
-              experimental - use it responsibly.
+              <Trans
+                i18nKey="disclaimer.description2"
+                ns="common"
+                components={{ strong: <strong /> }}
+              />
             </p>
             <p>
-              Learn more at{' '}
+              {t('disclaimer.learnMore')}{' '}
               <a
                 href="https://www.vibekanban.com/docs/getting-started#safety-notice"
                 target="_blank"
@@ -53,7 +58,7 @@ const DisclaimerDialogImpl = NiceModal.create<NoProps>(() => {
         </DialogHeader>
         <DialogFooter>
           <Button onClick={handleAccept} variant="default">
-            I Understand, Continue
+            {t('disclaimer.accept')}
           </Button>
         </DialogFooter>
       </DialogContent>

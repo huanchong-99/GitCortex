@@ -279,5 +279,12 @@
   "search": {
     "matchCount": "{{current}} / {{total}}",
     "noMatches": "无匹配项"
+  },
+  "disclaimer": {
+    "title": "安全提示",
+    "description1": "Vibe Kanban 默认以 <code>--dangerously-skip-permissions</code> / <code>--yolo</code> 模式运行 AI 编程代理，这将赋予它们在您系统上执行代码和运行命令的无限制访问权限。",
+    "description2": "<strong>重要提示：</strong>请始终审查代理的操作，并确保您已备份重要工作。此软件为实验性质 - 请谨慎使用。",
+    "learnMore": "了解更多请访问",
+    "accept": "我已了解，继续"
   }
 }
