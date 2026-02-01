@@ -77,10 +77,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: parseInt(process.env.FRONTEND_PORT || "3000"),
+    port: parseInt(process.env.FRONTEND_PORT || "23457"),
+    strictPort: true, // Don't try other ports if 23457 is in use
     proxy: {
       "/api": {
-        target: `http://localhost:${process.env.BACKEND_PORT || "3001"}`,
+        target: `http://localhost:${process.env.BACKEND_PORT || "23456"}`,
         changeOrigin: true,
         ws: true,
       }
