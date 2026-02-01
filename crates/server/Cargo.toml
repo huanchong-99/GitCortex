@@ -52,6 +52,8 @@ tower = "0.5"
 
 [target.'cfg(windows)'.dependencies]
 rfd = "0.15"
+raw-window-handle = "0.6"
+windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging"] }
 
 [build-dependencies]
 dotenv = "0.15"

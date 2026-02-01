@@ -5090,6 +5090,7 @@ dependencies = [
  "once_cell",
  "os_info",
  "rand 0.8.5",
+ "raw-window-handle",
  "regex",
  "reqwest",
  "rfd",
@@ -5121,6 +5122,7 @@ dependencies = [
  "url",
  "utils",
  "uuid",
+ "windows-sys 0.59.0",
  "wiremock",
 ]
 

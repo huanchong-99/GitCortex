@@ -10,6 +10,16 @@ use services::services::filesystem::{DirectoryEntry, DirectoryListResponse, File
 use ts_rs::TS;
 use utils::response::ApiResponse;
 
+#[cfg(windows)]
+use raw_window_handle::{
+    DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawDisplayHandle,
+    RawWindowHandle, Win32WindowHandle, WindowHandle, WindowsDisplayHandle,
+};
+#[cfg(windows)]
+use std::num::NonZeroIsize;
+#[cfg(windows)]
+use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+
 use crate::{DeploymentImpl, error::ApiError};
 
 #[derive(Debug, Deserialize)]
@@ -24,12 +34,56 @@ pub struct FolderPickerResponse {
     pub cancelled: bool,
 }
 
+/// Helper struct to wrap a foreground window handle for rfd parent binding.
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+struct ForegroundWindow {
+    hwnd: NonZeroIsize,
+}
+
+#[cfg(windows)]
+impl HasWindowHandle for ForegroundWindow {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+        let handle = Win32WindowHandle::new(self.hwnd);
+        let raw = RawWindowHandle::Win32(handle);
+        // SAFETY: The handle is valid for the duration of the dialog operation
+        Ok(unsafe { WindowHandle::borrow_raw(raw) })
+    }
+}
+
+#[cfg(windows)]
+impl HasDisplayHandle for ForegroundWindow {
+    fn display_handle(&self) -> Result<DisplayHandle<'_>, HandleError> {
+        let raw = RawDisplayHandle::Windows(WindowsDisplayHandle::new());
+        // SAFETY: Windows display handle is always valid
+        Ok(unsafe { DisplayHandle::borrow_raw(raw) })
+    }
+}
+
+/// Get the current foreground window handle.
+#[cfg(windows)]
+fn foreground_window() -> Option<ForegroundWindow> {
+    // SAFETY: GetForegroundWindow is safe to call and returns a valid HWND or NULL
+    let hwnd = unsafe { GetForegroundWindow() };
+    NonZeroIsize::new(hwnd as isize).map(|hwnd| ForegroundWindow { hwnd })
+}
+
 /// Opens a native folder picker dialog and returns the selected path.
 #[cfg(windows)]
 pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerResponse>>, ApiError> {
-    let result = tokio::task::spawn_blocking(|| {
-        let dialog = rfd::FileDialog::new()
+    // Capture foreground window on the main thread before spawning blocking task
+    let parent_hwnd = foreground_window();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let mut dialog = rfd::FileDialog::new()
             .set_title("Select Project Directory");
+
+        // Bind to foreground window to ensure dialog appears in front
+        if let Some(parent) = parent_hwnd {
+            dialog = dialog.set_parent(&parent);
+        } else {
+            tracing::warn!("No foreground window found; folder picker may open behind other windows");
+        }
 
         dialog.pick_folder()
     })
