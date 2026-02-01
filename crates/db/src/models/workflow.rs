@@ -262,7 +262,7 @@ pub struct WorkflowTask {
     /// Associated workflow ID
     pub workflow_id: String,
 
-    /// Associated vibe-kanban task ID (optional)
+    /// Associated gitcortex task ID (optional)
     pub vk_task_id: Option<Uuid>,
 
     /// Task name

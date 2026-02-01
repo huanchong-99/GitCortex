@@ -7,7 +7,7 @@ pub fn asset_dir() -> std::io::Result<std::path::PathBuf> {
     let path = if cfg!(debug_assertions) {
         std::path::PathBuf::from(PROJECT_ROOT).join("../../dev_assets")
     } else {
-        let dirs = ProjectDirs::from("ai", "bloop", "vibe-kanban").ok_or_else(|| {
+        let dirs = ProjectDirs::from("ai", "bloop", "gitcortex").ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::NotFound, "OS didn't give us a home directory")
         })?;
         dirs.data_dir().to_path_buf()

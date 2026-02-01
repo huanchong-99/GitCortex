@@ -1,9 +1,9 @@
 {
-  "vibe_kanban": {
+  "gitcortex": {
     "command": "npx",
     "args": [
       "-y",
-      "vibe-kanban@latest",
+      "gitcortex@latest",
       "--mcp"
     ]
   },
@@ -38,11 +38,11 @@
     ]
   },
   "meta": {
-    "vibe_kanban": {
-      "name": "Vibe Kanban",
-      "description": "Create, update and delete Vibe Kanban tasks",
-      "url": "https://www.vibekanban.com/docs/integrations/vibe-kanban-mcp-server",
-      "icon": "favicon-vk-light.svg"
+    "gitcortex": {
+      "name": "GitCortex",
+      "description": "Create, update and delete GitCortex tasks",
+      "url": "https://gitcortex.com/docs/integrations/gitcortex-mcp-server",
+      "icon": "favicon-gc-light.svg"
     },
     "context7": {
       "name": "Context7",

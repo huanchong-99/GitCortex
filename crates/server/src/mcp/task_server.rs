@@ -842,7 +842,7 @@ impl ServerHandler for TaskServer {
     fn get_info(&self) -> ServerInfo {
         let mut instruction = "A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. You can get project ids by using `list projects`. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`.. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_workspace_session', 'get_task', 'update_task', 'delete_task', 'list_repos'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string();
         if self.context.is_some() {
-            let context_instruction = "Use 'get_context' to fetch project/task/workspace metadata for the active Vibe Kanban workspace session when available.";
+            let context_instruction = "Use 'get_context' to fetch project/task/workspace metadata for the active GitCortex workspace session when available.";
             instruction = format!("{context_instruction} {instruction}");
         }
 
@@ -850,7 +850,7 @@ impl ServerHandler for TaskServer {
             protocol_version: ProtocolVersion::V_2025_03_26,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
-                name: "vibe-kanban".to_string(),
+                name: "gitcortex".to_string(),
                 version: "1.0.0".to_string(),
             },
             instructions: Some(instruction),

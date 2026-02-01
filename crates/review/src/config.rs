@@ -9,9 +9,9 @@ pub struct Config {
 }
 
 impl Config {
-    /// Get the path to the config file (~/.config/vibe-kanban/review.toml)
+    /// Get the path to the config file (~/.config/gitcortex/review.toml)
     fn config_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|p| p.join("vibe-kanban").join("review.toml"))
+        dirs::config_dir().map(|p| p.join("gitcortex").join("review.toml"))
     }
 
     /// Load config from disk, returning default if file doesn't exist

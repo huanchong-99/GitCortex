@@ -1,6 +1,6 @@
 //! CC-Switch 服务
 //!
-//! 封装 cc-switch crate，提供与 vibe-kanban 集成的接口。
+//! 封装 cc-switch crate，提供与 gitcortex 集成的接口。
 
 use std::sync::Arc;
 use async_trait::async_trait;

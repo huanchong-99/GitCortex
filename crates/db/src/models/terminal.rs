@@ -88,7 +88,7 @@ pub struct Terminal {
     /// Associated execution process ID (NEW FIELD)
     pub execution_process_id: Option<String>,
 
-    /// Associated vibe-kanban session ID
+    /// Associated gitcortex session ID
     pub vk_session_id: Option<Uuid>,
 
     /// Last Git commit hash
