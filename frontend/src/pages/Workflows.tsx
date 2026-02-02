@@ -1,7 +1,14 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus, Play, Pause, Square, Trash2 } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import {
@@ -14,6 +21,7 @@ import {
   useWorkflow,
   getWorkflowActions,
 } from '@/hooks/useWorkflows';
+import { useProjects } from '@/hooks/useProjects';
 import type { WorkflowTaskDto } from 'shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
 import { PipelineView, type WorkflowStatus, type WorkflowTask } from '@/components/workflow/PipelineView';
@@ -26,12 +34,32 @@ import { useTranslation } from 'react-i18next';
 
 export function Workflows() {
   const { t } = useTranslation('workflow');
-  const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [showWizard, setShowWizard] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
 
-  const { data: workflows, isLoading, error } = useWorkflows(projectId || '');
+  // Get projectId from URL query params
+  const projectIdFromUrl = searchParams.get('projectId');
+
+  // Load projects list for project selector
+  const { projects, isLoading: projectsLoading, error: projectsError } = useProjects();
+
+  // Validate projectId exists in projects list, fallback to first project if invalid
+  const validProjectId = projectIdFromUrl && projects.some(p => p.id === projectIdFromUrl)
+    ? projectIdFromUrl
+    : (projects.length > 0 ? projects[0].id : null);
+
+  // Update URL when projectId is invalid or missing
+  useEffect(() => {
+    if (projects.length > 0 && projectIdFromUrl !== validProjectId) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('projectId', validProjectId!);
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [projectIdFromUrl, validProjectId, projects.length, searchParams, setSearchParams]);
+
+  const { data: workflows, isLoading, error } = useWorkflows(validProjectId || '');
   const createMutation = useCreateWorkflow();
   const startMutation = useStartWorkflow();
   const pauseMutation = usePauseWorkflow();
@@ -74,6 +102,53 @@ export function Workflows() {
       })),
     }));
   };
+
+  // Handle project change (preserve other URL params)
+  const handleProjectChange = (newProjectId: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('projectId', newProjectId);
+    setSearchParams(newParams, { replace: true });
+    setSelectedWorkflowId(null); // Clear selected workflow when switching projects
+  };
+
+  // Get current project name for display
+  const currentProject = projects.find(p => p.id === validProjectId);
+
+  if (projectsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader message="Loading projects..." />
+      </div>
+    );
+  }
+
+  if (projectsError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-error mb-4">{t('errors.loadFailed')}</p>
+            <p className="text-sm text-low">{projectsError.message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
+            <p className="text-sm text-low">
+              Please create a project first in Settings → Projects before creating workflows.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -123,7 +198,16 @@ export function Workflows() {
       // Transform WizardConfig to CreateWorkflowRequest using the resolved project ID
       const request = wizardConfigToCreateRequest(projectId, wizardConfig);
 
-      await createMutation.mutateAsync(request);
+      const newWorkflow = await createMutation.mutateAsync(request);
+
+      // Update URL with the project ID so the workflow list can be refreshed (preserve other params)
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('projectId', projectId);
+      setSearchParams(newParams, { replace: true });
+
+      // Select the newly created workflow to show its details
+      setSelectedWorkflowId(newWorkflow.id);
+
       setShowWizard(false);
     } catch (error) {
       console.error('Failed to create workflow:', error);
@@ -236,11 +320,29 @@ export function Workflows() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Workflows</h1>
-          <p className="text-low">
-            Manage multi-terminal workflows for parallel task execution
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Workflows</h1>
+            <p className="text-low">
+              Manage multi-terminal workflows for parallel task execution
+            </p>
+          </div>
+          {projects.length > 1 && (
+            <Select value={validProjectId || ''} onValueChange={handleProjectChange}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select project">
+                  {currentProject?.name || 'Select project'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <Button onClick={() => setShowWizard(true)}>
           <Plus className="w-4 h-4 mr-2" />

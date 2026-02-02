@@ -146,7 +146,7 @@ const workflowsApi = {
    * Get all workflows for a project
    */
   getForProject: async (projectId: string): Promise<WorkflowListItemDto[]> => {
-    const response = await fetch(`/api/workflows?projectId=${encodeURIComponent(projectId)}`);
+    const response = await fetch(`/api/workflows?project_id=${encodeURIComponent(projectId)}`);
     return handleApiResponse<WorkflowListItemDto[]>(response);
   },
 
