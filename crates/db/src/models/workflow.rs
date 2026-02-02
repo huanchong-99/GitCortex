@@ -102,8 +102,8 @@ pub struct Workflow {
     /// Primary key ID (UUID as String for compatibility)
     pub id: String,
 
-    /// Associated project ID
-    pub project_id: String,
+    /// Associated project ID (BLOB in database)
+    pub project_id: Uuid,
 
     /// Workflow name
     pub name: String,
@@ -368,6 +368,18 @@ pub struct CreateWorkflowTaskRequest {
     pub terminals: Vec<CreateTerminalRequest>,
 }
 
+/// Inline model config for custom/temporary model configurations
+/// Used when frontend creates new model configs that don't exist in database
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct InlineModelConfig {
+    /// Display name for the model
+    pub display_name: String,
+    /// API model ID (e.g., "glm-4-plus", "claude-sonnet-4")
+    pub model_id: String,
+}
+
 /// Create Terminal Request
 #[derive(Debug, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -379,6 +391,8 @@ pub struct CreateTerminalRequest {
     pub cli_type_id: String,
     /// Model config ID
     pub model_config_id: String,
+    /// Inline model config (auto-created when model_config_id not found in database)
+    pub model_config: Option<InlineModelConfig>,
     /// Custom base URL (overrides model config)
     pub custom_base_url: Option<String>,
     /// Custom API key (encrypted storage)
@@ -449,6 +463,8 @@ pub struct OrchestratorConfig {
 pub struct TerminalConfig {
     pub cli_type_id: String,
     pub model_config_id: String,
+    /// Inline model config (auto-created when model_config_id not found in database)
+    pub model_config: Option<InlineModelConfig>,
     pub custom_base_url: Option<String>,
     pub custom_api_key: Option<String>,
 }
@@ -503,7 +519,7 @@ impl Workflow {
 
     /// Find workflows by project
     #[instrument(skip(pool), fields(project_id))]
-    pub async fn find_by_project(pool: &SqlitePool, project_id: &str) -> sqlx::Result<Vec<Self>> {
+    pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> sqlx::Result<Vec<Self>> {
         let start = std::time::Instant::now();
         let result = sqlx::query_as::<_, Workflow>(
             r"
@@ -532,7 +548,7 @@ impl Workflow {
 #[derive(Debug, Clone, FromRow)]
 pub struct WorkflowWithCounts {
     pub id: String,
-    pub project_id: String,
+    pub project_id: Uuid,
     pub name: String,
     pub description: Option<String>,
     pub status: String,
@@ -549,7 +565,7 @@ impl Workflow {
     #[instrument(skip(pool), fields(project_id))]
     pub async fn find_by_project_with_counts(
         pool: &SqlitePool,
-        project_id: &str,
+        project_id: Uuid,
     ) -> sqlx::Result<Vec<WorkflowWithCounts>> {
         let start = std::time::Instant::now();
         let result = sqlx::query_as::<_, WorkflowWithCounts>(
@@ -903,7 +919,7 @@ mod encryption_tests {
             || {
                 let mut workflow = Workflow {
                     id: "test-workflow".to_string(),
-                    project_id: "test-project".to_string(),
+                    project_id: Uuid::nil(),
                     name: "Test Workflow".to_string(),
                     description: None,
                     status: "pending".to_string(),
@@ -950,7 +966,7 @@ mod encryption_tests {
         with_var("GITCORTEX_ENCRYPTION_KEY", Option::<&str>::None, || {
             let mut workflow = Workflow {
                 id: "test-workflow".to_string(),
-                project_id: "test-project".to_string(),
+                project_id: Uuid::nil(),
                 name: "Test Workflow".to_string(),
                 description: None,
                 status: "pending".to_string(),
@@ -991,7 +1007,7 @@ mod encryption_tests {
         with_var("GITCORTEX_ENCRYPTION_KEY", Some("short"), || {
             let mut workflow = Workflow {
                 id: "test-workflow".to_string(),
-                project_id: "test-project".to_string(),
+                project_id: Uuid::nil(),
                 name: "Test Workflow".to_string(),
                 description: None,
                 status: "pending".to_string(),
@@ -1029,7 +1045,7 @@ mod encryption_tests {
             || {
                 let workflow = Workflow {
                     id: "test-workflow".to_string(),
-                    project_id: "test-project".to_string(),
+                    project_id: Uuid::nil(),
                     name: "Test Workflow".to_string(),
                     description: None,
                     status: "pending".to_string(),
@@ -1067,7 +1083,7 @@ mod encryption_tests {
             || {
                 let mut workflow = Workflow {
                     id: "test-workflow".to_string(),
-                    project_id: "test-project".to_string(),
+                    project_id: Uuid::nil(),
                     name: "Test Workflow".to_string(),
                     description: None,
                     status: "pending".to_string(),

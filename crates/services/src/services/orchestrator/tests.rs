@@ -721,11 +721,11 @@ mod orchestrator_tests {
         let pty_session_id = Uuid::new_v4().to_string();
 
         // First, we need to insert a project (required by workflow)
-        let project_id = Uuid::new_v4().to_string();
+        let project_id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
         )
-        .bind(&project_id)
+        .bind(project_id)
         .bind("test-project")
         .bind(chrono::Utc::now())
         .bind(chrono::Utc::now())
@@ -884,11 +884,11 @@ mod orchestrator_tests {
         let workflow_id = Uuid::new_v4().to_string();
 
         // First, we need to insert a project (required by workflow)
-        let project_id = Uuid::new_v4().to_string();
+        let project_id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
         )
-        .bind(&project_id)
+        .bind(project_id)
         .bind("test-project")
         .bind(chrono::Utc::now())
         .bind(chrono::Utc::now())
@@ -1011,11 +1011,11 @@ mod orchestrator_tests {
         let workflow_id = Uuid::new_v4().to_string();
 
         // First, we need to insert a project (required by workflow)
-        let project_id = Uuid::new_v4().to_string();
+        let project_id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
         )
-        .bind(&project_id)
+        .bind(project_id)
         .bind("test-project")
         .bind(chrono::Utc::now())
         .bind(chrono::Utc::now())
@@ -1120,11 +1120,11 @@ mod orchestrator_tests {
         let pty_session_id = Uuid::new_v4().to_string();
 
         // First, we need to insert a project (required by workflow)
-        let project_id = Uuid::new_v4().to_string();
+        let project_id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
         )
-        .bind(&project_id)
+        .bind(project_id)
         .bind("test-project")
         .bind(chrono::Utc::now())
         .bind(chrono::Utc::now())

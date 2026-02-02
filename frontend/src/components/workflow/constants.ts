@@ -7,56 +7,56 @@
  * Matches backend BaseCodingAgent enum from shared/types.ts
  */
 export const CLI_TYPES = {
-  'claude-code': {
-    id: 'claude-code',
+  'cli-claude-code': {
+    id: 'cli-claude-code',
     label: 'Claude Code',
     description: 'Anthropic Claude Code CLI',
     icon: 'terminal',
   },
-  'gemini-cli': {
-    id: 'gemini-cli',
+  'cli-gemini-cli': {
+    id: 'cli-gemini-cli',
     label: 'Gemini CLI',
     description: 'Google Gemini CLI',
     icon: 'terminal',
   },
-  'codex': {
-    id: 'codex',
+  'cli-codex': {
+    id: 'cli-codex',
     label: 'Codex',
     description: 'OpenAI Codex CLI',
     icon: 'terminal',
   },
-  'amp': {
-    id: 'amp',
+  'cli-amp': {
+    id: 'cli-amp',
     label: 'Amp',
     description: 'Sourcegraph Amp CLI',
     icon: 'terminal',
   },
-  'cursor-agent': {
-    id: 'cursor-agent',
+  'cli-cursor-agent': {
+    id: 'cli-cursor-agent',
     label: 'Cursor Agent',
     description: 'Cursor IDE Agent',
     icon: 'terminal',
   },
-  'qwen-code': {
-    id: 'qwen-code',
+  'cli-qwen-code': {
+    id: 'cli-qwen-code',
     label: 'Qwen Code',
     description: 'Alibaba Qwen Code CLI',
     icon: 'terminal',
   },
-  'copilot': {
-    id: 'copilot',
+  'cli-copilot': {
+    id: 'cli-copilot',
     label: 'Copilot',
     description: 'GitHub Copilot CLI',
     icon: 'terminal',
   },
-  'droid': {
-    id: 'droid',
+  'cli-droid': {
+    id: 'cli-droid',
     label: 'Droid',
     description: 'Droid AI CLI',
     icon: 'terminal',
   },
-  'opencode': {
-    id: 'opencode',
+  'cli-opencode': {
+    id: 'cli-opencode',
     label: 'Opencode',
     description: 'Opencode CLI',
     icon: 'terminal',

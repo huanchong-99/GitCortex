@@ -147,7 +147,7 @@ impl WorkflowDetailDto {
 
         Self {
             id: workflow.id.clone(),
-            project_id: workflow.project_id.clone(),
+            project_id: workflow.project_id.to_string(),
             name: workflow.name.clone(),
             description: workflow.description.clone(),
             status: workflow.status.clone(),
@@ -190,7 +190,7 @@ impl WorkflowDetailDto {
 
         Self {
             id: workflow.id.clone(),
-            project_id: workflow.project_id.clone(),
+            project_id: workflow.project_id.to_string(),
             name: workflow.name.clone(),
             description: workflow.description.clone(),
             status: workflow.status.clone(),
@@ -431,7 +431,7 @@ mod conversion_tests {
         // This test will fail until we implement the conversion
         let workflow = Workflow {
             id: Uuid::new_v4().to_string(),
-            project_id: Uuid::new_v4().to_string(),
+            project_id: Uuid::new_v4(),
             name: "Test Workflow".to_string(),
             description: Some("Test".to_string()),
             status: "created".to_string(),

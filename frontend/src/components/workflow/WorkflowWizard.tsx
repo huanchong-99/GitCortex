@@ -223,7 +223,7 @@ export function WorkflowWizard({
       <CardContent className="px-base">
         <StepIndicator currentStep={currentStep} completedSteps={completedSteps} />
 
-        <div className="min-h-[400px] mb-6">
+        <div className="min-h-[400px] max-h-[60vh] overflow-y-auto mb-6">
           {renderStep()}
         </div>
 

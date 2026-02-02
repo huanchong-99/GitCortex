@@ -49,6 +49,11 @@ export function getWorkflowActions(status: WorkflowStatusEnum): WorkflowActions 
 // Create Request Types (not in generated types yet)
 // ============================================================================
 
+export interface InlineModelConfig {
+  displayName: string;
+  modelId: string;
+}
+
 export interface CreateWorkflowRequest {
   projectId: string;
   name: string;
@@ -69,12 +74,14 @@ export interface CreateWorkflowRequest {
   errorTerminalConfig?: {
     cliTypeId: string;
     modelConfigId: string;
+    modelConfig?: InlineModelConfig;
     customBaseUrl?: string | null;
     customApiKey?: string | null;
   };
   mergeTerminalConfig?: {
     cliTypeId: string;
     modelConfigId: string;
+    modelConfig?: InlineModelConfig;
     customBaseUrl?: string | null;
     customApiKey?: string | null;
   };
@@ -89,6 +96,7 @@ export interface CreateWorkflowRequest {
       id?: string;
       cliTypeId: string;
       modelConfigId: string;
+      modelConfig?: InlineModelConfig;
       customBaseUrl?: string | null;
       customApiKey?: string | null;
       role?: string;

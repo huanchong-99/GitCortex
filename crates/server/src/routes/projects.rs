@@ -19,7 +19,7 @@ use db::models::{
 };
 use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use services::services::{
     file_search::SearchQuery, project::ProjectServiceError,
 };
@@ -41,6 +41,18 @@ pub struct LinkToExistingRequest {
 pub struct CreateRemoteProjectRequest {
     pub organization_id: Uuid,
     pub name: String,
+}
+
+#[derive(Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveProjectByPathRequest {
+    pub path: String,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveProjectByPathResponse {
+    pub project_id: String,
 }
 
 pub async fn get_projects(
@@ -221,6 +233,79 @@ pub async fn create_project(
         ))),
         Err(e) => Err(ProjectError::CreateFailed(e.to_string()).into()),
     }
+}
+
+/// Resolve a project by repository path.
+/// If a project with the given repo path exists, returns its ID.
+/// Otherwise, creates a new project with the path and returns the new ID.
+pub async fn resolve_project_by_path(
+    State(deployment): State<DeploymentImpl>,
+    Json(payload): Json<ResolveProjectByPathRequest>,
+) -> Result<ResponseJson<ApiResponse<ResolveProjectByPathResponse>>, ApiError> {
+    let path = payload.path.trim();
+    if path.is_empty() {
+        return Err(ApiError::BadRequest("path is required".to_string()));
+    }
+
+    // Normalize the path
+    let normalized_path = deployment
+        .repo()
+        .normalize_path(path)
+        .map_err(|e| ApiError::BadRequest(format!("Invalid path: {e}")))?;
+
+    let normalized_path_str = normalized_path.to_string_lossy().to_string();
+
+    // Check if repo exists and has an associated project
+    if let Some(repo) = Repo::find_by_path(&deployment.db().pool, &normalized_path_str).await? {
+        let project_ids =
+            ProjectRepo::find_project_ids_by_repo_id(&deployment.db().pool, repo.id).await?;
+        if let Some(project_id) = project_ids.first() {
+            tracing::debug!(
+                "Found existing project {} for path {}",
+                project_id,
+                normalized_path_str
+            );
+            return Ok(ResponseJson(ApiResponse::success(
+                ResolveProjectByPathResponse {
+                    project_id: project_id.to_string(),
+                },
+            )));
+        }
+    }
+
+    // No existing project found, create a new one
+    let name = normalized_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or("untitled")
+        .to_string();
+
+    tracing::debug!(
+        "Creating new project '{}' for path {}",
+        name,
+        normalized_path_str
+    );
+
+    let create_payload = CreateProject {
+        name: name.clone(),
+        repositories: vec![CreateProjectRepo {
+            display_name: name.clone(),
+            git_repo_path: normalized_path_str.clone(),
+        }],
+    };
+
+    let project = deployment
+        .project()
+        .create_project(&deployment.db().pool, deployment.repo(), create_payload)
+        .await
+        .map_err(|e| ApiError::BadRequest(format!("Failed to create project: {e}")))?;
+
+    Ok(ResponseJson(ApiResponse::success(
+        ResolveProjectByPathResponse {
+            project_id: project.id.to_string(),
+        },
+    )))
 }
 
 pub async fn update_project(
@@ -555,6 +640,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 
     let projects_router = Router::new()
         .route("/", get(get_projects).post(create_project))
+        .route("/resolve-by-path", post(resolve_project_by_path))
         .route(
             "/{project_id}/repositories/{repo_id}",
             get(get_project_repository).delete(delete_project_repository),

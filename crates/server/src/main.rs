@@ -11,6 +11,7 @@
 
 use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
+use dotenv;
 use server::{DeploymentImpl, routes};
 use services::services::container::ContainerService;
 use sqlx::Error as SqlxError;
@@ -38,6 +39,9 @@ pub enum GitCortexError {
 
 #[tokio::main]
 async fn main() -> Result<(), GitCortexError> {
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+
     // Install rustls crypto provider before any TLS operations
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()

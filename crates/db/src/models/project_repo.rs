@@ -69,6 +69,22 @@ impl ProjectRepo {
         .await
     }
 
+    /// Find all project IDs associated with a repo
+    pub async fn find_project_ids_by_repo_id(
+        pool: &SqlitePool,
+        repo_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar!(
+            r#"SELECT project_id as "project_id!: Uuid"
+               FROM project_repos
+               WHERE repo_id = $1
+               ORDER BY project_id ASC"#,
+            repo_id
+        )
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn find_repos_for_project(
         pool: &SqlitePool,
         project_id: Uuid,

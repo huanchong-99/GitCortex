@@ -194,7 +194,7 @@ export function getDefaultWizardConfig(): WizardConfig {
 // API Request Types (from useWorkflows.ts)
 // ============================================================================
 
-import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
+import type { CreateWorkflowRequest, InlineModelConfig } from '@/hooks/useWorkflows';
 
 /**
  * Transform WizardConfig to CreateWorkflowRequest
@@ -209,6 +209,14 @@ export function wizardConfigToCreateRequest(
   if (!orchestratorModel) {
     throw new Error('Orchestrator model not found in configured models');
   }
+
+  // Helper to create inline model config from model ID
+  const toInlineModelConfig = (modelConfigId?: string): InlineModelConfig | undefined => {
+    const model = config.models.find(m => m.id === modelConfigId);
+    return model
+      ? { displayName: model.displayName, modelId: model.modelId }
+      : undefined;
+  };
 
   const request: CreateWorkflowRequest = {
     projectId,
@@ -232,12 +240,14 @@ export function wizardConfigToCreateRequest(
     errorTerminalConfig: config.advanced.errorTerminal.enabled ? {
       cliTypeId: config.advanced.errorTerminal.cliTypeId!,
       modelConfigId: config.advanced.errorTerminal.modelConfigId!,
+      modelConfig: toInlineModelConfig(config.advanced.errorTerminal.modelConfigId),
       customBaseUrl: null,
       customApiKey: null,
     } : undefined,
     mergeTerminalConfig: {
       cliTypeId: config.advanced.mergeTerminal.cliTypeId,
       modelConfigId: config.advanced.mergeTerminal.modelConfigId,
+      modelConfig: toInlineModelConfig(config.advanced.mergeTerminal.modelConfigId),
       customBaseUrl: null,
       customApiKey: null,
     },
@@ -268,6 +278,10 @@ export function wizardConfigToCreateRequest(
             return {
               cliTypeId: terminal.cliTypeId,
               modelConfigId: terminal.modelConfigId,
+              modelConfig: {
+                displayName: model.displayName,
+                modelId: model.modelId,
+              },
               customBaseUrl: model.baseUrl !== orchestratorModel.baseUrl ? model.baseUrl : null,
               customApiKey: model.apiKey !== orchestratorModel.apiKey ? model.apiKey : null,
               role: terminal.role,

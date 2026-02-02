@@ -187,6 +187,54 @@ impl ModelConfig {
         .await
     }
 
+    /// Create a custom model config from inline data
+    ///
+    /// Used when frontend sends a temporary model_config_id that doesn't exist
+    /// in the database, along with inline model configuration data.
+    /// If the model config already exists (concurrent request), returns the existing one.
+    pub async fn create_custom(
+        pool: &SqlitePool,
+        id: &str,
+        cli_type_id: &str,
+        display_name: &str,
+        api_model_id: &str,
+    ) -> sqlx::Result<Self> {
+        let now = chrono::Utc::now();
+        // Use the ID as the name for custom configs
+        let name = id.to_string();
+
+        // Try to insert, handle conflict by returning existing record
+        let result = sqlx::query_as::<_, ModelConfig>(
+            r"
+            INSERT INTO model_config (
+                id, cli_type_id, name, display_name, api_model_id,
+                is_default, is_official, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, ?6, ?7)
+            RETURNING *
+            "
+        )
+        .bind(id)
+        .bind(cli_type_id)
+        .bind(&name)
+        .bind(display_name)
+        .bind(api_model_id)
+        .bind(now)
+        .bind(now)
+        .fetch_one(pool)
+        .await;
+
+        match result {
+            Ok(config) => Ok(config),
+            Err(sqlx::Error::Database(db_err)) if db_err.is_unique_violation() => {
+                // Concurrent insert - fetch the existing record
+                Self::find_by_id(pool, id)
+                    .await?
+                    .ok_or_else(|| sqlx::Error::RowNotFound)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     /// Get default model for a CLI type
     pub async fn find_default_for_cli(pool: &SqlitePool, cli_type_id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, ModelConfig>(

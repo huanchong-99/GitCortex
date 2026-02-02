@@ -43,3 +43,6 @@ frontend/dist/
 # Local dev config
 .dev-ports.json
 .claude/settings.local.json
+
+# Test data with API keys
+TEST_DATA.md

@@ -97,10 +97,30 @@ export function Workflows() {
   }
 
   const handleCreateWorkflow = async (wizardConfig: WizardConfig) => {
-    if (!projectId) return;
+    // Use working directory from wizard config
+    const workingDir = wizardConfig.project.workingDirectory;
+    if (!workingDir) return;
 
     try {
-      // Transform WizardConfig to CreateWorkflowRequest using the helper function
+      // First, resolve the project ID from the working directory path
+      const resolveResponse = await fetch('/api/projects/resolve-by-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: workingDir }),
+      });
+
+      if (!resolveResponse.ok) {
+        throw new Error('Failed to resolve project from path');
+      }
+
+      const resolveData = await resolveResponse.json();
+      if (!resolveData.success || !resolveData.data?.projectId) {
+        throw new Error(resolveData.message || 'Failed to resolve project');
+      }
+
+      const projectId = resolveData.data.projectId;
+
+      // Transform WizardConfig to CreateWorkflowRequest using the resolved project ID
       const request = wizardConfigToCreateRequest(projectId, wizardConfig);
 
       await createMutation.mutateAsync(request);

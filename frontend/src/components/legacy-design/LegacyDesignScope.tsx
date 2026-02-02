@@ -1,5 +1,6 @@
 import { ReactNode, useRef } from 'react';
 import { PortalContainerContext } from '@/contexts/PortalContainerContext';
+import { ToastProvider } from '@/components/ui/toast';
 import NiceModal from '@ebay/nice-modal-react';
 import '@/styles/legacy/index.css';
 
@@ -12,7 +13,9 @@ export function LegacyDesignScope({ children }: LegacyDesignScopeProps) {
   return (
     <div ref={ref} className="legacy-design min-h-screen">
       <PortalContainerContext.Provider value={ref}>
-        <NiceModal.Provider>{children}</NiceModal.Provider>
+        <ToastProvider>
+          <NiceModal.Provider>{children}</NiceModal.Provider>
+        </ToastProvider>
       </PortalContainerContext.Provider>
     </div>
   );

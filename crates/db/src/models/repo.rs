@@ -150,6 +150,31 @@ impl Repo {
         .await
     }
 
+    pub async fn find_by_path(
+        pool: &SqlitePool,
+        path: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Repo,
+            r#"SELECT id as "id!: Uuid",
+                      path,
+                      name,
+                      display_name,
+                      setup_script,
+                      cleanup_script,
+                      copy_files,
+                      parallel_setup_script as "parallel_setup_script!: bool",
+                      dev_server_script,
+                      created_at as "created_at!: DateTime<Utc>",
+                      updated_at as "updated_at!: DateTime<Utc>"
+               FROM repos
+               WHERE path = $1"#,
+            path
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn find_by_ids(pool: &SqlitePool, ids: &[Uuid]) -> Result<Vec<Self>, sqlx::Error> {
         if ids.is_empty() {
             return Ok(Vec::new());

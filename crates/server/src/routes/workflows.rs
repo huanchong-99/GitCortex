@@ -9,8 +9,8 @@ use axum::{
     routing::{get, post, put},
 };
 use db::models::{
-    CliType, CreateWorkflowRequest, ModelConfig, SlashCommandPreset, Terminal, Workflow,
-    WorkflowCommand, WorkflowTask,
+    CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
+    Workflow, WorkflowCommand, WorkflowTask,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
@@ -190,39 +190,72 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
 }
 
 /// Validate CLI types and model configs exist in database
+/// If model_config_id doesn't exist but inline model_config is provided,
+/// automatically create a new ModelConfig record.
 async fn validate_cli_and_model_configs(
     pool: &sqlx::SqlitePool,
     req: &CreateWorkflowRequest,
 ) -> Result<(), ApiError> {
-    // Collect all unique cli_type_id and model_config_id pairs
-    let mut pairs_to_validate: Vec<(String, String)> = Vec::new();
+    // Collect unique model_config_id references with CLI type and inline config
+    let mut model_config_refs: HashMap<String, (String, Option<InlineModelConfig>)> = HashMap::new();
 
-    // Add merge terminal config
-    pairs_to_validate.push((
-        req.merge_terminal_config.cli_type_id.clone(),
-        req.merge_terminal_config.model_config_id.clone(),
-    ));
+    // Helper to track model config references
+    let mut track_ref = |cli_type_id: &str,
+                         model_config_id: &str,
+                         inline: Option<&InlineModelConfig>|
+     -> Result<(), ApiError> {
+        match model_config_refs.get_mut(model_config_id) {
+            Some((existing_cli_type_id, existing_inline)) => {
+                // Validate same model_config_id is used with same CLI type
+                if existing_cli_type_id != cli_type_id {
+                    return Err(ApiError::BadRequest(format!(
+                        "Model config {model_config_id} used with multiple CLI types: {existing_cli_type_id} and {cli_type_id}"
+                    )));
+                }
+                // Use inline config if not already set
+                if existing_inline.is_none() {
+                    *existing_inline = inline.cloned();
+                }
+            }
+            None => {
+                model_config_refs.insert(
+                    model_config_id.to_string(),
+                    (cli_type_id.to_string(), inline.cloned()),
+                );
+            }
+        }
+        Ok(())
+    };
 
-    // Add error terminal config if present
+    // Track merge terminal config
+    track_ref(
+        &req.merge_terminal_config.cli_type_id,
+        &req.merge_terminal_config.model_config_id,
+        req.merge_terminal_config.model_config.as_ref(),
+    )?;
+
+    // Track error terminal config if present
     if let Some(error_config) = &req.error_terminal_config {
-        pairs_to_validate.push((
-            error_config.cli_type_id.clone(),
-            error_config.model_config_id.clone(),
-        ));
+        track_ref(
+            &error_config.cli_type_id,
+            &error_config.model_config_id,
+            error_config.model_config.as_ref(),
+        )?;
     }
 
-    // Add all task terminals
+    // Track all task terminals
     for task in &req.tasks {
         for terminal in &task.terminals {
-            pairs_to_validate.push((
-                terminal.cli_type_id.clone(),
-                terminal.model_config_id.clone(),
-            ));
+            track_ref(
+                &terminal.cli_type_id,
+                &terminal.model_config_id,
+                terminal.model_config.as_ref(),
+            )?;
         }
     }
 
-    // Validate each pair
-    for (cli_type_id, model_config_id) in pairs_to_validate {
+    // Validate each unique model_config_id
+    for (model_config_id, (cli_type_id, inline)) in model_config_refs {
         // Validate CLI type exists
         let cli_type = CliType::find_by_id(pool, &cli_type_id).await
             .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
@@ -233,18 +266,32 @@ async fn validate_cli_and_model_configs(
             )));
         }
 
-        // Validate model config exists
+        // Validate model config exists or create from inline data
         let model_config = ModelConfig::find_by_id(pool, &model_config_id).await
             .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
 
-        if model_config.is_none() {
-            return Err(ApiError::BadRequest(format!(
-                "Model config not found: {model_config_id}"
-            )));
-        }
+        let model_config = match model_config {
+            Some(mc) => mc,
+            None => {
+                // Model config not found - try to create from inline data
+                let inline = inline.ok_or_else(|| ApiError::BadRequest(format!(
+                    "Model config not found: {model_config_id}. Provide inline modelConfig to auto-create."
+                )))?;
+
+                // Create custom model config from inline data
+                ModelConfig::create_custom(
+                    pool,
+                    &model_config_id,
+                    &cli_type_id,
+                    &inline.display_name,
+                    &inline.model_id,
+                )
+                .await
+                .map_err(|e| ApiError::Internal(format!("Failed to create model config: {e}")))?
+            }
+        };
 
         // Validate model config belongs to the CLI type
-        let model_config = model_config.unwrap();
         if model_config.cli_type_id != cli_type_id {
             return Err(ApiError::BadRequest(format!(
                 "Model config {model_config_id} does not belong to CLI type {cli_type_id}"
@@ -261,9 +308,13 @@ async fn list_workflows(
     State(deployment): State<DeploymentImpl>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<ResponseJson<ApiResponse<Vec<WorkflowListItemDto>>>, ApiError> {
-    let project_id = params
+    let project_id_str = params
         .get("project_id")
         .ok_or_else(|| ApiError::BadRequest("project_id is required".to_string()))?;
+
+    // Parse project_id as UUID
+    let project_id = Uuid::parse_str(project_id_str)
+        .map_err(|_| ApiError::BadRequest("project_id must be a valid UUID".to_string()))?;
 
     // Use optimized query that returns counts in a single database call
     let workflows_with_counts =
@@ -274,7 +325,7 @@ async fn list_workflows(
         .into_iter()
         .map(|w| WorkflowListItemDto {
             id: w.id,
-            project_id: w.project_id,
+            project_id: w.project_id.to_string(),
             name: w.name,
             description: w.description,
             status: w.status,
@@ -297,16 +348,30 @@ async fn create_workflow(
     // Validate request structure
     validate_create_request(&req)?;
 
+    // Parse and validate project_id as UUID
+    let project_id = Uuid::parse_str(&req.project_id)
+        .map_err(|_| ApiError::BadRequest("projectId must be a valid UUID".to_string()))?;
+
     // Validate CLI types and model configs exist in database
     validate_cli_and_model_configs(&deployment.db().pool, &req).await?;
 
     let now = chrono::Utc::now();
     let workflow_id = Uuid::new_v4().to_string();
 
+    // Log workflow creation details
+    let total_terminals: usize = req.tasks.iter().map(|task| task.terminals.len()).sum();
+    tracing::info!(
+        workflow_id = %workflow_id,
+        project_id = %project_id,
+        tasks = req.tasks.len(),
+        terminals = total_terminals,
+        "creating workflow"
+    );
+
     // 1. Create workflow with encrypted API key
     let mut workflow = Workflow {
         id: workflow_id.clone(),
-        project_id: req.project_id,
+        project_id,
         name: req.name,
         description: req.description,
         status: "created".to_string(),
@@ -342,46 +407,14 @@ async fn create_workflow(
             .map_err(|e| ApiError::BadRequest(format!("Failed to encrypt API key: {e}")))?;
     }
 
-    let workflow = Workflow::create(&deployment.db().pool, &workflow).await?;
-
-    // 2. Create slash command associations with custom parameters
-    let mut commands: Vec<WorkflowCommand> = Vec::new();
-    if let Some(command_reqs) = req.commands {
-        for (index, cmd_req) in command_reqs.iter().enumerate() {
-            let index = i32::try_from(index)
-                .map_err(|_| ApiError::BadRequest("Command index overflow".to_string()))?;
-
-            // Validate custom_params is valid JSON if provided
-            if let Some(ref params) = cmd_req.custom_params {
-                if !params.trim().is_empty() {
-                    // Validate JSON format
-                    serde_json::from_str::<serde_json::Value>(params)
-                        .map_err(|_| ApiError::BadRequest(
-                            format!("Invalid JSON in custom_params for preset {}", cmd_req.preset_id)
-                        ))?;
-                }
-            }
-
-            WorkflowCommand::create(
-                &deployment.db().pool,
-                &workflow_id,
-                &cmd_req.preset_id,
-                index,
-                cmd_req.custom_params.as_deref(),
-            )
-            .await?;
-        }
-        commands = WorkflowCommand::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
-    }
-
-    // 3. Prepare tasks and terminals for transactional creation
+    // 2. Prepare tasks and terminals for transactional creation
     let mut task_rows: Vec<(WorkflowTask, Vec<Terminal>)> = Vec::new();
     let mut existing_branches: Vec<String> = Vec::new();
 
     // Collect existing branch names for conflict detection
     // In a real scenario, we'd query the git repository for existing branches
     // For now, we collect branches that will be created in this batch
-    for (task_index, task_req) in req.tasks.iter().enumerate() {
+    for (_task_index, task_req) in req.tasks.iter().enumerate() {
         let task_id = Uuid::new_v4().to_string();
 
         // Generate branch name using slugify with conflict detection
@@ -467,9 +500,39 @@ async fn create_workflow(
         task_rows.push((task, terminals));
     }
 
-    // 4. Execute transactional creation
+    // 3. Execute transactional creation (workflow + tasks + terminals)
     Workflow::create_with_tasks(&deployment.db().pool, &workflow, task_rows).await
         .map_err(|e| ApiError::BadRequest(format!("Failed to create workflow: {e}")))?;
+
+    // 4. Create slash command associations (after workflow exists)
+    let mut commands: Vec<WorkflowCommand> = Vec::new();
+    if let Some(command_reqs) = req.commands {
+        for (index, cmd_req) in command_reqs.iter().enumerate() {
+            let index = i32::try_from(index)
+                .map_err(|_| ApiError::BadRequest("Command index overflow".to_string()))?;
+
+            // Validate custom_params is valid JSON if provided
+            if let Some(ref params) = cmd_req.custom_params {
+                if !params.trim().is_empty() {
+                    // Validate JSON format
+                    serde_json::from_str::<serde_json::Value>(params)
+                        .map_err(|_| ApiError::BadRequest(
+                            format!("Invalid JSON in custom_params for preset {}", cmd_req.preset_id)
+                        ))?;
+                }
+            }
+
+            WorkflowCommand::create(
+                &deployment.db().pool,
+                &workflow_id,
+                &cmd_req.preset_id,
+                index,
+                cmd_req.custom_params.as_deref(),
+            )
+            .await?;
+        }
+        commands = WorkflowCommand::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    }
 
     // 5. Get command preset details
     let all_presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;

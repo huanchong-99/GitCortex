@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { WizardConfig, ModelConfig, ApiType } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useModelStore } from '@/stores/modelStore';
+import { useToast } from '@/components/ui/toast';
 
 interface Step3ModelsProps {
   config: WizardConfig;
@@ -75,6 +76,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   onUpdate,
 }) => {
   const { t } = useTranslation('workflow');
+  const { showToast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [formData, setFormData] = useState<ModelFormData>(initialFormData);
@@ -194,6 +196,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
         // Update form verification state for use when saving
         setIsFormVerified(true);
         setFormErrors({});
+        // Show success toast notification
+        showToast(t('step3.messages.verifySuccess'), 'success');
       } else {
         setIsFormVerified(false);
         setFormErrors({ verify: t('step3.errors.verifyFailed') });
