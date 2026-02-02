@@ -18,7 +18,11 @@ use raw_window_handle::{
 #[cfg(windows)]
 use std::num::NonZeroIsize;
 #[cfg(windows)]
-use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+#[cfg(windows)]
+use windows_sys::Win32::System::Threading::GetCurrentProcessId;
+#[cfg(windows)]
+use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
 use crate::{DeploymentImpl, error::ApiError};
 
@@ -60,12 +64,29 @@ impl HasDisplayHandle for ForegroundWindow {
     }
 }
 
-/// Get the current foreground window handle.
+/// Get the current foreground window handle, only if it belongs to the current process.
 #[cfg(windows)]
 fn foreground_window() -> Option<ForegroundWindow> {
     // SAFETY: GetForegroundWindow is safe to call and returns a valid HWND or NULL
     let hwnd = unsafe { GetForegroundWindow() };
-    NonZeroIsize::new(hwnd as isize).map(|hwnd| ForegroundWindow { hwnd })
+    let hwnd = NonZeroIsize::new(hwnd as isize)?;
+
+    // Check if the foreground window belongs to the current process
+    let mut pid = 0u32;
+    // SAFETY: hwnd is non-zero; pid is a valid mutable pointer
+    unsafe { GetWindowThreadProcessId(hwnd.get() as _, &mut pid) };
+
+    let current_pid = unsafe { GetCurrentProcessId() };
+    if pid != current_pid {
+        tracing::debug!(
+            "Foreground window (pid={}) not owned by current process (pid={}); skipping parent bind",
+            pid,
+            current_pid
+        );
+        return None;
+    }
+
+    Some(ForegroundWindow { hwnd })
 }
 
 /// Opens a native folder picker dialog and returns the selected path.
@@ -75,30 +96,43 @@ pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerRespon
     let parent_hwnd = foreground_window();
 
     let result = tokio::task::spawn_blocking(move || {
-        let mut dialog = rfd::FileDialog::new()
-            .set_title("Select Project Directory");
+        // Wrap entire dialog creation and invocation in catch_unwind
+        // to handle panics from rfd (e.g., GUI unavailable in headless/remote sessions)
+        catch_unwind(AssertUnwindSafe(|| {
+            let mut dialog = rfd::FileDialog::new()
+                .set_title("Select Project Directory");
 
-        // Bind to foreground window to ensure dialog appears in front
-        if let Some(parent) = parent_hwnd {
-            dialog = dialog.set_parent(&parent);
-        } else {
-            tracing::warn!("No foreground window found; folder picker may open behind other windows");
-        }
+            // Bind to foreground window to ensure dialog appears in front
+            if let Some(parent) = parent_hwnd {
+                dialog = dialog.set_parent(&parent);
+            } else {
+                tracing::warn!("No foreground window found; folder picker may open behind other windows");
+            }
 
-        dialog.pick_folder()
+            dialog.pick_folder()
+        }))
     })
     .await
-    .map_err(|e| ApiError::Internal(format!("Failed to spawn blocking task: {e}")))?;
+    .map_err(|e| {
+        tracing::error!("Failed to spawn blocking task for folder picker: {e}");
+        ApiError::Internal(format!("Failed to spawn blocking task: {e}"))
+    })?;
 
     match result {
-        Some(path) => Ok(ResponseJson(ApiResponse::success(FolderPickerResponse {
+        Ok(Some(path)) => Ok(ResponseJson(ApiResponse::success(FolderPickerResponse {
             path: Some(path.to_string_lossy().to_string()),
             cancelled: false,
         }))),
-        None => Ok(ResponseJson(ApiResponse::success(FolderPickerResponse {
+        Ok(None) => Ok(ResponseJson(ApiResponse::success(FolderPickerResponse {
             path: None,
             cancelled: true,
         }))),
+        Err(_) => {
+            tracing::error!("Folder picker panicked - GUI may be unavailable (headless/remote session)");
+            Ok(ResponseJson(ApiResponse::error(
+                "Folder picker failed to open. This may happen in headless or remote desktop sessions. Please enter the path manually.",
+            )))
+        }
     }
 }
 
