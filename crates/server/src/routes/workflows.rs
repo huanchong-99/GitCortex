@@ -926,8 +926,16 @@ async fn update_task_status(
         ));
     }
 
-    // Validate status value
-    let valid_statuses = ["pending", "in_progress", "completed", "failed", "cancelled"];
+    // Validate status value - support both backend and frontend status names
+    let valid_statuses = [
+        "pending",       // Initial state
+        "in_progress",   // Backend: task is being worked on
+        "running",       // Frontend Kanban: task is running
+        "review_pending", // Frontend Kanban: awaiting review
+        "completed",     // Task completed successfully
+        "failed",        // Task failed
+        "cancelled",     // Task was cancelled
+    ];
     if !valid_statuses.contains(&req.status.as_str()) {
         return Err(ApiError::BadRequest(format!(
             "Invalid status '{}', expected one of: {:?}",
