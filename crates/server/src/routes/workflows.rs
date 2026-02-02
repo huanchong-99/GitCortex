@@ -117,6 +117,10 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/{workflow_id}/merge", post(merge_workflow))
         .route("/{workflow_id}/tasks", get(list_workflow_tasks))
         .route(
+            "/{workflow_id}/tasks/{task_id}/status",
+            put(update_task_status),
+        )
+        .route(
             "/{workflow_id}/tasks/{task_id}/terminals",
             get(list_task_terminals),
         )
@@ -876,6 +880,62 @@ async fn list_workflow_tasks(
         task_details.push(WorkflowTaskDetailResponse { task, terminals });
     }
     Ok(ResponseJson(ApiResponse::success(task_details)))
+}
+
+/// Request body for updating task status
+#[derive(Debug, Deserialize)]
+pub struct UpdateTaskStatusRequest {
+    pub status: String,
+}
+
+/// PUT /api/workflows/:workflow_id/tasks/:task_id/status
+/// Update task status (for Kanban drag-and-drop)
+async fn update_task_status(
+    State(deployment): State<DeploymentImpl>,
+    Path((workflow_id, task_id)): Path<(String, String)>,
+    Json(req): Json<UpdateTaskStatusRequest>,
+) -> Result<ResponseJson<ApiResponse<WorkflowTask>>, ApiError> {
+    // Verify workflow exists
+    let _workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    // Verify task exists and belongs to the workflow
+    let task = WorkflowTask::find_by_id(&deployment.db().pool, &task_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Task not found".to_string()))?;
+
+    if task.workflow_id != workflow_id {
+        return Err(ApiError::BadRequest(
+            "Task does not belong to this workflow".to_string()
+        ));
+    }
+
+    // Validate status value
+    let valid_statuses = ["pending", "in_progress", "completed", "failed", "cancelled"];
+    if !valid_statuses.contains(&req.status.as_str()) {
+        return Err(ApiError::BadRequest(format!(
+            "Invalid status '{}', expected one of: {:?}",
+            req.status, valid_statuses
+        )));
+    }
+
+    // Update task status
+    WorkflowTask::update_status(&deployment.db().pool, &task_id, &req.status).await?;
+
+    // Fetch updated task
+    let updated_task = WorkflowTask::find_by_id(&deployment.db().pool, &task_id)
+        .await?
+        .ok_or_else(|| ApiError::Internal("Failed to fetch updated task".to_string()))?;
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        task_id = %task_id,
+        new_status = %req.status,
+        "Task status updated"
+    );
+
+    Ok(ResponseJson(ApiResponse::success(updated_task)))
 }
 
 /// GET /api/workflows/:workflow_id/tasks/:task_id/terminals
