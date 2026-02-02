@@ -129,6 +129,7 @@ function AppContent() {
               <Route index element={<Navigate to="/board" replace />} />
               <Route path="board" element={<Board />} />
               <Route path="wizard" element={<Workflows />} />
+              <Route path="workflows" element={<Workflows />} />
               <Route path="pipeline/:workflowId" element={<Pipeline />} />
               <Route path="debug/:workflowId" element={<WorkflowDebugPage />} />
             </Route>

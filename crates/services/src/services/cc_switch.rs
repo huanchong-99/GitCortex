@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use async_trait::async_trait;
 
-use cc_switch::{CliType as CcCliType, ModelSwitcher, SwitchConfig};
+use cc_switch::{CliType as CcCliType, ModelSwitcher, SwitchConfig, read_claude_config};
 use db::{
     DBService,
     models::{CliType, ModelConfig, Terminal},
@@ -58,10 +58,38 @@ impl CCSwitch for CCSwitchService {
         let cli = CcCliType::parse(&cli_type.name)
             .ok_or_else(|| anyhow::anyhow!("Unsupported CLI: {}", cli_type.name))?;
 
-        // 解密并获取 API key
-        let api_key = terminal
-            .get_custom_api_key()?
-            .ok_or_else(|| anyhow::anyhow!("API key not configured for terminal"))?;
+        // Resolve API key based on CLI type
+        let api_key = match cli {
+            CcCliType::ClaudeCode => {
+                // For Claude Code: try custom_api_key first, then read from existing config
+                if let Some(custom) = terminal.get_custom_api_key()? {
+                    custom
+                } else {
+                    // Try to read from existing Claude config
+                    let config = match read_claude_config().await {
+                        Ok(cfg) => cfg,
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to read Claude config file: {}. Will check for auth token anyway.",
+                                e
+                            );
+                            Default::default()
+                        }
+                    };
+                    config.env.auth_token
+                        .or(config.env.api_key)
+                        .ok_or_else(|| anyhow::anyhow!(
+                            "Claude Code auth token not configured. Please login via CLI (claude login) or set terminal custom_api_key"
+                        ))?
+                }
+            }
+            _ => {
+                // For other CLIs: require custom_api_key
+                terminal
+                    .get_custom_api_key()?
+                    .ok_or_else(|| anyhow::anyhow!("API key not configured for terminal"))?
+            }
+        };
 
         // 构建切换配置
         let config = SwitchConfig {
