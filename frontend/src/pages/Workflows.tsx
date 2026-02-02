@@ -9,11 +9,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Play, Pause, Square, Trash2 } from 'lucide-react';
+import { Plus, Play, Pause, Square, Trash2, Rocket } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import {
   useWorkflows,
   useCreateWorkflow,
+  usePrepareWorkflow,
   useStartWorkflow,
   usePauseWorkflow,
   useStopWorkflow,
@@ -61,6 +62,7 @@ export function Workflows() {
 
   const { data: workflows, isLoading, error } = useWorkflows(validProjectId || '');
   const createMutation = useCreateWorkflow();
+  const prepareMutation = usePrepareWorkflow();
   const startMutation = useStartWorkflow();
   const pauseMutation = usePauseWorkflow();
   const stopMutation = useStopWorkflow();
@@ -215,6 +217,10 @@ export function Workflows() {
     }
   };
 
+  const handlePrepareWorkflow = async (workflowId: string) => {
+    await prepareMutation.mutateAsync(workflowId);
+  };
+
   const handleStartWorkflow = async (workflowId: string) => {
     await startMutation.mutateAsync({ workflow_id: workflowId });
   };
@@ -261,6 +267,15 @@ export function Workflows() {
             ← Back to Workflows
           </Button>
           <div className="flex gap-2">
+            {actions.canPrepare && (
+              <Button
+                onClick={() => handlePrepareWorkflow(selectedWorkflowDetail.id)}
+                disabled={prepareMutation.isPending}
+              >
+                <Rocket className="w-4 h-4 mr-2" />
+                {prepareMutation.isPending ? 'Preparing...' : 'Prepare Workflow'}
+              </Button>
+            )}
             {actions.canStart && (
               <Button
                 onClick={() => handleStartWorkflow(selectedWorkflowDetail.id)}

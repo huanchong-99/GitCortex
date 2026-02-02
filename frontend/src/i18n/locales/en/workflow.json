@@ -84,7 +84,8 @@
     "errors": {
       "gitStatus": "Failed to check git status",
       "gitInit": "Failed to initialize git",
-      "gitNetwork": "Network error. Please try again."
+      "gitNetwork": "Network error. Please try again.",
+      "folderPicker": "Failed to open folder picker. Please try again."
     }
   },
   "step1": {

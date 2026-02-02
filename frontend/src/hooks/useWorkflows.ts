@@ -24,21 +24,22 @@ export type WorkflowStatusEnum =
   | 'cancelled';
 
 export interface WorkflowActions {
-  canStart: boolean;
+  canPrepare: boolean;  // created → starting → ready (启动终端)
+  canStart: boolean;    // ready → running (开始任务)
   canPause: boolean;
   canStop: boolean;
   canDelete: boolean;
 }
 
 export const WORKFLOW_STATUS_TRANSITIONS: Record<WorkflowStatusEnum, WorkflowActions> = {
-  created: { canStart: false, canPause: false, canStop: false, canDelete: true },
-  ready: { canStart: true, canPause: false, canStop: false, canDelete: true },
-  starting: { canStart: false, canPause: false, canStop: true, canDelete: false },
-  running: { canStart: false, canPause: true, canStop: true, canDelete: false },
-  paused: { canStart: true, canPause: false, canStop: true, canDelete: true },
-  completed: { canStart: false, canPause: false, canStop: false, canDelete: true },
-  failed: { canStart: true, canPause: false, canStop: false, canDelete: true },
-  cancelled: { canStart: false, canPause: false, canStop: false, canDelete: true },
+  created: { canPrepare: true, canStart: false, canPause: false, canStop: false, canDelete: true },
+  ready: { canPrepare: false, canStart: true, canPause: false, canStop: false, canDelete: true },
+  starting: { canPrepare: false, canStart: false, canPause: false, canStop: true, canDelete: false },
+  running: { canPrepare: false, canStart: false, canPause: true, canStop: true, canDelete: false },
+  paused: { canPrepare: false, canStart: true, canPause: false, canStop: true, canDelete: true },
+  completed: { canPrepare: false, canStart: false, canPause: false, canStop: false, canDelete: true },
+  failed: { canPrepare: true, canStart: false, canPause: false, canStop: false, canDelete: true },
+  cancelled: { canPrepare: false, canStart: false, canPause: false, canStop: false, canDelete: true },
 };
 
 export function getWorkflowActions(status: WorkflowStatusEnum): WorkflowActions {
@@ -171,7 +172,18 @@ const workflowsApi = {
   },
 
   /**
-   * Start a workflow execution
+   * Prepare a workflow (start terminals, created → starting → ready)
+   */
+  prepare: async (workflowId: string): Promise<void> => {
+    const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  /**
+   * Start a workflow execution (ready → running)
    */
   start: async (data: StartWorkflowRequest): Promise<WorkflowExecution> => {
     const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/start`, {
@@ -292,7 +304,28 @@ export function useCreateWorkflow() {
 }
 
 /**
- * Hook to start a workflow execution
+ * Hook to prepare a workflow (start terminals, created → starting → ready)
+ * @returns Mutation object for preparing workflows
+ */
+export function usePrepareWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workflowId: string) => workflowsApi.prepare(workflowId),
+    onSuccess: (_result, workflowId) => {
+      // Invalidate the workflow detail to reflect the new status
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(workflowId),
+      });
+    },
+    onError: (error) => {
+      logApiError('Failed to prepare workflow:', error);
+    },
+  });
+}
+
+/**
+ * Hook to start a workflow execution (ready → running)
  * @returns Mutation object for starting workflows
  */
 export function useStartWorkflow() {

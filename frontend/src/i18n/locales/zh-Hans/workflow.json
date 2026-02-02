@@ -84,7 +84,8 @@
     "errors": {
       "gitStatus": "获取 Git 状态失败",
       "gitInit": "初始化 Git 失败",
-      "gitNetwork": "网络错误，请重试"
+      "gitNetwork": "网络错误，请重试",
+      "folderPicker": "无法打开文件夹选择器，请重试"
     }
   },
   "step1": {

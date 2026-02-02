@@ -1,6 +1,7 @@
 //! Workflow API Routes
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::{
     Json, Router,
@@ -14,6 +15,10 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use services::services::{
+    cc_switch::CCSwitchService,
+    orchestrator::TerminalCoordinator,
+};
 use serde_json::json;
 use utils::response::ApiResponse;
 use utils::text;
@@ -105,6 +110,7 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/recover", post(recover_workflows))
         .route("/{workflow_id}", get(get_workflow).delete(delete_workflow))
         .route("/{workflow_id}/status", put(update_workflow_status))
+        .route("/{workflow_id}/prepare", post(prepare_workflow))
         .route("/{workflow_id}/start", post(start_workflow))
         .route("/{workflow_id}/merge", post(merge_workflow))
         .route("/{workflow_id}/tasks", get(list_workflow_tasks))
@@ -618,6 +624,84 @@ async fn update_workflow_status(
     Json(req): Json<UpdateWorkflowStatusRequest>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     Workflow::update_status(&deployment.db().pool, &workflow_id, &req.status).await?;
+    Ok(ResponseJson(ApiResponse::success(())))
+}
+
+/// POST /api/workflows/:workflow_id/prepare
+/// Prepare workflow: start all terminals (created → starting → ready)
+///
+/// This endpoint performs serial model switching for all terminals using cc-switch,
+/// then transitions the workflow to "ready" status for user confirmation before execution.
+async fn prepare_workflow(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    // Check workflow exists
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    // Verify workflow is in "created" or "failed" status (can retry failed workflows)
+    if workflow.status != "created" && workflow.status != "failed" {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot prepare workflow: current status is '{}', expected 'created' or 'failed'",
+            workflow.status
+        )));
+    }
+
+    // Update status to "starting"
+    Workflow::update_status(&deployment.db().pool, &workflow_id, "starting").await?;
+
+    // Create services for terminal coordination
+    let db_arc = Arc::new(deployment.db().clone());
+    let cc_switch = Arc::new(CCSwitchService::new(Arc::clone(&db_arc)));
+    let coordinator = TerminalCoordinator::new(db_arc, cc_switch);
+
+    // Start terminals using TerminalCoordinator (serial model switching)
+    if let Err(e) = coordinator.start_terminals_for_workflow(&workflow_id).await {
+        // Log the error for debugging
+        tracing::error!(
+            workflow_id = %workflow_id,
+            error = %e,
+            "Failed to prepare workflow terminals"
+        );
+
+        // Roll back: reset all terminals to "not_started" status
+        if let Ok(terminals) = Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await {
+            for terminal in &terminals {
+                let _ = Terminal::update_status(&deployment.db().pool, &terminal.id, "not_started").await;
+            }
+        }
+
+        // Roll back workflow status to "failed"
+        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+
+        return Err(ApiError::Internal(format!(
+            "Failed to prepare workflow terminals: {e}"
+        )));
+    }
+
+    // All terminals prepared successfully, mark workflow as ready
+    if let Err(e) = Workflow::set_ready(&deployment.db().pool, &workflow_id).await {
+        tracing::error!(
+            workflow_id = %workflow_id,
+            error = %e,
+            "Failed to set workflow ready status"
+        );
+
+        // Roll back workflow status to "failed" (terminals remain in "waiting" state)
+        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+
+        return Err(ApiError::Internal(
+            "Failed to finalize workflow preparation".to_string()
+        ));
+    }
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        "Workflow prepared and ready for execution"
+    );
+
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
