@@ -112,6 +112,8 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/{workflow_id}/status", put(update_workflow_status))
         .route("/{workflow_id}/prepare", post(prepare_workflow))
         .route("/{workflow_id}/start", post(start_workflow))
+        .route("/{workflow_id}/pause", post(pause_workflow))
+        .route("/{workflow_id}/stop", post(stop_workflow))
         .route("/{workflow_id}/merge", post(merge_workflow))
         .route("/{workflow_id}/tasks", get(list_workflow_tasks))
         .route(
@@ -738,6 +740,107 @@ async fn start_workflow(
 
     // Note: Workflow::set_started is called inside OrchestratorRuntime::start_workflow
     // to ensure the status update happens atomically with runtime startup
+
+    Ok(ResponseJson(ApiResponse::success(())))
+}
+
+/// POST /api/workflows/:workflow_id/pause
+/// Pause a running workflow
+async fn pause_workflow(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    // Check workflow exists
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    // Only allow pausing a running workflow
+    if workflow.status != "running" {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot pause workflow: current status is '{}', expected 'running'",
+            workflow.status
+        )));
+    }
+
+    // Stop the orchestrator runtime if it's active
+    let runtime = deployment.orchestrator_runtime();
+    if runtime.is_running(&workflow_id).await {
+        runtime
+            .stop_workflow(&workflow_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to stop workflow {} for pause: {:?}", workflow_id, e);
+                ApiError::Internal("Failed to pause workflow".to_string())
+            })?;
+    }
+
+    // Mark workflow as paused
+    Workflow::update_status(&deployment.db().pool, &workflow_id, "paused").await?;
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        "Workflow paused"
+    );
+
+    Ok(ResponseJson(ApiResponse::success(())))
+}
+
+/// POST /api/workflows/:workflow_id/stop
+/// Stop a workflow and mark as cancelled
+async fn stop_workflow(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    // Check workflow exists
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    // Allow stopping from starting/running/paused
+    let valid_statuses = ["starting", "running", "paused"];
+    if !valid_statuses.contains(&workflow.status.as_str()) {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot stop workflow: current status is '{}', expected one of: {:?}",
+            workflow.status, valid_statuses
+        )));
+    }
+
+    // Stop the orchestrator runtime if it's active
+    let runtime = deployment.orchestrator_runtime();
+    if runtime.is_running(&workflow_id).await {
+        runtime
+            .stop_workflow(&workflow_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to stop workflow {}: {:?}", workflow_id, e);
+                ApiError::Internal("Failed to stop workflow".to_string())
+            })?;
+    }
+
+    // Mark workflow as cancelled
+    Workflow::update_status(&deployment.db().pool, &workflow_id, "cancelled").await?;
+
+    // Mark all tasks as cancelled
+    let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    for task in &tasks {
+        if task.status != "completed" {
+            WorkflowTask::update_status(&deployment.db().pool, &task.id, "cancelled").await?;
+        }
+    }
+
+    // Mark all terminals as cancelled
+    let terminals = Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    for terminal in &terminals {
+        if terminal.status != "completed" {
+            Terminal::update_status(&deployment.db().pool, &terminal.id, "cancelled").await?;
+        }
+    }
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        "Workflow stopped and cancelled"
+    );
 
     Ok(ResponseJson(ApiResponse::success(())))
 }
