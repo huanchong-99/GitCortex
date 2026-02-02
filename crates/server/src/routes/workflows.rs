@@ -712,7 +712,7 @@ async fn prepare_workflow(
 }
 
 /// POST /api/workflows/:workflow_id/start
-/// Start workflow (user confirmed)
+/// Start workflow (user confirmed) or resume from paused state
 async fn start_workflow(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<String>,
@@ -727,6 +727,21 @@ async fn start_workflow(
         return Err(ApiError::BadRequest(
             "Cannot start workflow: orchestrator is not enabled".to_string()
         ));
+    }
+
+    // Validate workflow status - allow starting from ready or resuming from paused
+    let valid_start_statuses = ["ready", "paused"];
+    if !valid_start_statuses.contains(&workflow.status.as_str()) {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot start workflow: current status is '{}', expected 'ready' or 'paused'",
+            workflow.status
+        )));
+    }
+
+    // If resuming from paused, first reset to ready state
+    if workflow.status == "paused" {
+        Workflow::update_status(&deployment.db().pool, &workflow_id, "ready").await?;
+        tracing::info!(workflow_id = %workflow_id, "Resuming workflow from paused state");
     }
 
     // Call orchestrator runtime to start workflow
@@ -946,15 +961,6 @@ async fn list_task_terminals(
 ) -> Result<ResponseJson<ApiResponse<Vec<Terminal>>>, ApiError> {
     let terminals = Terminal::find_by_task(&deployment.db().pool, &task_id).await?;
     Ok(ResponseJson(ApiResponse::success(terminals)))
-}
-
-/// GET /api/workflows/presets/commands
-/// List slash command presets
-async fn list_command_presets(
-    State(deployment): State<DeploymentImpl>,
-) -> Result<ResponseJson<ApiResponse<Vec<SlashCommandPreset>>>, ApiError> {
-    let presets = SlashCommandPreset::find_all(&deployment.db().pool).await?;
-    Ok(ResponseJson(ApiResponse::success(presets)))
 }
 
 /// POST /api/workflows/:workflow_id/merge

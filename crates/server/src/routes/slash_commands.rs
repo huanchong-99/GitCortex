@@ -56,6 +56,25 @@ pub async fn list_command_presets(
     Ok(Json(ApiResponse::success(presets)))
 }
 
+/// Get a single slash command preset by ID
+///
+/// GET /api/workflows/presets/commands/:id
+pub async fn get_command_preset(
+    State(deployment): State<DeploymentImpl>,
+    Path(id): Path<String>,
+) -> Result<ResponseJson<ApiResponse<SlashCommandPreset>>, ApiError> {
+    let preset = sqlx::query_as::<_, SlashCommandPreset>(
+        "SELECT * FROM slash_command_preset WHERE id = ?"
+    )
+    .bind(&id)
+    .fetch_optional(&deployment.db().pool)
+    .await
+    .map_err(|e| ApiError::Internal(format!("Failed to fetch command preset: {}", e).into()))?
+    .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+
+    Ok(Json(ApiResponse::success(preset)))
+}
+
 /// Create a new slash command preset
 ///
 /// POST /api/workflows/presets/commands
@@ -222,5 +241,5 @@ pub async fn delete_command_preset(
 pub fn slash_commands_routes() -> Router<DeploymentImpl> {
     Router::new()
         .route("/presets/commands", get(list_command_presets).post(create_command_preset))
-        .route("/presets/commands/{id}", put(update_command_preset).delete(delete_command_preset))
+        .route("/presets/commands/{id}", get(get_command_preset).put(update_command_preset).delete(delete_command_preset))
 }

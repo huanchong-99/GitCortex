@@ -858,6 +858,81 @@ impl SlashCommandPreset {
         .fetch_all(pool)
         .await
     }
+
+    /// Find a preset by ID
+    pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, SlashCommandPreset>(
+            r"SELECT * FROM slash_command_preset WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Create a new slash command preset
+    pub async fn create(
+        pool: &SqlitePool,
+        command: &str,
+        description: &str,
+        prompt_template: Option<&str>,
+    ) -> sqlx::Result<Self> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now();
+        sqlx::query_as::<_, SlashCommandPreset>(
+            r"
+            INSERT INTO slash_command_preset (id, command, description, prompt_template, is_system, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, 0, ?5, ?5)
+            RETURNING *
+            ",
+        )
+        .bind(&id)
+        .bind(command)
+        .bind(description)
+        .bind(prompt_template)
+        .bind(now)
+        .fetch_one(pool)
+        .await
+    }
+
+    /// Update a slash command preset
+    pub async fn update(
+        pool: &SqlitePool,
+        id: &str,
+        command: Option<&str>,
+        description: Option<&str>,
+        prompt_template: Option<&str>,
+    ) -> sqlx::Result<Self> {
+        let now = Utc::now();
+        sqlx::query_as::<_, SlashCommandPreset>(
+            r"
+            UPDATE slash_command_preset
+            SET command = COALESCE(?2, command),
+                description = COALESCE(?3, description),
+                prompt_template = COALESCE(?4, prompt_template),
+                updated_at = ?5
+            WHERE id = ?1 AND is_system = 0
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(command)
+        .bind(description)
+        .bind(prompt_template)
+        .bind(now)
+        .fetch_one(pool)
+        .await
+    }
+
+    /// Delete a slash command preset (only non-system presets)
+    pub async fn delete(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+        sqlx::query(
+            r"DELETE FROM slash_command_preset WHERE id = ? AND is_system = 0",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
 }
 
 impl WorkflowCommand {
