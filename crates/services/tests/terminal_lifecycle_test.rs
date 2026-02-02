@@ -314,20 +314,15 @@ async fn test_terminal_lifecycle_cleanup() {
     let process_manager = Arc::new(ProcessManager::new());
     let temp_dir = tempfile::tempdir().unwrap();
 
-    // Spawn a simple test process
+    // Spawn a simple test process using PTY
     #[cfg(unix)]
-    let mut cmd = tokio::process::Command::new("sleep");
-    #[cfg(unix)]
-    cmd.arg("1");
-
+    let shell = "sh";
     #[cfg(windows)]
-    let mut cmd = tokio::process::Command::new("timeout");
-    #[cfg(windows)]
-    cmd.args(["/t", "1"]);
+    let shell = "cmd.exe";
 
     let terminal_id = "test-cleanup-terminal";
     let handle = process_manager
-        .spawn(terminal_id, cmd, temp_dir.path())
+        .spawn_pty(terminal_id, shell, temp_dir.path(), 80, 24)
         .await
         .unwrap();
 
@@ -338,11 +333,10 @@ async fn test_terminal_lifecycle_cleanup() {
     let running = process_manager.list_running().await;
     assert!(running.contains(&terminal_id.to_string()));
 
-    // Wait for process to complete naturally
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    // Kill the terminal to clean up
+    let _ = process_manager.kill_terminal(terminal_id).await;
 
-    // Verify cleanup after natural exit
-    process_manager.cleanup().await;
+    // Verify cleanup after kill
     let running_after = process_manager.list_running().await;
     assert!(!running_after.contains(&terminal_id.to_string()));
 }

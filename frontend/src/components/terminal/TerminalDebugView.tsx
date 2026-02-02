@@ -17,6 +17,7 @@ interface Props {
 export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const { t } = useTranslation('workflow');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
   const terminalRef = useRef<TerminalEmulatorRef>(null);
   const defaultRoleLabel = t('terminalCard.defaultRole');
 
@@ -38,8 +39,28 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     terminalRef.current?.clear();
   };
 
-  const handleRestart = () => {
-    console.log('Restart terminal:', selectedTerminalId);
+  const handleRestart = async () => {
+    if (!selectedTerminalId || isStarting) return;
+
+    setIsStarting(true);
+    try {
+      const response = await fetch(`/api/terminals/${selectedTerminalId}/start`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Failed to start terminal:', error);
+      } else {
+        console.log('Terminal started successfully');
+        // Reconnect the terminal emulator
+        terminalRef.current?.reconnect?.();
+      }
+    } catch (error) {
+      console.error('Failed to start terminal:', error);
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (

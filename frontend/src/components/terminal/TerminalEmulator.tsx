@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -25,6 +25,7 @@ interface Props {
 export interface TerminalEmulatorRef {
   write: (data: string) => void;
   clear: () => void;
+  reconnect: () => void;
 }
 
 /**
@@ -37,6 +38,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     const fitAddonRef = useRef<FitAddon | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const terminalReadyRef = useRef(false);
+    const [wsKey, setWsKey] = useState(0);
 
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
@@ -45,6 +47,14 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       },
       clear: () => {
         terminalRef.current?.clear();
+      },
+      reconnect: () => {
+        // Close existing connection and trigger reconnect
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+        setWsKey((k) => k + 1);
       },
     }));
 
@@ -172,7 +182,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       return () => {
         ws.close();
       };
-    }, [wsUrl, terminalId, notifyError]);
+    }, [wsUrl, terminalId, notifyError, wsKey]);
 
     return (
       <div

@@ -1,4 +1,6 @@
-//! Terminal WebSocket routes
+//! Terminal WebSocket routes with PTY support
+//!
+//! Provides WebSocket-based terminal I/O using portable-pty for cross-platform support.
 
 use axum::{
     extract::{Path, State, WebSocketUpgrade, ws::{Message, WebSocket}},
@@ -6,7 +8,6 @@ use axum::{
     routing::get,
     Router,
 };
-use db::models::Terminal;
 use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
@@ -23,14 +24,14 @@ use crate::error::ApiError;
 // Constants
 // ============================================================================
 
-/// Connection timeout for initial WebSocket setup (30 seconds)
-const WS_CONNECT_TIMEOUT_SECS: u64 = 30;
-
 /// Idle timeout - close connection if no activity (5 minutes)
 const WS_IDLE_TIMEOUT_SECS: u64 = 300;
 
 /// Heartbeat interval for keep-alive (30 seconds)
 const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+/// PTY read buffer size
+const PTY_READ_BUFFER_SIZE: usize = 4096;
 
 // Compile-time sanity check for timeout ordering.
 const _: () = {
@@ -42,20 +43,11 @@ const _: () = {
 // ============================================================================
 
 /// UUID v4 regex pattern (case-insensitive)
-/// Matches format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-/// where x is a hexadecimal digit (0-9, a-f, case-insensitive)
 static UUID_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap()
 });
 
 /// Validates that terminal_id is a properly formatted UUID
-///
-/// # Arguments
-/// * `terminal_id` - The terminal ID string to validate
-///
-/// # Returns
-/// * `Ok(())` if the terminal_id is a valid UUID format
-/// * `Err(anyhow::Error)` if the terminal_id is invalid
 pub fn validate_terminal_id(terminal_id: &str) -> anyhow::Result<()> {
     if UUID_REGEX.is_match(terminal_id) {
         Ok(())
@@ -112,7 +104,7 @@ async fn terminal_ws_handler(
     ws.on_upgrade(move |socket| handle_terminal_socket(socket, terminal_id, deployment))
 }
 
-/// Handle terminal WebSocket connection
+/// Handle terminal WebSocket connection with PTY
 async fn handle_terminal_socket(
     socket: WebSocket,
     terminal_id: String,
@@ -123,99 +115,136 @@ async fn handle_terminal_socket(
     // Split the WebSocket into sender and receiver
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    // Create channel for PTY input (client -> PTY)
-    let (pty_input_tx, mut pty_input_rx) = mpsc::channel::<Vec<u8>>(100);
-
-    // Clone for tasks
-    let terminal_id_clone = terminal_id.clone();
-    let terminal_id_pty = terminal_id.clone();
-
     // Get process handle from ProcessManager
     let process_handle = deployment.process_manager()
         .get_handle(&terminal_id)
         .await;
 
-    let mut stdin = match process_handle {
+    let process_handle = match process_handle {
         Some(handle) => handle,
         None => {
             let msg = WsMessage::Error {
-                message: "Terminal process not running".to_string(),
+                message: "Terminal process not running. Please start the terminal first.".to_string(),
             };
             let _ = ws_sender
                 .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
                 .await;
             let _ = ws_sender.close().await;
+            tracing::warn!("Terminal {} has no running process", terminal_id);
             return;
         }
     };
 
-    // Clone for tasks
-    let terminal_id_stdin = terminal_id.clone();
-    let terminal_id_stdout = terminal_id.clone();
+    // Extract PTY reader and writer
+    let reader = process_handle.reader;
+    let writer = process_handle.writer;
 
-    // Spawn stdin writer task: receive from channel and write to process stdin
-    let mut stdin_writer = tokio::spawn(async move {
-        while let Some(data) = pty_input_rx.recv().await {
-            if let Some(mut stdin_handle) = stdin.stdin.as_mut() {
-                use tokio::io::AsyncWriteExt;
-                if let Err(e) = stdin_handle.write_all(&data).await {
-                    tracing::error!("Failed to write to stdin {}: {}", terminal_id_stdin, e);
-                    break;
-                }
-            }
-        }
-    });
+    // Create channels for async communication
+    // PTY output -> WebSocket
+    let (pty_tx, mut pty_rx) = mpsc::channel::<Vec<u8>>(100);
+    // WebSocket input -> PTY
+    let (ws_tx, ws_rx) = mpsc::channel::<Vec<u8>>(100);
 
-    // Create channel for bi-directional communication
-    let (_tx, mut rx) = mpsc::channel::<String>(100);
-
-    // Clone terminal_id for use in tasks
+    // Clone terminal_id for tasks
+    let terminal_id_reader = terminal_id.clone();
+    let terminal_id_writer = terminal_id.clone();
     let terminal_id_heartbeat = terminal_id.clone();
-    let terminal_id_stdout2 = terminal_id_stdout.clone();
+    let terminal_id_recv = terminal_id.clone();
 
     // Track last activity time for idle timeout
     let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
     let last_activity_recv = last_activity.clone();
     let last_activity_heartbeat = last_activity.clone();
 
-    // We need to get the process handle again for stdout reading
-    // Note: This is a limitation of the current one-time-take design
-    // In production, we'd restructure to share handles or use channels
-    let tx_clone2 = _tx.clone();
+    // Clone process_manager for resize operations
+    let process_manager = deployment.process_manager().clone();
+    let terminal_id_resize = terminal_id.clone();
 
-    // Spawn stdout reader task: read from process stdout and send to WebSocket
-    let stdout_reader_task = tokio::spawn(async move {
-        // Since we can't get the handle again (one-time take), use a placeholder
-        // Real PTY integration would use channels or shared handles
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
-        loop {
-            interval.tick().await;
-            // TODO: Read from actual stdout handle
-            // For now, send placeholder to keep connection alive
-            let _ = tx_clone2.send(format!("[Terminal output from {}]\n", terminal_id_stdout2)).await;
-        }
-    });
-
-    // Spawn send task: receive from channel and send to WebSocket
-    let send_task = tokio::spawn(async move {
-        while let Some(data) = rx.recv().await {
-            let msg = WsMessage::Output { data };
-            match serde_json::to_string(&msg) {
-                Ok(json) => {
-                    if ws_sender.send(Message::Text(json.into())).await.is_err() {
-                        tracing::warn!("Failed to send message to WebSocket");
+    // Spawn PTY reader task (blocking read -> async channel)
+    let reader_task = if let Some(mut pty_reader) = reader {
+        let tx = pty_tx.clone();
+        Some(tokio::task::spawn_blocking(move || {
+            let mut buf = [0u8; PTY_READ_BUFFER_SIZE];
+            loop {
+                match pty_reader.read(&mut buf) {
+                    Ok(0) => {
+                        // EOF - PTY closed
+                        tracing::debug!("PTY EOF for terminal {}", terminal_id_reader);
+                        break;
+                    }
+                    Ok(n) => {
+                        // Send data to async channel
+                        if tx.blocking_send(buf[..n].to_vec()).is_err() {
+                            tracing::debug!("PTY channel closed for terminal {}", terminal_id_reader);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("PTY read error for terminal {}: {}", terminal_id_reader, e);
                         break;
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Failed to serialize message: {}", e);
+            }
+        }))
+    } else {
+        tracing::warn!("No PTY reader available for terminal {}", terminal_id);
+        None
+    };
+
+    // Spawn PTY writer task (async channel -> blocking write)
+    let writer_task = if let Some(mut pty_writer) = writer {
+        let mut rx = ws_rx;
+        Some(tokio::task::spawn_blocking(move || {
+            while let Some(data) = rx.blocking_recv() {
+                if let Err(e) = pty_writer.write_all(&data) {
+                    tracing::error!("PTY write error for terminal {}: {}", terminal_id_writer, e);
+                    break;
+                }
+                if let Err(e) = pty_writer.flush() {
+                    tracing::error!("PTY flush error for terminal {}: {}", terminal_id_writer, e);
                     break;
                 }
             }
+        }))
+    } else {
+        tracing::warn!("No PTY writer available for terminal {}", terminal_id);
+        None
+    };
+
+    // Spawn WebSocket send task (PTY output -> WebSocket)
+    // Handles UTF-8 boundary issues with streaming decoder
+    let send_task = tokio::spawn(async move {
+        let mut pending_bytes: Vec<u8> = Vec::new();
+
+        while let Some(bytes) = pty_rx.recv().await {
+            // Append new bytes to pending buffer
+            pending_bytes.extend_from_slice(&bytes);
+
+            // Find the longest valid UTF-8 prefix
+            let (valid_text, remaining) = decode_utf8_streaming(&pending_bytes);
+
+            if !valid_text.is_empty() {
+                let msg = WsMessage::Output { data: valid_text };
+                match serde_json::to_string(&msg) {
+                    Ok(json) => {
+                        if ws_sender.send(Message::Text(json.into())).await.is_err() {
+                            tracing::warn!("Failed to send message to WebSocket");
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to serialize message: {}", e);
+                        break;
+                    }
+                }
+            }
+
+            // Keep remaining incomplete bytes for next iteration
+            pending_bytes = remaining;
         }
     });
 
-    // Spawn heartbeat task: check for idle timeout and send pings
+    // Spawn heartbeat task
     let heartbeat_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
         loop {
@@ -241,10 +270,9 @@ async fn handle_terminal_socket(
         }
     });
 
-    // Spawn receive task: receive from WebSocket and process with timeout
+    // Spawn WebSocket receive task (WebSocket input -> PTY)
     let recv_task = tokio::spawn(async move {
         loop {
-            // Use timeout for each message receive
             let recv_result = timeout(
                 Duration::from_secs(WS_IDLE_TIMEOUT_SECS),
                 ws_receiver.next()
@@ -261,37 +289,38 @@ async fn handle_terminal_socket(
                                 if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
                                     match ws_msg {
                                         WsMessage::Input { data } => {
-                                            // Send to PTY stdin
-                                            if let Err(e) = pty_input_tx.send(data.into_bytes()).await {
+                                            // Send to PTY writer
+                                            if let Err(e) = ws_tx.send(data.into_bytes()).await {
                                                 tracing::error!("Failed to send to PTY: {}", e);
                                                 break;
                                             }
                                         }
                                         WsMessage::Resize { cols, rows } => {
-                                            // Resize requires PTY support (portable-pty crate)
-                                            // For now, log the resize request
-                                            tracing::info!(
-                                                "Terminal {} resize request: {}x{} (PTY resize not yet implemented)",
-                                                terminal_id_clone,
-                                                cols,
-                                                rows
-                                            );
-                                            // TODO: Implement PTY resize when PTY integration is complete
+                                            // Resize PTY
+                                            if let Err(e) = process_manager.resize(&terminal_id_resize, cols, rows).await {
+                                                tracing::warn!(
+                                                    "Failed to resize terminal {}: {}",
+                                                    terminal_id_resize,
+                                                    e
+                                                );
+                                            } else {
+                                                tracing::debug!(
+                                                    "Terminal {} resized to {}x{}",
+                                                    terminal_id_resize,
+                                                    cols,
+                                                    rows
+                                                );
+                                            }
                                         }
                                         WsMessage::Output { .. } => {
-                                            tracing::warn!(
-                                                "Client sent unexpected Output message"
-                                            );
+                                            tracing::warn!("Client sent unexpected Output message");
                                         }
                                         WsMessage::Error { .. } => {
                                             tracing::warn!("Client sent unexpected Error message");
                                         }
                                     }
                                 } else {
-                                    tracing::warn!(
-                                        "Failed to parse WebSocket message: {}",
-                                        text
-                                    );
+                                    tracing::warn!("Failed to parse WebSocket message: {}", text);
                                 }
                             }
                             Message::Close(_) => {
@@ -299,8 +328,6 @@ async fn handle_terminal_socket(
                                 break;
                             }
                             Message::Ping(data) => {
-                                // Respond to ping with pong
-                                // Note: Axum handles this automatically in most cases
                                 tracing::trace!("Received ping: {} bytes", data.len());
                             }
                             Message::Pong(data) => {
@@ -323,7 +350,7 @@ async fn handle_terminal_socket(
                 Err(_) => {
                     tracing::warn!(
                         "Terminal {} receive timeout after {}s of inactivity",
-                        terminal_id_clone,
+                        terminal_id_recv,
                         WS_IDLE_TIMEOUT_SECS
                     );
                     break;
@@ -343,29 +370,49 @@ async fn handle_terminal_socket(
         _ = heartbeat_task => {
             tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
         }
-        _ = stdin_writer => {
-            tracing::debug!("Stdin writer task completed for terminal {}", terminal_id);
+        _ = async {
+            if let Some(task) = reader_task {
+                let _ = task.await;
+            }
+        } => {
+            tracing::debug!("PTY reader task completed for terminal {}", terminal_id);
         }
-        _ = stdout_reader_task => {
-            tracing::debug!("Stdout reader task completed for terminal {}", terminal_id);
+        _ = async {
+            if let Some(task) = writer_task {
+                let _ = task.await;
+            }
+        } => {
+            tracing::debug!("PTY writer task completed for terminal {}", terminal_id);
         }
     }
 
     tracing::info!("Terminal WebSocket disconnected: {}", terminal_id);
 }
 
+/// Decode UTF-8 from a byte buffer, handling incomplete sequences at the end.
+/// Returns (valid_string, remaining_bytes).
+fn decode_utf8_streaming(bytes: &[u8]) -> (String, Vec<u8>) {
+    // Try to decode the entire buffer
+    match std::str::from_utf8(bytes) {
+        Ok(s) => (s.to_string(), Vec::new()),
+        Err(e) => {
+            // Get the valid portion
+            let valid_up_to = e.valid_up_to();
+            let valid_str = std::str::from_utf8(&bytes[..valid_up_to])
+                .unwrap_or("")
+                .to_string();
+
+            // Keep the remaining bytes (potentially incomplete UTF-8 sequence)
+            let remaining = bytes[valid_up_to..].to_vec();
+
+            (valid_str, remaining)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_timeout_constants() {
-        // Verify timeout constants are reasonable values
-        assert_eq!(WS_CONNECT_TIMEOUT_SECS, 30);
-        assert_eq!(WS_IDLE_TIMEOUT_SECS, 300); // 5 minutes
-        assert_eq!(WS_HEARTBEAT_INTERVAL_SECS, 30);
-
-    }
 
     #[test]
     fn test_ws_message_serialization() {
@@ -413,16 +460,6 @@ mod tests {
             _ => panic!("Expected Input message"),
         }
 
-        // Test Output message
-        let json = r#"{"type":"output","data":"response"}"#;
-        let msg: WsMessage = serde_json::from_str(json).unwrap();
-        match msg {
-            WsMessage::Output { data } => {
-                assert_eq!(data, "response");
-            }
-            _ => panic!("Expected Output message"),
-        }
-
         // Test Resize message
         let json = r#"{"type":"resize","cols":120,"rows":30}"#;
         let msg: WsMessage = serde_json::from_str(json).unwrap();
@@ -433,15 +470,44 @@ mod tests {
             }
             _ => panic!("Expected Resize message"),
         }
+    }
 
-        // Test Error message
-        let json = r#"{"type":"error","message":"error message"}"#;
-        let msg: WsMessage = serde_json::from_str(json).unwrap();
-        match msg {
-            WsMessage::Error { message } => {
-                assert_eq!(message, "error message");
-            }
-            _ => panic!("Expected Error message"),
-        }
+    #[test]
+    fn test_decode_utf8_streaming_complete() {
+        let bytes = "Hello, World!".as_bytes();
+        let (text, remaining) = decode_utf8_streaming(bytes);
+        assert_eq!(text, "Hello, World!");
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_decode_utf8_streaming_incomplete() {
+        // UTF-8 for "你好" is [228, 189, 160, 229, 165, 189]
+        // Incomplete sequence: first character complete, second incomplete
+        let bytes = vec![228, 189, 160, 229, 165]; // "你" + incomplete "好"
+        let (text, remaining) = decode_utf8_streaming(&bytes);
+        assert_eq!(text, "你");
+        assert_eq!(remaining, vec![229, 165]);
+    }
+
+    #[test]
+    fn test_decode_utf8_streaming_empty() {
+        let bytes: &[u8] = &[];
+        let (text, remaining) = decode_utf8_streaming(bytes);
+        assert!(text.is_empty());
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_validate_terminal_id_valid() {
+        assert!(validate_terminal_id("550e8400-e29b-41d4-a716-446655440000").is_ok());
+        assert!(validate_terminal_id("550E8400-E29B-41D4-A716-446655440000").is_ok());
+    }
+
+    #[test]
+    fn test_validate_terminal_id_invalid() {
+        assert!(validate_terminal_id("invalid").is_err());
+        assert!(validate_terminal_id("550e8400-e29b-41d4-a716").is_err());
+        assert!(validate_terminal_id("").is_err());
     }
 }

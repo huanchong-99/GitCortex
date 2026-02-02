@@ -1,30 +1,60 @@
-//! Process management
+//! Process management with PTY support
 //!
 //! Manages terminal process lifecycle including spawning, monitoring, and cleanup.
+//! Uses portable-pty for cross-platform PTY support (Windows ConPTY, Unix PTY).
 
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use db::DBService;
-use tokio::{
-    process::{Child, Command, ChildStdout, ChildStderr, ChildStdin},
-    sync::RwLock,
-};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
-/// Terminal idle timeout in seconds (10 minutes)
-///
-/// Sessions without user activity (input/output) for this duration
-/// will be automatically terminated to free resources.
-const TERMINAL_IDLE_TIMEOUT_SECS: u64 = 600;
+// ============================================================================
+// PTY Size Configuration
+// ============================================================================
 
-/// Terminal hard timeout in seconds (30 minutes)
-///
-/// Maximum lifetime for any terminal session, regardless of activity.
-/// After this duration, the session will be forcibly terminated.
-const TERMINAL_HARD_TIMEOUT_SECS: u64 = 1800;
+/// Default terminal columns
+pub const DEFAULT_COLS: u16 = 80;
 
-/// Process handle for tracking spawned processes
-#[derive(Debug)]
+/// Default terminal rows
+pub const DEFAULT_ROWS: u16 = 24;
+
+// ============================================================================
+// Process Handle Types
+// ============================================================================
+
+/// PTY reader wrapper for async reading
+pub struct PtyReader(Box<dyn Read + Send>);
+
+impl PtyReader {
+    /// Read bytes from PTY (blocking)
+    pub fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+
+/// PTY writer wrapper for async writing
+pub struct PtyWriter(Box<dyn Write + Send>);
+
+impl PtyWriter {
+    /// Write bytes to PTY (blocking)
+    pub fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.0.write_all(buf)
+    }
+
+    /// Flush PTY writer
+    pub fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()
+    }
+}
+
+/// Process handle for tracking spawned PTY processes
 pub struct ProcessHandle {
     /// Process ID
     pub pid: u32,
@@ -32,157 +62,194 @@ pub struct ProcessHandle {
     pub session_id: String,
     /// Associated terminal ID
     pub terminal_id: String,
-    /// Stdout reader (for WebSocket forwarding)
-    pub stdout: Option<ChildStdout>,
-    /// Stderr reader (for WebSocket forwarding)
-    pub stderr: Option<ChildStderr>,
-    /// Stdin writer (for WebSocket input)
-    pub stdin: Option<ChildStdin>,
+    /// PTY reader (for WebSocket forwarding) - single stream, no stdout/stderr separation
+    pub reader: Option<PtyReader>,
+    /// PTY writer (for WebSocket input)
+    pub writer: Option<PtyWriter>,
 }
 
-/// Tracked process with child and I/O handles
-#[derive(Debug)]
+// Implement Debug manually since portable-pty types don't implement Debug
+impl std::fmt::Debug for ProcessHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProcessHandle")
+            .field("pid", &self.pid)
+            .field("session_id", &self.session_id)
+            .field("terminal_id", &self.terminal_id)
+            .field("reader", &self.reader.is_some())
+            .field("writer", &self.writer.is_some())
+            .finish()
+    }
+}
+
+// ============================================================================
+// Tracked Process
+// ============================================================================
+
+/// Tracked process with PTY master and child handles
 struct TrackedProcess {
     /// Child process for lifecycle management
-    child: Child,
-    /// Stdout reader (for WebSocket forwarding)
-    stdout: Option<ChildStdout>,
-    /// Stderr reader (for WebSocket forwarding)
-    stderr: Option<ChildStderr>,
-    /// Stdin writer (for WebSocket input)
-    stdin: Option<ChildStdin>,
+    child: Box<dyn Child + Send + Sync>,
+    /// PTY master for I/O and resize operations (wrapped in Mutex for Sync)
+    master: Mutex<Box<dyn MasterPty + Send>>,
+    /// Whether reader has been taken
+    reader_taken: bool,
+    /// Whether writer has been taken
+    writer_taken: bool,
 }
 
-/// Process manager for terminal lifecycle
+// ============================================================================
+// Process Manager
+// ============================================================================
+
+/// Process manager for terminal lifecycle with PTY support
 pub struct ProcessManager {
     processes: Arc<RwLock<HashMap<String, TrackedProcess>>>,
 }
 
 impl ProcessManager {
     /// Creates a new ProcessManager instance
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use services::services::terminal::ProcessManager;
-    ///
-    /// let manager = ProcessManager::new();
-    /// ```
     pub fn new() -> Self {
         Self {
             processes: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    /// Spawns a new terminal process
+    /// Spawns a new terminal process with PTY
     ///
-    /// Creates a new process with the given command, running in the specified working directory.
+    /// Creates a new PTY and spawns the shell process attached to it.
     /// The process is tracked by its terminal ID and can be monitored or terminated later.
     ///
     /// # Arguments
     ///
     /// * `terminal_id` - Unique identifier for this terminal session
-    /// * `cmd` - The command to spawn
+    /// * `shell` - The shell command to spawn (e.g., "powershell", "bash")
     /// * `working_dir` - Directory where the process will run
+    /// * `cols` - Initial terminal width in columns
+    /// * `rows` - Initial terminal height in rows
     ///
     /// # Returns
     ///
-    /// Returns a `ProcessHandle` containing the PID, session ID, and terminal ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The process fails to spawn
-    /// - The process ID cannot be retrieved after spawning
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tokio::process::Command;
-    /// use services::services::terminal::ProcessManager;
-    /// use std::path::Path;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> anyhow::Result<()> {
-    /// let manager = ProcessManager::new();
-    /// let cmd = Command::new("echo");
-    /// let handle = manager.spawn("my-terminal", cmd, Path::new("/tmp")).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn spawn(
+    /// Returns a `ProcessHandle` containing the PID and session ID.
+    pub async fn spawn_pty(
         &self,
         terminal_id: &str,
-        mut cmd: Command,
+        shell: &str,
         working_dir: &Path,
+        cols: u16,
+        rows: u16,
     ) -> anyhow::Result<ProcessHandle> {
-        cmd.current_dir(working_dir);
+        // Create PTY system
+        let pty_system = native_pty_system();
 
-        // Configure standard I/O
-        cmd.stdin(std::process::Stdio::piped());
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
+        // Configure PTY size
+        let size = PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
 
-        let mut child = cmd
-            .spawn()
+        // Open PTY pair (master + slave)
+        let pair = pty_system
+            .openpty(size)
+            .map_err(|e| anyhow::anyhow!("Failed to open PTY: {e}"))?;
+
+        // Build command
+        let mut cmd = CommandBuilder::new(shell);
+        cmd.cwd(working_dir);
+
+        // Set environment variables for proper terminal behavior
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+
+        // UTF-8 encoding for Unix
+        #[cfg(unix)]
+        {
+            cmd.env("LANG", "C.UTF-8");
+            cmd.env("LC_ALL", "C.UTF-8");
+        }
+
+        // Spawn child process on slave PTY
+        let child = pair
+            .slave
+            .spawn_command(cmd)
             .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {e}"))?;
-        let pid = child
-            .id()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get process ID"))?;
+
+        let pid = child.process_id().unwrap_or(0);
         let session_id = Uuid::new_v4().to_string();
 
-        // Extract I/O handles for PTY communication
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
-        let stdin = child.stdin.take();
-
+        // Store tracked process
         let mut processes = self.processes.write().await;
-        processes.insert(terminal_id.to_string(), TrackedProcess {
-            child,
-            stdout,
-            stderr,
-            stdin,
-        });
+        processes.insert(
+            terminal_id.to_string(),
+            TrackedProcess {
+                child,
+                master: Mutex::new(pair.master),
+                reader_taken: false,
+                writer_taken: false,
+            },
+        );
+
+        tracing::info!(
+            terminal_id = %terminal_id,
+            pid = pid,
+            shell = %shell,
+            "PTY process spawned successfully"
+        );
 
         Ok(ProcessHandle {
             pid,
             session_id,
             terminal_id: terminal_id.to_string(),
-            stdout: None, // Will be provided by get_handle
-            stderr: None,
-            stdin: None,
+            reader: None,
+            writer: None,
         })
+    }
+
+    /// Resize terminal PTY
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal_id` - Terminal ID to resize
+    /// * `cols` - New width in columns
+    /// * `rows` - New height in rows
+    pub async fn resize(&self, terminal_id: &str, cols: u16, rows: u16) -> anyhow::Result<()> {
+        let processes = self.processes.read().await;
+
+        if let Some(tracked) = processes.get(terminal_id) {
+            let size = PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            };
+
+            let master = tracked
+                .master
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock PTY master: {e}"))?;
+
+            master
+                .resize(size)
+                .map_err(|e| anyhow::anyhow!("Failed to resize PTY: {e}"))?;
+
+            tracing::debug!(
+                terminal_id = %terminal_id,
+                cols = cols,
+                rows = rows,
+                "PTY resized"
+            );
+
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Terminal not found: {terminal_id}"))
+        }
     }
 
     /// Terminates a process by its PID
     ///
     /// Sends a termination signal to the process with the given PID.
     /// On Unix, sends SIGTERM. On Windows, uses taskkill /F.
-    ///
-    /// # Arguments
-    ///
-    /// * `pid` - Process ID to terminate
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the termination signal was sent successfully.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the termination signal fails to send.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use services::services::terminal::ProcessManager;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> anyhow::Result<()> {
-    /// let manager = ProcessManager::new();
-    /// manager.kill(12345)?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn kill(&self, pid: u32) -> anyhow::Result<()> {
         #[cfg(unix)]
         {
@@ -209,53 +276,170 @@ impl ProcessManager {
 
         Ok(())
     }
+
+    /// Kill terminal by terminal ID
+    pub async fn kill_terminal(&self, terminal_id: &str) -> anyhow::Result<()> {
+        let mut processes = self.processes.write().await;
+
+        if let Some(mut tracked) = processes.remove(terminal_id) {
+            // Try to kill the child process
+            if let Err(e) = tracked.child.kill() {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    error = %e,
+                    "Failed to kill child process"
+                );
+            }
+
+            tracing::info!(terminal_id = %terminal_id, "Terminal killed");
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Terminal not found: {terminal_id}"))
+        }
+    }
+
+    /// Check if a terminal process is running
+    pub async fn is_running(&self, terminal_id: &str) -> bool {
+        let processes = self.processes.read().await;
+        processes.contains_key(terminal_id)
+    }
+
+    /// Lists all currently tracked terminal IDs
+    pub async fn list_running(&self) -> Vec<String> {
+        let processes = self.processes.read().await;
+        processes.keys().cloned().collect()
+    }
+
+    /// Removes dead processes from tracking
+    pub async fn cleanup(&self) {
+        let mut processes = self.processes.write().await;
+
+        // Collect IDs of dead processes
+        let dead_ids: Vec<String> = processes
+            .iter_mut()
+            .filter_map(|(id, tracked)| {
+                match tracked.child.try_wait() {
+                    Ok(Some(_)) => Some(id.clone()), // Process exited
+                    _ => None,                       // Still running or error
+                }
+            })
+            .collect();
+
+        // Remove dead processes
+        for id in dead_ids {
+            processes.remove(&id);
+            tracing::debug!(terminal_id = %id, "Removed dead process from tracking");
+        }
+    }
+
+    /// Get process handle by terminal ID
+    ///
+    /// Returns a ProcessHandle containing the PTY reader/writer for the terminal process.
+    /// This is a one-time operation - the handles are moved out of storage.
+    pub async fn get_handle(&self, terminal_id: &str) -> Option<ProcessHandle> {
+        let mut processes = self.processes.write().await;
+
+        if let Some(tracked) = processes.get_mut(terminal_id) {
+            // Check if handles are still available
+            if tracked.reader_taken && tracked.writer_taken {
+                return None;
+            }
+
+            let session_id = Uuid::new_v4().to_string();
+
+            // Lock the master to get reader/writer
+            let master = match tracked.master.lock() {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::error!(
+                        terminal_id = %terminal_id,
+                        error = %e,
+                        "Failed to lock PTY master"
+                    );
+                    return None;
+                }
+            };
+
+            // Get reader if not taken
+            let reader = if !tracked.reader_taken {
+                tracked.reader_taken = true;
+                match master.try_clone_reader() {
+                    Ok(r) => Some(PtyReader(r)),
+                    Err(e) => {
+                        tracing::error!(
+                            terminal_id = %terminal_id,
+                            error = %e,
+                            "Failed to clone PTY reader"
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Get writer if not taken
+            let writer = if !tracked.writer_taken {
+                tracked.writer_taken = true;
+                match master.take_writer() {
+                    Ok(w) => Some(PtyWriter(w)),
+                    Err(e) => {
+                        tracing::error!(
+                            terminal_id = %terminal_id,
+                            error = %e,
+                            "Failed to take PTY writer"
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Drop the lock before accessing child
+            drop(master);
+
+            // Get PID from child
+            let pid = tracked.child.process_id().unwrap_or(0);
+
+            Some(ProcessHandle {
+                pid,
+                session_id,
+                terminal_id: terminal_id.to_string(),
+                reader,
+                writer,
+            })
+        } else {
+            None
+        }
+    }
 }
+
+impl Default for ProcessManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// Terminal Logger
+// ============================================================================
 
 /// Batch logger for terminal output
 ///
 /// Batches log lines and flushes them every second to reduce I/O overhead.
-/// Uses an in-memory buffer and periodic background task for efficient logging.
 pub const DEFAULT_MAX_BUFFER_SIZE: usize = 1000;
 
 pub struct TerminalLogger {
-    /// Batch buffer for log lines
     buffer: Arc<RwLock<Vec<String>>>,
-    /// Flush interval in seconds
     flush_interval_secs: u64,
-    /// Maximum number of buffered log lines before forcing a flush
     max_buffer_size: usize,
-    /// Database service for persistence
     db: Arc<DBService>,
-    /// Associated terminal ID
     terminal_id: String,
-    /// Log type (stdout/stderr/system/etc.)
     log_type: String,
 }
 
 impl TerminalLogger {
-    /// Creates a new TerminalLogger with specified flush interval
-    ///
-    /// # Arguments
-    ///
-    /// * `db` - Database service for log persistence
-    /// * `terminal_id` - Terminal ID for log association
-    /// * `log_type` - Log type for storage (stdout/stderr/system/etc.)
-    /// * `flush_interval_secs` - Seconds between automatic flushes (default: 1)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::sync::Arc;
-    /// use db::DBService;
-    /// use services::services::terminal::process::TerminalLogger;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let db = Arc::new(DBService::new().await?);
-    /// let logger = TerminalLogger::new(db, "terminal-id", "stdout", 1);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn new(
         db: Arc<DBService>,
         terminal_id: impl Into<String>,
@@ -302,11 +486,7 @@ impl TerminalLogger {
         Ok(())
     }
 
-    /// Starts the background flush task
-    ///
-    /// Spawns a periodic task that flushes the buffer to disk/log storage.
-    /// Runs every `flush_interval_secs` seconds.
-    fn start_flush_task(mut self) -> Self {
+    fn start_flush_task(self) -> Self {
         let buffer = Arc::clone(&self.buffer);
         let interval_secs = self.flush_interval_secs;
         let db = Arc::clone(&self.db);
@@ -314,7 +494,8 @@ impl TerminalLogger {
         let log_type = self.log_type.clone();
 
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
             loop {
                 interval.tick().await;
                 let entries = {
@@ -330,9 +511,10 @@ impl TerminalLogger {
                     continue;
                 }
 
-                if let Err(e) = Self::persist_entries(&db, &terminal_id, &log_type, &entries).await {
+                if let Err(e) =
+                    Self::persist_entries(&db, &terminal_id, &log_type, &entries).await
+                {
                     tracing::error!("Failed to persist terminal logs: {e}");
-                    // Re-queue failed entries at the beginning of buffer
                     let mut buffer = buffer.write().await;
                     buffer.splice(0..0, entries);
                 }
@@ -342,29 +524,6 @@ impl TerminalLogger {
         self
     }
 
-    /// Appends a log line to the batch buffer
-    ///
-    /// Lines are buffered in memory and flushed periodically by the background task.
-    ///
-    /// # Arguments
-    ///
-    /// * `line` - Log line to append
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::sync::Arc;
-    /// use db::DBService;
-    /// use services::services::terminal::process::TerminalLogger;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let db = Arc::new(DBService::new().await?);
-    /// let logger = TerminalLogger::new(db, "terminal-id", "stdout", 1);
-    /// logger.append("Hello, terminal!").await;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn append(&self, line: &str) {
         let entries = {
             let mut buffer = self.buffer.write().await;
@@ -377,204 +536,23 @@ impl TerminalLogger {
             buffer.drain(..).collect::<Vec<_>>()
         };
 
-        if let Err(e) = Self::persist_entries(&self.db, &self.terminal_id, &self.log_type, &entries).await {
+        if let Err(e) =
+            Self::persist_entries(&self.db, &self.terminal_id, &self.log_type, &entries).await
+        {
             tracing::error!("Failed to persist terminal logs: {e}");
-            // Re-queue failed entries at the beginning of buffer
             let mut buffer = self.buffer.write().await;
             buffer.splice(0..0, entries);
         }
     }
 }
 
-impl ProcessManager {
-    ///
-    /// # Arguments
-    ///
-    /// * `terminal_id` - Terminal ID to check
-    ///
-    /// # Returns
-    ///
-    /// `true` if the process is tracked and has a valid ID, `false` otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use services::services::terminal::ProcessManager;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// let manager = ProcessManager::new();
-    /// let is_running = manager.is_running("my-terminal").await;
-    /// # }
-    /// ```
-    pub async fn is_running(&self, terminal_id: &str) -> bool {
-        let processes = self.processes.read().await;
-        processes
-            .get(terminal_id)
-            .is_some_and(|tracked| tracked.child.id().is_some())
-    }
-
-    /// Lists all currently tracked terminal IDs
-    ///
-    /// # Returns
-    ///
-    /// A vector of terminal IDs for all tracked processes.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use services::services::terminal::ProcessManager;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// let manager = ProcessManager::new();
-    /// let terminals = manager.list_running().await;
-    /// for terminal_id in terminals {
-    ///     println!("Terminal: {}", terminal_id);
-    /// }
-    /// # }
-    /// ```
-    pub async fn list_running(&self) -> Vec<String> {
-        let processes = self.processes.read().await;
-        processes.keys().cloned().collect()
-    }
-
-    /// Removes dead processes from tracking
-    ///
-    /// Checks all tracked processes and removes those that have exited.
-    /// This should be called periodically to clean up the process table.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use services::services::terminal::ProcessManager;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// let manager = ProcessManager::new();
-    /// manager.cleanup().await;
-    /// # }
-    /// ```
-    pub async fn cleanup(&self) {
-        let mut processes = self.processes.write().await;
-        // Collect IDs of dead processes
-        let dead_ids: Vec<String> = processes
-            .iter_mut()
-            .filter_map(|(id, tracked)| {
-                match tracked.child.try_wait() {
-                    Ok(Some(_)) => Some(id.clone()), // Process exited
-                    _ => None,                       // Still running or error
-                }
-            })
-            .collect();
-
-        // Remove dead processes
-        for id in dead_ids {
-            processes.remove(&id);
-        }
-    }
-
-    /// Get process handle by terminal ID
-    ///
-    /// Returns a ProcessHandle containing the I/O handles for the terminal process.
-    /// This is a one-time operation - the handles are moved out of storage.
-    ///
-    /// # Arguments
-    ///
-    /// * `terminal_id` - Terminal ID to look up
-    ///
-    /// # Returns
-    ///
-    /// `Some(ProcessHandle)` if the terminal process exists and handles are available,
-    /// `None` if the terminal doesn't exist or handles were already taken.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use services::services::terminal::ProcessManager;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// let manager = ProcessManager::new();
-    /// let handle = manager.get_handle("my-terminal").await;
-    /// # }
-    /// ```
-    pub async fn get_handle(&self, terminal_id: &str) -> Option<ProcessHandle> {
-        let mut processes = self.processes.write().await;
-
-        if let Some(tracked) = processes.get_mut(terminal_id) {
-            // Check if process is still running
-            let pid = tracked.child.id()?;
-
-            // Check if handles are still available (not yet taken)
-            if tracked.stdout.is_none() && tracked.stderr.is_none() && tracked.stdin.is_none() {
-                // All handles have been taken
-                return None;
-            }
-
-            let session_id = Uuid::new_v4().to_string();
-
-            // Take I/O handles (one-time operation)
-            let stdout = tracked.stdout.take();
-            let stderr = tracked.stderr.take();
-            let stdin = tracked.stdin.take();
-
-            Some(ProcessHandle {
-                pid,
-                session_id,
-                terminal_id: terminal_id.to_string(),
-                stdout,
-                stderr,
-                stdin,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for ProcessManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// ============================================================================
+// Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use super::*;
-
-    /// Helper function to create a long-running test process
-    fn long_running_cmd() -> Command {
-        #[cfg(unix)]
-        {
-            let mut cmd = Command::new("sleep");
-            cmd.arg("10");
-            cmd
-        }
-        #[cfg(windows)]
-        {
-            let mut cmd = Command::new("timeout");
-            cmd.args(["/t", "10"]);
-            cmd
-        }
-    }
-
-    /// Helper function to create a quick-exit test process
-    fn quick_exit_cmd() -> Command {
-        #[cfg(unix)]
-        {
-            let mut cmd = Command::new("true");
-            cmd
-        }
-        #[cfg(windows)]
-        {
-            let mut cmd = Command::new("cmd");
-            cmd.args(["/C", "exit 0"]);
-            cmd
-        }
-    }
 
     #[tokio::test]
     async fn test_process_manager_new() {
@@ -591,97 +569,83 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_spawn_creates_process_handle() {
+    async fn test_spawn_pty_creates_process() {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
+        // Use platform-specific shell
+        #[cfg(windows)]
+        let shell = "cmd.exe";
+        #[cfg(unix)]
+        let shell = "sh";
+
         let result = manager
-            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
+            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
             .await;
 
-        assert!(result.is_ok(), "Spawn should succeed");
+        assert!(result.is_ok(), "Spawn should succeed: {:?}", result.err());
         let handle = result.unwrap();
         assert_eq!(handle.terminal_id, "test-terminal");
         assert!(!handle.session_id.is_empty());
-        assert_ne!(handle.pid, 0);
+
+        // Cleanup
+        let _ = manager.kill_terminal("test-terminal").await;
     }
 
     #[tokio::test]
-    async fn test_spawn_tracks_process() {
+    async fn test_get_handle_returns_pty_handles() {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        let _ = manager
-            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
-            .await;
-
-        let running = manager.list_running().await;
-        assert_eq!(running.len(), 1);
-        assert!(running.contains(&"test-terminal".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_is_running_detects_active_process() {
-        let manager = ProcessManager::new();
-        let temp_dir = tempfile::tempdir().unwrap();
+        #[cfg(windows)]
+        let shell = "cmd.exe";
+        #[cfg(unix)]
+        let shell = "sh";
 
         let _ = manager
-            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
-            .await;
-
-        assert!(manager.is_running("test-terminal").await);
-        assert!(!manager.is_running("non-existent").await);
-    }
-
-    #[tokio::test]
-    async fn test_cleanup_removes_dead_processes() {
-        let manager = ProcessManager::new();
-        let temp_dir = tempfile::tempdir().unwrap();
-
-        let _ = manager
-            .spawn("quick-exit", quick_exit_cmd(), temp_dir.path())
-            .await;
-
-        // Wait for process to exit
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        // Before cleanup, process is still tracked
-        let running_before = manager.list_running().await;
-        assert_eq!(running_before.len(), 1);
-
-        // Cleanup should remove dead processes
-        manager.cleanup().await;
-
-        let running_after = manager.list_running().await;
-        assert_eq!(running_after.len(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_get_handle_returns_io_handles() {
-        let manager = ProcessManager::new();
-        let temp_dir = tempfile::tempdir().unwrap();
-
-        let _ = manager
-            .spawn("test-terminal", long_running_cmd(), temp_dir.path())
+            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
             .await;
 
         // First call should return handles
         let handle1 = manager.get_handle("test-terminal").await;
         assert!(handle1.is_some());
         let handle1 = handle1.unwrap();
-        assert!(handle1.stdin.is_some());
-        assert!(handle1.stdout.is_some());
-        assert!(handle1.stderr.is_some());
+        assert!(handle1.reader.is_some());
+        assert!(handle1.writer.is_some());
 
         // Second call should return None (handles were taken)
         let handle2 = manager.get_handle("test-terminal").await;
         assert!(handle2.is_none());
+
+        // Cleanup
+        let _ = manager.kill_terminal("test-terminal").await;
+    }
+
+    #[tokio::test]
+    async fn test_resize_pty() {
+        let manager = ProcessManager::new();
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        #[cfg(windows)]
+        let shell = "cmd.exe";
+        #[cfg(unix)]
+        let shell = "sh";
+
+        let _ = manager
+            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
+            .await;
+
+        // Resize should succeed
+        let result = manager.resize("test-terminal", 120, 40).await;
+        assert!(result.is_ok());
+
+        // Cleanup
+        let _ = manager.kill_terminal("test-terminal").await;
     }
 
     #[tokio::test]
     async fn test_get_handle_for_nonexistent_terminal() {
         let manager = ProcessManager::new();
-
         let handle = manager.get_handle("non-existent").await;
         assert!(handle.is_none());
     }

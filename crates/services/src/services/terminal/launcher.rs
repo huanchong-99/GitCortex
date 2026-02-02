@@ -22,7 +22,7 @@ use executors::{
     executors::BaseCodingAgent,
 };
 
-use super::process::{ProcessHandle, ProcessManager};
+use super::process::{ProcessHandle, ProcessManager, DEFAULT_COLS, DEFAULT_ROWS};
 use crate::services::cc_switch::{CCSwitchService, CCSwitch};
 
 /// Terminal launcher for serial terminal startup
@@ -211,13 +211,13 @@ impl TerminalLauncher {
             (None, None)
         };
 
-        // 4. Build launch command
-        let cmd = self.build_launch_command(&cli_type.name);
+        // 4. Get CLI command for the terminal
+        let cli_command = self.get_cli_command(&cli_type.name);
 
-        // 5. Spawn process
+        // 5. Spawn PTY process
         match self
             .process_manager
-            .spawn(&terminal_id, cmd, &self.working_dir)
+            .spawn_pty(&terminal_id, &cli_command, &self.working_dir, DEFAULT_COLS, DEFAULT_ROWS)
             .await
         {
             Ok(handle) => {
@@ -264,27 +264,22 @@ impl TerminalLauncher {
         }
     }
 
-    /// Build launch command for a CLI type
+    /// Get CLI command string for a CLI type
     ///
     /// # Arguments
     /// * `cli_name` - The CLI name
     ///
     /// # Returns
-    /// A configured Command for the CLI
-    fn build_launch_command(&self, cli_name: &str) -> tokio::process::Command {
-        let mut cmd = match cli_name {
-            "claude-code" => tokio::process::Command::new("claude"),
-            "gemini-cli" => tokio::process::Command::new("gemini"),
-            "codex" => tokio::process::Command::new("codex"),
-            "amp" => tokio::process::Command::new("amp"),
-            "cursor-agent" => tokio::process::Command::new("cursor"),
-            _ => tokio::process::Command::new(cli_name),
-        };
-
-        cmd.current_dir(&self.working_dir);
-        cmd.kill_on_drop(true);
-
-        cmd
+    /// The command string to execute
+    fn get_cli_command(&self, cli_name: &str) -> String {
+        match cli_name {
+            "claude-code" => "claude".to_string(),
+            "gemini-cli" => "gemini".to_string(),
+            "codex" => "codex".to_string(),
+            "amp" => "amp".to_string(),
+            "cursor-agent" => "cursor".to_string(),
+            _ => cli_name.to_string(),
+        }
     }
 
     /// Get workspace ID for a terminal by traversing workflow_task -> task -> workspace
@@ -377,28 +372,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_build_launch_command_claude() {
+    async fn test_get_cli_command_claude() {
         let (launcher, _) = setup_launcher().await;
-        let cmd = launcher.build_launch_command("claude-code");
-
-        // Security: Verify --dangerously-skip-permissions flag is NOT present
-        // The launcher must NOT force this dangerous flag
-        let std_cmd = cmd.as_std();
-        let args: Vec<String> = std_cmd.get_args()
-            .map(|arg| arg.to_string_lossy().to_string())
-            .collect();
-
-        assert!(
-            !args.iter().any(|a| a.contains("--dangerously-skip-permissions")),
-            "claude-code launch command must NOT force --dangerously-skip-permissions flag. Args found: {:?}",
-            args
-        );
+        let cmd = launcher.get_cli_command("claude-code");
+        assert_eq!(cmd, "claude");
     }
 
     #[tokio::test]
-    async fn test_build_launch_command_gemini() {
+    async fn test_get_cli_command_gemini() {
         let (launcher, _) = setup_launcher().await;
-        let _cmd = launcher.build_launch_command("gemini-cli");
+        let cmd = launcher.get_cli_command("gemini-cli");
+        assert_eq!(cmd, "gemini");
     }
 
     #[tokio::test]
