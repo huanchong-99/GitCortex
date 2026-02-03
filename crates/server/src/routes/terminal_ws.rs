@@ -192,15 +192,28 @@ async fn handle_terminal_socket(
     };
 
     // Spawn PTY writer task (async channel -> blocking write)
-    let writer_task = if let Some(mut pty_writer) = writer {
+    // Writer is shared via Arc<Mutex> to support WebSocket reconnection
+    let writer_task = if let Some(pty_writer) = writer {
         let mut rx = ws_rx;
         Some(tokio::task::spawn_blocking(move || {
             while let Some(data) = rx.blocking_recv() {
-                if let Err(e) = pty_writer.write_all(&data) {
+                // Lock the shared writer for each write operation
+                let mut writer_guard = match pty_writer.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        tracing::error!(
+                            "PTY writer lock poisoned for terminal {}: {}",
+                            terminal_id_writer,
+                            e
+                        );
+                        break;
+                    }
+                };
+                if let Err(e) = writer_guard.write_all(&data) {
                     tracing::error!("PTY write error for terminal {}: {}", terminal_id_writer, e);
                     break;
                 }
-                if let Err(e) = pty_writer.flush() {
+                if let Err(e) = writer_guard.flush() {
                     tracing::error!("PTY flush error for terminal {}: {}", terminal_id_writer, e);
                     break;
                 }

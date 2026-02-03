@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { TerminalEmulator, type TerminalEmulatorRef } from './TerminalEmulator';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,14 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const { t } = useTranslation('workflow');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const readyTerminalIdsRef = useRef<Set<string>>(new Set());
+  const [, forceUpdate] = useState({});
+  const startingTerminalIdsRef = useRef<Set<string>>(new Set());
   const terminalRef = useRef<TerminalEmulatorRef>(null);
+  const autoStartedRef = useRef<Set<string>>(new Set());
+  const needsRestartRef = useRef<Set<string>>(new Set());
+  const restartAttemptsRef = useRef<Map<string, number>>(new Map());
+  const MAX_RESTART_ATTEMPTS = 3;
   const defaultRoleLabel = t('terminalCard.defaultRole');
 
   const allTerminals = tasks.flatMap((task) =>
@@ -39,28 +46,128 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     terminalRef.current?.clear();
   };
 
-  const handleRestart = async () => {
-    if (!selectedTerminalId || isStarting) return;
+  const resetAutoStart = useCallback((terminalId: string) => {
+    autoStartedRef.current.delete(terminalId);
+  }, []);
 
+  const startTerminal = useCallback(async (terminalId: string, retryAfterStop = false) => {
+    // Allow multiple terminals to start in parallel
+    if (startingTerminalIdsRef.current.has(terminalId)) return;
+    startingTerminalIdsRef.current.add(terminalId);
+    // Mark as auto-started only after confirming we can start
+    autoStartedRef.current.add(terminalId);
     setIsStarting(true);
     try {
-      const response = await fetch(`/api/terminals/${selectedTerminalId}/start`, {
+      const response = await fetch(`/api/terminals/${terminalId}/start`, {
         method: 'POST',
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => null);
+
+        // Handle 409 Conflict by stopping first, then retrying
+        if (response.status === 409 && !retryAfterStop) {
+          console.log('Terminal conflict, stopping and retrying...');
+          startingTerminalIdsRef.current.delete(terminalId);
+          try {
+            await fetch(`/api/terminals/${terminalId}/stop`, { method: 'POST' });
+          } catch {
+            // Ignore stop errors
+          }
+          // Retry start after stop
+          return startTerminal(terminalId, true);
+        }
+
         console.error('Failed to start terminal:', error);
+        resetAutoStart(terminalId);
+        // Clear ready state on failure
+        readyTerminalIdsRef.current.delete(terminalId);
+        forceUpdate({});
       } else {
         console.log('Terminal started successfully');
-        // Reconnect the terminal emulator
-        terminalRef.current?.reconnect?.();
+        // Mark this terminal as ready and clear restart flag
+        needsRestartRef.current.delete(terminalId);
+        readyTerminalIdsRef.current.add(terminalId);
+        // Note: Don't reset restart attempts here - only reset on manual restart
+        // This prevents infinite loops when API succeeds but process doesn't actually start
+        forceUpdate({});
       }
     } catch (error) {
       console.error('Failed to start terminal:', error);
+      resetAutoStart(terminalId);
+      // Clear ready state on failure
+      readyTerminalIdsRef.current.delete(terminalId);
+      forceUpdate({});
     } finally {
-      setIsStarting(false);
+      startingTerminalIdsRef.current.delete(terminalId);
+      setIsStarting(startingTerminalIdsRef.current.size > 0);
     }
+  }, [resetAutoStart]);
+
+  // Handle terminal errors - auto-restart if process is not running
+  const handleTerminalError = useCallback((error: Error) => {
+    console.error('Terminal error:', error.message);
+
+    // If the error indicates the process is not running, auto-restart (with limit)
+    if (error.message.includes('Terminal process not running') && selectedTerminalId) {
+      const attempts = restartAttemptsRef.current.get(selectedTerminalId) || 0;
+      if (attempts >= MAX_RESTART_ATTEMPTS) {
+        console.error(`Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for terminal ${selectedTerminalId}`);
+        // Clear flags to show "starting" message and stop retrying
+        needsRestartRef.current.add(selectedTerminalId);
+        readyTerminalIdsRef.current.delete(selectedTerminalId);
+        forceUpdate({});
+        return;
+      }
+
+      console.log(`Terminal process not running, auto-restarting... (attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS})`);
+      restartAttemptsRef.current.set(selectedTerminalId, attempts + 1);
+      // Mark as needing restart to hide TerminalEmulator
+      needsRestartRef.current.add(selectedTerminalId);
+      // Clear ready state
+      readyTerminalIdsRef.current.delete(selectedTerminalId);
+      // Allow re-auto-start
+      autoStartedRef.current.delete(selectedTerminalId);
+      forceUpdate({});
+      // Start the terminal
+      void startTerminal(selectedTerminalId);
+    }
+  }, [selectedTerminalId, startTerminal]);
+
+  // Auto-start terminal when selected and not yet started
+  useEffect(() => {
+    const selectedStatus = selectedTerminal?.status;
+    if (!selectedTerminalId || !selectedStatus) return;
+
+    // Only auto-start if terminal is not started and hasn't been auto-started before
+    if (selectedStatus !== 'not_started') return;
+    if (autoStartedRef.current.has(selectedTerminalId)) return;
+
+    // Note: autoStartedRef is updated inside startTerminal after confirming it can start
+    void startTerminal(selectedTerminalId);
+  }, [selectedTerminalId, selectedTerminal?.status, startTerminal]);
+
+  // Clear ready state and autoStarted when terminal status changes to failed or not_started
+  useEffect(() => {
+    if (!selectedTerminalId || !selectedTerminal?.status) return;
+
+    if (['failed', 'not_started'].includes(selectedTerminal.status)) {
+      if (readyTerminalIdsRef.current.has(selectedTerminalId)) {
+        readyTerminalIdsRef.current.delete(selectedTerminalId);
+        forceUpdate({});
+      }
+      // Allow re-auto-start when status returns to not_started
+      if (selectedTerminal.status === 'not_started') {
+        autoStartedRef.current.delete(selectedTerminalId);
+      }
+    }
+  }, [selectedTerminalId, selectedTerminal?.status]);
+
+  const handleRestart = async () => {
+    if (!selectedTerminalId) return;
+    // Reset restart attempts when user manually restarts
+    restartAttemptsRef.current.delete(selectedTerminalId);
+    await startTerminal(selectedTerminalId);
   };
 
   return (
@@ -122,11 +229,21 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
               </div>
             </div>
             <div className="flex-1 p-4">
-              <TerminalEmulator
-                ref={terminalRef}
-                terminalId={selectedTerminal.id}
-                wsUrl={wsUrl}
-              />
+              {!needsRestartRef.current.has(selectedTerminal.id) &&
+               (readyTerminalIdsRef.current.has(selectedTerminal.id) ||
+                (!['failed', 'not_started'].includes(selectedTerminal.status) &&
+                 ['waiting', 'working', 'running', 'active', 'completed'].includes(selectedTerminal.status))) ? (
+                <TerminalEmulator
+                  ref={terminalRef}
+                  terminalId={selectedTerminal.id}
+                  wsUrl={wsUrl}
+                  onError={handleTerminalError}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  {t('terminalDebug.starting')}
+                </div>
+              )}
             </div>
           </>
         ) : (

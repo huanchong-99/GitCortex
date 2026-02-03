@@ -359,13 +359,18 @@
   },
   "terminalCard": {
     "orderLabel": "T{{index}}",
-    "defaultRole": "Terminal"
+    "defaultRole": "Terminal",
+    "debugButton": "Debug terminals"
+  },
+  "taskCard": {
+    "debugButton": "Debug terminals"
   },
   "terminalDebug": {
     "listTitle": "Terminal list",
     "clear": "Clear",
     "restart": "Restart",
     "selectPrompt": "Select a terminal to start debugging",
+    "starting": "Starting terminal...",
     "status": {
       "not_started": "Not started",
       "starting": "Starting",

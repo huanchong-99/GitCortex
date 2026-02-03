@@ -29,12 +29,13 @@ const columns: Column[] = [
 interface KanbanColumnProps {
   column: Column;
   tasks: WorkflowTaskDto[];
+  workflowId: string;
 }
 
 /**
  * Droppable column for the Kanban board
  */
-function KanbanColumn({ column, tasks }: KanbanColumnProps) {
+function KanbanColumn({ column, tasks, workflowId }: KanbanColumnProps) {
   const { t } = useTranslation('workflow');
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const columnTasks = tasks.filter((task) => task.status === column.id);
@@ -53,7 +54,7 @@ function KanbanColumn({ column, tasks }: KanbanColumnProps) {
       </div>
       <div className="space-y-2 min-h-[100px]">
         {columnTasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard key={task.id} task={task} workflowId={workflowId} />
         ))}
       </div>
     </div>
@@ -100,7 +101,12 @@ export function WorkflowKanbanBoard({ workflowId }: WorkflowKanbanBoardProps) {
     <DndContext onDragEnd={handleDragEnd}>
       <div className="flex-1 p-6 grid grid-cols-6 gap-4">
         {columns.map((column) => (
-          <KanbanColumn key={column.id} column={column} tasks={tasks} />
+          <KanbanColumn
+            key={column.id}
+            column={column}
+            tasks={tasks}
+            workflowId={workflowId}
+          />
         ))}
       </div>
     </DndContext>

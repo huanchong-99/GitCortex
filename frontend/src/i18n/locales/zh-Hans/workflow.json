@@ -359,13 +359,18 @@
   },
   "terminalCard": {
     "orderLabel": "T{{index}}",
-    "defaultRole": "终端"
+    "defaultRole": "终端",
+    "debugButton": "调试终端"
+  },
+  "taskCard": {
+    "debugButton": "调试终端"
   },
   "terminalDebug": {
     "listTitle": "终端列表",
     "clear": "清空",
     "restart": "重启",
     "selectPrompt": "选择一个终端开始调试",
+    "starting": "正在启动终端...",
     "status": {
       "not_started": "未开始",
       "starting": "启动中",

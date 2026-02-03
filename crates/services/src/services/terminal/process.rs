@@ -64,8 +64,8 @@ pub struct ProcessHandle {
     pub terminal_id: String,
     /// PTY reader (for WebSocket forwarding) - single stream, no stdout/stderr separation
     pub reader: Option<PtyReader>,
-    /// PTY writer (for WebSocket input)
-    pub writer: Option<PtyWriter>,
+    /// Shared PTY writer (for WebSocket input) - wrapped in Arc<Mutex> for reconnection support
+    pub writer: Option<Arc<Mutex<PtyWriter>>>,
 }
 
 // Implement Debug manually since portable-pty types don't implement Debug
@@ -91,10 +91,8 @@ struct TrackedProcess {
     child: Box<dyn Child + Send + Sync>,
     /// PTY master for I/O and resize operations (wrapped in Mutex for Sync)
     master: Mutex<Box<dyn MasterPty + Send>>,
-    /// Whether reader has been taken
-    reader_taken: bool,
-    /// Whether writer has been taken
-    writer_taken: bool,
+    /// Shared PTY writer (initialized on first get_handle call, then reused for reconnections)
+    shared_writer: Option<Arc<Mutex<PtyWriter>>>,
 }
 
 // ============================================================================
@@ -155,6 +153,15 @@ impl ProcessManager {
             .map_err(|e| anyhow::anyhow!("Failed to open PTY: {e}"))?;
 
         // Build command
+        // On Windows, use cmd.exe /c to run commands so that .cmd/.bat files are found
+        #[cfg(windows)]
+        let mut cmd = {
+            let mut c = CommandBuilder::new("cmd.exe");
+            c.arg("/c");
+            c.arg(shell);
+            c
+        };
+        #[cfg(not(windows))]
         let mut cmd = CommandBuilder::new(shell);
         cmd.cwd(working_dir);
 
@@ -170,13 +177,33 @@ impl ProcessManager {
         }
 
         // Spawn child process on slave PTY
-        let child = pair
+        let mut child = pair
             .slave
             .spawn_command(cmd)
             .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {e}"))?;
 
         let pid = child.process_id().unwrap_or(0);
         let session_id = Uuid::new_v4().to_string();
+
+        // Wait a short time and check if the process is still alive
+        // This catches cases where the command fails immediately (e.g., not found, permission denied)
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return Err(anyhow::anyhow!(
+                    "Terminal process exited immediately with status: {:?}. The CLI may not be installed correctly.",
+                    status
+                ));
+            }
+            Ok(None) => {
+                // Process is still running, good
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Failed to check terminal process status: {e}"
+                ));
+            }
+        }
 
         // Store tracked process
         let mut processes = self.processes.write().await;
@@ -185,8 +212,7 @@ impl ProcessManager {
             TrackedProcess {
                 child,
                 master: Mutex::new(pair.master),
-                reader_taken: false,
-                writer_taken: false,
+                shared_writer: None,
             },
         );
 
@@ -335,16 +361,13 @@ impl ProcessManager {
     /// Get process handle by terminal ID
     ///
     /// Returns a ProcessHandle containing the PTY reader/writer for the terminal process.
-    /// This is a one-time operation - the handles are moved out of storage.
+    /// This method supports multiple calls for WebSocket reconnection scenarios:
+    /// - Reader is cloned on each call (portable-pty supports multiple readers)
+    /// - Writer is shared via Arc<Mutex> (initialized on first call, then reused)
     pub async fn get_handle(&self, terminal_id: &str) -> Option<ProcessHandle> {
         let mut processes = self.processes.write().await;
 
         if let Some(tracked) = processes.get_mut(terminal_id) {
-            // Check if handles are still available
-            if tracked.reader_taken && tracked.writer_taken {
-                return None;
-            }
-
             let session_id = Uuid::new_v4().to_string();
 
             // Lock the master to get reader/writer
@@ -360,41 +383,41 @@ impl ProcessManager {
                 }
             };
 
-            // Get reader if not taken
-            let reader = if !tracked.reader_taken {
-                tracked.reader_taken = true;
-                match master.try_clone_reader() {
-                    Ok(r) => Some(PtyReader(r)),
-                    Err(e) => {
-                        tracing::error!(
-                            terminal_id = %terminal_id,
-                            error = %e,
-                            "Failed to clone PTY reader"
-                        );
-                        None
-                    }
+            // Clone reader on each call (portable-pty supports multiple readers)
+            let reader = match master.try_clone_reader() {
+                Ok(r) => Some(PtyReader(r)),
+                Err(e) => {
+                    tracing::error!(
+                        terminal_id = %terminal_id,
+                        error = %e,
+                        "Failed to clone PTY reader"
+                    );
+                    None
                 }
-            } else {
-                None
             };
 
-            // Get writer if not taken
-            let writer = if !tracked.writer_taken {
-                tracked.writer_taken = true;
+            // Initialize shared writer on first call, then reuse for reconnections
+            if tracked.shared_writer.is_none() {
                 match master.take_writer() {
-                    Ok(w) => Some(PtyWriter(w)),
+                    Ok(w) => {
+                        tracked.shared_writer = Some(Arc::new(Mutex::new(PtyWriter(w))));
+                        tracing::debug!(
+                            terminal_id = %terminal_id,
+                            "Initialized shared PTY writer"
+                        );
+                    }
                     Err(e) => {
                         tracing::error!(
                             terminal_id = %terminal_id,
                             error = %e,
                             "Failed to take PTY writer"
                         );
-                        None
                     }
                 }
-            } else {
-                None
-            };
+            }
+
+            // Clone the Arc reference for the caller
+            let writer = tracked.shared_writer.as_ref().map(Arc::clone);
 
             // Drop the lock before accessing child
             drop(master);
@@ -613,9 +636,18 @@ mod tests {
         assert!(handle1.reader.is_some());
         assert!(handle1.writer.is_some());
 
-        // Second call should return None (handles were taken)
+        // Second call should also return handles (reader cloned, writer shared)
+        // This supports WebSocket reconnection scenarios
         let handle2 = manager.get_handle("test-terminal").await;
-        assert!(handle2.is_none());
+        assert!(handle2.is_some());
+        let handle2 = handle2.unwrap();
+        assert!(handle2.reader.is_some());
+        assert!(handle2.writer.is_some());
+
+        // Verify that writers are the same Arc (shared)
+        let writer1 = handle1.writer.as_ref().unwrap();
+        let writer2 = handle2.writer.as_ref().unwrap();
+        assert!(Arc::ptr_eq(writer1, writer2), "Writers should be shared via Arc");
 
         // Cleanup
         let _ = manager.kill_terminal("test-terminal").await;

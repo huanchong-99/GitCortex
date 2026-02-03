@@ -12,15 +12,96 @@ use db::models::terminal::{Terminal, TerminalLog};
 use deployment::Deployment;
 use serde::Deserialize;
 use services::services::terminal::process::{ProcessManager, DEFAULT_COLS, DEFAULT_ROWS};
+use tokio::process::Command;
 use utils::response::ApiResponse;
 
 use crate::{error::ApiError, DeploymentImpl};
+
+/// Terminal state machine: statuses that can directly transition to starting.
+/// For waiting/working, we check if process is actually running first.
+const STARTABLE_TERMINAL_STATUSES: [&str; 5] = ["not_started", "failed", "cancelled", "waiting", "working"];
 
 /// Query parameters for terminal logs retrieval
 #[derive(Debug, Deserialize)]
 pub struct TerminalLogsQuery {
     /// Maximum number of logs to return (default: 1000)
     pub limit: Option<i32>,
+}
+
+/// Get extended PATH with common CLI installation directories
+#[cfg(windows)]
+fn get_extended_path() -> String {
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    let mut paths: Vec<String> = vec![current_path];
+
+    // Add common npm global paths
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        paths.push(format!("{}\\npm", appdata));
+    }
+
+    // Add user local bin (for tools like claude)
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        paths.push(format!("{}\\.local\\bin", userprofile));
+    }
+
+    // Add common program files paths
+    if let Ok(programfiles) = std::env::var("ProgramFiles") {
+        paths.push(format!("{}\\nodejs", programfiles));
+    }
+
+    paths.join(";")
+}
+
+#[cfg(not(windows))]
+fn get_extended_path() -> String {
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    let mut paths: Vec<String> = vec![current_path];
+
+    // Add common paths on Unix
+    if let Ok(home) = std::env::var("HOME") {
+        paths.push(format!("{}/.local/bin", home));
+        paths.push(format!("{}/.npm-global/bin", home));
+        paths.push(format!("{}/bin", home));
+    }
+
+    paths.push("/usr/local/bin".to_string());
+
+    paths.join(":")
+}
+
+/// Find executable path for a command
+async fn find_executable(cmd: &str) -> Option<String> {
+    let extended_path = get_extended_path();
+
+    #[cfg(unix)]
+    {
+        Command::new("which")
+            .arg(cmd)
+            .env("PATH", &extended_path)
+            .output()
+            .await
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    }
+
+    #[cfg(windows)]
+    {
+        Command::new("where")
+            .arg(cmd)
+            .env("PATH", &extended_path)
+            .output()
+            .await
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .to_string()
+            })
+    }
 }
 
 /// Get terminal logs endpoint
@@ -56,6 +137,14 @@ pub async fn start_terminal(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("Terminal {id} not found")))?;
 
+    // Validate terminal status before starting
+    if !STARTABLE_TERMINAL_STATUSES.contains(&terminal.status.as_str()) {
+        return Err(ApiError::Conflict(format!(
+            "Terminal {id} cannot be started from status '{}'",
+            terminal.status
+        )));
+    }
+
     // Check if terminal is already running
     if deployment.process_manager().is_running(&id).await {
         return Err(ApiError::Conflict(format!("Terminal {id} is already running")));
@@ -68,7 +157,7 @@ pub async fn start_terminal(
         .ok_or_else(|| ApiError::NotFound(format!("CLI type {} not found", terminal.cli_type_id)))?;
 
     // Determine shell command based on CLI type
-    let shell = match cli_type.name.as_str() {
+    let cmd_name = match cli_type.name.as_str() {
         "claude-code" => "claude",
         "gemini-cli" => "gemini",
         "codex" => "codex",
@@ -77,17 +166,40 @@ pub async fn start_terminal(
         _ => &cli_type.name,
     };
 
+    // Find the absolute path of the CLI executable
+    let shell = find_executable(cmd_name).await.ok_or_else(|| {
+        ApiError::BadRequest(format!(
+            "CLI '{}' not found in PATH. Please ensure it is installed and accessible.",
+            cmd_name
+        ))
+    })?;
+
+    tracing::info!("Found CLI executable at: {}", shell);
+
     // Get working directory from workflow task
     let working_dir = get_terminal_working_dir(&deployment, &terminal.workflow_task_id)
         .await
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
 
-    // Spawn PTY process
-    let handle = deployment
-        .process_manager()
-        .spawn_pty(&id, shell, &working_dir, DEFAULT_COLS, DEFAULT_ROWS)
+    // Transition to starting before spawn
+    Terminal::update_status(&deployment.db().pool, &id, "starting")
         .await
-        .map_err(|e| ApiError::Internal(format!("Failed to spawn terminal process: {e}")))?;
+        .map_err(|e| ApiError::Internal(format!("Failed to update terminal status: {e}")))?;
+
+    // Spawn PTY process
+    let handle = match deployment
+        .process_manager()
+        .spawn_pty(&id, &shell, &working_dir, DEFAULT_COLS, DEFAULT_ROWS)
+        .await
+    {
+        Ok(handle) => handle,
+        Err(e) => {
+            // On spawn failure, set status to failed
+            let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
+            let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
+            return Err(ApiError::Internal(format!("Failed to spawn terminal process: {e}")));
+        }
+    };
 
     // Update terminal status in database
     Terminal::set_started(&deployment.db().pool, &id)
@@ -144,22 +256,21 @@ async fn get_terminal_working_dir(
 ///
 /// POST /api/terminals/:id/stop
 ///
-/// Stops a running terminal by updating its status to 'cancelled' and killing the process
+/// Stops a running terminal and resets its status to 'not_started' for restart
 pub async fn stop_terminal(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<String>>, ApiError> {
-    // Kill the terminal using ProcessManager
-    deployment
-        .process_manager()
-        .kill_terminal(&id)
-        .await
-        .map_err(|e| ApiError::Internal(format!("Failed to kill terminal {id}: {e}")))?;
+    // Best-effort kill in case the process is still running
+    if let Err(e) = deployment.process_manager().kill_terminal(&id).await {
+        tracing::warn!("Failed to kill terminal {}: {}", id, e);
+    }
 
-    // Update terminal status to 'cancelled'
-    Terminal::update_status(&deployment.db().pool, &id, "cancelled").await?;
+    // Reset terminal status for restart (not_started allows re-starting)
+    Terminal::update_status(&deployment.db().pool, &id, "not_started").await?;
+    Terminal::update_process(&deployment.db().pool, &id, None, None).await?;
 
-    tracing::info!("Terminal {} stopped successfully", id);
+    tracing::info!("Terminal {} stopped and reset successfully", id);
 
     Ok(ResponseJson(ApiResponse::success(format!(
         "Terminal {} stopped successfully",

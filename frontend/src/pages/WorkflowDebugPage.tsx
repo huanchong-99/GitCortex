@@ -22,8 +22,10 @@ function mapTerminalStatus(status: string): TerminalStatus {
     case 'completed':
       return 'completed';
     case 'failed':
-    case 'cancelled':
       return 'failed';
+    case 'cancelled':
+      // cancelled maps to not_started to allow restart
+      return 'not_started';
     default:
       return 'not_started';
   }

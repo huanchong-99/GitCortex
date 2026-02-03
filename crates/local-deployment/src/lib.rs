@@ -12,7 +12,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use db::DBService;
+use db::{models::terminal::Terminal, DBService};
 use deployment::{Deployment, DeploymentError};
 use executors::profile::ExecutorConfigs;
 use services::services::{
@@ -176,6 +176,12 @@ impl Deployment for LocalDeployment {
 
         let process_manager = Arc::new(ProcessManager::new());
 
+        // Reconcile terminal statuses on startup
+        // Reset any terminals that are marked as running but have no actual process
+        if let Err(e) = Self::reconcile_terminal_statuses(&db, &process_manager).await {
+            tracing::warn!("Failed to reconcile terminal statuses on startup: {}", e);
+        }
+
         let deployment = Self {
             config,
             user_id,
@@ -270,6 +276,46 @@ impl Deployment for LocalDeployment {
 }
 
 impl LocalDeployment {
+    /// Reconcile terminal statuses on startup
+    ///
+    /// Resets any terminals that are marked as running/waiting in the database
+    /// but have no actual process in the process manager (e.g., after a restart).
+    async fn reconcile_terminal_statuses(
+        db: &DBService,
+        process_manager: &ProcessManager,
+    ) -> anyhow::Result<()> {
+        // Find all terminals with active statuses (including 'starting' for interrupted spawns)
+        let terminal_ids: Vec<String> = sqlx::query_scalar(
+            "SELECT id FROM terminal WHERE status IN ('starting', 'started', 'waiting', 'working', 'running', 'active')"
+        )
+        .fetch_all(&db.pool)
+        .await?;
+
+        let mut reset_count = 0;
+        for terminal_id in terminal_ids {
+            // Check if the process is actually running
+            if !process_manager.is_running(&terminal_id).await {
+                // Reset the terminal status to not_started
+                Terminal::update_status(&db.pool, &terminal_id, "not_started").await?;
+                Terminal::update_process(&db.pool, &terminal_id, None, None).await?;
+                reset_count += 1;
+                tracing::info!(
+                    terminal_id = %terminal_id,
+                    "Reset stale terminal status to not_started"
+                );
+            }
+        }
+
+        if reset_count > 0 {
+            tracing::info!(
+                count = reset_count,
+                "Reconciled stale terminal statuses on startup"
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn remote_client(&self) -> Result<(), DeploymentError> {
         Err(DeploymentError::Other(anyhow::anyhow!("Remote client not configured")))
     }
