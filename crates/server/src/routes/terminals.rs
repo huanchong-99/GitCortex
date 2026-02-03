@@ -226,7 +226,7 @@ async fn get_terminal_working_dir(
     deployment: &DeploymentImpl,
     workflow_task_id: &str,
 ) -> anyhow::Result<std::path::PathBuf> {
-    // Get workflow from workflow_task
+    // Get workflow_id from workflow_task
     let workflow_id: Option<String> = sqlx::query_scalar(
         "SELECT workflow_id FROM workflow_task WHERE id = ?"
     )
@@ -235,21 +235,43 @@ async fn get_terminal_working_dir(
     .await?
     .flatten();
 
-    if let Some(wf_id) = workflow_id {
-        let base_dir: Option<String> = sqlx::query_scalar(
-            "SELECT base_dir FROM workflow WHERE id = ?"
-        )
-        .bind(&wf_id)
-        .fetch_optional(&deployment.db().pool)
-        .await?
-        .flatten();
+    let workflow_id = workflow_id.ok_or_else(|| {
+        anyhow::anyhow!("Workflow task {} not found", workflow_task_id)
+    })?;
 
-        if let Some(dir) = base_dir {
+    // Get project_id from workflow
+    let project_id: Option<Vec<u8>> = sqlx::query_scalar(
+        "SELECT project_id FROM workflow WHERE id = ?"
+    )
+    .bind(&workflow_id)
+    .fetch_optional(&deployment.db().pool)
+    .await?
+    .flatten();
+
+    let project_id = project_id.ok_or_else(|| {
+        anyhow::anyhow!("Workflow {} not found", workflow_id)
+    })?;
+
+    // Convert project_id bytes to UUID string
+    let project_uuid = uuid::Uuid::from_slice(&project_id)
+        .map_err(|e| anyhow::anyhow!("Invalid project_id format: {}", e))?;
+
+    // Get default_agent_working_dir from project
+    let working_dir: Option<String> = sqlx::query_scalar(
+        "SELECT default_agent_working_dir FROM projects WHERE id = ?"
+    )
+    .bind(project_uuid)
+    .fetch_optional(&deployment.db().pool)
+    .await?
+    .flatten();
+
+    if let Some(dir) = working_dir {
+        if !dir.is_empty() {
             return Ok(std::path::PathBuf::from(dir));
         }
     }
 
-    Err(anyhow::anyhow!("Could not determine working directory"))
+    Err(anyhow::anyhow!("Could not determine working directory: project has no default_agent_working_dir configured"))
 }
 
 /// Stop terminal endpoint
