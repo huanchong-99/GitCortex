@@ -1080,6 +1080,251 @@ mod orchestrator_tests {
     }
 
     // =========================================================================
+    // Test Suite 6.5: StartTask and Auto-Dispatch (Phase 20)
+    // =========================================================================
+
+    /// Helper function to set up workflow with multiple terminals for testing
+    async fn setup_workflow_with_terminals(
+        terminal_count: usize,
+        include_pty: bool,
+    ) -> (Arc<db::DBService>, String, String, Vec<(String, Option<String>)>) {
+        use db::DBService;
+        use sqlx::sqlite::SqlitePoolOptions;
+        use std::path::PathBuf;
+        use uuid::Uuid;
+
+        // Create in-memory database with migrations
+        let pool = SqlitePoolOptions::new()
+            .connect(":memory:")
+            .await
+            .unwrap();
+
+        // Run migrations
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let migration_dir = manifest_dir
+            .ancestors()
+            .nth(1)
+            .unwrap()
+            .join("db")
+            .join("migrations");
+
+        let migrator = sqlx::migrate::Migrator::new(migration_dir)
+            .await
+            .unwrap();
+        migrator.run(&pool).await.unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+
+        let workflow_id = Uuid::new_v4().to_string();
+        let task_id = Uuid::new_v4().to_string();
+
+        // Insert project
+        let project_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+        )
+        .bind(project_id)
+        .bind("test-project")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow
+        sqlx::query(
+            r"
+            INSERT INTO workflow (
+                id, project_id, name, target_branch,
+                merge_terminal_cli_id, merge_terminal_model_id,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "
+        )
+        .bind(&workflow_id)
+        .bind(&project_id)
+        .bind("test-workflow")
+        .bind("main")
+        .bind("cli-claude-code")
+        .bind("model-claude-sonnet")
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert workflow_task
+        sqlx::query(
+            r"
+            INSERT INTO workflow_task (
+                id, workflow_id, name, branch, order_index,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "
+        )
+        .bind(&task_id)
+        .bind(&workflow_id)
+        .bind("test-task")
+        .bind("feature/test")
+        .bind(0)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let mut terminals = Vec::new();
+        for index in 0..terminal_count {
+            let terminal_id = Uuid::new_v4().to_string();
+            let pty_session_id = if include_pty {
+                Some(Uuid::new_v4().to_string())
+            } else {
+                None
+            };
+
+            sqlx::query(
+                r"
+                INSERT INTO terminal (
+                    id, workflow_task_id, cli_type_id, model_config_id,
+                    order_index, status, pty_session_id, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                "
+            )
+            .bind(&terminal_id)
+            .bind(&task_id)
+            .bind("cli-claude-code")
+            .bind("model-claude-sonnet")
+            .bind(index as i32)
+            .bind("waiting")
+            .bind(pty_session_id.as_deref())
+            .bind(chrono::Utc::now())
+            .bind(chrono::Utc::now())
+            .execute(&pool)
+            .await
+            .unwrap();
+
+            terminals.push((terminal_id, pty_session_id));
+        }
+
+        (db, workflow_id, task_id, terminals)
+    }
+
+    #[tokio::test]
+    async fn test_execute_instruction_start_task() {
+        use db::models::{Terminal, WorkflowTask};
+
+        let (db, workflow_id, task_id, terminals) =
+            setup_workflow_with_terminals(1, true).await;
+        let (terminal_id, pty_session_id) = terminals.first().cloned().unwrap();
+        let pty_session_id = pty_session_id.expect("PTY should be present");
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow_id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
+
+        let instruction_json = format!(
+            r#"{{"type":"start_task","task_id":"{}","instruction":"echo start"}}"#,
+            task_id
+        );
+
+        let result = agent.execute_instruction(&instruction_json).await;
+        assert!(result.is_ok(), "StartTask should succeed");
+
+        let timeout = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500),
+            terminal_rx.recv()
+        ).await;
+
+        assert!(timeout.is_ok(), "Should receive terminal message");
+        let msg = timeout.unwrap().unwrap();
+        match msg {
+            BusMessage::TerminalMessage { message } => {
+                assert_eq!(message, "echo start");
+            }
+            other => panic!("Expected TerminalMessage, got {other:?}"),
+        }
+
+        let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "working");
+
+        let task = WorkflowTask::find_by_id(&db.pool, &task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(task.status, "running");
+    }
+
+    #[tokio::test]
+    async fn test_execute_instruction_start_task_no_pty() {
+        use db::models::{Terminal, WorkflowTask};
+
+        let (db, workflow_id, task_id, terminals) =
+            setup_workflow_with_terminals(1, false).await;
+        let (terminal_id, _) = terminals.first().cloned().unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow_id.clone(),
+            message_bus,
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let instruction_json = format!(
+            r#"{{"type":"start_task","task_id":"{}","instruction":"echo start"}}"#,
+            task_id
+        );
+
+        let result = agent.execute_instruction(&instruction_json).await;
+        assert!(result.is_err(), "StartTask should fail without PTY");
+
+        let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "failed");
+
+        let task = WorkflowTask::find_by_id(&db.pool, &task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(task.status, "failed");
+    }
+
+    // =========================================================================
     // Test Suite 7: handle_git_event (Task 8)
     // =========================================================================
 

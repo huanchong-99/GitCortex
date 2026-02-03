@@ -101,6 +101,12 @@ impl OrchestratorAgent {
             // Don't fail the workflow, just log the error
         }
 
+        // Auto-dispatch initial terminals for all tasks
+        if let Err(e) = self.auto_dispatch_initial_tasks().await {
+            tracing::error!("Failed to auto-dispatch initial tasks: {}", e);
+            // Don't fail the workflow, just log the error
+        }
+
         // 事件循环
         while let Some(message) = rx.recv().await {
             let should_stop = self.handle_message(message).await?;
@@ -147,15 +153,55 @@ impl OrchestratorAgent {
             event.status
         );
 
-        // 更新状态
-        {
+        // Determine if terminal completed successfully
+        let success = matches!(
+            event.status,
+            TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
+        );
+
+        // Update state and get next terminal info
+        let (next_terminal_index, task_completed, has_next, task_failed) = {
             let mut state = self.state.write().await;
             state.run_state = OrchestratorRunState::Processing;
-            let success = matches!(
-                event.status,
-                TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
-            );
             state.mark_terminal_completed(&event.task_id, &event.terminal_id, success);
+
+            // Advance to next terminal if successful
+            let has_next = if success {
+                state.advance_terminal(&event.task_id)
+            } else {
+                false
+            };
+
+            let next_index = state.get_next_terminal_for_task(&event.task_id);
+            let task_completed = state.is_task_completed(&event.task_id);
+            let task_failed = state.task_has_failures(&event.task_id);
+
+            (next_index, task_completed, has_next, task_failed)
+        };
+
+        // Update task status based on completion/failure
+        if task_failed && task_completed {
+            // Task has failures and all terminals are done - mark as failed
+            if let Err(e) = db::models::WorkflowTask::update_status(
+                &self.db.pool,
+                &event.task_id,
+                "failed",
+            )
+            .await
+            {
+                tracing::error!("Failed to mark task {} failed: {}", event.task_id, e);
+            }
+        } else if task_completed {
+            // Task completed successfully
+            if let Err(e) = db::models::WorkflowTask::update_status(
+                &self.db.pool,
+                &event.task_id,
+                "completed",
+            )
+            .await
+            {
+                tracing::error!("Failed to mark task {} completed: {}", event.task_id, e);
+            }
         }
 
         // 构建提示并调用 LLM
@@ -165,6 +211,19 @@ impl OrchestratorAgent {
         // 解析并执行指令
         self.execute_instruction(&response).await?;
 
+        // Auto-dispatch next terminal if successful, there's more to do, and task hasn't failed
+        if success && has_next && !task_failed {
+            if let Some(index) = next_terminal_index {
+                if let Err(e) = self.dispatch_next_terminal(&event.task_id, index).await {
+                    tracing::error!(
+                        "Failed to dispatch next terminal for task {}: {}",
+                        event.task_id,
+                        e
+                    );
+                }
+            }
+        }
+
         // 恢复空闲状态
         {
             let mut state = self.state.write().await;
@@ -172,6 +231,38 @@ impl OrchestratorAgent {
         }
 
         Ok(())
+    }
+
+    /// Dispatches the next terminal in a task sequence.
+    async fn dispatch_next_terminal(&self, task_id: &str, terminal_index: usize) -> anyhow::Result<()> {
+        // Get task
+        let task = db::models::WorkflowTask::find_by_id(&self.db.pool, task_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get task: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Task {task_id} not found"))?;
+
+        // Get terminals
+        let terminals = db::models::Terminal::find_by_task(&self.db.pool, task_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get terminals: {e}"))?;
+
+        let terminal = terminals.get(terminal_index).cloned().ok_or_else(|| {
+            anyhow::anyhow!("Terminal index {terminal_index} out of range for task {task_id}")
+        })?;
+
+        // Only dispatch if terminal is in waiting status
+        if terminal.status != "waiting" {
+            tracing::debug!(
+                "Skipping next terminal {} due to status {}",
+                terminal.id,
+                terminal.status
+            );
+            return Ok(());
+        }
+
+        // Build and dispatch instruction
+        let instruction = Self::build_task_instruction(&task, &terminal);
+        self.dispatch_terminal(task_id, &terminal, &instruction).await
     }
 
     /// Handles Git events emitted by the watcher.
@@ -534,9 +625,263 @@ impl OrchestratorAgent {
 
                     tracing::error!("Workflow {} failed: {}", workflow_id, reason);
                 }
+                OrchestratorInstruction::StartTask { task_id, instruction } => {
+                    tracing::info!("Starting task {}: {}", task_id, instruction);
+
+                    // 1. Get task from database
+                    let task = db::models::WorkflowTask::find_by_id(&self.db.pool, &task_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to get task: {e}"))?
+                        .ok_or_else(|| anyhow::anyhow!("Task {task_id} not found"))?;
+
+                    // 2. Get terminals for this task
+                    let terminals = db::models::Terminal::find_by_task(&self.db.pool, &task_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to get terminals: {e}"))?;
+
+                    if terminals.is_empty() {
+                        return Err(anyhow::anyhow!("No terminals found for task {task_id}"));
+                    }
+
+                    // 3. Initialize task state if not already done
+                    {
+                        let mut state = self.state.write().await;
+                        if !state.task_states.contains_key(&task_id) {
+                            state.init_task(task_id.clone(), terminals.len());
+                        }
+                    }
+
+                    // 4. Get next terminal index
+                    let next_index = {
+                        let state = self.state.read().await;
+                        state.get_next_terminal_for_task(&task_id)
+                    };
+
+                    // 5. Dispatch the terminal
+                    if let Some(index) = next_index {
+                        let terminal = terminals.get(index).cloned().ok_or_else(|| {
+                            anyhow::anyhow!("Terminal index {index} out of range for task {task_id}")
+                        })?;
+                        self.dispatch_terminal(&task.id, &terminal, &instruction).await?;
+                    } else {
+                        tracing::info!("No pending terminals for task {task_id}");
+                    }
+                }
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    /// Dispatches a terminal with the given instruction.
+    ///
+    /// Updates terminal and task status, then sends the instruction to the PTY session.
+    /// If the terminal has no PTY session, marks both terminal and task as failed.
+    /// Skips dispatch if terminal is not in "waiting" status.
+    async fn dispatch_terminal(
+        &self,
+        task_id: &str,
+        terminal: &db::models::Terminal,
+        instruction: &str,
+    ) -> anyhow::Result<()> {
+        // 0. Check terminal status - only dispatch if waiting
+        if terminal.status != "waiting" {
+            tracing::warn!(
+                "Skipping dispatch for terminal {} due to status {}",
+                terminal.id,
+                terminal.status
+            );
+            return Ok(());
+        }
+
+        // 1. Get PTY session ID, fail if not available
+        let pty_session_id = match terminal.pty_session_id.as_deref() {
+            Some(id) => id.to_string(),
+            None => {
+                tracing::error!(
+                    "Terminal {} has no PTY session, marking as failed",
+                    terminal.id
+                );
+
+                // Mark terminal as failed
+                let _ = db::models::Terminal::update_status(
+                    &self.db.pool,
+                    &terminal.id,
+                    TERMINAL_STATUS_FAILED,
+                )
+                .await;
+
+                // Mark task as failed
+                let _ = db::models::WorkflowTask::update_status(
+                    &self.db.pool,
+                    task_id,
+                    "failed",
+                )
+                .await;
+
+                return Err(anyhow::anyhow!(
+                    "Terminal {} has no PTY session",
+                    terminal.id
+                ));
+            }
+        };
+
+        // 2. Update terminal status to working
+        db::models::Terminal::update_status(&self.db.pool, &terminal.id, "working")
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to update terminal status: {e}"))?;
+
+        // 3. Update task status to running
+        db::models::WorkflowTask::update_status(&self.db.pool, task_id, "running")
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to update task status: {e}"))?;
+
+        // 4. Send instruction to PTY session
+        self.message_bus
+            .publish(
+                &pty_session_id,
+                BusMessage::TerminalMessage {
+                    message: instruction.to_string(),
+                },
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send instruction to terminal: {e}"))?;
+
+        tracing::info!(
+            "Dispatched terminal {} for task {} with instruction: {}",
+            terminal.id,
+            task_id,
+            instruction
+        );
+
+        Ok(())
+    }
+
+    /// Builds a task instruction from task and terminal information.
+    fn build_task_instruction(
+        task: &db::models::WorkflowTask,
+        terminal: &db::models::Terminal,
+    ) -> String {
+        let mut instruction = format!("Start task: {} ({})", task.name, task.id);
+
+        if let Some(description) = &task.description {
+            instruction.push_str("\n\nTask description:\n");
+            instruction.push_str(description);
+        }
+
+        if let Some(role) = &terminal.role {
+            instruction.push_str("\n\nYour role: ");
+            instruction.push_str(role);
+        }
+
+        if let Some(role_description) = &terminal.role_description {
+            instruction.push_str("\nRole description: ");
+            instruction.push_str(role_description);
+        }
+
+        instruction.push_str("\n\nPlease proceed with the task.");
+        instruction
+    }
+
+    /// Auto-dispatches the first terminal for each task when workflow starts.
+    ///
+    /// This method is called after the workflow enters running state to automatically
+    /// start execution of all tasks by dispatching their first terminals.
+    async fn auto_dispatch_initial_tasks(&self) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        // Get all tasks for this workflow
+        let tasks = db::models::WorkflowTask::find_by_workflow(&self.db.pool, &workflow_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get workflow tasks: {e}"))?;
+
+        if tasks.is_empty() {
+            tracing::info!("No tasks found for workflow {}, skipping auto-dispatch", workflow_id);
+            return Ok(());
+        }
+
+        tracing::info!(
+            "Auto-dispatching initial terminals for {} tasks in workflow {}",
+            tasks.len(),
+            workflow_id
+        );
+
+        for task in tasks {
+            // Skip tasks that are already completed, failed, or cancelled
+            if task.status == "completed" || task.status == "failed" || task.status == "cancelled" {
+                tracing::debug!(
+                    "Skipping task {} due to status {}",
+                    task.id,
+                    task.status
+                );
+                continue;
+            }
+
+            // Get terminals for this task
+            let terminals = db::models::Terminal::find_by_task(&self.db.pool, &task.id)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to get terminals for task {}: {e}", task.id))?;
+
+            if terminals.is_empty() {
+                tracing::warn!("No terminals found for task {}, skipping", task.id);
+                continue;
+            }
+
+            // Initialize task state
+            {
+                let mut state = self.state.write().await;
+                if !state.task_states.contains_key(&task.id) {
+                    state.init_task(task.id.clone(), terminals.len());
+                }
+            }
+
+            // Get next terminal index (should be 0 for initial dispatch)
+            let next_index = {
+                let state = self.state.read().await;
+                state.get_next_terminal_for_task(&task.id)
+            };
+
+            let Some(index) = next_index else {
+                tracing::debug!("No pending terminals for task {}", task.id);
+                continue;
+            };
+
+            let Some(terminal) = terminals.get(index).cloned() else {
+                tracing::warn!(
+                    "Terminal index {} out of range for task {}",
+                    index,
+                    task.id
+                );
+                continue;
+            };
+
+            // Only dispatch terminals in waiting status
+            if terminal.status != "waiting" {
+                tracing::debug!(
+                    "Skipping terminal {} for task {} due to status {}",
+                    terminal.id,
+                    task.id,
+                    terminal.status
+                );
+                continue;
+            }
+
+            // Build and dispatch instruction
+            let instruction = Self::build_task_instruction(&task, &terminal);
+            if let Err(e) = self.dispatch_terminal(&task.id, &terminal, &instruction).await {
+                tracing::error!(
+                    "Failed to auto-dispatch terminal {} for task {}: {}",
+                    terminal.id,
+                    task.id,
+                    e
+                );
+                // Continue with other tasks even if one fails
+            }
+        }
+
         Ok(())
     }
 

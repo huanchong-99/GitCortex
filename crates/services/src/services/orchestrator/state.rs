@@ -100,6 +100,49 @@ impl OrchestratorState {
         }
     }
 
+    /// Advances the current terminal index for a task.
+    ///
+    /// Returns `true` if there is a next terminal to dispatch, `false` otherwise.
+    pub fn advance_terminal(&mut self, task_id: &str) -> bool {
+        if let Some(state) = self.task_states.get_mut(task_id) {
+            if state.current_terminal_index + 1 < state.total_terminals {
+                state.current_terminal_index += 1;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Returns the next terminal index for a task, if any.
+    ///
+    /// Returns `None` if the task is completed or all terminals have been processed.
+    pub fn get_next_terminal_for_task(&self, task_id: &str) -> Option<usize> {
+        let state = self.task_states.get(task_id)?;
+        if state.is_completed {
+            return None;
+        }
+        if state.current_terminal_index >= state.total_terminals {
+            return None;
+        }
+        Some(state.current_terminal_index)
+    }
+
+    /// Checks if a task is completed.
+    pub fn is_task_completed(&self, task_id: &str) -> bool {
+        self.task_states
+            .get(task_id)
+            .map(|s| s.is_completed)
+            .unwrap_or(false)
+    }
+
+    /// Returns true if a specific task has any failed terminals.
+    pub fn task_has_failures(&self, task_id: &str) -> bool {
+        self.task_states
+            .get(task_id)
+            .map(|s| !s.failed_terminals.is_empty())
+            .unwrap_or(false)
+    }
+
     /// Appends a message and trims history based on config.
     pub fn add_message(&mut self, role: &str, content: &str, config: &OrchestratorConfig) {
         self.conversation_history.push(LLMMessage {
@@ -266,5 +309,109 @@ mod tests {
         state.run_state = OrchestratorRunState::Paused;
 
         assert!(state.transition_to(OrchestratorRunState::Stopped).is_ok());
+    }
+
+    #[test]
+    fn test_advance_terminal_single_terminal() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.init_task("task-1".to_string(), 1);
+
+        // With only 1 terminal, advance should return false (no next terminal)
+        assert!(!state.advance_terminal("task-1"));
+        assert_eq!(state.get_next_terminal_for_task("task-1"), Some(0));
+    }
+
+    #[test]
+    fn test_advance_terminal_multiple_terminals() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.init_task("task-1".to_string(), 3);
+
+        // Initial state: index 0
+        assert_eq!(state.get_next_terminal_for_task("task-1"), Some(0));
+
+        // Advance to index 1
+        assert!(state.advance_terminal("task-1"));
+        assert_eq!(state.get_next_terminal_for_task("task-1"), Some(1));
+
+        // Advance to index 2
+        assert!(state.advance_terminal("task-1"));
+        assert_eq!(state.get_next_terminal_for_task("task-1"), Some(2));
+
+        // No more terminals to advance to
+        assert!(!state.advance_terminal("task-1"));
+        assert_eq!(state.get_next_terminal_for_task("task-1"), Some(2));
+    }
+
+    #[test]
+    fn test_advance_terminal_nonexistent_task() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+
+        // Advancing a non-existent task should return false
+        assert!(!state.advance_terminal("nonexistent-task"));
+        assert_eq!(state.get_next_terminal_for_task("nonexistent-task"), None);
+    }
+
+    #[test]
+    fn test_get_next_terminal_completed_task() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.init_task("task-1".to_string(), 2);
+
+        // Mark both terminals as completed
+        state.mark_terminal_completed("task-1", "term-1", true);
+        state.mark_terminal_completed("task-1", "term-2", true);
+
+        // Task is completed, should return None
+        assert!(state.is_task_completed("task-1"));
+        assert_eq!(state.get_next_terminal_for_task("task-1"), None);
+    }
+
+    #[test]
+    fn test_is_task_completed() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.init_task("task-1".to_string(), 2);
+
+        // Initially not completed
+        assert!(!state.is_task_completed("task-1"));
+
+        // After one terminal, still not completed
+        state.mark_terminal_completed("task-1", "term-1", true);
+        assert!(!state.is_task_completed("task-1"));
+
+        // After all terminals, completed
+        state.mark_terminal_completed("task-1", "term-2", true);
+        assert!(state.is_task_completed("task-1"));
+    }
+
+    #[test]
+    fn test_is_task_completed_nonexistent() {
+        let state = OrchestratorState::new("test-workflow".to_string());
+        assert!(!state.is_task_completed("nonexistent-task"));
+    }
+
+    #[test]
+    fn test_task_has_failures() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.init_task("task-1".to_string(), 3);
+
+        // Initially no failures
+        assert!(!state.task_has_failures("task-1"));
+
+        // After successful completion, still no failures
+        state.mark_terminal_completed("task-1", "term-1", true);
+        assert!(!state.task_has_failures("task-1"));
+
+        // After failed completion, has failures
+        state.mark_terminal_completed("task-1", "term-2", false);
+        assert!(state.task_has_failures("task-1"));
+
+        // Still has failures after another success
+        state.mark_terminal_completed("task-1", "term-3", true);
+        assert!(state.task_has_failures("task-1"));
+    }
+
+    #[test]
+    fn test_task_has_failures_nonexistent() {
+        let state = OrchestratorState::new("test-workflow".to_string());
+        assert!(!state.task_has_failures("nonexistent-task"));
     }
 }
