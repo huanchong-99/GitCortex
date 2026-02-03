@@ -38,8 +38,10 @@ pub struct CreateProject {
 }
 
 #[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProject {
     pub name: Option<String>,
+    pub default_agent_working_dir: Option<String>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -198,11 +200,16 @@ impl Project {
             .ok_or(sqlx::Error::RowNotFound)?;
 
         let name = payload.name.clone().unwrap_or(existing.name);
+        let default_agent_working_dir = payload
+            .default_agent_working_dir
+            .clone()
+            .or(existing.default_agent_working_dir);
 
         sqlx::query_as!(
             Project,
             r#"UPDATE projects
-               SET name = $2
+               SET name = $2,
+                   default_agent_working_dir = $3
                WHERE id = $1
                RETURNING id as "id!: Uuid",
                          name,
@@ -212,6 +219,7 @@ impl Project {
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             name,
+            default_agent_working_dir,
         )
         .fetch_one(pool)
         .await

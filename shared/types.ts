@@ -28,7 +28,7 @@ export type Project = { id: string, name: string, defaultAgentWorkingDir: string
 
 export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 
-export type UpdateProject = { name: string | null, };
+export type UpdateProject = { name: string | null, defaultAgentWorkingDir: string | null, };
 
 export type SearchResult = { path: string, isFile: boolean, matchType: SearchMatchType, 
 /**
@@ -96,7 +96,7 @@ export type Workspace = { id: string, taskId: string, containerRef: string | nul
 
 export type WorkspaceWithStatus = { isRunning: boolean, isErrored: boolean, id: string, taskId: string, containerRef: string | null, branch: string, agentWorkingDir: string | null, setupCompletedAt: string | null, createdAt: string, updatedAt: string, archived: boolean, pinned: boolean, name: string | null, };
 
-export type Session = { id: string, workspaceId: string, executor: string | null, createdAt: string, updatedAt: string, };
+export type Session = { id: string, workspaceId: string, executor: string | null, terminalId: string | null, createdAt: string, updatedAt: string, };
 
 export type ExecutionProcess = { id: string, sessionId: string, runReason: ExecutionProcessRunReason, executorAction: ExecutorAction, status: ExecutionProcessStatus, exitCode: bigint | null, 
 /**
