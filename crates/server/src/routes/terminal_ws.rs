@@ -198,15 +198,15 @@ async fn handle_terminal_socket(
         Some(tokio::task::spawn_blocking(move || {
             while let Some(data) = rx.blocking_recv() {
                 // Lock the shared writer for each write operation
+                // Recover from poisoned lock to allow continued input
                 let mut writer_guard = match pty_writer.lock() {
                     Ok(guard) => guard,
-                    Err(e) => {
-                        tracing::error!(
-                            "PTY writer lock poisoned for terminal {}: {}",
-                            terminal_id_writer,
-                            e
+                    Err(poisoned) => {
+                        tracing::warn!(
+                            "PTY writer lock was poisoned for terminal {}, recovering",
+                            terminal_id_writer
                         );
-                        break;
+                        poisoned.into_inner()
                     }
                 };
                 if let Err(e) = writer_guard.write_all(&data) {
@@ -373,6 +373,12 @@ async fn handle_terminal_socket(
     });
 
     // Wait for any task to complete
+    // Use conditional guards to prevent immediate exit when optional tasks are None
+    let reader_task_active = reader_task.is_some();
+    let writer_task_active = writer_task.is_some();
+    let mut reader_task = reader_task;
+    let mut writer_task = writer_task;
+
     tokio::select! {
         _ = send_task => {
             tracing::debug!("Send task completed for terminal {}", terminal_id);
@@ -384,19 +390,27 @@ async fn handle_terminal_socket(
             tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
         }
         _ = async {
-            if let Some(task) = reader_task {
+            if let Some(task) = &mut reader_task {
                 let _ = task.await;
             }
-        } => {
+        }, if reader_task_active => {
             tracing::debug!("PTY reader task completed for terminal {}", terminal_id);
         }
         _ = async {
-            if let Some(task) = writer_task {
+            if let Some(task) = &mut writer_task {
                 let _ = task.await;
             }
-        } => {
+        }, if writer_task_active => {
             tracing::debug!("PTY writer task completed for terminal {}", terminal_id);
         }
+    }
+
+    // Abort any remaining background tasks to avoid leaks
+    if let Some(task) = reader_task {
+        task.abort();
+    }
+    if let Some(task) = writer_task {
+        task.abort();
     }
 
     tracing::info!("Terminal WebSocket disconnected: {}", terminal_id);
