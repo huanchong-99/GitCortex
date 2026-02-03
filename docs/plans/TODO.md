@@ -8,19 +8,21 @@
 | 指标 | 值 |
 |------|-----|
 | 总任务数 | 231 |
-| 已完成 | 143 |
+| 已完成 | 165 |
 | 进行中 | 0 |
-| 未开始 | 88 (Phase 18.5: 21个, Phase 20: 22个, Phase 21: 16个, Phase 22: 20个, Phase 23: 6个, 其他: 3个) |
+| 未开始 | 66 (Phase 18.5: 15个, Phase 21: 16个, Phase 22: 20个, Phase 23: 6个, 其他: 9个) |
 | 可选优化 | 0 |
-| **完成率** | **61.9%** |
+| **完成率** | **71.4%** |
 
 > **当前审计分数:** 100/100 (S级)
 > **目标分数:** 100/100 (S级 - 完美代码)
 >
-> **下一步:** Phase 18.5 - 设计文档对齐修复（48个偏差修复）
+> **Phase 20 已完成 (2026-02-04):**
+> - ✅ Orchestrator 自动任务派发（启动终端后自动开发）
 >
-> **核心功能缺失（2026-02-04 审计）:**
-> - Phase 20: Orchestrator 自动任务派发（启动终端后自动开发）
+> **下一步:** Phase 21 - Git 事件驱动接入（Git 提交唤醒主 Agent）
+>
+> **核心功能缺失（待实施）:**
 > - Phase 21: Git 事件驱动接入（Git 提交唤醒主 Agent）
 > - Phase 22: WebSocket 事件广播完善（前端实时感知状态变化）
 
@@ -561,67 +563,68 @@
 
 **计划文件:** `2026-02-04-phase-20-orchestrator-auto-dispatch.md`
 
-> **状态:** 📋 待实施
+> **状态:** ✅ 已完成
 > **优先级:** 🔴 高（核心功能实现）
 > **目标:** 实现"启动终端后自动开发"的核心功能
-> **前置条件:** Phase 18.5 设计文档对齐修复完成
+> **完成时间:** 2026-02-04
+> **完成说明:** 实现了自动派发核心功能，包括 StartTask 指令处理、自动派发首个终端、终端完成后推进到下一终端、失败状态处理。130 个单元测试全部通过。
 
 ### P0 - 自动派发触发点
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.1 | 定义派发触发点 - 确认 `ready -> running` 入口仅为 `/api/workflows/:id/start` | ⬜ |  |
-| 20.2 | 在 Orchestrator `run()` 初始阶段执行自动派发逻辑 | ⬜ |  |
-| 20.3 | 增加"派发失败"容错与重试策略 | ⬜ |  |
+| 20.1 | 定义派发触发点 - 确认 `ready -> running` 入口仅为 `/api/workflows/:id/start` | ✅ | 2026-02-04 |
+| 20.2 | 在 Orchestrator `run()` 初始阶段执行自动派发逻辑 | ✅ | 2026-02-04 |
+| 20.3 | 增加"派发失败"容错与重试策略 | ✅ | 2026-02-04 |
 
 ### P1 - 任务状态初始化
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.4 | 基于 `workflow_task` 与 `terminal` 表加载每个任务的终端序列 | ⬜ |  |
-| 20.5 | 使用 `OrchestratorState::init_task` 初始化 `TaskExecutionState` | ⬜ |  |
-| 20.6 | 保存 `current_terminal_index` 与 `total_terminals` 状态 | ⬜ |  |
+| 20.4 | 基于 `workflow_task` 与 `terminal` 表加载每个任务的终端序列 | ✅ | 2026-02-04 |
+| 20.5 | 使用 `OrchestratorState::init_task` 初始化 `TaskExecutionState` | ✅ | 2026-02-04 |
+| 20.6 | 保存 `current_terminal_index` 与 `total_terminals` 状态 | ✅ | 2026-02-04 |
 
 ### P2 - 自动派发第一个终端
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.7 | 从 `workflow_task` 与第一个 `terminal` 生成指令文本 | ⬜ |  |
-| 20.8 | 通过 `BusMessage::TerminalMessage` 发送到 PTY 会话 | ⬜ |  |
-| 20.9 | 若终端无 `pty_session_id`，记录错误并标记任务失败或进入重试 | ⬜ |  |
+| 20.7 | 从 `workflow_task` 与第一个 `terminal` 生成指令文本 | ✅ | 2026-02-04 |
+| 20.8 | 通过 `BusMessage::TerminalMessage` 发送到 PTY 会话 | ✅ | 2026-02-04 |
+| 20.9 | 若终端无 `pty_session_id`，记录错误并标记任务失败或进入重试 | ✅ | 2026-02-04 |
 
 ### P3 - execute_instruction 处理 StartTask
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.10 | 在 `OrchestratorInstruction` 枚举中添加 `StartTask` 变体 | ⬜ |  |
-| 20.11 | 实现 `execute_instruction` 对 `StartTask` 的处理逻辑 | ⬜ |  |
-| 20.12 | `StartTask` 可携带 `task_id` 与 `instruction` 文本 | ⬜ |  |
+| 20.10 | 在 `OrchestratorInstruction` 枚举中添加 `StartTask` 变体 | ✅ | 2026-02-04 |
+| 20.11 | 实现 `execute_instruction` 对 `StartTask` 的处理逻辑 | ✅ | 2026-02-04 |
+| 20.12 | `StartTask` 可携带 `task_id` 与 `instruction` 文本 | ✅ | 2026-02-04 |
 
 ### P4 - 自动触发下一个终端
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.13 | 在 `handle_terminal_completed` 中推进 `current_terminal_index` | ⬜ |  |
-| 20.14 | 对同一 task 的下一个 terminal 自动派发 | ⬜ |  |
-| 20.15 | 所有 terminals 完成后标记 task 完成 | ⬜ |  |
-| 20.16 | 所有 tasks 完成后触发合并或完成流程 | ⬜ |  |
+| 20.13 | 在 `handle_terminal_completed` 中推进 `current_terminal_index` | ✅ | 2026-02-04 |
+| 20.14 | 对同一 task 的下一个 terminal 自动派发 | ✅ | 2026-02-04 |
+| 20.15 | 所有 terminals 完成后标记 task 完成 | ✅ | 2026-02-04 |
+| 20.16 | 所有 tasks 完成后触发合并或完成流程 | ✅ | 2026-02-04 |
 
 ### P5 - 斜杠命令自动执行
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.17 | 在 `execute_slash_commands` 中对 LLM 返回内容执行 `execute_instruction` | ⬜ |  |
-| 20.18 | 引入"无指令响应"的安全兜底处理 | ⬜ |  |
+| 20.17 | 在 `execute_slash_commands` 中对 LLM 返回内容执行 `execute_instruction` | ✅ | 2026-02-04 |
+| 20.18 | 引入"无指令响应"的安全兜底处理 | ✅ | 2026-02-04 |
 
 ### P6 - 测试与回归
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 20.19 | 新增 Orchestrator 自动派发单测 | ⬜ |  |
-| 20.20 | 新增 `StartTask` 指令执行单测 | ⬜ |  |
-| 20.21 | 新增"终端完成 -> 下一终端派发"单测 | ⬜ |  |
-| 20.22 | 新增终端无 PTY 会话时的错误路径测试 | ⬜ |  |
+| 20.19 | 新增 Orchestrator 自动派发单测 | ✅ | 2026-02-04 |
+| 20.20 | 新增 `StartTask` 指令执行单测 | ✅ | 2026-02-04 |
+| 20.21 | 新增"终端完成 -> 下一终端派发"单测 | ✅ | 2026-02-04 |
+| 20.22 | 新增终端无 PTY 会话时的错误路径测试 | ✅ | 2026-02-04 |
 
 ---
 
