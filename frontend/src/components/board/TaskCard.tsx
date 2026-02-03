@@ -34,7 +34,7 @@ export function TaskCard({ task, workflowId }: TaskCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative bg-panel border border-border rounded p-3 pr-10 cursor-grab active:cursor-grabbing select-none ${
+      className={`relative bg-panel border border-border rounded p-3 pr-10 select-none ${
         isDragging ? 'opacity-70 ring-2 ring-brand/30 shadow-lg z-50' : ''
       }`}
       {...attributes}
@@ -42,7 +42,7 @@ export function TaskCard({ task, workflowId }: TaskCardProps) {
     >
       <button
         type="button"
-        className="absolute right-2 top-2 z-10 rounded border border-border bg-secondary/90 p-1 text-normal hover:text-high hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        className="absolute right-2 top-2 z-20 rounded border border-border bg-secondary p-1.5 text-high shadow-sm hover:bg-brand hover:text-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         aria-label={t('taskCard.debugButton')}
         title={t('taskCard.debugButton')}
         onPointerDown={(event) => event.stopPropagation()}
@@ -50,10 +50,12 @@ export function TaskCard({ task, workflowId }: TaskCardProps) {
       >
         <Terminal className="h-4 w-4" />
       </button>
-      <div className="text-sm font-semibold">{task.name}</div>
-      <div className="text-xs text-low">{task.branch}</div>
-      <div className="mt-2">
-        <TerminalDots terminalCount={task.terminals.length} />
+      <div className="cursor-grab active:cursor-grabbing">
+        <div className="text-sm font-semibold">{task.name}</div>
+        <div className="text-xs text-low">{task.branch}</div>
+        <div className="mt-2">
+          <TerminalDots terminalCount={task.terminals.length} />
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 import type { WorkflowTaskDto } from 'shared/types';
 import { TaskCard } from './TaskCard';
@@ -50,7 +51,11 @@ const task: WorkflowTaskDto = {
 
 describe('TaskCard', () => {
   it('renders task details and terminal count', () => {
-    render(<TaskCard task={task} />);
+    render(
+      <MemoryRouter>
+        <TaskCard task={task} workflowId="wf-1" />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText('Task One')).toBeInTheDocument();
     expect(screen.getByText('feature/task-one')).toBeInTheDocument();
