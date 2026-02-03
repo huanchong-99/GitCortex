@@ -7,17 +7,22 @@
 
 | 指标 | 值 |
 |------|-----|
-| 总任务数 | 179 |
+| 总任务数 | 231 |
 | 已完成 | 143 |
 | 进行中 | 0 |
-| 未开始 | 27 (Phase 18.5: 21个, Phase 19: 6个) |
+| 未开始 | 88 (Phase 18.5: 21个, Phase 20: 22个, Phase 21: 16个, Phase 22: 20个, Phase 23: 6个, 其他: 3个) |
 | 可选优化 | 0 |
-| **完成率** | **79.9%** |
+| **完成率** | **61.9%** |
 
 > **当前审计分数:** 100/100 (S级)
 > **目标分数:** 100/100 (S级 - 完美代码)
 >
 > **下一步:** Phase 18.5 - 设计文档对齐修复（48个偏差修复）
+>
+> **核心功能缺失（2026-02-04 审计）:**
+> - Phase 20: Orchestrator 自动任务派发（启动终端后自动开发）
+> - Phase 21: Git 事件驱动接入（Git 提交唤醒主 Agent）
+> - Phase 22: WebSocket 事件广播完善（前端实时感知状态变化）
 
 ---
 
@@ -551,22 +556,198 @@
 
 ---
 
-## Phase 19: Docker 容器化部署（开源发布优化）
+## Phase 20: 自动化协调核心（Orchestrator 自动任务派发）
+
+**计划文件:** `2026-02-04-phase-20-orchestrator-auto-dispatch.md`
+
+> **状态:** 📋 待实施
+> **优先级:** 🔴 高（核心功能实现）
+> **目标:** 实现"启动终端后自动开发"的核心功能
+> **前置条件:** Phase 18.5 设计文档对齐修复完成
+
+### P0 - 自动派发触发点
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.1 | 定义派发触发点 - 确认 `ready -> running` 入口仅为 `/api/workflows/:id/start` | ⬜ |  |
+| 20.2 | 在 Orchestrator `run()` 初始阶段执行自动派发逻辑 | ⬜ |  |
+| 20.3 | 增加"派发失败"容错与重试策略 | ⬜ |  |
+
+### P1 - 任务状态初始化
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.4 | 基于 `workflow_task` 与 `terminal` 表加载每个任务的终端序列 | ⬜ |  |
+| 20.5 | 使用 `OrchestratorState::init_task` 初始化 `TaskExecutionState` | ⬜ |  |
+| 20.6 | 保存 `current_terminal_index` 与 `total_terminals` 状态 | ⬜ |  |
+
+### P2 - 自动派发第一个终端
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.7 | 从 `workflow_task` 与第一个 `terminal` 生成指令文本 | ⬜ |  |
+| 20.8 | 通过 `BusMessage::TerminalMessage` 发送到 PTY 会话 | ⬜ |  |
+| 20.9 | 若终端无 `pty_session_id`，记录错误并标记任务失败或进入重试 | ⬜ |  |
+
+### P3 - execute_instruction 处理 StartTask
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.10 | 在 `OrchestratorInstruction` 枚举中添加 `StartTask` 变体 | ⬜ |  |
+| 20.11 | 实现 `execute_instruction` 对 `StartTask` 的处理逻辑 | ⬜ |  |
+| 20.12 | `StartTask` 可携带 `task_id` 与 `instruction` 文本 | ⬜ |  |
+
+### P4 - 自动触发下一个终端
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.13 | 在 `handle_terminal_completed` 中推进 `current_terminal_index` | ⬜ |  |
+| 20.14 | 对同一 task 的下一个 terminal 自动派发 | ⬜ |  |
+| 20.15 | 所有 terminals 完成后标记 task 完成 | ⬜ |  |
+| 20.16 | 所有 tasks 完成后触发合并或完成流程 | ⬜ |  |
+
+### P5 - 斜杠命令自动执行
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.17 | 在 `execute_slash_commands` 中对 LLM 返回内容执行 `execute_instruction` | ⬜ |  |
+| 20.18 | 引入"无指令响应"的安全兜底处理 | ⬜ |  |
+
+### P6 - 测试与回归
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 20.19 | 新增 Orchestrator 自动派发单测 | ⬜ |  |
+| 20.20 | 新增 `StartTask` 指令执行单测 | ⬜ |  |
+| 20.21 | 新增"终端完成 -> 下一终端派发"单测 | ⬜ |  |
+| 20.22 | 新增终端无 PTY 会话时的错误路径测试 | ⬜ |  |
+
+---
+
+## Phase 21: Git 事件驱动接入
+
+**计划文件:** `2026-02-04-phase-21-git-event-driven.md`
+
+> **状态:** 📋 待实施
+> **优先级:** 🔴 高（核心功能实现）
+> **目标:** Git 提交后唤醒主 Agent，形成事件驱动闭环
+> **前置条件:** Phase 20 自动化协调核心完成
+
+### P0 - GitWatcher 生命周期接入
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 21.1 | 在 workflow 启动时初始化 GitWatcher | ⬜ |  |
+| 21.2 | 在 workflow 停止/完成时释放 GitWatcher | ⬜ |  |
+| 21.3 | GitWatcher 与 workflow_id 建立关联 | ⬜ |  |
+| 21.4 | 从 project/workspace 获取 repo path 作为 watcher 目录 | ⬜ |  |
+
+### P1 - Git 提交事件上报 MessageBus
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 21.5 | 增加 `MessageBus::publish_git_event` 方法或复用 `publish` | ⬜ |  |
+| 21.6 | 将 commit hash、branch、message 写入 `BusMessage::GitEvent` | ⬜ |  |
+| 21.7 | 解析 commit message 中的 METADATA 格式 | ⬜ |  |
+
+### P2 - Orchestrator 响应 GitEvent
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 21.8 | 对含 metadata 的提交走现有 `handle_git_event` 逻辑 | ⬜ |  |
+| 21.9 | 对无 metadata 的提交触发"唤醒"决策逻辑 | ⬜ |  |
+| 21.10 | 将 Git 事件写入 `git_event` 表并更新处理状态 | ⬜ |  |
+
+### P3 - 配置项支持
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 21.11 | 支持 GitWatcher polling interval 配置 | ⬜ |  |
+| 21.12 | 支持 workflow 级别 Git 监测开关（可选） | ⬜ |  |
+
+### P4 - 测试与回归
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 21.13 | 新增 GitWatcher 启动接入测试 | ⬜ |  |
+| 21.14 | 新增 GitEvent 发布测试 | ⬜ |  |
+| 21.15 | 新增 Orchestrator GitEvent 响应测试 | ⬜ |  |
+| 21.16 | 新增 METADATA 解析测试 | ⬜ |  |
+
+---
+
+## Phase 22: WebSocket 事件广播完善
+
+**计划文件:** `2026-02-04-phase-22-websocket-broadcast.md`
+
+> **状态:** 📋 待实施
+> **优先级:** 🟡 中（前端体验优化）
+> **目标:** 前端实时感知 workflow / orchestrator / git 状态变化
+> **前置条件:** Phase 21 Git 事件驱动接入完成
+
+### P0 - WebSocket 事件通道设计
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 22.1 | 新增 workflow 事件 WS 路由 `/ws/workflow/:id/events` | ⬜ |  |
+| 22.2 | WS 消息格式对齐设计 `{type, payload, timestamp, id}` | ⬜ |  |
+| 22.3 | 增加 workflow 级别事件流订阅机制 | ⬜ |  |
+
+### P1 - MessageBus 到 WebSocket 桥接
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 22.4 | 转发 `StatusUpdate` 为 `workflow.status_changed` | ⬜ |  |
+| 22.5 | 转发 Orchestrator 运行状态为 `orchestrator.awakened/sleeping` | ⬜ |  |
+| 22.6 | 转发决策输出为 `orchestrator.decision` | ⬜ |  |
+| 22.7 | 转发 GitWatcher 提交为 `git.commit_detected` | ⬜ |  |
+| 22.8 | 转发终端状态为 `terminal.status_changed` | ⬜ |  |
+
+### P2 - 心跳机制
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 22.9 | 服务端定期发送 `system.heartbeat`（30秒间隔） | ⬜ |  |
+| 22.10 | 客户端收到心跳后更新连接时间戳 | ⬜ |  |
+| 22.11 | 客户端心跳超时后自动重连 | ⬜ |  |
+
+### P3 - 前端订阅与渲染
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 22.12 | 在 workflow 详情页建立 WS 连接 | ⬜ |  |
+| 22.13 | 将事件同步到 Zustand wsStore | ⬜ |  |
+| 22.14 | PipelineView 实时刷新终端状态 | ⬜ |  |
+| 22.15 | TerminalDebugView 实时刷新 | ⬜ |  |
+| 22.16 | StatusBar 显示 Orchestrator 状态 | ⬜ |  |
+
+### P4 - 测试与回归
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 22.17 | 新增 WS 事件路由测试 | ⬜ |  |
+| 22.18 | 新增前端 wsStore 事件处理测试 | ⬜ |  |
+| 22.19 | 新增心跳机制测试 | ⬜ |  |
+| 22.20 | 新增断线重连测试 | ⬜ |  |
+
+---
+
+## Phase 23: Docker 容器化部署（开源发布优化）
 
 **计划文件:** `2026-01-27-phase-19-docker-deployment.md`
 
-> **状态:** 📦 延后实施（Phase 18 完成后执行）
+> **状态:** 📦 延后实施（Phase 22 完成后执行）
 > **优先级:** 🚀 中（开源部署便利性）
 > **目标:** 方便开源后其他开发者一键部署
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 19.1 | 创建生产部署 Dockerfile（多阶段构建） | ⬜ |  |
-| 19.2 | 创建生产部署 Docker Compose | ⬜ |  |
-| 19.3 | 创建开发调试 Docker Compose（可选） | ⬜ |  |
-| 19.4 | 优化 Docker 镜像构建（缓存/体积） | ⬜ |  |
-| 19.5 | 创建 Docker 部署文档 | ⬜ |  |
-| 19.6 | CI/CD 集成（GitHub Actions） | ⬜ |  |
+| 23.1 | 创建生产部署 Dockerfile（多阶段构建） | ⬜ |  |
+| 23.2 | 创建生产部署 Docker Compose | ⬜ |  |
+| 23.3 | 创建开发调试 Docker Compose（可选） | ⬜ |  |
+| 23.4 | 优化 Docker 镜像构建（缓存/体积） | ⬜ |  |
+| 23.5 | 创建 Docker 部署文档 | ⬜ |  |
+| 23.6 | CI/CD 集成（GitHub Actions） | ⬜ |  |
 
 **预期收益:**
 - ✅ 使用者无需安装 Rust/Node.js 环境
