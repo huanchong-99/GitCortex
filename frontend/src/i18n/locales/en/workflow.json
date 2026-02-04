@@ -355,7 +355,11 @@
       "failed": "Failed"
     },
     "taskLabel": "Task {{index}}",
-    "mergeTerminalRole": "Merge Terminal"
+    "mergeTerminalRole": "Merge Terminal",
+    "terminalsCount": "{{count}} terminals",
+    "terminalsCount_one": "{{count}} terminal",
+    "slashCommands": "Slash Commands:",
+    "hint": "Click on a terminal to view details"
   },
   "terminalCard": {
     "orderLabel": "T{{index}}",

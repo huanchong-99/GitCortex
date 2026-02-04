@@ -355,7 +355,11 @@
       "failed": "失败"
     },
     "taskLabel": "任务 {{index}}",
-    "mergeTerminalRole": "合并终端"
+    "mergeTerminalRole": "合并终端",
+    "terminalsCount": "{{count}} 个终端",
+    "terminalsCount_one": "{{count}} 个终端",
+    "slashCommands": "斜杠命令：",
+    "hint": "点击终端查看详情"
   },
   "terminalCard": {
     "orderLabel": "T{{index}}",
