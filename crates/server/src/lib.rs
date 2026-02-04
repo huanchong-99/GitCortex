@@ -17,6 +17,9 @@ pub mod routes;
 #[cfg(test)]
 pub mod tests;
 
+// Re-export Deployment trait for tests
+pub use deployment::Deployment;
+
 // #[cfg(feature = "cloud")]
 // type DeploymentImpl = gitcortex_cloud::deployment::CloudDeployment;
 // #[cfg(not(feature = "cloud"))]

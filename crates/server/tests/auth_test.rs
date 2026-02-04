@@ -13,14 +13,16 @@ use axum::{
     http::{header, Request, StatusCode},
 };
 use once_cell::sync::Lazy;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use tower::ServiceExt;
 
+use server::Deployment;
 use server::routes::router;
 use server::routes::subscription_hub::SubscriptionHub;
 use server::DeploymentImpl;
 
-/// Mutex to serialize environment variable access across tests
+/// Mutex to serialize environment variable access across tests.
+/// This ensures tests that modify environment variables run sequentially.
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 /// Helper: Create a test subscription hub
@@ -28,33 +30,41 @@ fn create_test_hub() -> server::routes::SharedSubscriptionHub {
     Arc::new(SubscriptionHub::default())
 }
 
-/// RAII guard for managing environment variables during tests
+/// RAII guard for managing environment variables during tests.
+///
+/// IMPORTANT: The MutexGuard is held for the entire lifetime of this struct,
+/// ensuring that concurrent tests cannot interfere with each other's
+/// environment variable modifications.
 struct EnvVarGuard {
     key: &'static str,
     prev: Option<String>,
+    /// Holds the lock for the entire test duration to prevent concurrent env var access
+    _lock: MutexGuard<'static, ()>,
 }
 
 impl EnvVarGuard {
-    /// Set an environment variable to a value
+    /// Set an environment variable to a value.
+    /// The lock is held until this guard is dropped.
     fn set(key: &'static str, value: &str) -> Self {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let lock = ENV_LOCK.lock().unwrap();
         let prev = std::env::var(key).ok();
         unsafe { std::env::set_var(key, value) };
-        Self { key, prev }
+        Self { key, prev, _lock: lock }
     }
 
-    /// Unset an environment variable
+    /// Unset an environment variable.
+    /// The lock is held until this guard is dropped.
     fn unset(key: &'static str) -> Self {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let lock = ENV_LOCK.lock().unwrap();
         let prev = std::env::var(key).ok();
         unsafe { std::env::remove_var(key) };
-        Self { key, prev }
+        Self { key, prev, _lock: lock }
     }
 }
 
 impl Drop for EnvVarGuard {
     fn drop(&mut self) {
-        let _lock = ENV_LOCK.lock().unwrap();
+        // Lock is already held via _lock field, no need to acquire again
         match &self.prev {
             Some(value) => unsafe { std::env::set_var(self.key, value) },
             None => unsafe { std::env::remove_var(self.key) },
