@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { WorkflowSidebar } from './WorkflowSidebar';
 
 vi.mock('@/hooks/useProjects', () => ({
@@ -12,6 +13,10 @@ vi.mock('@/hooks/useWorkflows', () => ({
 
 import { useProjects } from '@/hooks/useProjects';
 import { useWorkflows } from '@/hooks/useWorkflows';
+
+const renderWithRouter = (ui: React.ReactElement) => {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+};
 
 describe('WorkflowSidebar', () => {
   it('renders workflows list', () => {
@@ -41,7 +46,7 @@ describe('WorkflowSidebar', () => {
       error: null,
     } as any);
 
-    render(
+    renderWithRouter(
       <WorkflowSidebar
         selectedWorkflowId={null}
         onSelectWorkflow={() => {}}
@@ -66,7 +71,7 @@ describe('WorkflowSidebar', () => {
       error: null,
     } as any);
 
-    render(
+    renderWithRouter(
       <WorkflowSidebar
         selectedWorkflowId={null}
         onSelectWorkflow={() => {}}

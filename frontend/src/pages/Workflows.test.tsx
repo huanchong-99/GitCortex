@@ -1,11 +1,21 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workflows } from './Workflows';
 import type { WorkflowListItemDto } from 'shared/types';
 import { I18nextProvider } from 'react-i18next';
-import { i18n } from '@/test/renderWithI18n';
+import { i18n, setTestLanguage } from '@/test/renderWithI18n';
+import { ToastProvider } from '@/components/ui/toast';
+
+// Mock useProjects hook to avoid WebSocket connection in tests
+vi.mock('@/hooks/useProjects', () => ({
+  useProjects: () => ({
+    projects: [{ id: 'proj-1', name: 'Test Project', path: '/test' }],
+    isLoading: false,
+    error: null,
+  }),
+}));
 
 // ============================================================================
 // Test Utilities
@@ -25,13 +35,15 @@ const createMockQueryClient = () =>
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <I18nextProvider i18n={i18n}>
-    <QueryClientProvider client={createMockQueryClient()}>
-      <MemoryRouter initialEntries={['/projects/proj-1/workflows']}>
-        <Routes>
-          <Route path="/projects/:projectId/workflows" element={children} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>
+    <ToastProvider>
+      <QueryClientProvider client={createMockQueryClient()}>
+        <MemoryRouter initialEntries={['/projects/proj-1/workflows']}>
+          <Routes>
+            <Route path="/projects/:projectId/workflows" element={children} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </ToastProvider>
   </I18nextProvider>
 );
 
@@ -77,8 +89,13 @@ const mockWorkflows: WorkflowListItemDto[] = [
 // ============================================================================
 
 describe('Workflows Page', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await setTestLanguage('en');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('List Rendering', () => {
