@@ -30,7 +30,7 @@ export function Board() {
           </div>
         </div>
         <TerminalActivityPanel workflowId={selectedWorkflowId} />
-        <StatusBar />
+        <StatusBar workflowId={selectedWorkflowId} />
       </main>
     </div>
   );
