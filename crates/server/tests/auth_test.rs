@@ -12,7 +12,6 @@ use axum::{
     body::Body,
     http::{header, Request, StatusCode},
 };
-use deployment::Deployment;
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
@@ -28,9 +27,6 @@ static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 fn create_test_hub() -> server::routes::SharedSubscriptionHub {
     Arc::new(SubscriptionHub::default())
 }
-
-/// Mutex to serialize environment variable access across tests
-static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 /// RAII guard for managing environment variables during tests
 struct EnvVarGuard {

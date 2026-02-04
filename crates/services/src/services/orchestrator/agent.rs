@@ -180,7 +180,24 @@ impl OrchestratorAgent {
         };
 
         // Update task status based on completion/failure
-        if task_failed && task_completed {
+        // Fail fast: if terminal failed, mark task as failed immediately to avoid stalled tasks
+        if !success {
+            // Terminal failed - mark task as failed immediately
+            if let Err(e) = db::models::WorkflowTask::update_status(
+                &self.db.pool,
+                &event.task_id,
+                "failed",
+            )
+            .await
+            {
+                tracing::error!("Failed to mark task {} failed: {}", event.task_id, e);
+            }
+            tracing::warn!(
+                "Task {} marked as failed due to terminal {} failure",
+                event.task_id,
+                event.terminal_id
+            );
+        } else if task_failed && task_completed {
             // Task has failures and all terminals are done - mark as failed
             if let Err(e) = db::models::WorkflowTask::update_status(
                 &self.db.pool,
@@ -290,12 +307,6 @@ impl OrchestratorAgent {
             }
         }
 
-        // Mark commit as processed
-        {
-            let mut state = self.state.write().await;
-            state.processed_commits.insert(commit_hash.to_string());
-        }
-
         // 1. Try to parse commit metadata
         let metadata = match crate::services::git_watcher::parse_commit_metadata(message) {
             Ok(m) => m,
@@ -305,6 +316,11 @@ impl OrchestratorAgent {
                     "Commit {} has no METADATA, waking orchestrator for decision",
                     commit_hash
                 );
+                // Mark commit as processed to avoid repeated wake-ups
+                {
+                    let mut state = self.state.write().await;
+                    state.processed_commits.insert(commit_hash.to_string());
+                }
                 self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message).await?;
                 return Ok(());
             }
@@ -316,7 +332,14 @@ impl OrchestratorAgent {
                 "Workflow ID mismatch: expected {}, got {}",
                 workflow_id, metadata.workflow_id
             );
+            // Don't mark as processed - another workflow may need this commit
             return Ok(());
+        }
+
+        // Mark commit as processed after validation
+        {
+            let mut state = self.state.write().await;
+            state.processed_commits.insert(commit_hash.to_string());
         }
 
         // 3. Route to handler based on status
