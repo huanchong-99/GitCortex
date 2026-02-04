@@ -11,11 +11,14 @@ use axum::{
 };
 use db::models::{
     CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
-    Workflow, WorkflowCommand, WorkflowTask,
+    Workflow, WorkflowCommand, WorkflowTask, project::Project,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::orchestrator::TerminalCoordinator;
+use services::services::terminal::TerminalLauncher;
+use services::services::cc_switch::CCSwitchService;
+use std::path::PathBuf;
 use serde_json::json;
 use utils::response::ApiResponse;
 use utils::text;
@@ -659,9 +662,9 @@ async fn prepare_workflow(
     // Note: Model configuration is now handled at spawn time via environment variable injection,
     // not by the coordinator. This provides process-level isolation for concurrent workflows.
     let db_arc = Arc::new(deployment.db().clone());
-    let coordinator = TerminalCoordinator::new(db_arc);
+    let coordinator = TerminalCoordinator::new(db_arc.clone());
 
-    // Start terminals using TerminalCoordinator (serial model switching)
+    // Step 1: Transition terminals to "waiting" status using TerminalCoordinator
     if let Err(e) = coordinator.start_terminals_for_workflow(&workflow_id).await {
         // Log the error for debugging
         tracing::error!(
@@ -684,6 +687,65 @@ async fn prepare_workflow(
             "Failed to prepare workflow terminals: {e}"
         )));
     }
+
+    // Step 2: Get working directory from project
+    let project = Project::find_by_id(&deployment.db().pool, workflow.project_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Project not found".to_string()))?;
+
+    let working_dir = project
+        .default_agent_working_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    // Step 3: Launch PTY processes for all terminals
+    let cc_switch = Arc::new(CCSwitchService::new(db_arc.clone()));
+    let process_manager = deployment.process_manager().clone();
+    let launcher = TerminalLauncher::new(db_arc, cc_switch, process_manager, working_dir);
+
+    let launch_results = launcher.launch_all(&workflow_id).await.map_err(|e| {
+        tracing::error!(
+            workflow_id = %workflow_id,
+            error = %e,
+            "Failed to launch workflow terminals"
+        );
+        ApiError::Internal(format!("Failed to launch workflow terminals: {e}"))
+    })?;
+
+    // Check if any terminal failed to launch
+    // Extract error info before any await to avoid Send issues with LaunchResult
+    let failed_error_msgs: Vec<String> = launch_results
+        .iter()
+        .filter(|r| !r.success)
+        .map(|r| format!("{}: {}", r.terminal_id, r.error.as_deref().unwrap_or("unknown")))
+        .collect();
+
+    let launched_count = launch_results.len();
+    drop(launch_results); // Release non-Send types before await
+
+    if !failed_error_msgs.is_empty() {
+        tracing::error!(
+            workflow_id = %workflow_id,
+            failed_count = failed_error_msgs.len(),
+            errors = ?failed_error_msgs,
+            "Some terminals failed to launch"
+        );
+
+        // Roll back workflow status to "failed"
+        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+
+        return Err(ApiError::Internal(format!(
+            "Failed to launch terminals: {}",
+            failed_error_msgs.join(", ")
+        )));
+    }
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        launched_count = launched_count,
+        "All terminals launched successfully"
+    );
 
     // All terminals prepared successfully, mark workflow as ready
     if let Err(e) = Workflow::set_ready(&deployment.db().pool, &workflow_id).await {
