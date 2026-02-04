@@ -782,10 +782,17 @@ impl OrchestratorAgent {
         let pty_session_id = match terminal.pty_session_id.as_deref() {
             Some(id) => id.to_string(),
             None => {
-                tracing::error!(
+                let error_msg = format!(
                     "Terminal {} has no PTY session, marking as failed",
                     terminal.id
                 );
+                tracing::error!("{}", error_msg);
+
+                // Get workflow_id for broadcasting
+                let workflow_id = {
+                    let state = self.state.read().await;
+                    state.workflow_id.clone()
+                };
 
                 // Mark terminal as failed
                 let _ = db::models::Terminal::update_status(
@@ -795,6 +802,19 @@ impl OrchestratorAgent {
                 )
                 .await;
 
+                // Broadcast terminal status update
+                let _ = self
+                    .message_bus
+                    .publish(
+                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                        BusMessage::TerminalStatusUpdate {
+                            workflow_id: workflow_id.clone(),
+                            terminal_id: terminal.id.clone(),
+                            status: TERMINAL_STATUS_FAILED.to_string(),
+                        },
+                    )
+                    .await;
+
                 // Mark task as failed
                 let _ = db::models::WorkflowTask::update_status(
                     &self.db.pool,
@@ -802,6 +822,31 @@ impl OrchestratorAgent {
                     "failed",
                 )
                 .await;
+
+                // Broadcast task status update
+                let _ = self
+                    .message_bus
+                    .publish(
+                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                        BusMessage::TaskStatusUpdate {
+                            workflow_id: workflow_id.clone(),
+                            task_id: task_id.to_string(),
+                            status: "failed".to_string(),
+                        },
+                    )
+                    .await;
+
+                // Broadcast error event for UI notification
+                let _ = self
+                    .message_bus
+                    .publish(
+                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                        BusMessage::Error {
+                            workflow_id,
+                            error: error_msg.clone(),
+                        },
+                    )
+                    .await;
 
                 return Err(anyhow::anyhow!(
                     "Terminal {} has no PTY session",
