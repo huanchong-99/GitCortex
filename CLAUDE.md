@@ -1,4 +1,8 @@
 AGENTS.md
+## 修改文件的核心原则
+
+禁止修改C:\Users\Administrator文件夹下的一切内容
+
 ## 创建git-worktrees的核心原则
 
 使用using-git-worktrees创建隔离工作区必须把CLAUDE.md的全部内容复制过去
