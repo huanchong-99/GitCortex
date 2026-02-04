@@ -183,6 +183,7 @@
     "terminalCount": "This task has {{count}} terminals",
     "cliStatusTitle": "CLI installation status",
     "loadingCli": "Detecting CLI installation status...",
+    "refreshCli": "Refresh",
     "installGuide": "Install guide",
     "terminalLabel": "Terminal {{index}}",
     "cliTypeLabel": "CLI type",

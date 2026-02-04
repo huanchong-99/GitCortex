@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Check, X, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Check, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import { ErrorAlert } from '../../ui-new/primitives/ErrorAlert';
 import { cn } from '@/lib/utils';
@@ -69,6 +69,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [cliTypes, setCliTypes] = useState<CliType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter to only installed CLI types
   const availableCliTypes = cliTypes.filter((ct) => ct.installed);
@@ -104,32 +105,41 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   }, [currentTask, config.terminals, onUpdate]);
 
   // Detect CLI installation status from API
-  useEffect(() => {
-    const detectCliTypes = async () => {
+  const detectCliTypes = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsRefreshing(true);
+    } else {
       setIsLoading(true);
-      try {
-        const response = await fetch('/api/cli_types/detect');
-        const data = await parseJson(response);
-        if (response.ok && isCliDetectResponseArray(data)) {
-          // Convert API response to CliType array
-          const cliList: CliType[] = data.map((item) => ({
-            id: item.cliTypeId,
-            name: item.name,
-            displayName: item.displayName,
-            installed: item.installed,
-            installGuideUrl: item.installGuideUrl,
-          }));
-          setCliTypes(cliList);
-        }
-      } catch (error) {
-        notifyError(error, 'detectCliTypes');
-      } finally {
-        setIsLoading(false);
+    }
+    try {
+      const response = await fetch('/api/cli_types/detect');
+      const data = await parseJson(response);
+      if (response.ok && isCliDetectResponseArray(data)) {
+        // Convert API response to CliType array
+        const cliList: CliType[] = data.map((item) => ({
+          id: item.cliTypeId,
+          name: item.name,
+          displayName: item.displayName,
+          installed: item.installed,
+          installGuideUrl: item.installGuideUrl,
+        }));
+        setCliTypes(cliList);
       }
-    };
-
-    void detectCliTypes();
+    } catch (error) {
+      notifyError(error, 'detectCliTypes');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, [notifyError]);
+
+  useEffect(() => {
+    void detectCliTypes();
+  }, [detectCliTypes]);
+
+  const handleRefreshCli = () => {
+    void detectCliTypes(true);
+  };
 
   const updateTerminal = (terminalId: string, updates: Partial<TerminalConfig>) => {
     const newTerminals = config.terminals.map((t) =>
@@ -228,7 +238,23 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
 
       {/* CLI Installation Status */}
       <div className="bg-secondary border rounded-sm p-base">
-        <div className="text-base text-high font-medium mb-base">{t('step4.cliStatusTitle')}</div>
+        <div className="flex items-center justify-between mb-base">
+          <div className="text-base text-high font-medium">{t('step4.cliStatusTitle')}</div>
+          <button
+            type="button"
+            onClick={handleRefreshCli}
+            disabled={isRefreshing}
+            className={cn(
+              'flex items-center gap-half px-base py-half rounded-sm border text-sm',
+              'transition-colors hover:border-brand hover:text-high',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              'border-border text-low bg-panel'
+            )}
+          >
+            <RefreshCw className={cn('size-icon-sm', isRefreshing && 'animate-spin')} />
+            {t('step4.refreshCli', { defaultValue: 'Refresh' })}
+          </button>
+        </div>
         {isLoading ? (
           <div className="text-base text-low">{t('step4.loadingCli')}</div>
         ) : (

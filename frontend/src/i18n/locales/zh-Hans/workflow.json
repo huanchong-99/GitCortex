@@ -183,6 +183,7 @@
     "terminalCount": "此任务有 {{count}} 个串行终端",
     "cliStatusTitle": "CLI 安装状态",
     "loadingCli": "正在检测 CLI 安装状态...",
+    "refreshCli": "刷新",
     "installGuide": "安装指南",
     "terminalLabel": "终端 {{index}}",
     "cliTypeLabel": "CLI 类型",
