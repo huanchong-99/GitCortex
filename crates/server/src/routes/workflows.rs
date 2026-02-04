@@ -15,10 +15,7 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
-use services::services::{
-    cc_switch::CCSwitchService,
-    orchestrator::TerminalCoordinator,
-};
+use services::services::orchestrator::TerminalCoordinator;
 use serde_json::json;
 use utils::response::ApiResponse;
 use utils::text;
@@ -659,9 +656,10 @@ async fn prepare_workflow(
     Workflow::update_status(&deployment.db().pool, &workflow_id, "starting").await?;
 
     // Create services for terminal coordination
+    // Note: Model configuration is now handled at spawn time via environment variable injection,
+    // not by the coordinator. This provides process-level isolation for concurrent workflows.
     let db_arc = Arc::new(deployment.db().clone());
-    let cc_switch = Arc::new(CCSwitchService::new(Arc::clone(&db_arc)));
-    let coordinator = TerminalCoordinator::new(db_arc, cc_switch);
+    let coordinator = TerminalCoordinator::new(db_arc);
 
     // Start terminals using TerminalCoordinator (serial model switching)
     if let Err(e) = coordinator.start_terminals_for_workflow(&workflow_id).await {

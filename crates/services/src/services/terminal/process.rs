@@ -6,7 +6,7 @@
 use std::{
     collections::HashMap,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -24,6 +24,99 @@ pub const DEFAULT_COLS: u16 = 80;
 
 /// Default terminal rows
 pub const DEFAULT_ROWS: u16 = 24;
+
+// ============================================================================
+// Spawn Configuration (Process Isolation)
+// ============================================================================
+
+/// Environment variable configuration for process-level isolation.
+///
+/// Supports both setting new environment variables and removing inherited ones
+/// to prevent parent process pollution.
+#[derive(Debug, Clone, Default)]
+pub struct SpawnEnv {
+    /// Environment variables to set on the child process.
+    pub set: HashMap<String, String>,
+    /// Environment variable keys to remove from the inherited environment.
+    /// Use this to prevent parent process environment from leaking into child.
+    pub unset: Vec<String>,
+}
+
+impl SpawnEnv {
+    /// Creates a new empty SpawnEnv.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds an environment variable to set.
+    pub fn with_var(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.set.insert(key.into(), value.into());
+        self
+    }
+
+    /// Adds an environment variable key to unset (remove from inherited env).
+    pub fn with_unset(mut self, key: impl Into<String>) -> Self {
+        self.unset.push(key.into());
+        self
+    }
+
+    /// Checks if an environment variable key contains sensitive information.
+    /// Used for log redaction.
+    pub fn is_sensitive_key(key: &str) -> bool {
+        let key_upper = key.to_ascii_uppercase();
+        key_upper.contains("KEY")
+            || key_upper.contains("TOKEN")
+            || key_upper.contains("SECRET")
+            || key_upper.contains("PASSWORD")
+            || key_upper.contains("CREDENTIAL")
+    }
+}
+
+/// Command configuration for spawning terminal processes.
+///
+/// Encapsulates all information needed to spawn a process with proper isolation:
+/// command, arguments, working directory, and environment configuration.
+#[derive(Debug, Clone)]
+pub struct SpawnCommand {
+    /// Command to execute (e.g., "claude", "codex", "gemini").
+    pub command: String,
+    /// Command-line arguments.
+    pub args: Vec<String>,
+    /// Working directory for the child process.
+    pub working_dir: PathBuf,
+    /// Environment variable configuration for process isolation.
+    pub env: SpawnEnv,
+}
+
+impl SpawnCommand {
+    /// Creates a new SpawnCommand with the given command and working directory.
+    pub fn new(command: impl Into<String>, working_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            command: command.into(),
+            args: Vec::new(),
+            working_dir: working_dir.into(),
+            env: SpawnEnv::default(),
+        }
+    }
+
+    /// Adds a command-line argument.
+    pub fn with_arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    /// Adds multiple command-line arguments.
+    pub fn with_args(mut self, args: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.args.extend(args.into_iter().map(Into::into));
+        self
+    }
+
+    /// Sets the environment configuration.
+    pub fn with_env(mut self, env: SpawnEnv) -> Self {
+        self.env = env;
+        self
+    }
+}
 
 // ============================================================================
 // Process Handle Types
@@ -93,6 +186,42 @@ struct TrackedProcess {
     master: Mutex<Box<dyn MasterPty + Send>>,
     /// Shared PTY writer (initialized on first get_handle call, then reused for reconnections)
     shared_writer: Option<Arc<Mutex<PtyWriter>>>,
+    /// Isolated CODEX_HOME path (for Codex terminals, cleaned up on exit)
+    codex_home: Option<PathBuf>,
+}
+
+// ============================================================================
+// CODEX_HOME Cleanup Guard (RAII)
+// ============================================================================
+
+/// Guard that ensures CODEX_HOME directories are cleaned up on early spawn failures.
+/// Uses RAII pattern to guarantee cleanup even if spawn_pty_with_config returns early.
+struct CodexHomeGuard {
+    terminal_id: String,
+    path: Option<PathBuf>,
+}
+
+impl CodexHomeGuard {
+    fn new(terminal_id: &str, path: Option<PathBuf>) -> Self {
+        Self {
+            terminal_id: terminal_id.to_string(),
+            path,
+        }
+    }
+
+    /// Disarm the guard after successful process tracking.
+    /// The CODEX_HOME will be cleaned up by TrackedProcess instead.
+    fn disarm(&mut self) {
+        self.path = None;
+    }
+}
+
+impl Drop for CodexHomeGuard {
+    fn drop(&mut self) {
+        if let Some(path) = self.path.take() {
+            ProcessManager::cleanup_codex_home(&self.terminal_id, &path);
+        }
+    }
 }
 
 // ============================================================================
@@ -110,6 +239,251 @@ impl ProcessManager {
         Self {
             processes: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    /// Cleans up CODEX_HOME temporary directory for a terminated Codex terminal.
+    ///
+    /// Safety: Only removes directories under the gitcortex temp directory to prevent
+    /// accidental deletion of user data.
+    fn cleanup_codex_home(terminal_id: &str, codex_home: &Path) {
+        if codex_home.as_os_str().is_empty() {
+            return;
+        }
+
+        // Safety check: only clean up directories under our temp directory
+        let base_dir = std::env::temp_dir().join("gitcortex");
+        if !codex_home.starts_with(&base_dir) {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                codex_home = %codex_home.display(),
+                "Skipping CODEX_HOME cleanup: path is outside temp directory"
+            );
+            return;
+        }
+
+        match std::fs::remove_dir_all(codex_home) {
+            Ok(()) => {
+                tracing::info!(
+                    terminal_id = %terminal_id,
+                    codex_home = %codex_home.display(),
+                    "Cleaned up CODEX_HOME directory"
+                );
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    codex_home = %codex_home.display(),
+                    "CODEX_HOME directory already removed"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    codex_home = %codex_home.display(),
+                    error = %e,
+                    "Failed to clean up CODEX_HOME directory"
+                );
+            }
+        }
+    }
+
+    /// Spawns a new terminal process with PTY using SpawnCommand configuration.
+    ///
+    /// This method provides process-level isolation by:
+    /// 1. Removing inherited environment variables (via `env.unset`)
+    /// 2. Injecting custom environment variables (via `env.set`)
+    /// 3. Passing CLI arguments for runtime configuration
+    ///
+    /// This approach avoids modifying global configuration files, enabling
+    /// multiple workflows to run concurrently without conflicts.
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal_id` - Unique identifier for this terminal session
+    /// * `config` - Spawn configuration including command, args, working dir, and env
+    /// * `cols` - Initial terminal width in columns
+    /// * `rows` - Initial terminal height in rows
+    ///
+    /// # Returns
+    ///
+    /// Returns a `ProcessHandle` containing the PID and session ID.
+    pub async fn spawn_pty_with_config(
+        &self,
+        terminal_id: &str,
+        config: &SpawnCommand,
+        cols: u16,
+        rows: u16,
+    ) -> anyhow::Result<ProcessHandle> {
+        // Capture CODEX_HOME for cleanup on process exit (and on early failures via guard)
+        let codex_home = config
+            .env
+            .set
+            .get("CODEX_HOME")
+            .and_then(|value| {
+                let trimmed = value.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(PathBuf::from(trimmed))
+                }
+            });
+        let mut codex_home_guard = CodexHomeGuard::new(terminal_id, codex_home.clone());
+
+        // Create PTY system
+        let pty_system = native_pty_system();
+
+        // Configure PTY size
+        let size = PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+
+        // Open PTY pair (master + slave)
+        let pair = pty_system
+            .openpty(size)
+            .map_err(|e| anyhow::anyhow!("Failed to open PTY: {e}"))?;
+
+        // Build command
+        // On Windows, use cmd.exe /c to run commands so that .cmd/.bat files are found
+        #[cfg(windows)]
+        let mut cmd = {
+            let mut c = CommandBuilder::new("cmd.exe");
+            c.arg("/c");
+            c.arg(&config.command);
+            for arg in &config.args {
+                c.arg(arg);
+            }
+            c
+        };
+        #[cfg(not(windows))]
+        let mut cmd = {
+            let mut c = CommandBuilder::new(&config.command);
+            for arg in &config.args {
+                c.arg(arg);
+            }
+            c
+        };
+        cmd.cwd(&config.working_dir);
+
+        // Set environment variables for proper terminal behavior
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+
+        // UTF-8 encoding for Unix
+        #[cfg(unix)]
+        {
+            cmd.env("LANG", "C.UTF-8");
+            cmd.env("LC_ALL", "C.UTF-8");
+        }
+
+        // Remove inherited environment variables to prevent parent process pollution
+        // This must be done BEFORE setting new values to ensure clean isolation
+        for key in &config.env.unset {
+            cmd.env_remove(key);
+            tracing::debug!(
+                terminal_id = %terminal_id,
+                key = %key,
+                "Removed inherited env var"
+            );
+        }
+
+        // Inject custom environment variables for process-level isolation
+        for (key, value) in &config.env.set {
+            cmd.env(key, value);
+            // Redact sensitive values in logs
+            if SpawnEnv::is_sensitive_key(key) {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    key = %key,
+                    "Injected env var [REDACTED]"
+                );
+            } else {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    key = %key,
+                    value = %value,
+                    "Injected env var"
+                );
+            }
+        }
+
+        // Capture CODEX_HOME for cleanup on process exit
+        let codex_home = config
+            .env
+            .set
+            .get("CODEX_HOME")
+            .and_then(|value| {
+                let trimmed = value.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(PathBuf::from(trimmed))
+                }
+            });
+
+        // Spawn child process on slave PTY
+        let mut child = pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {e}"))?;
+
+        let pid = child.process_id().unwrap_or(0);
+        let session_id = Uuid::new_v4().to_string();
+
+        // Wait a short time and check if the process is still alive
+        // This catches cases where the command fails immediately (e.g., not found, permission denied)
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return Err(anyhow::anyhow!(
+                    "Terminal process exited immediately with status: {:?}. The CLI may not be installed correctly.",
+                    status
+                ));
+            }
+            Ok(None) => {
+                // Process is still running, good
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Failed to check terminal process status: {e}"
+                ));
+            }
+        }
+
+        // Store tracked process
+        let mut processes = self.processes.write().await;
+        processes.insert(
+            terminal_id.to_string(),
+            TrackedProcess {
+                child,
+                master: Mutex::new(pair.master),
+                shared_writer: None,
+                codex_home,
+            },
+        );
+
+        // Disarm the guard - CODEX_HOME cleanup is now managed by TrackedProcess
+        codex_home_guard.disarm();
+
+        tracing::info!(
+            terminal_id = %terminal_id,
+            pid = pid,
+            command = %config.command,
+            args_count = config.args.len(),
+            env_set_count = config.env.set.len(),
+            env_unset_count = config.env.unset.len(),
+            "PTY process spawned with config successfully"
+        );
+
+        Ok(ProcessHandle {
+            pid,
+            session_id,
+            terminal_id: terminal_id.to_string(),
+            reader: None,
+            writer: None,
+        })
     }
 
     /// Spawns a new terminal process with PTY
@@ -213,6 +587,7 @@ impl ProcessManager {
                 child,
                 master: Mutex::new(pair.master),
                 shared_writer: None,
+                codex_home: None, // Legacy spawn_pty doesn't support CODEX_HOME
             },
         );
 
@@ -277,6 +652,11 @@ impl ProcessManager {
     /// Sends a termination signal to the process with the given PID.
     /// On Unix, sends SIGTERM. On Windows, uses taskkill /F.
     pub fn kill(&self, pid: u32) -> anyhow::Result<()> {
+        // Safety check: PID 0 is invalid and could cause unintended behavior
+        if pid == 0 {
+            return Err(anyhow::anyhow!("Invalid PID 0: cannot kill process with PID 0"));
+        }
+
         #[cfg(unix)]
         {
             use nix::{
@@ -305,9 +685,12 @@ impl ProcessManager {
 
     /// Kill terminal by terminal ID
     pub async fn kill_terminal(&self, terminal_id: &str) -> anyhow::Result<()> {
-        let mut processes = self.processes.write().await;
+        let tracked = {
+            let mut processes = self.processes.write().await;
+            processes.remove(terminal_id)
+        };
 
-        if let Some(mut tracked) = processes.remove(terminal_id) {
+        if let Some(mut tracked) = tracked {
             // Try to kill the child process
             if let Err(e) = tracked.child.kill() {
                 tracing::warn!(
@@ -315,6 +698,11 @@ impl ProcessManager {
                     error = %e,
                     "Failed to kill child process"
                 );
+            }
+
+            // Clean up CODEX_HOME if this was a Codex terminal
+            if let Some(codex_home) = tracked.codex_home.take() {
+                Self::cleanup_codex_home(terminal_id, &codex_home);
             }
 
             tracing::info!(terminal_id = %terminal_id, "Terminal killed");
@@ -338,22 +726,36 @@ impl ProcessManager {
 
     /// Removes dead processes from tracking
     pub async fn cleanup(&self) {
-        let mut processes = self.processes.write().await;
+        let cleanup_targets = {
+            let mut processes = self.processes.write().await;
 
-        // Collect IDs of dead processes
-        let dead_ids: Vec<String> = processes
-            .iter_mut()
-            .filter_map(|(id, tracked)| {
-                match tracked.child.try_wait() {
-                    Ok(Some(_)) => Some(id.clone()), // Process exited
-                    _ => None,                       // Still running or error
+            // Collect IDs of dead processes
+            let dead_ids: Vec<String> = processes
+                .iter_mut()
+                .filter_map(|(id, tracked)| {
+                    match tracked.child.try_wait() {
+                        Ok(Some(_)) => Some(id.clone()), // Process exited
+                        _ => None,                       // Still running or error
+                    }
+                })
+                .collect();
+
+            // Remove dead processes and capture CODEX_HOME for cleanup
+            let mut targets = Vec::new();
+            for id in dead_ids {
+                if let Some(tracked) = processes.remove(&id) {
+                    targets.push((id, tracked.codex_home));
                 }
-            })
-            .collect();
+            }
 
-        // Remove dead processes
-        for id in dead_ids {
-            processes.remove(&id);
+            targets
+        };
+
+        // Clean up CODEX_HOME directories outside the lock
+        for (id, codex_home) in cleanup_targets {
+            if let Some(path) = codex_home {
+                Self::cleanup_codex_home(&id, &path);
+            }
             tracing::debug!(terminal_id = %id, "Removed dead process from tracking");
         }
     }

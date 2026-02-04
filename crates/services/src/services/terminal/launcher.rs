@@ -84,9 +84,8 @@ impl TerminalLauncher {
         for terminal in terminals {
             let result = self.launch_terminal(&terminal).await;
             results.push(result);
-
-            // Brief delay to ensure environment variable switching takes effect
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            // No delay needed - environment variable injection is immediate
+            // (removed 500ms delay that was required for global config file switching)
         }
 
         Ok(results)
@@ -102,18 +101,7 @@ impl TerminalLauncher {
     pub async fn launch_terminal(&self, terminal: &Terminal) -> LaunchResult {
         let terminal_id = terminal.id.clone();
 
-        // 1. Switch model configuration
-        if let Err(e) = self.cc_switch.switch_for_terminal(terminal).await {
-            tracing::error!("Failed to switch model for terminal {}: {}", terminal_id, e);
-            return LaunchResult {
-                terminal_id,
-                process_handle: None,
-                success: false,
-                error: Some(format!("Model switch failed: {e}")),
-            };
-        }
-
-        // 2. Get CLI type information
+        // 1. Get CLI type information
         let cli_type =
             match cli_type::CliType::find_by_id(&self.db.pool, &terminal.cli_type_id).await {
                 Ok(Some(cli)) => cli,
@@ -135,7 +123,7 @@ impl TerminalLauncher {
                 }
             };
 
-        // 3. Create Session for execution context tracking
+        // 2. Create Session for execution context tracking
         // Get workflow task to find associated workspace
         let workspace_id = match self.get_workspace_for_terminal(&terminal.workflow_task_id).await {
             Ok(Some(id)) => Some(id),
@@ -211,13 +199,35 @@ impl TerminalLauncher {
             (None, None)
         };
 
-        // 4. Get CLI command for the terminal
+        // 3. Get CLI command for the terminal
         let cli_command = self.get_cli_command(&cli_type.name);
 
-        // 5. Spawn PTY process
+        // 4. Build spawn configuration (process-level isolation, no global config changes)
+        let spawn_config = match self
+            .cc_switch
+            .build_launch_config(terminal, &cli_command, &self.working_dir)
+            .await
+        {
+            Ok(config) => config,
+            Err(e) => {
+                tracing::error!(
+                    terminal_id = %terminal_id,
+                    error = %e,
+                    "Failed to build launch config for terminal"
+                );
+                return LaunchResult {
+                    terminal_id,
+                    process_handle: None,
+                    success: false,
+                    error: Some(format!("Config build failed: {e}")),
+                };
+            }
+        };
+
+        // 5. Spawn PTY process with environment variable injection
         match self
             .process_manager
-            .spawn_pty(&terminal_id, &cli_command, &self.working_dir, DEFAULT_COLS, DEFAULT_ROWS)
+            .spawn_pty_with_config(&terminal_id, &spawn_config, DEFAULT_COLS, DEFAULT_ROWS)
             .await
         {
             Ok(handle) => {

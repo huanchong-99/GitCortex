@@ -1,15 +1,14 @@
 //! Terminal Coordinator Tests
 //!
-//! Test terminal startup sequence with serial model switching.
+//! Test terminal preparation sequence with status transitions.
+//! Note: Model configuration is now handled at spawn time via environment variables,
+//! not by the coordinator.
 
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::Utc;
-use tokio::sync::Mutex;
-use async_trait::async_trait;
 use sqlx::sqlite::SqlitePoolOptions;
 
-use crate::services::cc_switch::CCSwitch;
 use crate::services::orchestrator::TerminalCoordinator;
 use db::{
     DBService,
@@ -249,56 +248,12 @@ async fn create_workflow_with_terminals(
     (workflow_id, terminal_ids)
 }
 
-// Mock CCSwitch implementation for testing
-struct MockCCSwitch {
-    switch_calls: Arc<Mutex<Vec<SwitchCall>>>,
-}
-
-#[derive(Debug, Clone)]
-struct SwitchCall {
-    terminal_id: String,
-    cli_type_id: String,
-    model_config_id: String,
-}
-
-#[async_trait]
-impl CCSwitch for MockCCSwitch {
-    async fn switch_for_terminal(
-        &self,
-        terminal: &Terminal,
-    ) -> anyhow::Result<()> {
-        let mut calls = self.switch_calls.lock().await;
-        calls.push(SwitchCall {
-            terminal_id: terminal.id.clone(),
-            cli_type_id: terminal.cli_type_id.clone(),
-            model_config_id: terminal.model_config_id.clone(),
-        });
-        Ok(())
-    }
-}
-
-impl MockCCSwitch {
-    fn new() -> Self {
-        Self {
-            switch_calls: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    async fn get_switch_calls(&self) -> Vec<SwitchCall> {
-        self.switch_calls.lock().await.clone()
-    }
-
-    async fn call_count(&self) -> usize {
-        self.switch_calls.lock().await.len()
-    }
-}
-
 #[tokio::test]
 async fn test_terminal_startup_sequence_succeeds() {
     let db = setup_test_db().await;
-    let mock_cc_switch = Arc::new(MockCCSwitch::new());
 
-    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()), mock_cc_switch.clone());
+    // No longer need MockCCSwitch - config is applied at spawn time
+    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()));
 
     // Create workflow with 2 tasks, each with 2 terminals
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 2, 2).await;
@@ -307,10 +262,7 @@ async fn test_terminal_startup_sequence_succeeds() {
     let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
-    assert!(result.is_ok(), "Terminal startup should succeed with mock service");
-
-    // Verify all terminals were switched
-    assert_eq!(mock_cc_switch.call_count().await, 4, "Should switch 4 terminals");
+    assert!(result.is_ok(), "Terminal startup should succeed");
 
     // Verify terminals are in "waiting" status
     for terminal_id in terminal_ids {
@@ -323,11 +275,10 @@ async fn test_terminal_startup_sequence_succeeds() {
 }
 
 #[tokio::test]
-async fn test_terminal_startup_switches_models_serially() {
+async fn test_terminal_startup_updates_all_terminals() {
     let db = setup_test_db().await;
-    let mock_cc_switch = Arc::new(MockCCSwitch::new());
 
-    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()), mock_cc_switch.clone());
+    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()));
 
     // Create workflow with 2 tasks, each with 2 terminals (4 terminals total)
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 2, 2).await;
@@ -338,27 +289,20 @@ async fn test_terminal_startup_switches_models_serially() {
     // Should succeed
     assert!(result.is_ok(), "Terminal startup should succeed");
 
-    // Verify switches were called
-    let calls = mock_cc_switch.get_switch_calls().await;
-    assert_eq!(calls.len(), 4, "Should have 4 switch calls");
-
-    // Verify switches were called in order (serial execution)
-    for (i, terminal_id) in terminal_ids.iter().enumerate() {
-        assert_eq!(
-            &calls[i].terminal_id,
-            terminal_id,
-            "Switch call {} should be for terminal {}",
-            i,
-            terminal_id
-        );
+    // Verify all terminals are in "waiting" status
+    for terminal_id in terminal_ids {
+        let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+            .await
+            .expect("Failed to query terminal")
+            .expect("Terminal not found");
+        assert_eq!(terminal.status, "waiting", "Terminal should be in waiting status");
     }
 }
 
 #[tokio::test]
 async fn test_empty_workflow_no_terminals() {
     let db = setup_test_db().await;
-    let mock_cc_switch = Arc::new(MockCCSwitch::new());
-    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()), mock_cc_switch);
+    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()));
 
     // Create workflow with no tasks
     let workflow_id = Uuid::new_v4().to_string();
@@ -425,9 +369,8 @@ async fn test_empty_workflow_no_terminals() {
 #[tokio::test]
 async fn test_single_terminal_startup() {
     let db = setup_test_db().await;
-    let mock_cc_switch = Arc::new(MockCCSwitch::new());
 
-    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()), mock_cc_switch.clone());
+    let coordinator = TerminalCoordinator::new(Arc::new(db.clone()));
 
     // Create workflow with 1 task with 1 terminal
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 1, 1).await;
@@ -437,9 +380,6 @@ async fn test_single_terminal_startup() {
 
     // Should succeed
     assert!(result.is_ok(), "Single terminal startup should succeed");
-
-    // Verify exactly one switch call
-    assert_eq!(mock_cc_switch.call_count().await, 1, "Should switch 1 terminal");
 
     // Verify terminal is in "waiting" status
     let terminal = Terminal::find_by_id(&db.pool, &terminal_ids[0])
