@@ -266,6 +266,9 @@ impl OrchestratorAgent {
     }
 
     /// Handles Git events emitted by the watcher.
+    ///
+    /// For commits with METADATA: routes to appropriate handler based on status.
+    /// For commits without METADATA: wakes up orchestrator for decision making.
     pub async fn handle_git_event(
         &self,
         workflow_id: &str,
@@ -278,8 +281,34 @@ impl OrchestratorAgent {
             commit_hash, branch, message
         );
 
-        // 1. Parse commit metadata
-        let metadata = crate::services::git_watcher::parse_commit_metadata(message)?;
+        // Check if this commit was already processed (idempotency)
+        {
+            let state = self.state.read().await;
+            if state.processed_commits.contains(commit_hash) {
+                tracing::debug!("Commit {} already processed, skipping", commit_hash);
+                return Ok(());
+            }
+        }
+
+        // Mark commit as processed
+        {
+            let mut state = self.state.write().await;
+            state.processed_commits.insert(commit_hash.to_string());
+        }
+
+        // 1. Try to parse commit metadata
+        let metadata = match crate::services::git_watcher::parse_commit_metadata(message) {
+            Ok(m) => m,
+            Err(_) => {
+                // No METADATA - wake up orchestrator for decision
+                tracing::info!(
+                    "Commit {} has no METADATA, waking orchestrator for decision",
+                    commit_hash
+                );
+                self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message).await?;
+                return Ok(());
+            }
+        };
 
         // 2. Validate workflow_id matches
         if metadata.workflow_id != workflow_id {
@@ -326,6 +355,38 @@ impl OrchestratorAgent {
                 tracing::warn!("Unknown status in commit: {}", metadata.status);
             }
         }
+
+        Ok(())
+    }
+
+    /// Handle git event without METADATA - wake up orchestrator for decision.
+    async fn handle_git_event_no_metadata(
+        &self,
+        workflow_id: &str,
+        commit_hash: &str,
+        branch: &str,
+        message: &str,
+    ) -> anyhow::Result<()> {
+        // Add to conversation history for context
+        {
+            let mut state = self.state.write().await;
+            state.add_message(
+                "system",
+                &format!(
+                    "Git commit detected on branch '{}': {} - {}",
+                    branch, &commit_hash[..8.min(commit_hash.len())], message
+                ),
+                &self.config,
+            );
+        }
+
+        // Wake up orchestrator to decide next action
+        self.awaken().await;
+
+        tracing::info!(
+            "Orchestrator awakened for commit {} on workflow {}",
+            commit_hash, workflow_id
+        );
 
         Ok(())
     }

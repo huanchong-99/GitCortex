@@ -46,6 +46,7 @@ pub enum BusMessage {
 }
 
 /// In-memory pub/sub bus for workflow and terminal events.
+#[derive(Clone)]
 pub struct MessageBus {
     broadcast_tx: broadcast::Sender<BusMessage>,
     subscribers: Arc<RwLock<HashMap<String, Vec<mpsc::Sender<BusMessage>>>>>,
@@ -105,6 +106,29 @@ impl MessageBus {
         let _ = self.publish(&topic, BusMessage::TerminalCompleted(event.clone()))
             .await;
         let _ = self.broadcast(BusMessage::TerminalCompleted(event));
+    }
+
+    /// Publishes a git event to workflow topic and broadcast channel.
+    ///
+    /// This is called when a new commit is detected in the repository.
+    /// For commits without METADATA, this triggers the orchestrator to wake up
+    /// and make a decision about the next action.
+    pub async fn publish_git_event(
+        &self,
+        workflow_id: &str,
+        commit_hash: &str,
+        branch: &str,
+        message: &str,
+    ) {
+        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
+        let event = BusMessage::GitEvent {
+            workflow_id: workflow_id.to_string(),
+            commit_hash: commit_hash.to_string(),
+            branch: branch.to_string(),
+            message: message.to_string(),
+        };
+        let _ = self.publish(&topic, event.clone()).await;
+        let _ = self.broadcast(event);
     }
 }
 

@@ -3,6 +3,7 @@
 //! Manages multiple OrchestratorAgent instances, one per active workflow.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -11,6 +12,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{timeout, Duration};
 use tracing::{debug, error, info, warn};
 
+use crate::services::git_watcher::{GitWatcher, GitWatcherConfig};
 use super::{
     constants::{WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_READY},
     OrchestratorAgent, OrchestratorConfig, SharedMessageBus,
@@ -26,6 +28,8 @@ pub struct RuntimeConfig {
     pub max_concurrent_workflows: usize,
     /// Message bus channel capacity
     pub message_bus_capacity: usize,
+    /// Git watcher polling interval in milliseconds
+    pub git_watch_poll_interval_ms: u64,
 }
 
 impl Default for RuntimeConfig {
@@ -33,6 +37,7 @@ impl Default for RuntimeConfig {
         Self {
             max_concurrent_workflows: 10,
             message_bus_capacity: 1000,
+            git_watch_poll_interval_ms: 2000,
         }
     }
 }
@@ -40,6 +45,12 @@ impl Default for RuntimeConfig {
 /// Workflow agent with its task handle
 struct RunningWorkflow {
     agent: Arc<OrchestratorAgent>,
+    task_handle: JoinHandle<()>,
+}
+
+/// Git watcher with its task handle for lifecycle management
+struct GitWatcherHandle {
+    watcher: Arc<GitWatcher>,
     task_handle: JoinHandle<()>,
 }
 
@@ -52,6 +63,8 @@ pub struct OrchestratorRuntime {
     message_bus: SharedMessageBus,
     config: RuntimeConfig,
     running_workflows: Arc<Mutex<HashMap<String, RunningWorkflow>>>,
+    /// Git watchers for each workflow, keyed by workflow_id
+    git_watchers: Arc<Mutex<HashMap<String, GitWatcherHandle>>>,
     persistence: StatePersistence,
 }
 
@@ -65,6 +78,7 @@ impl OrchestratorRuntime {
             message_bus,
             config: RuntimeConfig::default(),
             running_workflows: Arc::new(Mutex::new(HashMap::new())),
+            git_watchers: Arc::new(Mutex::new(HashMap::new())),
             persistence,
         }
     }
@@ -82,7 +96,112 @@ impl OrchestratorRuntime {
             message_bus,
             config,
             running_workflows: Arc::new(Mutex::new(HashMap::new())),
+            git_watchers: Arc::new(Mutex::new(HashMap::new())),
             persistence,
+        }
+    }
+
+    /// Try to start a GitWatcher for the workflow.
+    ///
+    /// Returns None if:
+    /// - Project not found
+    /// - Project has no default_agent_working_dir
+    /// - Path is not a valid git repository
+    async fn try_start_git_watcher(
+        &self,
+        workflow_id: &str,
+        workflow: &db::models::Workflow,
+    ) -> Result<Option<GitWatcherHandle>> {
+        // Get project to find repo path
+        let project = match db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id).await? {
+            Some(project) => project,
+            None => {
+                warn!(
+                    "Project {} not found for workflow {}, git watcher disabled",
+                    workflow.project_id, workflow_id
+                );
+                return Ok(None);
+            }
+        };
+
+        // Get repo path from project
+        let Some(repo_path) = project.default_agent_working_dir.clone() else {
+            warn!(
+                "Project {} has no default_agent_working_dir; git watcher disabled for workflow {}",
+                project.id, workflow_id
+            );
+            return Ok(None);
+        };
+
+        // Create GitWatcher config
+        let config = GitWatcherConfig::new(
+            PathBuf::from(&repo_path),
+            self.config.git_watch_poll_interval_ms,
+        );
+
+        // Create GitWatcher
+        let mut watcher = match GitWatcher::new(config, self.message_bus.as_ref().clone()) {
+            Ok(watcher) => watcher,
+            Err(e) => {
+                warn!(
+                    "Failed to create GitWatcher for workflow {} (repo {}): {}",
+                    workflow_id, repo_path, e
+                );
+                return Ok(None);
+            }
+        };
+
+        // Associate watcher with workflow
+        watcher.set_workflow_id(workflow_id.to_string());
+
+        let watcher = Arc::new(watcher);
+        let watcher_clone = watcher.clone();
+        let workflow_id_owned = workflow_id.to_string();
+
+        // Spawn watcher task
+        let task_handle = tokio::spawn(async move {
+            if let Err(e) = watcher_clone.watch().await {
+                error!("GitWatcher failed for workflow {}: {}", workflow_id_owned, e);
+            }
+        });
+
+        info!(
+            "GitWatcher started for workflow {} (repo: {})",
+            workflow_id, repo_path
+        );
+
+        Ok(Some(GitWatcherHandle { watcher, task_handle }))
+    }
+
+    /// Stop the GitWatcher for a workflow if running.
+    async fn stop_git_watcher(&self, workflow_id: &str) {
+        let git_watcher_handle = {
+            let mut watchers = self.git_watchers.lock().await;
+            watchers.remove(workflow_id)
+        };
+
+        if let Some(handle) = git_watcher_handle {
+            // Signal watcher to stop
+            handle.watcher.stop();
+            info!("GitWatcher stop requested for workflow {}", workflow_id);
+
+            // Wait for graceful shutdown with timeout
+            let mut task_handle = handle.task_handle;
+            let shutdown_result = timeout(Duration::from_secs(5), &mut task_handle).await;
+
+            match shutdown_result {
+                Ok(Ok(())) => {
+                    info!("GitWatcher for workflow {} shutdown gracefully", workflow_id);
+                }
+                Ok(Err(e)) => {
+                    warn!("GitWatcher task failed for workflow {}: {:?}", workflow_id, e);
+                }
+                Err(_) => {
+                    warn!("GitWatcher shutdown timeout for workflow {}, aborting", workflow_id);
+                    task_handle.abort();
+                    task_handle.await.ok();
+                }
+            }
         }
     }
 
@@ -178,6 +297,21 @@ impl OrchestratorRuntime {
         );
         drop(running); // Release lock before logging
 
+        // Start GitWatcher for this workflow (non-blocking, failure is not fatal)
+        match self.try_start_git_watcher(workflow_id, &workflow).await {
+            Ok(Some(handle)) => {
+                let mut watchers = self.git_watchers.lock().await;
+                watchers.insert(workflow_id.to_string(), handle);
+            }
+            Ok(None) => {
+                // GitWatcher not started (no repo path or invalid repo)
+                debug!("GitWatcher not started for workflow {} (no valid repo)", workflow_id);
+            }
+            Err(e) => {
+                warn!("Failed to start GitWatcher for workflow {}: {}", workflow_id, e);
+            }
+        }
+
         info!("Workflow {} started successfully", workflow_id);
         let running = self.running_workflows.lock().await;
         debug!("Total running workflows: {}", running.len());
@@ -190,6 +324,9 @@ impl OrchestratorRuntime {
     /// Sends shutdown signal to the agent and waits for graceful shutdown.
     /// If shutdown doesn't complete within timeout, the task is aborted.
     pub async fn stop_workflow(&self, workflow_id: &str) -> Result<()> {
+        // Stop GitWatcher first (non-blocking)
+        self.stop_git_watcher(workflow_id).await;
+
         // Remove from running workflows
         let running_workflow = {
             let mut running = self.running_workflows.lock().await;

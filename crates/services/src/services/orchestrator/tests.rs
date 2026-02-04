@@ -1657,4 +1657,241 @@ next_action: continue"#;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().content, "Success after retries");
     }
+
+    // =========================================================================
+    // Test Suite 9: Git Event-Driven Integration (Phase 21)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_publish_git_event() {
+        let bus = MessageBus::new(100);
+        let mut sub = bus.subscribe("workflow:wf-1").await;
+
+        // Publish git event
+        bus.publish_git_event(
+            "wf-1",
+            "abc123def456",
+            "feature/test",
+            "feat: add new feature",
+        ).await;
+
+        // Verify message received on topic
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub.recv()
+        ).await;
+
+        assert!(msg.is_ok(), "Should receive git event within timeout");
+        let msg = msg.unwrap().unwrap();
+
+        match msg {
+            BusMessage::GitEvent { workflow_id, commit_hash, branch, message } => {
+                assert_eq!(workflow_id, "wf-1");
+                assert_eq!(commit_hash, "abc123def456");
+                assert_eq!(branch, "feature/test");
+                assert_eq!(message, "feat: add new feature");
+            }
+            _ => panic!("Expected GitEvent, got {:?}", msg),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_git_event_broadcast() {
+        let bus = MessageBus::new(100);
+        let mut broadcast_sub = bus.subscribe_broadcast();
+
+        // Publish git event
+        bus.publish_git_event(
+            "wf-1",
+            "abc123",
+            "main",
+            "fix: bug fix",
+        ).await;
+
+        // Verify broadcast received
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            broadcast_sub.recv()
+        ).await;
+
+        assert!(msg.is_ok(), "Should receive broadcast within timeout");
+        let msg = msg.unwrap().unwrap();
+
+        match msg {
+            BusMessage::GitEvent { workflow_id, .. } => {
+                assert_eq!(workflow_id, "wf-1");
+            }
+            _ => panic!("Expected GitEvent broadcast"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_commit_idempotency() {
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        // Create valid commit message
+        let commit_message = format!(
+            r#"Terminal completed
+
+---METADATA---
+workflow_id: {}
+task_id: {}
+terminal_id: {}
+status: completed
+next_action: continue"#,
+            workflow.id, terminal.workflow_task_id, terminal.id
+        );
+
+        let commit_hash = "unique_commit_hash_123";
+
+        // First call should process the commit
+        let result1 = agent.handle_git_event(
+            &workflow.id,
+            commit_hash,
+            "main",
+            &commit_message
+        ).await;
+        assert!(result1.is_ok(), "First call should succeed");
+
+        // Second call with same commit hash should be idempotent (no error, but no processing)
+        let result2 = agent.handle_git_event(
+            &workflow.id,
+            commit_hash,
+            "main",
+            &commit_message
+        ).await;
+        assert!(result2.is_ok(), "Second call should succeed (idempotent)");
+
+        // Verify terminal status is still completed (not double-processed)
+        let updated_terminal = db::models::Terminal::find_by_id(
+            &db.pool,
+            &terminal.id
+        ).await.unwrap().unwrap();
+        assert_eq!(updated_terminal.status, "completed");
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_no_metadata() {
+        let (db, workflow, _terminal) = setup_test_workflow().await;
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config.clone(),
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        // Commit message without METADATA section
+        let commit_message = "feat: add new feature without metadata";
+
+        // Should succeed and trigger awakening logic
+        let result = agent.handle_git_event(
+            &workflow.id,
+            "no_metadata_commit_456",
+            "feature/branch",
+            commit_message
+        ).await;
+
+        assert!(result.is_ok(), "Should handle commit without metadata");
+    }
+
+    #[tokio::test]
+    async fn test_processed_commits_tracking() {
+        let mut state = OrchestratorState::new("workflow-1".to_string());
+
+        // Initially empty
+        assert!(state.processed_commits.is_empty());
+
+        // Add a commit
+        state.processed_commits.insert("commit_hash_1".to_string());
+        assert!(state.processed_commits.contains("commit_hash_1"));
+        assert!(!state.processed_commits.contains("commit_hash_2"));
+
+        // Add another commit
+        state.processed_commits.insert("commit_hash_2".to_string());
+        assert_eq!(state.processed_commits.len(), 2);
+
+        // Duplicate insert should not increase count
+        state.processed_commits.insert("commit_hash_1".to_string());
+        assert_eq!(state.processed_commits.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_git_event_topic_isolation() {
+        let bus = MessageBus::new(100);
+
+        let mut sub_wf1 = bus.subscribe("workflow:wf-1").await;
+        let mut sub_wf2 = bus.subscribe("workflow:wf-2").await;
+
+        // Publish to wf-1 only
+        bus.publish_git_event(
+            "wf-1",
+            "abc123",
+            "main",
+            "commit message",
+        ).await;
+
+        // wf-1 should receive
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub_wf1.recv()
+        ).await;
+        assert!(msg.is_ok(), "wf-1 should receive git event");
+
+        // wf-2 should NOT receive (timeout)
+        let msg = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            sub_wf2.recv()
+        ).await;
+        assert!(msg.is_err(), "wf-2 should not receive wf-1's git event");
+    }
 }

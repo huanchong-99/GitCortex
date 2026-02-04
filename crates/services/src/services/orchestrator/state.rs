@@ -1,6 +1,6 @@
 //! Orchestrator state tracking and transitions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tokio::sync::RwLock;
 
@@ -53,6 +53,9 @@ pub struct OrchestratorState {
 
     /// Total error count for this workflow run.
     pub error_count: u32,
+
+    /// Set of processed commit hashes for idempotency.
+    pub processed_commits: HashSet<String>,
 }
 
 impl OrchestratorState {
@@ -65,6 +68,7 @@ impl OrchestratorState {
             pending_events: Vec::new(),
             total_tokens_used: 0,
             error_count: 0,
+            processed_commits: HashSet::new(),
         }
     }
 

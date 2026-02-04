@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use anyhow::{Result, Context, anyhow};
 use serde::{Deserialize, Serialize};
@@ -151,6 +152,7 @@ impl CommitMetadata {
 #[derive(Debug, Clone)]
 pub struct ParsedCommit {
     pub hash: String,
+    pub branch: String,
     pub message: String,
     pub metadata: Option<CommitMetadata>,
 }
@@ -159,8 +161,11 @@ pub struct ParsedCommit {
 pub struct GitWatcher {
     config: GitWatcherConfig,
     message_bus: MessageBus,
+    /// The workflow ID this watcher is associated with (for GitEvent publishing)
+    workflow_id: Option<String>,
     last_commit_hash: Arc<Mutex<Option<String>>>,
-    is_running: bool,
+    /// Thread-safe running flag for graceful shutdown
+    is_running: AtomicBool,
 }
 
 impl GitWatcher {
@@ -194,22 +199,36 @@ impl GitWatcher {
         Ok(Self {
             config,
             message_bus,
+            workflow_id: None,
             last_commit_hash: Arc::new(Mutex::new(None)),
-            is_running: false,
+            is_running: AtomicBool::new(false),
         })
+    }
+
+    /// Associate this watcher with a workflow ID.
+    ///
+    /// This is required for publishing GitEvent messages when commits
+    /// without METADATA are detected.
+    pub fn set_workflow_id(&mut self, workflow_id: impl Into<String>) {
+        self.workflow_id = Some(workflow_id.into());
+    }
+
+    /// Get the workflow ID this watcher is associated with.
+    pub fn workflow_id(&self) -> Option<&str> {
+        self.workflow_id.as_deref()
     }
 
     /// Check if the watcher is currently running
     pub fn is_running(&self) -> bool {
-        self.is_running
+        self.is_running.load(Ordering::SeqCst)
     }
 
     /// Start watching the repository for new commits
     ///
     /// This method polls the git repository for new commits and processes
     /// any that contain workflow metadata. It runs until cancelled.
-    pub async fn watch(&mut self) -> Result<()> {
-        self.is_running = true;
+    pub async fn watch(&self) -> Result<()> {
+        self.is_running.store(true, Ordering::SeqCst);
         let repo_path = self.config.repo_path.clone();
         let poll_interval = Duration::from_millis(self.config.poll_interval_ms);
 
@@ -229,7 +248,7 @@ impl GitWatcher {
         }
 
         // Polling loop
-        while self.is_running {
+        while self.is_running.load(Ordering::SeqCst) {
             tokio::time::sleep(poll_interval).await;
 
             // Check for new commits
@@ -267,8 +286,8 @@ impl GitWatcher {
     }
 
     /// Stop watching the repository
-    pub fn stop(&mut self) {
-        self.is_running = false;
+    pub fn stop(&self) {
+        self.is_running.store(false, Ordering::SeqCst);
         tracing::info!("GitWatcher stop requested");
     }
 
@@ -301,6 +320,27 @@ impl GitWatcher {
         let hash = parts[0].to_string();
         let message = parts[1..].join("|"); // Handle cases where message might contain '|'
 
+        // Get current branch name
+        let branch_output = Command::new("git")
+            .current_dir(repo_path)
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .output()
+            .await
+            .context(format!(
+                "Failed to get current branch from {}",
+                self.config.repo_path.display()
+            ))?;
+
+        let branch = if branch_output.status.success() {
+            String::from_utf8_lossy(&branch_output.stdout).trim().to_string()
+        } else {
+            tracing::warn!(
+                "Failed to get branch name: {}",
+                String::from_utf8_lossy(&branch_output.stderr)
+            );
+            "unknown".to_string()
+        };
+
         // Try to parse metadata from the commit message
         // Get full message body for metadata parsing
         let full_output = Command::new("git")
@@ -318,6 +358,7 @@ impl GitWatcher {
 
         Ok(ParsedCommit {
             hash,
+            branch,
             message,
             metadata,
         })
@@ -325,13 +366,33 @@ impl GitWatcher {
 
     /// Handle a new commit by parsing its metadata and publishing events
     async fn handle_new_commit(&self, commit: ParsedCommit) -> Result<()> {
-        // Only process commits with metadata
+        // Check if commit has metadata
         let metadata = match commit.metadata {
             Some(m) => m,
             None => {
-                tracing::debug!(
-                    "Commit {} has no workflow metadata, skipping",
-                    commit.hash
+                // No metadata - publish GitEvent to wake up orchestrator
+                let Some(workflow_id) = self.workflow_id.as_deref() else {
+                    tracing::debug!(
+                        "Commit {} has no workflow metadata and watcher is not bound to a workflow, skipping",
+                        commit.hash
+                    );
+                    return Ok(());
+                };
+
+                // Publish GitEvent for commits without METADATA
+                self.message_bus
+                    .publish_git_event(
+                        workflow_id,
+                        &commit.hash,
+                        &commit.branch,
+                        &commit.message,
+                    )
+                    .await;
+
+                tracing::info!(
+                    "Published GitEvent for commit {} (no metadata) on workflow {}",
+                    commit.hash,
+                    workflow_id
                 );
                 return Ok(());
             }
