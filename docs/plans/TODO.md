@@ -539,13 +539,15 @@
 | 18.5.8 | Step3 实现真实 API 获取/验证模型 - 移除 TODO 占位符 | ✅ | 2026-02-01 |
 | 18.5.9 | CLI 类型扩展到 9 个 - 补齐 Amp/Cursor Agent/Qwen Code/Copilot/Droid/Opencode | ✅ | 2026-02-01 |
 
-### 阶段 4: 流程一致性（P1-1 ~ P1-7）⚠️
+### 阶段 4: 流程一致性（P1-1 ~ P1-7）⚠️ (可选优化)
+
+> **说明:** 以下任务为 UI/UX 优化，不影响核心功能，标记为可选优化延后处理。
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 18.5.10 | Git 提交规范对齐 METADATA 格式 - 替换 Conventional Commit | ⬜ |  |
-| 18.5.11 | 路由结构改为分步路由 - /wizard/project, /wizard/basic 等 | ⬜ |  |
-| 18.5.12 | 设置页面结构对齐 - 添加 /settings/cli, /settings/models, /settings/presets | ⬜ |  |
+| 18.5.10 | Git 提交规范对齐 METADATA 格式 - 替换 Conventional Commit | 🔵 可选 |  |
+| 18.5.11 | 路由结构改为分步路由 - /wizard/project, /wizard/basic 等 | 🔵 可选 |  |
+| 18.5.12 | 设置页面结构对齐 - 添加 /settings/cli, /settings/models, /settings/presets | 🔵 可选 |  |
 | 18.5.13 | 视图切换导航补齐 - NewDesignLayout 添加 [看板][流水线][调试] 切换 | ✅ | 2026-02-01 |
 | 18.5.14 | 终端活动面板功能补全 - 仅 Working/Waiting + 3-5行输出 + 可折叠 + 最后更新时间 | ✅ | 2026-02-04 |
 | 18.5.15 | 流水线视图信息补全 - 任务名+分支+命令+连接线 | ✅ | 2026-02-04 |
