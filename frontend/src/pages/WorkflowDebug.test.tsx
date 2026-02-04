@@ -150,9 +150,8 @@ describe('WorkflowDebugPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Test Workflow', { selector: 'h1' })).toBeInTheDocument();
-        expect(
-          screen.getByText(i18n.t('workflow:workflowDebug.statusLabel', { status: 'running' }))
-        ).toBeInTheDocument();
+        // Status is now displayed as a badge - there may be multiple "Running" texts
+        expect(screen.getAllByText(i18n.t('workflow:status.running')).length).toBeGreaterThan(0);
       });
     });
 
