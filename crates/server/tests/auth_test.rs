@@ -12,12 +12,22 @@ use axum::{
     body::Body,
     http::{header, Request, StatusCode},
 };
+use deployment::Deployment;
 use once_cell::sync::Lazy;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 
 use server::routes::router;
+use server::routes::subscription_hub::SubscriptionHub;
 use server::DeploymentImpl;
+
+/// Mutex to serialize environment variable access across tests
+static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+/// Helper: Create a test subscription hub
+fn create_test_hub() -> server::routes::SharedSubscriptionHub {
+    Arc::new(SubscriptionHub::default())
+}
 
 /// Mutex to serialize environment variable access across tests
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
@@ -65,7 +75,7 @@ async fn test_allows_requests_when_token_unset() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Request without auth header should succeed
     let response = app
@@ -94,7 +104,7 @@ async fn test_rejects_requests_without_authorization() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Request without auth header should fail
     let response = app
@@ -123,7 +133,7 @@ async fn test_rejects_requests_with_invalid_token() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Request with wrong token should fail
     let response = app
@@ -153,7 +163,7 @@ async fn test_allows_requests_with_valid_token() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Request with correct token should succeed
     let response = app
@@ -183,7 +193,7 @@ async fn test_rejects_requests_with_malformed_auth_header() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Request with malformed auth header (missing "Bearer" prefix) should fail
     let response = app
@@ -213,7 +223,7 @@ async fn test_token_comparison_is_case_sensitive() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Request with different case should fail
     let response = app
@@ -243,7 +253,7 @@ async fn test_multiple_requests_with_same_token() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = router(deployment);
+    let app = router(deployment, create_test_hub());
 
     // Multiple requests with valid token should all succeed
     for i in 0..3 {

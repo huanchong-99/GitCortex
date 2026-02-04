@@ -1,9 +1,11 @@
 use axum::{
-    Router,
+    Extension, Router,
     routing::{IntoMakeService, get},
 };
 
 use crate::{DeploymentImpl, middleware::require_api_token};
+
+pub use subscription_hub::SharedSubscriptionHub;
 
 pub mod approvals;
 pub mod cli_types;
@@ -12,6 +14,7 @@ pub mod containers;
 pub mod filesystem;
 // pub mod github;
 pub mod events;
+pub mod event_bridge;
 pub mod execution_processes;
 pub mod frontend;
 pub mod git;
@@ -25,16 +28,19 @@ pub mod repo;
 pub mod scratch;
 pub mod sessions;
 pub mod shared_tasks_types;
+pub mod subscription_hub;
 pub mod tags;
 pub mod task_attempts;
 pub mod tasks;
 pub mod terminals;
 pub mod terminal_ws;
+pub mod workflow_events;
+pub mod workflow_ws;
 pub mod workflows;
 pub mod workflows_dto;
 pub mod slash_commands;
 
-pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
+pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
     let base_routes = Router::new()
         .route("/health", get(health::health_check))
@@ -61,6 +67,9 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .nest("/workflows", slash_commands::slash_commands_routes())
         .nest("/terminal", terminal_ws::terminal_ws_routes())
         .nest("/terminals", terminals::terminal_routes())
+        // WebSocket routes for workflow events (requires Extension layer for hub)
+        .nest("/ws", workflow_ws::workflow_ws_routes())
+        .layer(Extension(hub))
         .layer(axum::middleware::from_fn(require_api_token))
         .with_state(deployment);
 

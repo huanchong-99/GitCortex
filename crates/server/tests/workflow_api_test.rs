@@ -6,12 +6,19 @@
 //! - Status transitions
 
 use server::DeploymentImpl;
+use server::routes::subscription_hub::SubscriptionHub;
 use db::models::{
     CreateWorkflowRequest, CreateTaskRequest, CreateTerminalRequest,
     MergeTerminalConfig, OrchestratorConfig, Workflow, CliType, ModelConfig,
 };
 use uuid::Uuid;
 use serde_json::json;
+use std::sync::Arc;
+
+/// Helper: Create a test subscription hub
+fn create_test_hub() -> server::routes::SharedSubscriptionHub {
+    Arc::new(SubscriptionHub::default())
+}
 
 /// Helper: Setup test environment
 async fn setup_test() -> (DeploymentImpl, String) {
@@ -147,7 +154,7 @@ async fn test_start_workflow_requires_ready_status() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment.clone());
+    let app = server::routes::router(deployment.clone(), create_test_hub());
 
     let request = Request::builder()
         .method("POST")
@@ -195,7 +202,7 @@ async fn test_start_workflow_transitions_to_running() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment.clone());
+    let app = server::routes::router(deployment.clone(), create_test_hub());
 
     let request = Request::builder()
         .method("POST")
@@ -245,7 +252,7 @@ async fn test_start_workflow_requires_orchestrator_enabled() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment.clone());
+    let app = server::routes::router(deployment.clone(), create_test_hub());
 
     let request = Request::builder()
         .method("POST")

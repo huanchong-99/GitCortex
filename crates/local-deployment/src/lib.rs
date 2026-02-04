@@ -27,7 +27,7 @@ use services::services::{
     git::GitService,
     image::ImageService,
     oauth_credentials::OAuthCredentials,
-    orchestrator::{MessageBus, OrchestratorRuntime},
+    orchestrator::{MessageBus, OrchestratorRuntime, SharedMessageBus},
     project::ProjectService,
     queued_message::QueuedMessageService,
     repo::RepoService,
@@ -66,6 +66,7 @@ pub struct LocalDeployment {
     oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
     orchestrator_runtime: OrchestratorRuntime,
     process_manager: Arc<ProcessManager>,
+    message_bus: SharedMessageBus,
 }
 
 #[derive(Debug, Clone)]
@@ -172,7 +173,7 @@ impl Deployment for LocalDeployment {
 
         // Create message bus and orchestrator runtime
         let message_bus = Arc::new(MessageBus::new(1000));
-        let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus);
+        let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus.clone());
 
         let process_manager = Arc::new(ProcessManager::new());
 
@@ -201,6 +202,7 @@ impl Deployment for LocalDeployment {
             oauth_handoffs,
             orchestrator_runtime,
             process_manager,
+            message_bus,
         };
 
         Ok(deployment)
@@ -276,6 +278,11 @@ impl Deployment for LocalDeployment {
 }
 
 impl LocalDeployment {
+    /// Get the shared message bus for WebSocket event broadcasting.
+    pub fn message_bus(&self) -> &SharedMessageBus {
+        &self.message_bus
+    }
+
     /// Reconcile terminal statuses on startup
     ///
     /// Resets any terminals that are marked as running/waiting in the database

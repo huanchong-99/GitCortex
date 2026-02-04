@@ -15,11 +15,16 @@ export interface WsMessage {
  * WebSocket event types following namespace convention
  */
 export type WsEventType =
-  | `workflow.${string}`
-  | `terminal.${string}`
-  | `git.${string}`
-  | `orchestrator.${string}`
-  | `system.${string}`;
+  | 'workflow.status_changed'
+  | 'terminal.status_changed'
+  | 'task.status_changed'
+  | 'terminal.completed'
+  | 'git.commit_detected'
+  | 'orchestrator.awakened'
+  | 'orchestrator.decision'
+  | 'system.heartbeat'
+  | 'system.lagged'
+  | 'system.error';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -30,6 +35,7 @@ interface WsState {
   connectionStatus: ConnectionStatus;
   lastHeartbeat: Date | null;
   reconnectAttempts: number;
+  currentWorkflowId: string | null;
 
   // Internal
   _ws: WebSocket | null;
@@ -41,6 +47,7 @@ interface WsState {
 
   // Actions
   connect: (url: string) => void;
+  connectToWorkflow: (workflowId: string) => void;
   disconnect: () => void;
   send: (message: WsMessage) => void;
   subscribe: (eventType: string, handler: MessageHandler) => () => void;
@@ -66,6 +73,7 @@ export const useWsStore = create<WsState>((set, get) => ({
   connectionStatus: 'disconnected',
   lastHeartbeat: null,
   reconnectAttempts: 0,
+  currentWorkflowId: null,
 
   // Internal state
   _ws: null,
@@ -74,6 +82,23 @@ export const useWsStore = create<WsState>((set, get) => ({
   _reconnectTimeout: null,
   _url: null,
   _manualDisconnect: false,
+
+  connectToWorkflow: (workflowId: string) => {
+    const state = get();
+
+    // If already connected to this workflow, do nothing
+    if (state.currentWorkflowId === workflowId && state.connectionStatus === 'connected') {
+      return;
+    }
+
+    // Build WebSocket URL for workflow events
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const url = `${protocol}//${host}/api/ws/workflow/${workflowId}/events`;
+
+    set({ currentWorkflowId: workflowId });
+    state.connect(url);
+  },
 
   connect: (url: string) => {
     const state = get();
@@ -214,7 +239,7 @@ export const useWsStore = create<WsState>((set, get) => ({
   disconnect: () => {
     const state = get();
 
-    set({ _manualDisconnect: true });
+    set({ _manualDisconnect: true, currentWorkflowId: null });
 
     if (state._heartbeatInterval) {
       clearInterval(state._heartbeatInterval);
@@ -285,4 +310,131 @@ export function useWsSubscription(
     return subscribe(eventType, handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventType, handler, subscribe, ...deps]);
+}
+
+/**
+ * Payload types for workflow events
+ */
+export interface WorkflowStatusPayload {
+  workflowId: string;
+  status: string;
+}
+
+export interface TerminalStatusPayload {
+  workflowId: string;
+  terminalId: string;
+  status: string;
+}
+
+export interface TaskStatusPayload {
+  workflowId: string;
+  taskId: string;
+  status: string;
+}
+
+export interface GitCommitPayload {
+  workflowId: string;
+  commitHash: string;
+  branch: string;
+  message: string;
+}
+
+export interface TerminalCompletedPayload {
+  workflowId: string;
+  taskId: string;
+  terminalId: string;
+  status: 'completed' | 'failed' | 'cancelled';
+  commitHash?: string;
+  commitMessage?: string;
+}
+
+export interface SystemLaggedPayload {
+  skipped: number;
+}
+
+export interface SystemErrorPayload {
+  workflowId?: string;
+  error?: string;
+  message?: string;
+}
+
+/**
+ * Hook to connect to workflow events and subscribe to specific event types
+ * Automatically connects on mount and disconnects on unmount
+ */
+export function useWorkflowEvents(
+  workflowId: string | null | undefined,
+  handlers?: {
+    onWorkflowStatusChanged?: (payload: WorkflowStatusPayload) => void;
+    onTerminalStatusChanged?: (payload: TerminalStatusPayload) => void;
+    onTaskStatusChanged?: (payload: TaskStatusPayload) => void;
+    onTerminalCompleted?: (payload: TerminalCompletedPayload) => void;
+    onGitCommitDetected?: (payload: GitCommitPayload) => void;
+    onSystemError?: (payload: SystemErrorPayload) => void;
+  }
+) {
+  const connectToWorkflow = useWsStore((s) => s.connectToWorkflow);
+  const disconnect = useWsStore((s) => s.disconnect);
+  const subscribe = useWsStore((s) => s.subscribe);
+  const connectionStatus = useWsStore((s) => s.connectionStatus);
+
+  // Connect to workflow on mount, disconnect on unmount
+  React.useEffect(() => {
+    if (workflowId) {
+      connectToWorkflow(workflowId);
+    }
+
+    return () => {
+      disconnect();
+    };
+  }, [workflowId, connectToWorkflow, disconnect]);
+
+  // Subscribe to events
+  React.useEffect(() => {
+    if (!workflowId) return;
+
+    const unsubscribers: (() => void)[] = [];
+
+    if (handlers?.onWorkflowStatusChanged) {
+      unsubscribers.push(
+        subscribe('workflow.status_changed', handlers.onWorkflowStatusChanged as MessageHandler)
+      );
+    }
+
+    if (handlers?.onTerminalStatusChanged) {
+      unsubscribers.push(
+        subscribe('terminal.status_changed', handlers.onTerminalStatusChanged as MessageHandler)
+      );
+    }
+
+    if (handlers?.onTaskStatusChanged) {
+      unsubscribers.push(
+        subscribe('task.status_changed', handlers.onTaskStatusChanged as MessageHandler)
+      );
+    }
+
+    if (handlers?.onTerminalCompleted) {
+      unsubscribers.push(
+        subscribe('terminal.completed', handlers.onTerminalCompleted as MessageHandler)
+      );
+    }
+
+    if (handlers?.onGitCommitDetected) {
+      unsubscribers.push(
+        subscribe('git.commit_detected', handlers.onGitCommitDetected as MessageHandler)
+      );
+    }
+
+    if (handlers?.onSystemError) {
+      unsubscribers.push(
+        subscribe('system.error', handlers.onSystemError as MessageHandler)
+      );
+    }
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [workflowId, handlers, subscribe]);
+
+  return { connectionStatus };
 }

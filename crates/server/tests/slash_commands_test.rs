@@ -8,10 +8,17 @@
 //! - Input validation (command must start with /, command must be unique, description required)
 
 use server::DeploymentImpl;
+use server::routes::subscription_hub::SubscriptionHub;
 use db::models::SlashCommandPreset;
 use uuid::Uuid;
 use serde_json::json;
 use chrono::Utc;
+use std::sync::Arc;
+
+/// Helper: Create a test subscription hub
+fn create_test_hub() -> server::routes::SharedSubscriptionHub {
+    Arc::new(SubscriptionHub::default())
+}
 
 /// Helper: Setup test environment
 async fn setup_test() -> DeploymentImpl {
@@ -32,7 +39,7 @@ async fn test_list_command_presets() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     let response = app
         .oneshot(
@@ -69,7 +76,7 @@ async fn test_create_command_preset_success() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     let new_command = json!({
         "command": "/test-command",
@@ -114,7 +121,7 @@ async fn test_create_command_preset_missing_leading_slash() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     let new_command = json!({
         "command": "test-command",  // Missing leading slash
@@ -154,7 +161,7 @@ async fn test_create_command_preset_duplicate_command() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     let new_command = json!({
         "command": "/duplicate-test",
@@ -204,7 +211,7 @@ async fn test_create_command_preset_missing_description() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     let new_command = json!({
         "command": "/test-command"
@@ -237,7 +244,7 @@ async fn test_update_command_preset() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     // First create a command
     let new_command = json!({
@@ -305,7 +312,7 @@ async fn test_delete_command_preset() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::router(deployment);
+    let app = server::routes::router(deployment, create_test_hub());
 
     // First create a command
     let new_command = json!({

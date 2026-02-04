@@ -13,8 +13,10 @@ use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
 use dotenv;
 use server::{DeploymentImpl, routes};
+use server::routes::{SharedSubscriptionHub, event_bridge::EventBridge, subscription_hub::SubscriptionHub};
 use services::services::container::ContainerService;
 use sqlx::Error as SqlxError;
+use std::sync::Arc;
 use strip_ansi_escapes::strip;
 use thiserror::Error;
 use tracing_subscriber::{EnvFilter, prelude::*};
@@ -95,7 +97,13 @@ async fn main() -> Result<(), GitCortexError> {
         }
     });
 
-    let app_router = routes::router(deployment.clone());
+    // Initialize WebSocket subscription hub and event bridge
+    let subscription_hub: SharedSubscriptionHub = Arc::new(SubscriptionHub::default());
+    let event_bridge = EventBridge::new(deployment.message_bus().clone(), subscription_hub.clone());
+    let _event_bridge_handle = event_bridge.spawn();
+    tracing::info!("WebSocket event bridge started");
+
+    let app_router = routes::router(deployment.clone(), subscription_hub);
 
     let port = std::env::var("BACKEND_PORT")
         .or_else(|_| std::env::var("PORT"))
