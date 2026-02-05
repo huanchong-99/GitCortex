@@ -22,8 +22,10 @@ use executors::{
     executors::BaseCodingAgent,
 };
 
+use super::bridge::TerminalBridge;
 use super::process::{ProcessHandle, ProcessManager, DEFAULT_COLS, DEFAULT_ROWS};
 use crate::services::cc_switch::{CCSwitchService, CCSwitch};
+use crate::services::orchestrator::SharedMessageBus;
 
 /// Terminal launcher for serial terminal startup
 pub struct TerminalLauncher {
@@ -31,6 +33,8 @@ pub struct TerminalLauncher {
     cc_switch: Arc<CCSwitchService>,
     process_manager: Arc<ProcessManager>,
     working_dir: PathBuf,
+    /// Optional terminal bridge for MessageBus -> PTY stdin forwarding
+    terminal_bridge: Option<TerminalBridge>,
 }
 
 /// Result of a terminal launch operation
@@ -61,6 +65,34 @@ impl TerminalLauncher {
             cc_switch,
             process_manager,
             working_dir,
+            terminal_bridge: None,
+        }
+    }
+
+    /// Create a new terminal launcher with MessageBus bridge
+    ///
+    /// This enables Orchestrator -> PTY stdin communication for terminal messages.
+    ///
+    /// # Arguments
+    /// * `db` - Database service
+    /// * `cc_switch` - CC switch service for model switching
+    /// * `process_manager` - Process manager for lifecycle management
+    /// * `working_dir` - Working directory for spawned processes
+    /// * `message_bus` - Shared message bus for terminal bridge
+    pub fn with_message_bus(
+        db: Arc<DBService>,
+        cc_switch: Arc<CCSwitchService>,
+        process_manager: Arc<ProcessManager>,
+        working_dir: PathBuf,
+        message_bus: SharedMessageBus,
+    ) -> Self {
+        let terminal_bridge = TerminalBridge::new(message_bus, Arc::clone(&process_manager));
+        Self {
+            db,
+            cc_switch,
+            process_manager,
+            working_dir,
+            terminal_bridge: Some(terminal_bridge),
         }
     }
 
@@ -205,7 +237,7 @@ impl TerminalLauncher {
         // 4. Build spawn configuration (process-level isolation, no global config changes)
         let spawn_config = match self
             .cc_switch
-            .build_launch_config(terminal, &cli_command, &self.working_dir)
+            .build_launch_config(terminal, &cli_command, &self.working_dir, terminal.auto_confirm)
             .await
         {
             Ok(config) => config,
@@ -251,6 +283,24 @@ impl TerminalLauncher {
                         execution_process_id.as_deref(),
                     )
                     .await;
+                }
+
+                // Register terminal bridge for MessageBus -> PTY stdin forwarding
+                if let Some(ref bridge) = self.terminal_bridge {
+                    if let Err(e) = bridge.register(&terminal_id, &handle.session_id).await {
+                        tracing::warn!(
+                            terminal_id = %terminal_id,
+                            pty_session_id = %handle.session_id,
+                            error = %e,
+                            "Failed to register terminal bridge (non-fatal)"
+                        );
+                    } else {
+                        tracing::debug!(
+                            terminal_id = %terminal_id,
+                            pty_session_id = %handle.session_id,
+                            "Terminal bridge registered successfully"
+                        );
+                    }
                 }
 
                 tracing::info!("Terminal {} started with PID {}", terminal_id, handle.pid);
@@ -430,6 +480,7 @@ mod tests {
             session_id: None,
             execution_process_id: None,
             vk_session_id: None,
+            auto_confirm: false,
             last_commit_hash: None,
             last_commit_message: None,
             started_at: None,

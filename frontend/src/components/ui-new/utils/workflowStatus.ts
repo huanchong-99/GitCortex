@@ -9,6 +9,7 @@ import {
   Pause,
   Play,
   XCircle,
+  ShieldQuestion,
 } from 'lucide-react';
 
 export type StatusTone =
@@ -148,6 +149,16 @@ const TERMINAL_STATUS_CONFIG: Record<string, StatusConfig> = {
     key: 'workflow:terminalDebug.status.idle',
     tone: 'neutral',
     icon: Circle,
+  },
+  waiting_for_approval: {
+    key: 'workflow:terminalDebug.status.waiting_for_approval',
+    tone: 'warning',
+    icon: ShieldQuestion,
+  },
+  stalled: {
+    key: 'workflow:terminalDebug.status.stalled',
+    tone: 'warning',
+    icon: AlertTriangle,
   },
   unknown: {
     key: 'workflow:terminalDebug.status.unknown',

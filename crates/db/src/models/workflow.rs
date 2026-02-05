@@ -403,6 +403,9 @@ pub struct CreateTerminalRequest {
     pub role_description: Option<String>,
     /// Terminal order index within task
     pub order_index: i32,
+    /// Auto-confirm mode: skip CLI permission prompts
+    #[serde(default)]
+    pub auto_confirm: bool,
 }
 
 /// Create Workflow Request

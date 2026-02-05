@@ -1,0 +1,415 @@
+//! Message bus -> PTY input bridge.
+//!
+//! Subscribes to PTY session topics and forwards terminal messages to stdin.
+//! This enables the Orchestrator to send commands and confirmations to CLI tools.
+
+use std::{collections::HashMap, sync::Arc, time::Duration};
+
+use tokio::{
+    sync::{mpsc, RwLock},
+    task::JoinHandle,
+    time::MissedTickBehavior,
+};
+
+use crate::services::orchestrator::message_bus::{BusMessage, SharedMessageBus};
+
+use super::process::ProcessManager;
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/// Channel capacity for PTY writer queue.
+const BRIDGE_CHANNEL_CAPACITY: usize = 100;
+
+/// Health check interval for terminal liveness (seconds).
+const BRIDGE_HEALTH_INTERVAL_SECS: u64 = 5;
+
+// ============================================================================
+// Bridge Handle
+// ============================================================================
+
+/// Internal handle for tracking active bridge tasks.
+struct BridgeHandle {
+    terminal_id: String,
+    task_handle: JoinHandle<()>,
+}
+
+// ============================================================================
+// Terminal Bridge
+// ============================================================================
+
+/// Bridges MessageBus terminal topics to PTY stdin.
+///
+/// This component enables bidirectional communication between the Orchestrator
+/// and CLI tools running in PTY terminals. When the Orchestrator publishes a
+/// `TerminalMessage` to a PTY session topic, this bridge forwards it to the
+/// terminal's stdin.
+///
+/// # Architecture
+///
+/// ```text
+/// Orchestrator -> MessageBus -> TerminalBridge -> PTY stdin
+/// ```
+///
+/// # Usage
+///
+/// ```ignore
+/// let bridge = TerminalBridge::new(message_bus, process_manager);
+/// bridge.register("terminal-123", "session-456").await?;
+/// ```
+#[derive(Clone)]
+pub struct TerminalBridge {
+    message_bus: SharedMessageBus,
+    process_manager: Arc<ProcessManager>,
+    active_sessions: Arc<RwLock<HashMap<String, BridgeHandle>>>,
+}
+
+impl TerminalBridge {
+    /// Creates a new TerminalBridge instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `message_bus` - Shared message bus for subscribing to topics
+    /// * `process_manager` - Process manager for accessing PTY handles
+    pub fn new(message_bus: SharedMessageBus, process_manager: Arc<ProcessManager>) -> Self {
+        Self {
+            message_bus,
+            process_manager,
+            active_sessions: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Registers a bridge task for a PTY session topic.
+    ///
+    /// This method subscribes to the PTY session topic and spawns a background
+    /// task that forwards incoming `TerminalMessage` events to the PTY stdin.
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal_id` - Terminal identifier for PTY handle lookup
+    /// * `pty_session_id` - PTY session ID used as the message bus topic
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if registration succeeds, or an error if the session ID
+    /// is empty or registration fails.
+    pub async fn register(&self, terminal_id: &str, pty_session_id: &str) -> anyhow::Result<()> {
+        let session_id = pty_session_id.trim();
+        if session_id.is_empty() {
+            return Err(anyhow::anyhow!("pty_session_id is empty"));
+        }
+
+        // Check if already registered
+        {
+            let active = self.active_sessions.read().await;
+            if active.contains_key(session_id) {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    pty_session_id = %session_id,
+                    "Terminal bridge already registered"
+                );
+                return Ok(());
+            }
+        }
+
+        // Subscribe to the PTY session topic
+        let mut rx = self.message_bus.subscribe(session_id).await;
+        let process_manager = Arc::clone(&self.process_manager);
+        let session_id_owned = session_id.to_string();
+        let terminal_id_owned = terminal_id.to_string();
+        let terminal_id_for_task = terminal_id.to_string();
+        let active_sessions = Arc::clone(&self.active_sessions);
+
+        // Spawn bridge task
+        let task_handle = tokio::spawn(async move {
+            let result = Self::run_bridge(
+                process_manager,
+                terminal_id_for_task.clone(),
+                session_id_owned.clone(),
+                &mut rx,
+            )
+            .await;
+
+            // Remove from active sessions on exit
+            {
+                let mut active = active_sessions.write().await;
+                active.remove(&session_id_owned);
+            }
+
+            match result {
+                Ok(()) => {
+                    tracing::debug!(
+                        terminal_id = %terminal_id_for_task,
+                        pty_session_id = %session_id_owned,
+                        "Terminal bridge stopped gracefully"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        terminal_id = %terminal_id_for_task,
+                        pty_session_id = %session_id_owned,
+                        error = %e,
+                        "Terminal bridge stopped with error"
+                    );
+                }
+            }
+        });
+
+        // Register the bridge handle (with race condition check)
+        {
+            let mut active = self.active_sessions.write().await;
+            if active.contains_key(session_id) {
+                // Another task registered while we were setting up
+                task_handle.abort();
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    pty_session_id = %session_id,
+                    "Terminal bridge registration race: existing session kept"
+                );
+                return Ok(());
+            }
+
+            active.insert(
+                session_id.to_string(),
+                BridgeHandle {
+                    terminal_id: terminal_id_owned,
+                    task_handle,
+                },
+            );
+        }
+
+        tracing::info!(
+            terminal_id = %terminal_id,
+            pty_session_id = %session_id,
+            "Terminal bridge registered"
+        );
+
+        Ok(())
+    }
+
+    /// Unregisters a bridge task for a PTY session.
+    ///
+    /// # Arguments
+    ///
+    /// * `pty_session_id` - PTY session ID to unregister
+    pub async fn unregister(&self, pty_session_id: &str) {
+        let mut active = self.active_sessions.write().await;
+        if let Some(handle) = active.remove(pty_session_id) {
+            handle.task_handle.abort();
+            tracing::info!(
+                terminal_id = %handle.terminal_id,
+                pty_session_id = %pty_session_id,
+                "Terminal bridge unregistered"
+            );
+        }
+    }
+
+    /// Returns the number of active bridge sessions.
+    pub async fn active_count(&self) -> usize {
+        self.active_sessions.read().await.len()
+    }
+
+    /// Main bridge loop that forwards messages to PTY stdin.
+    async fn run_bridge(
+        process_manager: Arc<ProcessManager>,
+        terminal_id: String,
+        pty_session_id: String,
+        rx: &mut mpsc::Receiver<BusMessage>,
+    ) -> anyhow::Result<()> {
+        // Get PTY handle
+        let handle = process_manager
+            .get_handle(&terminal_id)
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Terminal not running: {}", terminal_id))?;
+
+        let writer = handle
+            .writer
+            .ok_or_else(|| anyhow::anyhow!("PTY writer unavailable for terminal {}", terminal_id))?;
+
+        // Create channel for writer task
+        let (tx, mut writer_rx) = mpsc::channel::<Vec<u8>>(BRIDGE_CHANNEL_CAPACITY);
+        let terminal_id_writer = terminal_id.clone();
+
+        // Spawn blocking writer task
+        let mut writer_task = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            while let Some(data) = writer_rx.blocking_recv() {
+                let mut writer_guard = match writer.lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id_writer,
+                            "PTY writer lock poisoned; recovering"
+                        );
+                        poisoned.into_inner()
+                    }
+                };
+
+                if let Err(e) = writer_guard.write_all(&data) {
+                    return Err(anyhow::anyhow!("PTY write error: {e}"));
+                }
+                if let Err(e) = writer_guard.flush() {
+                    return Err(anyhow::anyhow!("PTY flush error: {e}"));
+                }
+            }
+            Ok(())
+        });
+
+        let mut writer_finished = false;
+        let mut health_interval =
+            tokio::time::interval(Duration::from_secs(BRIDGE_HEALTH_INTERVAL_SECS));
+        health_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        loop {
+            tokio::select! {
+                msg = rx.recv() => {
+                    match msg {
+                        Some(BusMessage::TerminalMessage { message }) => {
+                            let payload = Self::normalize_message(&message);
+                            if payload.is_empty() {
+                                continue;
+                            }
+
+                            tracing::debug!(
+                                terminal_id = %terminal_id,
+                                pty_session_id = %pty_session_id,
+                                message_len = payload.len(),
+                                "Forwarding message to PTY stdin"
+                            );
+
+                            if tx.send(payload.into_bytes()).await.is_err() {
+                                return Err(anyhow::anyhow!("PTY writer channel closed"));
+                            }
+                        }
+                        Some(BusMessage::Shutdown) => {
+                            tracing::debug!(
+                                terminal_id = %terminal_id,
+                                pty_session_id = %pty_session_id,
+                                "Terminal bridge received shutdown"
+                            );
+                            break;
+                        }
+                        Some(_) => {
+                            // Ignore other message types
+                        }
+                        None => {
+                            tracing::debug!(
+                                terminal_id = %terminal_id,
+                                pty_session_id = %pty_session_id,
+                                "Terminal bridge channel closed"
+                            );
+                            break;
+                        }
+                    }
+                }
+                _ = health_interval.tick() => {
+                    // Cleanup dead processes
+                    process_manager.cleanup().await;
+
+                    // Check if terminal is still running
+                    if !process_manager.is_running(&terminal_id).await {
+                        tracing::info!(
+                            terminal_id = %terminal_id,
+                            pty_session_id = %pty_session_id,
+                            "Terminal process no longer running; stopping bridge"
+                        );
+                        break;
+                    }
+                }
+                result = &mut writer_task => {
+                    writer_finished = true;
+                    match result {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => return Err(e),
+                        Err(e) => return Err(anyhow::anyhow!("Writer task join error: {e}")),
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Clean shutdown: close sender and wait for writer task
+        drop(tx);
+
+        if !writer_finished {
+            match writer_task.await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => return Err(e),
+                Err(e) => return Err(anyhow::anyhow!("Writer task join error: {e}")),
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Normalizes a message by ensuring it ends with a newline.
+    ///
+    /// On Windows, uses `\r\n` for compatibility with some CLI tools.
+    /// On Unix, uses `\n`.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to normalize
+    ///
+    /// # Returns
+    ///
+    /// The normalized message with appropriate line ending.
+    fn normalize_message(message: &str) -> String {
+        let mut payload = message.to_string();
+
+        // Already has newline
+        if payload.ends_with('\n') {
+            return payload;
+        }
+
+        // Append platform-appropriate newline
+        if cfg!(windows) {
+            payload.push_str("\r\n");
+        } else {
+            payload.push('\n');
+        }
+
+        payload
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_message_adds_newline() {
+        let result = TerminalBridge::normalize_message("hello");
+        assert!(result.ends_with('\n'), "Should end with newline");
+    }
+
+    #[test]
+    fn test_normalize_message_preserves_existing_newline() {
+        let result = TerminalBridge::normalize_message("hello\n");
+        assert_eq!(result, "hello\n", "Should preserve existing newline");
+    }
+
+    #[test]
+    fn test_normalize_message_empty_string() {
+        let result = TerminalBridge::normalize_message("");
+        assert!(result.ends_with('\n'), "Empty string should get newline");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_message_windows_crlf() {
+        let result = TerminalBridge::normalize_message("hello");
+        assert!(result.ends_with("\r\n"), "Windows should use CRLF");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn test_normalize_message_unix_lf() {
+        let result = TerminalBridge::normalize_message("hello");
+        assert!(result.ends_with('\n') && !result.ends_with("\r\n"), "Unix should use LF only");
+    }
+}

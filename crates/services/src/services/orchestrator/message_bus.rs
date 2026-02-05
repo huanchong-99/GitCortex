@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{RwLock, broadcast, mpsc};
 
 use super::constants::WORKFLOW_TOPIC_PREFIX;
-use super::types::{OrchestratorInstruction, TerminalCompletionEvent};
+use super::types::{OrchestratorInstruction, PromptDecision, TerminalCompletionEvent, TerminalPromptEvent};
 
 /// Messages routed through the orchestrator bus.
 #[allow(clippy::large_enum_variant)]
@@ -41,6 +41,22 @@ pub enum BusMessage {
     },
     TerminalMessage {
         message: String,
+    },
+    /// Terminal prompt detected - sent by PromptWatcher when a prompt is detected
+    TerminalPromptDetected(TerminalPromptEvent),
+    /// Terminal input - sent to PTY stdin via TerminalBridge
+    TerminalInput {
+        terminal_id: String,
+        session_id: String,
+        input: String,
+        /// Decision that led to this input (for logging/debugging)
+        decision: Option<PromptDecision>,
+    },
+    /// Terminal prompt decision made - for UI updates
+    TerminalPromptDecision {
+        terminal_id: String,
+        workflow_id: String,
+        decision: PromptDecision,
     },
     Shutdown,
 }
@@ -129,6 +145,55 @@ impl MessageBus {
         };
         let _ = self.publish(&topic, event.clone()).await;
         let _ = self.broadcast(event);
+    }
+
+    /// Publishes a terminal prompt detected event.
+    ///
+    /// Called by PromptWatcher when an interactive prompt is detected in PTY output.
+    pub async fn publish_terminal_prompt_detected(&self, event: TerminalPromptEvent) {
+        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, event.workflow_id);
+        let _ = self.publish(&topic, BusMessage::TerminalPromptDetected(event.clone()))
+            .await;
+        let _ = self.broadcast(BusMessage::TerminalPromptDetected(event));
+    }
+
+    /// Publishes a terminal input message to be sent to PTY stdin.
+    ///
+    /// Called by Orchestrator after making a decision about how to respond to a prompt.
+    pub async fn publish_terminal_input(
+        &self,
+        terminal_id: &str,
+        session_id: &str,
+        input: &str,
+        decision: Option<PromptDecision>,
+    ) {
+        let message = BusMessage::TerminalInput {
+            terminal_id: terminal_id.to_string(),
+            session_id: session_id.to_string(),
+            input: input.to_string(),
+            decision,
+        };
+        // Broadcast to all listeners (including TerminalBridge)
+        let _ = self.broadcast(message);
+    }
+
+    /// Publishes a terminal prompt decision for UI updates.
+    ///
+    /// Called by Orchestrator to notify UI about the decision made for a prompt.
+    pub async fn publish_terminal_prompt_decision(
+        &self,
+        terminal_id: &str,
+        workflow_id: &str,
+        decision: PromptDecision,
+    ) {
+        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
+        let message = BusMessage::TerminalPromptDecision {
+            terminal_id: terminal_id.to_string(),
+            workflow_id: workflow_id.to_string(),
+            decision: decision.clone(),
+        };
+        let _ = self.publish(&topic, message.clone()).await;
+        let _ = self.broadcast(message);
     }
 }
 

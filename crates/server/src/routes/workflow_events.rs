@@ -59,6 +59,14 @@ pub enum WsEventType {
     /// System error occurred
     #[serde(rename = "system.error")]
     SystemError,
+
+    /// Terminal prompt detected (interactive prompt requiring response)
+    #[serde(rename = "terminal.prompt_detected")]
+    TerminalPromptDetected,
+
+    /// Terminal prompt decision made by Orchestrator
+    #[serde(rename = "terminal.prompt_decision")]
+    TerminalPromptDecision,
 }
 
 // ============================================================================
@@ -206,9 +214,45 @@ impl WsEvent {
                 Some((workflow_id, Self::new(WsEventType::SystemError, payload)))
             }
 
+            // Terminal prompt events - forward to WebSocket for UI updates
+            BusMessage::TerminalPromptDetected(event) => {
+                let workflow_id = event.workflow_id.clone();
+                let payload = json!({
+                    "workflowId": workflow_id,
+                    "terminalId": event.terminal_id,
+                    "promptKind": format!("{:?}", event.prompt.kind),
+                    "promptText": event.prompt.raw_text,
+                    "confidence": event.prompt.confidence,
+                    "hasDangerousKeywords": event.prompt.has_dangerous_keywords,
+                    "options": event.prompt.options,
+                    "selectedIndex": event.prompt.selected_index
+                });
+                Some((
+                    workflow_id,
+                    Self::new(WsEventType::TerminalPromptDetected, payload),
+                ))
+            }
+
+            BusMessage::TerminalPromptDecision {
+                terminal_id,
+                workflow_id,
+                decision,
+            } => {
+                let payload = json!({
+                    "workflowId": workflow_id,
+                    "terminalId": terminal_id,
+                    "decision": decision
+                });
+                Some((
+                    workflow_id,
+                    Self::new(WsEventType::TerminalPromptDecision, payload),
+                ))
+            }
+
             // Messages that don't map to WebSocket events
             BusMessage::Instruction(_) => None,
             BusMessage::TerminalMessage { .. } => None,
+            BusMessage::TerminalInput { .. } => None, // Internal message, not for WebSocket
             BusMessage::Shutdown => None,
         }
     }

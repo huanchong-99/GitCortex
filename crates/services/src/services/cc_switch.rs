@@ -8,6 +8,13 @@
 //! - 通过环境变量注入配置，而非修改全局配置文件
 //! - 支持多工作流并发运行，配置互不干扰
 //! - 用户全局配置保持不变
+//!
+//! ## 自动确认参数 (Phase 24)
+//!
+//! 支持为各 CLI 注入自动确认参数：
+//! - Claude Code: `--dangerously-skip-permissions`
+//! - Codex: `--yolo`
+//! - Gemini: `--yolo`
 
 use std::{path::Path, sync::Arc};
 use async_trait::async_trait;
@@ -19,6 +26,36 @@ use db::{
 };
 
 use crate::services::terminal::process::{SpawnCommand, SpawnEnv};
+
+// ============================================================================
+// Auto-Confirm Parameters
+// ============================================================================
+
+/// Applies CLI-specific auto-confirm arguments.
+///
+/// # Arguments
+///
+/// * `cli` - The CLI type
+/// * `args` - Mutable reference to the arguments vector
+/// * `auto_confirm` - Whether to add auto-confirm flags
+fn apply_auto_confirm_args(cli: &CcCliType, args: &mut Vec<String>, auto_confirm: bool) {
+    if !auto_confirm {
+        return;
+    }
+
+    let flag = match cli {
+        CcCliType::ClaudeCode => "--dangerously-skip-permissions",
+        CcCliType::Codex | CcCliType::Gemini => "--yolo",
+        _ => return,
+    };
+
+    // Avoid duplicate flags
+    if args.iter().any(|arg| arg == flag) {
+        return;
+    }
+
+    args.push(flag.to_string());
+}
 
 /// CC-Switch trait for dependency injection and testing
 #[async_trait]
@@ -140,15 +177,19 @@ impl CCSwitchService {
     ///
     /// - **Claude Code**: Sets ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_MODEL,
     ///   and ANTHROPIC_DEFAULT_*_MODEL environment variables.
+    ///   Auto-confirm: `--dangerously-skip-permissions`
     /// - **Codex**: Sets OPENAI_API_KEY, OPENAI_BASE_URL, CODEX_HOME (temp directory),
     ///   and CLI arguments --model and --config.
+    ///   Auto-confirm: `--yolo`
     /// - **Gemini**: Sets GOOGLE_GEMINI_BASE_URL, GEMINI_API_KEY, GEMINI_MODEL.
+    ///   Auto-confirm: `--yolo`
     ///
     /// # Arguments
     ///
     /// * `terminal` - Terminal configuration from database
     /// * `base_command` - CLI command to execute (e.g., "claude", "codex", "gemini")
     /// * `working_dir` - Working directory for the spawned process
+    /// * `auto_confirm` - Whether to add CLI auto-confirm flags
     ///
     /// # Returns
     ///
@@ -159,6 +200,7 @@ impl CCSwitchService {
         terminal: &Terminal,
         base_command: &str,
         working_dir: &Path,
+        auto_confirm: bool,
     ) -> anyhow::Result<SpawnCommand> {
         // Fetch CLI type information
         let cli_type = CliType::find_by_id(&self.db.pool, &terminal.cli_type_id)
@@ -370,12 +412,16 @@ impl CCSwitchService {
             }
         }
 
+        // Apply auto-confirm flags if enabled
+        apply_auto_confirm_args(&cli, &mut args, auto_confirm);
+
         tracing::info!(
             terminal_id = %terminal.id,
             cli = %cli_type.name,
             model = %model_config.display_name,
             env_vars_count = env.set.len(),
             args_count = args.len(),
+            auto_confirm = auto_confirm,
             "Built launch config for terminal (process isolation)"
         );
 

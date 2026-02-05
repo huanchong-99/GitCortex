@@ -91,6 +91,13 @@ pub struct Terminal {
     /// Associated gitcortex session ID
     pub vk_session_id: Option<Uuid>,
 
+    /// Auto-confirm mode: skip CLI permission prompts
+    /// When enabled, CLI will be launched with auto-confirm flags:
+    /// - Claude Code: --dangerously-skip-permissions
+    /// - Codex: --yolo
+    /// - Gemini: --yolo
+    pub auto_confirm: bool,
+
     /// Last Git commit hash
     pub last_commit_hash: Option<String>,
 
@@ -216,6 +223,9 @@ pub struct CreateTerminalRequest {
     pub custom_api_key: Option<String>,
     pub role: Option<String>,
     pub role_description: Option<String>,
+    /// Auto-confirm mode: skip CLI permission prompts
+    #[serde(default)]
+    pub auto_confirm: bool,
 }
 
 impl Terminal {
@@ -301,8 +311,8 @@ impl Terminal {
             INSERT INTO terminal (
                 id, workflow_task_id, cli_type_id, model_config_id,
                 custom_base_url, custom_api_key, role, role_description,
-                order_index, status, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                order_index, status, auto_confirm, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
             RETURNING *
             "
         )
@@ -316,6 +326,7 @@ impl Terminal {
         .bind(&terminal.role_description)
         .bind(terminal.order_index)
         .bind(&terminal.status)
+        .bind(terminal.auto_confirm)
         .bind(terminal.created_at)
         .bind(terminal.updated_at)
         .fetch_one(pool)
@@ -582,6 +593,7 @@ mod tests {
                     session_id: None,
                     execution_process_id: None,
                     vk_session_id: None,
+                    auto_confirm: false,
                     last_commit_hash: None,
                     last_commit_message: None,
                     started_at: None,
@@ -633,6 +645,7 @@ mod tests {
                 session_id: None,
                 execution_process_id: None,
                 vk_session_id: None,
+                auto_confirm: false,
                 last_commit_hash: None,
                 last_commit_message: None,
                 started_at: None,
@@ -671,6 +684,7 @@ mod tests {
                 session_id: None,
                 execution_process_id: None,
                 vk_session_id: None,
+                auto_confirm: false,
                 last_commit_hash: None,
                 last_commit_message: None,
                 started_at: None,
@@ -708,6 +722,7 @@ mod tests {
                     session_id: None,
                     execution_process_id: None,
                     vk_session_id: None,
+                    auto_confirm: false,
                     last_commit_hash: None,
                     last_commit_message: None,
                     started_at: None,
@@ -745,6 +760,7 @@ mod tests {
                     session_id: None,
                     execution_process_id: None,
                     vk_session_id: None,
+                    auto_confirm: false,
                     last_commit_hash: None,
                     last_commit_message: None,
                     started_at: None,
@@ -792,6 +808,7 @@ mod tests {
                     session_id: None,
                     execution_process_id: None,
                     vk_session_id: None,
+                    auto_confirm: false,
                     last_commit_hash: None,
                     last_commit_message: None,
                     started_at: None,
