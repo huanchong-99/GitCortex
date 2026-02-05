@@ -1,0 +1,536 @@
+//! Orchestrator Prompt Handler Module
+//!
+//! Processes terminal prompt events and makes intelligent decisions about how to respond.
+//! Implements a rule-based strategy with LLM fallback for complex decisions.
+//!
+//! ## Decision Strategy
+//!
+//! 1. **EnterConfirm** (high confidence, no dangerous keywords): Auto-send `\n`
+//! 2. **Password**: Always ask user (never auto-respond)
+//! 3. **Dangerous keywords detected**: Escalate to LLM or ask user
+//! 4. **YesNo/Choice/ArrowSelect/Input**: LLM decision
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
+
+use super::message_bus::SharedMessageBus;
+use super::types::{
+    DetectedPrompt, PromptDecision, PromptKind, TerminalPromptEvent,
+    TerminalPromptStateMachine,
+};
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/// Confidence threshold for auto-confirming EnterConfirm prompts
+const AUTO_CONFIRM_CONFIDENCE_THRESHOLD: f32 = 0.85;
+
+// ============================================================================
+// LLM Prompt Decision Request/Response
+// ============================================================================
+
+/// Request for LLM to make a prompt decision
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LLMPromptDecisionRequest {
+    /// The detected prompt
+    pub prompt_kind: String,
+    /// Raw prompt text
+    pub prompt_text: String,
+    /// Available options (for ArrowSelect/Choice)
+    pub options: Option<Vec<String>>,
+    /// Current selected index (for ArrowSelect)
+    pub current_index: Option<usize>,
+    /// Whether dangerous keywords were detected
+    pub has_dangerous_keywords: bool,
+    /// Task context (what the terminal is doing)
+    pub task_context: Option<String>,
+}
+
+/// Response from LLM for prompt decision
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct LLMPromptDecisionResponse {
+    /// The decision action
+    pub action: String,
+    /// Response to send (for auto/llm decisions)
+    pub response: Option<String>,
+    /// Target index (for ArrowSelect)
+    pub target_index: Option<usize>,
+    /// Reasoning for the decision
+    pub reasoning: String,
+    /// Whether to ask user instead
+    pub ask_user: Option<bool>,
+}
+
+// ============================================================================
+// Prompt Handler
+// ============================================================================
+
+/// Handles terminal prompt events and makes decisions
+pub struct PromptHandler {
+    /// Message bus for publishing responses
+    message_bus: SharedMessageBus,
+    /// Per-terminal state machines
+    state_machines: Arc<RwLock<HashMap<String, TerminalPromptStateMachine>>>,
+    /// Task context cache (terminal_id -> context)
+    task_contexts: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl PromptHandler {
+    /// Create a new prompt handler
+    pub fn new(message_bus: SharedMessageBus) -> Self {
+        Self {
+            message_bus,
+            state_machines: Arc::new(RwLock::new(HashMap::new())),
+            task_contexts: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Set task context for a terminal (used for LLM decisions)
+    pub async fn set_task_context(&self, terminal_id: &str, context: &str) {
+        let mut contexts = self.task_contexts.write().await;
+        contexts.insert(terminal_id.to_string(), context.to_string());
+    }
+
+    /// Clear task context for a terminal
+    pub async fn clear_task_context(&self, terminal_id: &str) {
+        let mut contexts = self.task_contexts.write().await;
+        contexts.remove(terminal_id);
+    }
+
+    /// Handle a terminal prompt event
+    ///
+    /// Returns the decision made, or None if the prompt should be skipped.
+    pub async fn handle_prompt_event(
+        &self,
+        event: &TerminalPromptEvent,
+    ) -> Option<PromptDecision> {
+        // Get or create state machine for this terminal
+        let mut state_machines = self.state_machines.write().await;
+        let state_machine = state_machines
+            .entry(event.terminal_id.clone())
+            .or_insert_with(TerminalPromptStateMachine::new);
+
+        // Check if we should process this prompt
+        if !state_machine.should_process(&event.prompt) {
+            tracing::debug!(
+                terminal_id = %event.terminal_id,
+                prompt_kind = ?event.prompt.kind,
+                "Skipping duplicate/debounced prompt"
+            );
+            return Some(PromptDecision::skip("Duplicate or debounced prompt"));
+        }
+
+        // Update state machine
+        state_machine.on_prompt_detected(event.prompt.clone());
+        state_machine.on_deciding();
+
+        // Make decision based on prompt type and context
+        let decision = self.make_decision(&event.prompt).await;
+
+        // Update state machine based on decision
+        match &decision {
+            PromptDecision::AskUser { .. } => {
+                state_machine.on_waiting_for_approval(decision.clone());
+            }
+            PromptDecision::Skip { .. } => {
+                state_machine.reset();
+            }
+            _ => {
+                state_machine.on_response_sent(decision.clone());
+            }
+        }
+
+        // Drop lock before publishing
+        drop(state_machines);
+
+        // Publish decision for UI updates
+        self.message_bus
+            .publish_terminal_prompt_decision(
+                &event.terminal_id,
+                &event.workflow_id,
+                decision.clone(),
+            )
+            .await;
+
+        // If decision has a response, publish terminal input
+        if let Some(response) = self.get_response_from_decision(&decision) {
+            self.message_bus
+                .publish_terminal_input(
+                    &event.terminal_id,
+                    &event.session_id,
+                    &response,
+                    Some(decision.clone()),
+                )
+                .await;
+        }
+
+        Some(decision)
+    }
+
+    /// Make a decision for a detected prompt
+    async fn make_decision(&self, prompt: &DetectedPrompt) -> PromptDecision {
+        // Rule 1: Password prompts always require user intervention
+        if prompt.kind == PromptKind::Password {
+            tracing::info!(
+                prompt_kind = ?prompt.kind,
+                "Password prompt detected - requiring user intervention"
+            );
+            return PromptDecision::ask_password();
+        }
+
+        // Rule 2: Dangerous keywords escalate to user (conservative approach)
+        if prompt.has_dangerous_keywords {
+            tracing::warn!(
+                prompt_kind = ?prompt.kind,
+                raw_text = %prompt.raw_text,
+                "Dangerous keywords detected - requiring user confirmation"
+            );
+            return PromptDecision::AskUser {
+                reason: format!(
+                    "Dangerous operation detected: {}",
+                    prompt.raw_text.chars().take(100).collect::<String>()
+                ),
+                suggestions: self.get_suggestions_for_prompt(prompt),
+            };
+        }
+
+        // Rule 3: EnterConfirm with high confidence - auto-confirm
+        if prompt.kind == PromptKind::EnterConfirm
+            && prompt.confidence >= AUTO_CONFIRM_CONFIDENCE_THRESHOLD
+        {
+            tracing::info!(
+                prompt_kind = ?prompt.kind,
+                confidence = prompt.confidence,
+                "Auto-confirming EnterConfirm prompt"
+            );
+            return PromptDecision::auto_enter();
+        }
+
+        // Rule 4: Other prompts - use rule-based defaults or LLM
+        // For now, use conservative rule-based defaults
+        // TODO: Integrate actual LLM call when LLM service is available
+        self.make_rule_based_decision(prompt).await
+    }
+
+    /// Make a rule-based decision (fallback when LLM is not available)
+    async fn make_rule_based_decision(&self, prompt: &DetectedPrompt) -> PromptDecision {
+        match prompt.kind {
+            PromptKind::EnterConfirm => {
+                // Lower confidence EnterConfirm - still auto-confirm but log
+                tracing::debug!(
+                    confidence = prompt.confidence,
+                    "Auto-confirming EnterConfirm with lower confidence"
+                );
+                PromptDecision::auto_enter()
+            }
+
+            PromptKind::YesNo => {
+                // Default to 'yes' for non-dangerous prompts
+                // In production, this should use LLM
+                tracing::info!(
+                    raw_text = %prompt.raw_text,
+                    "YesNo prompt - defaulting to 'yes' (rule-based)"
+                );
+                PromptDecision::llm_yes_no(
+                    true,
+                    "Rule-based default: answering 'yes' to non-dangerous prompt".to_string(),
+                )
+            }
+
+            PromptKind::Choice => {
+                // Default to first option for non-dangerous prompts
+                // In production, this should use LLM
+                tracing::info!(
+                    raw_text = %prompt.raw_text,
+                    "Choice prompt - defaulting to first option (rule-based)"
+                );
+                PromptDecision::llm_choice(
+                    "1",
+                    "Rule-based default: selecting first option".to_string(),
+                )
+            }
+
+            PromptKind::ArrowSelect => {
+                // Default to first option (index 0)
+                // In production, this should use LLM
+                let current_index = prompt.selected_index.unwrap_or(0);
+                let target_index = 0; // Default to first option
+
+                tracing::info!(
+                    raw_text = %prompt.raw_text,
+                    current_index = current_index,
+                    target_index = target_index,
+                    "ArrowSelect prompt - defaulting to first option (rule-based)"
+                );
+
+                PromptDecision::llm_arrow_select(
+                    current_index,
+                    target_index,
+                    "Rule-based default: selecting first option".to_string(),
+                )
+            }
+
+            PromptKind::Input => {
+                // Input prompts should ask user - we can't guess free-form input
+                tracing::info!(
+                    raw_text = %prompt.raw_text,
+                    "Input prompt - requiring user input"
+                );
+                PromptDecision::AskUser {
+                    reason: "Free-form input required".to_string(),
+                    suggestions: None,
+                }
+            }
+
+            PromptKind::Password => {
+                // Should not reach here (handled above), but be safe
+                PromptDecision::ask_password()
+            }
+        }
+    }
+
+    /// Get response string from a decision (if applicable)
+    fn get_response_from_decision(&self, decision: &PromptDecision) -> Option<String> {
+        match decision {
+            PromptDecision::AutoConfirm { response, .. } => Some(response.clone()),
+            PromptDecision::LLMDecision { response, .. } => Some(response.clone()),
+            PromptDecision::AskUser { .. } | PromptDecision::Skip { .. } => None,
+        }
+    }
+
+    /// Get suggestions for a prompt (for AskUser decisions)
+    fn get_suggestions_for_prompt(&self, prompt: &DetectedPrompt) -> Option<Vec<String>> {
+        match prompt.kind {
+            PromptKind::YesNo => Some(vec!["y".to_string(), "n".to_string()]),
+            PromptKind::ArrowSelect => {
+                prompt.options.as_ref().map(|opts| {
+                    opts.iter().map(|o| o.label.clone()).collect()
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Reset state for a terminal
+    pub async fn reset_terminal_state(&self, terminal_id: &str) {
+        let mut state_machines = self.state_machines.write().await;
+        if let Some(sm) = state_machines.get_mut(terminal_id) {
+            sm.reset();
+        }
+    }
+
+    /// Handle user approval for a waiting prompt
+    pub async fn handle_user_approval(
+        &self,
+        terminal_id: &str,
+        session_id: &str,
+        workflow_id: &str,
+        user_response: &str,
+    ) {
+        // Update state machine
+        let mut state_machines = self.state_machines.write().await;
+        if let Some(sm) = state_machines.get_mut(terminal_id) {
+            let decision = PromptDecision::LLMDecision {
+                response: format!("{}\n", user_response),
+                reasoning: "User provided response".to_string(),
+                target_index: None,
+            };
+            sm.on_response_sent(decision.clone());
+
+            // Drop lock before publishing
+            drop(state_machines);
+
+            // Publish the response
+            self.message_bus
+                .publish_terminal_input(
+                    terminal_id,
+                    session_id,
+                    &format!("{}\n", user_response),
+                    Some(decision.clone()),
+                )
+                .await;
+
+            // Publish decision for UI
+            self.message_bus
+                .publish_terminal_prompt_decision(terminal_id, workflow_id, decision)
+                .await;
+        }
+    }
+}
+
+// ============================================================================
+// LLM Prompt Template
+// ============================================================================
+
+/// Build LLM prompt for making a decision about a terminal prompt
+pub fn build_llm_decision_prompt(request: &LLMPromptDecisionRequest) -> String {
+    let mut prompt = format!(
+        r#"You are an AI assistant helping to respond to an interactive terminal prompt.
+
+## Prompt Information
+- Type: {}
+- Text: {}
+- Has dangerous keywords: {}
+"#,
+        request.prompt_kind,
+        request.prompt_text,
+        request.has_dangerous_keywords
+    );
+
+    if let Some(ref options) = request.options {
+        prompt.push_str("\n## Available Options\n");
+        for (i, opt) in options.iter().enumerate() {
+            prompt.push_str(&format!("{}. {}\n", i, opt));
+        }
+    }
+
+    if let Some(idx) = request.current_index {
+        prompt.push_str(&format!("\nCurrently selected: option {}\n", idx));
+    }
+
+    if let Some(ref context) = request.task_context {
+        prompt.push_str(&format!("\n## Task Context\n{}\n", context));
+    }
+
+    prompt.push_str(
+        r#"
+## Instructions
+Analyze the prompt and decide how to respond. Return a JSON object with:
+- "action": "confirm" | "select" | "input" | "ask_user"
+- "response": the text to send (if action is not "ask_user")
+- "target_index": the option index to select (for ArrowSelect prompts)
+- "reasoning": brief explanation of your decision
+- "ask_user": true if human intervention is needed
+
+## Response Format
+```json
+{
+  "action": "...",
+  "response": "...",
+  "target_index": null,
+  "reasoning": "...",
+  "ask_user": false
+}
+```
+"#,
+    );
+
+    prompt
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::orchestrator::message_bus::MessageBus;
+    use crate::services::terminal::prompt_detector::DetectedPrompt;
+
+    fn create_test_handler() -> PromptHandler {
+        let message_bus = Arc::new(MessageBus::new(100));
+        PromptHandler::new(message_bus)
+    }
+
+    fn create_test_prompt(kind: PromptKind, text: &str, confidence: f32) -> DetectedPrompt {
+        DetectedPrompt::new(kind, text.to_string(), confidence)
+    }
+
+    #[tokio::test]
+    async fn test_password_always_asks_user() {
+        let handler = create_test_handler();
+        let prompt = create_test_prompt(PromptKind::Password, "Enter password:", 0.95);
+
+        let decision = handler.make_decision(&prompt).await;
+
+        match decision {
+            PromptDecision::AskUser { reason, .. } => {
+                assert!(reason.contains("Password") || reason.contains("sensitive"));
+            }
+            _ => panic!("Expected AskUser decision for password prompt"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enter_confirm_auto_confirms() {
+        let handler = create_test_handler();
+        let prompt = create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.90);
+
+        let decision = handler.make_decision(&prompt).await;
+
+        match decision {
+            PromptDecision::AutoConfirm { response, .. } => {
+                assert_eq!(response, "\n");
+            }
+            _ => panic!("Expected AutoConfirm decision for EnterConfirm prompt"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_yes_no_defaults_to_yes() {
+        let handler = create_test_handler();
+        let prompt = create_test_prompt(PromptKind::YesNo, "Continue? [y/n]", 0.90);
+
+        let decision = handler.make_decision(&prompt).await;
+
+        match decision {
+            PromptDecision::LLMDecision { response, .. } => {
+                assert_eq!(response, "y\n");
+            }
+            _ => panic!("Expected LLMDecision for YesNo prompt"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_input_asks_user() {
+        let handler = create_test_handler();
+        let prompt = create_test_prompt(PromptKind::Input, "Enter your name:", 0.85);
+
+        let decision = handler.make_decision(&prompt).await;
+
+        match decision {
+            PromptDecision::AskUser { .. } => {}
+            _ => panic!("Expected AskUser decision for Input prompt"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dangerous_keywords_ask_user() {
+        let handler = create_test_handler();
+        let mut prompt = create_test_prompt(PromptKind::YesNo, "Delete all files? [y/n]", 0.90);
+        // Manually set dangerous keywords flag
+        prompt.has_dangerous_keywords = true;
+
+        let decision = handler.make_decision(&prompt).await;
+
+        match decision {
+            PromptDecision::AskUser { reason, .. } => {
+                assert!(reason.contains("Dangerous"));
+            }
+            _ => panic!("Expected AskUser decision for dangerous prompt"),
+        }
+    }
+
+    #[test]
+    fn test_build_llm_decision_prompt() {
+        let request = LLMPromptDecisionRequest {
+            prompt_kind: "YesNo".to_string(),
+            prompt_text: "Continue? [y/n]".to_string(),
+            options: None,
+            current_index: None,
+            has_dangerous_keywords: false,
+            task_context: Some("Installing dependencies".to_string()),
+        };
+
+        let prompt = build_llm_decision_prompt(&request);
+
+        assert!(prompt.contains("YesNo"));
+        assert!(prompt.contains("Continue? [y/n]"));
+        assert!(prompt.contains("Installing dependencies"));
+        assert!(prompt.contains("JSON"));
+    }
+}

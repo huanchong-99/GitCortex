@@ -388,6 +388,8 @@
       "failed": "Failed",
       "killed": "Killed",
       "idle": "Idle",
+      "waiting_for_approval": "Awaiting Approval",
+      "stalled": "Stalled",
       "unknown": "Unknown"
     }
   },

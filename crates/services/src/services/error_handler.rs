@@ -180,6 +180,7 @@ impl ErrorHandler {
                 session_id: None,
                 execution_process_id: None,
                 vk_session_id: None,
+                auto_confirm: false,
                 last_commit_hash: None,
                 last_commit_message: None,
                 started_at: Some(now),

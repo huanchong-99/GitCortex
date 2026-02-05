@@ -489,6 +489,7 @@ async fn create_workflow(
                 session_id: None,
                 execution_process_id: None,
                 vk_session_id: None,
+                auto_confirm: terminal_req.auto_confirm,
                 last_commit_hash: None,
                 last_commit_message: None,
                 started_at: None,
@@ -702,7 +703,14 @@ async fn prepare_workflow(
     // Step 3: Launch PTY processes for all terminals
     let cc_switch = Arc::new(CCSwitchService::new(db_arc.clone()));
     let process_manager = deployment.process_manager().clone();
-    let launcher = TerminalLauncher::new(db_arc, cc_switch, process_manager, working_dir);
+    let message_bus = deployment.message_bus().clone();
+    let launcher = TerminalLauncher::with_message_bus(
+        db_arc,
+        cc_switch,
+        process_manager,
+        working_dir,
+        message_bus,
+    );
 
     let launch_results = launcher.launch_all(&workflow_id).await.map_err(|e| {
         tracing::error!(

@@ -1,0 +1,343 @@
+//! Terminal Prompt Watcher Module
+//!
+//! Monitors PTY output streams and detects interactive prompts.
+//! Publishes `TerminalPromptDetected` events to MessageBus for Orchestrator processing.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
+use tokio::sync::RwLock;
+use tokio::time::Instant;
+
+use crate::services::orchestrator::message_bus::SharedMessageBus;
+use crate::services::orchestrator::types::{
+    PromptState, TerminalPromptEvent, TerminalPromptStateMachine,
+};
+use crate::services::terminal::prompt_detector::{DetectedPrompt, PromptDetector};
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/// Minimum time between prompt detections for the same terminal (debounce)
+const PROMPT_DEBOUNCE_MS: u64 = 500;
+
+/// Timeout for prompt state machine to reset to idle
+const PROMPT_STATE_TIMEOUT_SECS: i64 = 30;
+
+/// Minimum confidence threshold for publishing prompt events
+const MIN_CONFIDENCE_THRESHOLD: f32 = 0.7;
+
+// ============================================================================
+// Terminal Watch State
+// ============================================================================
+
+/// State for a single watched terminal
+#[derive(Debug)]
+struct TerminalWatchState {
+    /// Terminal ID
+    terminal_id: String,
+    /// Workflow ID
+    workflow_id: String,
+    /// Task ID
+    task_id: String,
+    /// PTY session ID
+    session_id: String,
+    /// Prompt detector instance
+    detector: PromptDetector,
+    /// Prompt state machine
+    state_machine: TerminalPromptStateMachine,
+    /// Last detection timestamp (for debouncing)
+    last_detection: Option<Instant>,
+}
+
+impl TerminalWatchState {
+    fn new(terminal_id: String, workflow_id: String, task_id: String, session_id: String) -> Self {
+        Self {
+            terminal_id,
+            workflow_id,
+            task_id,
+            session_id,
+            detector: PromptDetector::new(),
+            state_machine: TerminalPromptStateMachine::new(),
+            last_detection: None,
+        }
+    }
+
+    /// Check if enough time has passed since last detection (debounce)
+    fn should_debounce(&self) -> bool {
+        if let Some(last) = self.last_detection {
+            last.elapsed() < Duration::from_millis(PROMPT_DEBOUNCE_MS)
+        } else {
+            false
+        }
+    }
+
+    /// Process a line of output and return detected prompt if any
+    fn process_line(&mut self, line: &str) -> Option<DetectedPrompt> {
+        // Check debounce
+        if self.should_debounce() {
+            return None;
+        }
+
+        // Detect prompt
+        let prompt = self.detector.process_line(line)?;
+
+        // Check confidence threshold
+        if prompt.confidence < MIN_CONFIDENCE_THRESHOLD {
+            return None;
+        }
+
+        // Check state machine
+        if !self.state_machine.should_process(&prompt) {
+            return None;
+        }
+
+        // Update state
+        self.last_detection = Some(Instant::now());
+        self.state_machine.on_prompt_detected(prompt.clone());
+
+        Some(prompt)
+    }
+
+    /// Reset state machine if stale
+    fn check_and_reset_stale(&mut self) {
+        let timeout = chrono::Duration::seconds(PROMPT_STATE_TIMEOUT_SECS);
+        if self.state_machine.is_stale(timeout) {
+            self.state_machine.reset();
+            self.detector.clear_buffer();
+        }
+    }
+}
+
+// ============================================================================
+// Prompt Watcher
+// ============================================================================
+
+/// Watches PTY output for interactive prompts and publishes events
+#[derive(Clone)]
+pub struct PromptWatcher {
+    /// Message bus for publishing events
+    message_bus: SharedMessageBus,
+    /// Watched terminals state
+    terminals: Arc<RwLock<HashMap<String, TerminalWatchState>>>,
+}
+
+impl PromptWatcher {
+    /// Create a new prompt watcher
+    pub fn new(message_bus: SharedMessageBus) -> Self {
+        Self {
+            message_bus,
+            terminals: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Register a terminal for watching
+    pub async fn register(
+        &self,
+        terminal_id: &str,
+        workflow_id: &str,
+        task_id: &str,
+        session_id: &str,
+    ) {
+        let state = TerminalWatchState::new(
+            terminal_id.to_string(),
+            workflow_id.to_string(),
+            task_id.to_string(),
+            session_id.to_string(),
+        );
+
+        let mut terminals = self.terminals.write().await;
+        terminals.insert(terminal_id.to_string(), state);
+
+        tracing::debug!(
+            terminal_id = %terminal_id,
+            workflow_id = %workflow_id,
+            session_id = %session_id,
+            "Registered terminal for prompt watching"
+        );
+    }
+
+    /// Unregister a terminal from watching
+    pub async fn unregister(&self, terminal_id: &str) {
+        let mut terminals = self.terminals.write().await;
+        terminals.remove(terminal_id);
+
+        tracing::debug!(
+            terminal_id = %terminal_id,
+            "Unregistered terminal from prompt watching"
+        );
+    }
+
+    /// Process PTY output for a terminal
+    ///
+    /// Call this method with each line of PTY output.
+    /// If a prompt is detected, publishes a `TerminalPromptDetected` event.
+    pub async fn process_output(&self, terminal_id: &str, output: &str) {
+        let mut terminals = self.terminals.write().await;
+
+        let state = match terminals.get_mut(terminal_id) {
+            Some(s) => s,
+            None => {
+                tracing::trace!(
+                    terminal_id = %terminal_id,
+                    "Terminal not registered for prompt watching, ignoring output"
+                );
+                return;
+            }
+        };
+
+        // Check and reset stale state
+        state.check_and_reset_stale();
+
+        // Process each line
+        for line in output.lines() {
+            if let Some(prompt) = state.process_line(line) {
+                let event = TerminalPromptEvent {
+                    terminal_id: state.terminal_id.clone(),
+                    workflow_id: state.workflow_id.clone(),
+                    task_id: state.task_id.clone(),
+                    session_id: state.session_id.clone(),
+                    prompt: prompt.clone(),
+                    detected_at: chrono::Utc::now(),
+                };
+
+                tracing::info!(
+                    terminal_id = %state.terminal_id,
+                    prompt_kind = ?prompt.kind,
+                    confidence = prompt.confidence,
+                    has_dangerous_keywords = prompt.has_dangerous_keywords,
+                    "Detected interactive prompt"
+                );
+
+                // Publish event (drop lock first to avoid deadlock)
+                drop(terminals);
+                self.message_bus.publish_terminal_prompt_detected(event).await;
+                return;
+            }
+        }
+    }
+
+    /// Update terminal state after response is sent
+    pub async fn on_response_sent(
+        &self,
+        terminal_id: &str,
+        decision: crate::services::orchestrator::types::PromptDecision,
+    ) {
+        let mut terminals = self.terminals.write().await;
+        if let Some(state) = terminals.get_mut(terminal_id) {
+            state.state_machine.on_response_sent(decision);
+            state.detector.clear_buffer();
+        }
+    }
+
+    /// Update terminal state when waiting for user approval
+    pub async fn on_waiting_for_approval(
+        &self,
+        terminal_id: &str,
+        decision: crate::services::orchestrator::types::PromptDecision,
+    ) {
+        let mut terminals = self.terminals.write().await;
+        if let Some(state) = terminals.get_mut(terminal_id) {
+            state.state_machine.on_waiting_for_approval(decision);
+        }
+    }
+
+    /// Reset terminal prompt state
+    pub async fn reset_state(&self, terminal_id: &str) {
+        let mut terminals = self.terminals.write().await;
+        if let Some(state) = terminals.get_mut(terminal_id) {
+            state.state_machine.reset();
+            state.detector.clear_buffer();
+        }
+    }
+
+    /// Get current prompt state for a terminal
+    pub async fn get_state(&self, terminal_id: &str) -> Option<PromptState> {
+        let terminals = self.terminals.read().await;
+        terminals.get(terminal_id).map(|s| s.state_machine.state)
+    }
+
+    /// Check if a terminal is registered
+    pub async fn is_registered(&self, terminal_id: &str) -> bool {
+        let terminals = self.terminals.read().await;
+        terminals.contains_key(terminal_id)
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::orchestrator::message_bus::MessageBus;
+
+    fn create_test_watcher() -> PromptWatcher {
+        let message_bus = Arc::new(MessageBus::new(100));
+        PromptWatcher::new(message_bus)
+    }
+
+    #[tokio::test]
+    async fn test_register_unregister() {
+        let watcher = create_test_watcher();
+
+        watcher
+            .register("term-1", "workflow-1", "task-1", "session-1")
+            .await;
+        assert!(watcher.is_registered("term-1").await);
+
+        watcher.unregister("term-1").await;
+        assert!(!watcher.is_registered("term-1").await);
+    }
+
+    #[tokio::test]
+    async fn test_process_output_unregistered() {
+        let watcher = create_test_watcher();
+
+        // Should not panic for unregistered terminal
+        watcher
+            .process_output("unknown-term", "Press Enter to continue")
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_get_state() {
+        let watcher = create_test_watcher();
+
+        // Unregistered terminal returns None
+        assert!(watcher.get_state("term-1").await.is_none());
+
+        // Registered terminal returns Idle
+        watcher
+            .register("term-1", "workflow-1", "task-1", "session-1")
+            .await;
+        assert_eq!(watcher.get_state("term-1").await, Some(PromptState::Idle));
+    }
+
+    #[tokio::test]
+    async fn test_reset_state() {
+        let watcher = create_test_watcher();
+
+        watcher
+            .register("term-1", "workflow-1", "task-1", "session-1")
+            .await;
+
+        // Process a prompt to change state
+        watcher
+            .process_output("term-1", "Press Enter to continue")
+            .await;
+
+        // State should be Detected
+        assert_eq!(
+            watcher.get_state("term-1").await,
+            Some(PromptState::Detected)
+        );
+
+        // Reset state
+        watcher.reset_state("term-1").await;
+        assert_eq!(watcher.get_state("term-1").await, Some(PromptState::Idle));
+    }
+}

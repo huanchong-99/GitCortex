@@ -2,6 +2,8 @@
 //!
 //! API endpoints for terminal management and log retrieval
 
+use std::sync::Arc;
+
 use axum::{
     extract::{Path, Query, State},
     response::Json as ResponseJson,
@@ -11,7 +13,9 @@ use axum::{
 use db::models::terminal::{Terminal, TerminalLog};
 use deployment::Deployment;
 use serde::Deserialize;
-use services::services::terminal::process::{ProcessManager, DEFAULT_COLS, DEFAULT_ROWS};
+use services::services::cc_switch::CCSwitchService;
+use services::services::terminal::bridge::TerminalBridge;
+use services::services::terminal::process::{DEFAULT_COLS, DEFAULT_ROWS};
 use tokio::process::Command;
 use utils::response::ApiResponse;
 
@@ -127,7 +131,8 @@ pub async fn get_terminal_logs(
 ///
 /// POST /api/terminals/:id/start
 ///
-/// Starts a terminal by spawning a PTY process
+/// Starts a terminal by spawning a PTY process with proper configuration
+/// including auto-confirm flags and MessageBus bridge registration.
 pub async fn start_terminal(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
@@ -186,10 +191,24 @@ pub async fn start_terminal(
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to update terminal status: {e}")))?;
 
-    // Spawn PTY process
+    // Build spawn configuration with auto-confirm flags using CCSwitchService
+    let cc_switch = CCSwitchService::new(Arc::new(deployment.db().clone()));
+    let spawn_config = match cc_switch
+        .build_launch_config(&terminal, &shell, &working_dir, terminal.auto_confirm)
+        .await
+    {
+        Ok(config) => config,
+        Err(e) => {
+            // On config build failure, reset status
+            let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
+            return Err(ApiError::Internal(format!("Failed to build launch config: {e}")));
+        }
+    };
+
+    // Spawn PTY process with configuration
     let handle = match deployment
         .process_manager()
-        .spawn_pty(&id, &shell, &working_dir, DEFAULT_COLS, DEFAULT_ROWS)
+        .spawn_pty_with_config(&id, &spawn_config, DEFAULT_COLS, DEFAULT_ROWS)
         .await
     {
         Ok(handle) => handle,
@@ -211,13 +230,39 @@ pub async fn start_terminal(
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to update terminal process info: {e}")))?;
 
-    tracing::info!("Terminal {} started with PID {}", id, handle.pid);
+    // Register terminal bridge for MessageBus -> PTY stdin forwarding
+    let terminal_bridge = TerminalBridge::new(
+        deployment.message_bus().clone(),
+        deployment.process_manager().clone(),
+    );
+    if let Err(e) = terminal_bridge.register(&id, &handle.session_id).await {
+        tracing::warn!(
+            terminal_id = %id,
+            pty_session_id = %handle.session_id,
+            error = %e,
+            "Failed to register terminal bridge (non-fatal)"
+        );
+    } else {
+        tracing::debug!(
+            terminal_id = %id,
+            pty_session_id = %handle.session_id,
+            "Terminal bridge registered successfully"
+        );
+    }
+
+    tracing::info!(
+        terminal_id = %id,
+        pid = handle.pid,
+        auto_confirm = terminal.auto_confirm,
+        "Terminal started with auto-confirm={}", terminal.auto_confirm
+    );
 
     Ok(ResponseJson(ApiResponse::success(serde_json::json!({
         "terminal_id": id,
         "pid": handle.pid,
         "session_id": handle.session_id,
-        "status": "started"
+        "status": "started",
+        "auto_confirm": terminal.auto_confirm
     }))))
 }
 

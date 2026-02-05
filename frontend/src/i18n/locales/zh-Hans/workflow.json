@@ -388,6 +388,8 @@
       "failed": "失败",
       "killed": "已终止",
       "idle": "未开始",
+      "waiting_for_approval": "等待确认",
+      "stalled": "已停滞",
       "unknown": "未知"
     }
   },
