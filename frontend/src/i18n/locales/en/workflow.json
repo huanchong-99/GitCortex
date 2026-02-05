@@ -409,7 +409,8 @@
     "kanban": "Kanban",
     "pipeline": "Pipeline",
     "debug": "Debug",
-    "selectWorkflowFirst": "Select a workflow first"
+    "selectWorkflowFirst": "Select a workflow first",
+    "settings": "Settings"
   },
   "kanban": {
     "columns": {

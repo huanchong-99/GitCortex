@@ -3,13 +3,13 @@
   "short_name": "GC",
   "icons": [
     {
-      "src": "/favicon-vk-light.svg",
+      "src": "/favicon-gitcortex-light.svg",
       "sizes": "any",
       "purpose": "any",
       "type": "image/svg+xml"
     },
     {
-      "src": "/favicon-vk-light-maskable.svg",
+      "src": "/favicon-gitcortex-dark.svg",
       "sizes": "any",
       "purpose": "maskable",
       "type": "image/svg+xml"

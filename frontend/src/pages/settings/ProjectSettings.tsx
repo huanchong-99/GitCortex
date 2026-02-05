@@ -25,6 +25,7 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { RepoPickerDialog } from '@/components/dialogs/shared/RepoPickerDialog';
+import { CreateProjectDialog } from '@/components/ui-new/dialogs/CreateProjectDialog';
 import { projectsApi } from '@/lib/api';
 import { repoBranchKeys } from '@/hooks/useRepoBranches';
 import type { Project, Repo, UpdateProject } from 'shared/types';
@@ -43,7 +44,7 @@ export function ProjectSettings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const projectIdParam = searchParams.get('projectId') ?? '';
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation(['settings', 'projects']);
   const queryClient = useQueryClient();
 
   // Fetch all projects
@@ -108,6 +109,14 @@ export function ProjectSettings() {
     },
     [hasUnsavedChanges, selectedProjectId, setSearchParams, t]
   );
+
+  // Handle creating a new project
+  const handleCreateProject = useCallback(async () => {
+    const result = await CreateProjectDialog.show({});
+    if (result.status === 'saved') {
+      handleProjectSelect(result.project.id);
+    }
+  }, [handleProjectSelect]);
 
   // Sync selectedProjectId when URL changes (with unsaved changes prompt)
   useEffect(() => {
@@ -358,10 +367,18 @@ export function ProjectSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('settings.projects.title')}</CardTitle>
-          <CardDescription>
-            {t('settings.projects.description')}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <CardTitle>{t('settings.projects.title')}</CardTitle>
+              <CardDescription>
+                {t('settings.projects.description')}
+              </CardDescription>
+            </div>
+            <Button onClick={handleCreateProject} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              {t('projects:createProject')}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

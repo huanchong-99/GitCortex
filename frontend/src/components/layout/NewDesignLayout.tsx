@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { LayoutGrid, GitBranch, Bug } from 'lucide-react';
+import { LayoutGrid, GitBranch, Bug, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
@@ -79,30 +79,41 @@ export function NewDesignLayout() {
       {/* View Switcher Navigation */}
       {showViewSwitcher && (
         <div className="h-10 bg-panel border-b border-border px-4 flex items-center gap-1">
-          {VIEW_OPTIONS.map((option) => {
-            const Icon = option.icon;
-            const isActive = currentView === option.id;
-            const isDisabled = option.requiresWorkflow && !workflowId;
-            return (
-              <button
-                key={option.id}
-                onClick={() => handleViewChange(option)}
-                disabled={isDisabled}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors',
-                  isActive
-                    ? 'bg-brand/10 text-brand font-medium'
-                    : isDisabled
-                    ? 'text-low/50 cursor-not-allowed'
-                    : 'text-low hover:text-high hover:bg-secondary'
-                )}
-                title={isDisabled ? t('viewSwitcher.selectWorkflowFirst') : undefined}
-              >
-                <Icon className="w-4 h-4" />
-                {t(option.labelKey)}
-              </button>
-            );
-          })}
+          <div className="flex items-center gap-1">
+            {VIEW_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const isActive = currentView === option.id;
+              const isDisabled = option.requiresWorkflow && !workflowId;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => handleViewChange(option)}
+                  disabled={isDisabled}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors',
+                    isActive
+                      ? 'bg-brand/10 text-brand font-medium'
+                      : isDisabled
+                      ? 'text-low/50 cursor-not-allowed'
+                      : 'text-low hover:text-high hover:bg-secondary'
+                  )}
+                  title={isDisabled ? t('viewSwitcher.selectWorkflowFirst') : undefined}
+                >
+                  <Icon className="w-4 h-4" />
+                  {t(option.labelKey)}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
+            aria-label={t('viewSwitcher.settings')}
+            title={t('viewSwitcher.settings')}
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       )}
 

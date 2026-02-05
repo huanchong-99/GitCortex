@@ -409,7 +409,8 @@
     "kanban": "看板",
     "pipeline": "流水线",
     "debug": "调试",
-    "selectWorkflowFirst": "请先选择工作流"
+    "selectWorkflowFirst": "请先选择工作流",
+    "settings": "设置"
   },
   "kanban": {
     "columns": {
