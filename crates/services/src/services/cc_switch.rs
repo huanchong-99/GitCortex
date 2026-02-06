@@ -28,6 +28,139 @@ use db::{
 use crate::services::terminal::process::{SpawnCommand, SpawnEnv};
 
 // ============================================================================
+// Authentication Skip Helpers
+// ============================================================================
+
+/// Creates Codex config.toml in CODEX_HOME to skip authentication
+fn create_codex_config(codex_home: &Path, base_url: Option<&str>, model: &str) -> anyhow::Result<()> {
+    let config_path = codex_home.join("config.toml");
+
+    let base_url_str = base_url.unwrap_or("https://api.openai.com/v1");
+
+    let config_content = format!(
+        r#"forced_login_method = "api"
+model_provider = "openai"
+model = "{}"
+
+[model_providers.openai]
+name = "OpenAI"
+base_url = "{}"
+env_key = "OPENAI_API_KEY"
+wire_api = "responses"
+"#,
+        model, base_url_str
+    );
+
+    std::fs::write(&config_path, config_content)
+        .map_err(|e| anyhow::anyhow!("Failed to write Codex config.toml: {}", e))?;
+
+    tracing::debug!(
+        codex_home = %codex_home.display(),
+        "Created Codex config.toml for authentication skip"
+    );
+
+    Ok(())
+}
+
+/// Creates Claude Code config.json in isolated directory to skip authentication
+fn create_claude_config(claude_home: &Path) -> anyhow::Result<()> {
+    let config_path = claude_home.join("config.json");
+
+    // Only set primaryApiKey = "any" to skip authentication
+    // Preserve other fields if file exists
+    let config_content = if config_path.exists() {
+        let existing = std::fs::read_to_string(&config_path)?;
+        let mut value: serde_json::Value = serde_json::from_str(&existing)
+            .unwrap_or_else(|_| serde_json::json!({}));
+
+        if let Some(obj) = value.as_object_mut() {
+            obj.insert("primaryApiKey".to_string(), serde_json::Value::String("any".to_string()));
+        }
+
+        serde_json::to_string_pretty(&value)?
+    } else {
+        serde_json::to_string_pretty(&serde_json::json!({
+            "primaryApiKey": "any"
+        }))?
+    };
+
+    std::fs::write(&config_path, config_content)
+        .map_err(|e| anyhow::anyhow!("Failed to write Claude config.json: {}", e))?;
+
+    tracing::debug!(
+        claude_home = %claude_home.display(),
+        "Created Claude Code config.json for authentication skip"
+    );
+
+    Ok(())
+}
+
+/// Creates Gemini .env in isolated directory to skip authentication
+fn create_gemini_env(gemini_home: &Path, api_key: &str, base_url: Option<&str>, model: &str) -> anyhow::Result<()> {
+    let env_path = gemini_home.join(".env");
+
+    let mut env_content = format!("GEMINI_API_KEY={}\nGEMINI_MODEL={}\n", api_key, model);
+
+    if let Some(url) = base_url {
+        env_content.push_str(&format!("GOOGLE_GEMINI_BASE_URL={}\n", url));
+    }
+
+    std::fs::write(&env_path, env_content)
+        .map_err(|e| anyhow::anyhow!("Failed to write Gemini .env: {}", e))?;
+
+    // Set restrictive permissions on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600)) {
+            tracing::warn!(
+                env_path = %env_path.display(),
+                error = %e,
+                "Failed to set restrictive permissions on Gemini .env"
+            );
+        }
+    }
+
+    tracing::debug!(
+        gemini_home = %gemini_home.display(),
+        "Created Gemini .env for authentication skip"
+    );
+
+    Ok(())
+}
+
+/// Creates OpenCode config in isolated directory
+fn create_opencode_config(opencode_home: &Path, base_url: Option<&str>, model: &str) -> anyhow::Result<()> {
+    let config_path = opencode_home.join("opencode.json");
+
+    let base_url_str = base_url.unwrap_or("https://api.openai.com/v1");
+
+    let config = serde_json::json!({
+        "$schema": "https://opencode.ai/config.json",
+        "provider": {
+            "openai": {
+                "options": {
+                    "baseURL": base_url_str,
+                    "apiKey": "{env:OPENAI_API_KEY}"
+                }
+            }
+        },
+        "model": format!("openai/{}", model)
+    });
+
+    let config_content = serde_json::to_string_pretty(&config)?;
+    std::fs::write(&config_path, config_content)
+        .map_err(|e| anyhow::anyhow!("Failed to write OpenCode config: {}", e))?;
+
+    tracing::debug!(
+        opencode_home = %opencode_home.display(),
+        "Created OpenCode config for authentication skip"
+    );
+
+    Ok(())
+}
+
+// ============================================================================
 // Auto-Confirm Parameters
 // ============================================================================
 
@@ -250,6 +383,47 @@ impl CCSwitchService {
 
         match cli {
             CcCliType::ClaudeCode => {
+                // Create isolated Claude home directory
+                let safe_id: String = terminal.id
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .take(64)
+                    .collect();
+                let base_dir = std::env::temp_dir().join("gitcortex");
+                std::fs::create_dir_all(&base_dir).map_err(|e| {
+                    anyhow::anyhow!("Failed to create Claude home base directory {}: {e}", base_dir.display())
+                })?;
+                let claude_home = base_dir.join(format!("claude-{}", safe_id));
+                std::fs::create_dir_all(&claude_home).map_err(|e| {
+                    anyhow::anyhow!("Failed to create Claude home directory {}: {e}", claude_home.display())
+                })?;
+
+                // Set restrictive permissions on Unix
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Err(e) = std::fs::set_permissions(&claude_home, std::fs::Permissions::from_mode(0o700)) {
+                        tracing::warn!(
+                            terminal_id = %terminal.id,
+                            claude_home = %claude_home.display(),
+                            error = %e,
+                            "Failed to set restrictive permissions on Claude home"
+                        );
+                    }
+                }
+
+                // Create config.json to skip authentication
+                if let Err(e) = create_claude_config(&claude_home) {
+                    tracing::warn!(
+                        terminal_id = %terminal.id,
+                        error = %e,
+                        "Failed to create Claude config for authentication skip, continuing anyway"
+                    );
+                }
+
+                // Set CLAUDE_HOME to isolated directory
+                env.set.insert("CLAUDE_HOME".to_string(), claude_home.to_string_lossy().to_string());
+
                 // Handle base URL: set if provided, otherwise remove inherited
                 if let Some(base_url) = &terminal.custom_base_url {
                     env.set.insert("ANTHROPIC_BASE_URL".to_string(), base_url.clone());
@@ -296,7 +470,8 @@ impl CCSwitchService {
                 tracing::debug!(
                     terminal_id = %terminal.id,
                     cli = "claude-code",
-                    "Built launch config for Claude Code"
+                    claude_home = %claude_home.display(),
+                    "Built launch config for Claude Code with authentication skip"
                 );
             }
             CcCliType::Codex => {
@@ -352,16 +527,27 @@ impl CCSwitchService {
                     }
                 }
 
+                // Get model name
+                let model = model_config
+                    .api_model_id
+                    .clone()
+                    .unwrap_or_else(|| model_config.name.clone());
+
+                // Create config.toml to skip authentication
+                if let Err(e) = create_codex_config(&codex_home, terminal.custom_base_url.as_deref(), &model) {
+                    tracing::warn!(
+                        terminal_id = %terminal.id,
+                        error = %e,
+                        "Failed to create Codex config for authentication skip, continuing anyway"
+                    );
+                }
+
                 env.set.insert(
                     "CODEX_HOME".to_string(),
                     codex_home.to_string_lossy().to_string(),
                 );
 
                 // CLI arguments (higher priority than config files)
-                let model = model_config
-                    .api_model_id
-                    .clone()
-                    .unwrap_or_else(|| model_config.name.clone());
                 args.push("--model".to_string());
                 args.push(model);
                 args.push("--config".to_string());
@@ -371,10 +557,62 @@ impl CCSwitchService {
                     terminal_id = %terminal.id,
                     cli = "codex",
                     codex_home = %codex_home.display(),
-                    "Built launch config for Codex"
+                    "Built launch config for Codex with authentication skip"
                 );
             }
             CcCliType::Gemini => {
+                // Gemini requires API key
+                let api_key = terminal
+                    .get_custom_api_key()?
+                    .ok_or_else(|| anyhow::anyhow!("Gemini requires API key"))?;
+
+                // Create isolated Gemini home directory
+                let safe_id: String = terminal.id
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .take(64)
+                    .collect();
+                let base_dir = std::env::temp_dir().join("gitcortex");
+                std::fs::create_dir_all(&base_dir).map_err(|e| {
+                    anyhow::anyhow!("Failed to create Gemini home base directory {}: {e}", base_dir.display())
+                })?;
+                let gemini_home = base_dir.join(format!("gemini-{}", safe_id));
+                std::fs::create_dir_all(&gemini_home).map_err(|e| {
+                    anyhow::anyhow!("Failed to create Gemini home directory {}: {e}", gemini_home.display())
+                })?;
+
+                // Set restrictive permissions on Unix
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Err(e) = std::fs::set_permissions(&gemini_home, std::fs::Permissions::from_mode(0o700)) {
+                        tracing::warn!(
+                            terminal_id = %terminal.id,
+                            gemini_home = %gemini_home.display(),
+                            error = %e,
+                            "Failed to set restrictive permissions on Gemini home"
+                        );
+                    }
+                }
+
+                // Get model name
+                let model = model_config
+                    .api_model_id
+                    .clone()
+                    .unwrap_or_else(|| model_config.name.clone());
+
+                // Create .env to skip authentication
+                if let Err(e) = create_gemini_env(&gemini_home, &api_key, terminal.custom_base_url.as_deref(), &model) {
+                    tracing::warn!(
+                        terminal_id = %terminal.id,
+                        error = %e,
+                        "Failed to create Gemini .env for authentication skip, continuing anyway"
+                    );
+                }
+
+                // Set GEMINI_HOME to isolated directory (Gemini CLI respects this)
+                env.set.insert("GEMINI_HOME".to_string(), gemini_home.to_string_lossy().to_string());
+
                 // Handle base URL
                 if let Some(base_url) = &terminal.custom_base_url {
                     env.set.insert("GOOGLE_GEMINI_BASE_URL".to_string(), base_url.clone());
@@ -382,23 +620,14 @@ impl CCSwitchService {
                     env.unset.push("GOOGLE_GEMINI_BASE_URL".to_string());
                 }
 
-                // Gemini requires API key
-                let api_key = terminal
-                    .get_custom_api_key()?
-                    .ok_or_else(|| anyhow::anyhow!("Gemini requires API key"))?;
                 env.set.insert("GEMINI_API_KEY".to_string(), api_key);
-
-                // Set model
-                let model = model_config
-                    .api_model_id
-                    .clone()
-                    .unwrap_or_else(|| model_config.name.clone());
                 env.set.insert("GEMINI_MODEL".to_string(), model);
 
                 tracing::debug!(
                     terminal_id = %terminal.id,
                     cli = "gemini",
-                    "Built launch config for Gemini"
+                    gemini_home = %gemini_home.display(),
+                    "Built launch config for Gemini with authentication skip"
                 );
             }
             _ => {
