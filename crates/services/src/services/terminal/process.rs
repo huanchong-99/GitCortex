@@ -1164,25 +1164,29 @@ mod tests {
             .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
             .await;
 
-        // First call should return handles
+        // In new architecture, reader is owned by background fanout task
+        // get_handle() returns reader: None, writer: Some
         let handle1 = manager.get_handle("test-terminal").await;
         assert!(handle1.is_some());
         let handle1 = handle1.unwrap();
-        assert!(handle1.reader.is_some());
+        assert!(handle1.reader.is_none(), "Reader should be None (owned by fanout task)");
         assert!(handle1.writer.is_some());
 
-        // Second call should also return handles (reader cloned, writer shared)
-        // This supports WebSocket reconnection scenarios
+        // Second call should also return handle with shared writer
         let handle2 = manager.get_handle("test-terminal").await;
         assert!(handle2.is_some());
         let handle2 = handle2.unwrap();
-        assert!(handle2.reader.is_some());
+        assert!(handle2.reader.is_none(), "Reader should be None (owned by fanout task)");
         assert!(handle2.writer.is_some());
 
         // Verify that writers are the same Arc (shared)
         let writer1 = handle1.writer.as_ref().unwrap();
         let writer2 = handle2.writer.as_ref().unwrap();
         assert!(Arc::ptr_eq(writer1, writer2), "Writers should be shared via Arc");
+
+        // Verify subscribe_output works (new API for reading output)
+        let subscription = manager.subscribe_output("test-terminal", None).await;
+        assert!(subscription.is_ok(), "Should be able to subscribe to output");
 
         // Cleanup
         let _ = manager.kill_terminal("test-terminal").await;
