@@ -243,7 +243,7 @@ async fn handle_terminal_socket(
 
     // Create channels for async communication
     // WebSocket input -> PTY
-    let (ws_tx_input, ws_rx) = mpsc::channel::<Vec<u8>>(100);
+    let (ws_tx_input, mut ws_rx) = mpsc::channel::<Vec<u8>>(100);
 
     // Clone terminal_id for tasks
     let terminal_id_writer = terminal_id.clone();
