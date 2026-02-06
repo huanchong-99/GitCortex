@@ -216,22 +216,25 @@ export function WorkflowWizard({
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto bg-panel text-high">
-      <CardHeader>
+    <Card className="w-full max-w-4xl mx-auto bg-panel text-high max-h-[calc(100vh-8rem)] min-h-0 flex flex-col">
+      <CardHeader className="shrink-0">
         <CardTitle className="text-xl">{t('wizard.title')}</CardTitle>
       </CardHeader>
-      <CardContent className="px-base">
-        <StepIndicator currentStep={currentStep} completedSteps={completedSteps} />
+      <CardContent className="px-base flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0">
+          <StepIndicator currentStep={currentStep} completedSteps={completedSteps} />
+        </div>
 
-        <div className="min-h-[400px] max-h-[60vh] overflow-y-auto mb-6">
+        <div className="min-h-0 flex-1 overflow-y-auto mb-6">
           {renderStep()}
         </div>
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between items-center pt-4 border-t border-border">
+        <div className="shrink-0 flex justify-between items-center pt-4 border-t border-border">
           <div>
             {currentStep > WizardStep.Project ? (
               <button
+                type="button"
                 onClick={handleBack}
                 disabled={isSubmitting}
                 className={cn(
@@ -248,6 +251,7 @@ export function WorkflowWizard({
           <div className="flex gap-3">
             {currentStep === WizardStep.Project ? (
               <button
+                type="button"
                 onClick={handleCancel}
                 className={cn(
                   'px-4 py-2 rounded border text-sm',
@@ -259,6 +263,7 @@ export function WorkflowWizard({
             ) : null}
 
             <button
+              type="button"
               onClick={handlePrimaryButtonClick}
               disabled={isSubmitting}
               className={cn(

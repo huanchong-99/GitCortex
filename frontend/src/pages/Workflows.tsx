@@ -261,7 +261,7 @@ export function Workflows() {
     const actions = getWorkflowActions(selectedWorkflowDetail.status as any);
 
     return (
-      <div className="space-y-6">
+      <div className="h-full min-h-0 overflow-auto space-y-6">
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={() => setSelectedWorkflowId(null)}>
             ← Back to Workflows
@@ -333,7 +333,7 @@ export function Workflows() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 overflow-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div>
@@ -372,7 +372,8 @@ export function Workflows() {
         />
       )}
 
-      {!workflows || workflows.length === 0 ? (
+      {!showWizard && (
+        !workflows || workflows.length === 0 ? (
         <Card className="p-12 text-center">
           <h3 className="text-lg font-semibold mb-2">{t('empty.title')}</h3>
           <p className="text-low mb-6">{t('empty.description')}</p>
@@ -418,6 +419,7 @@ export function Workflows() {
             </Card>
           ))}
         </div>
+        )
       )}
     </div>
   );
