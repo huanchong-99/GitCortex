@@ -175,9 +175,8 @@ impl Deployment for LocalDeployment {
         // Create message bus and orchestrator runtime
         let message_bus = Arc::new(MessageBus::new(1000));
         let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus.clone());
-        let prompt_watcher = PromptWatcher::new(message_bus.clone());
-
         let process_manager = Arc::new(ProcessManager::new());
+        let prompt_watcher = PromptWatcher::new(message_bus.clone(), process_manager.clone());
 
         // Reconcile terminal statuses on startup
         // Reset any terminals that are marked as running but have no actual process

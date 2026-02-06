@@ -31,9 +31,6 @@ const WS_IDLE_TIMEOUT_SECS: u64 = 300;
 /// Heartbeat interval for keep-alive (30 seconds)
 const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
-/// PTY read buffer size
-const PTY_READ_BUFFER_SIZE: usize = 4096;
-
 // Compile-time sanity check for timeout ordering.
 const _: () = {
     assert!(WS_HEARTBEAT_INTERVAL_SECS < WS_IDLE_TIMEOUT_SECS);
@@ -205,69 +202,143 @@ async fn handle_terminal_socket(
         }
     }
 
-    // Extract PTY reader and writer
-    let reader = process_handle.reader;
+    // Clone process_manager for output subscription and resize operations
+    let process_manager = deployment.process_manager().clone();
+
+    // Extract PTY writer (reader is now owned by background fanout task)
     let writer = process_handle.writer;
 
+    // Proactively check if writer is available
+    if writer.is_none() {
+        let msg = WsMessage::Error {
+            message: "Terminal process has no input writer available.".to_string(),
+        };
+        if let Ok(json) = serde_json::to_string(&msg) {
+            let _ = ws_sender.send(Message::Text(json.into())).await;
+        }
+        let _ = ws_sender.close().await;
+        tracing::warn!("Terminal {} has no PTY writer available", terminal_id);
+        return;
+    }
+
+    // Subscribe to terminal output stream with replay
+    let mut output_subscription = match process_manager.subscribe_output(&terminal_id, None).await {
+        Ok(sub) => sub,
+        Err(e) => {
+            tracing::error!(
+                terminal_id = %terminal_id,
+                error = %e,
+                "Failed to subscribe to terminal output"
+            );
+            let msg = WsMessage::Error {
+                message: format!("Failed to subscribe to terminal output: {e}"),
+            };
+            if let Ok(json) = serde_json::to_string(&msg) {
+                let _ = ws_sender.send(Message::Text(json.into())).await;
+            }
+            let _ = ws_sender.close().await;
+            return;
+        }
+    };
+
     // Create channels for async communication
-    // PTY output -> WebSocket
-    let (pty_tx, mut pty_rx) = mpsc::channel::<Vec<u8>>(100);
     // WebSocket input -> PTY
-    let (ws_tx, ws_rx) = mpsc::channel::<Vec<u8>>(100);
+    let (ws_tx_input, ws_rx) = mpsc::channel::<Vec<u8>>(100);
 
     // Clone terminal_id for tasks
-    let terminal_id_reader = terminal_id.clone();
     let terminal_id_writer = terminal_id.clone();
     let terminal_id_heartbeat = terminal_id.clone();
     let terminal_id_recv = terminal_id.clone();
+    let terminal_id_output = terminal_id.clone();
 
     // Track last activity time for idle timeout
     let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
     let last_activity_recv = last_activity.clone();
     let last_activity_heartbeat = last_activity.clone();
 
-    // Clone process_manager for resize operations
-    let process_manager = deployment.process_manager().clone();
     let terminal_id_resize = terminal_id.clone();
-    let terminal_id_prompt = terminal_id.clone();
 
-    // Spawn PTY reader task (blocking read -> async channel)
-    let reader_task = if let Some(mut pty_reader) = reader {
-        let tx = pty_tx.clone();
-        Some(tokio::task::spawn_blocking(move || {
-            let mut buf = [0u8; PTY_READ_BUFFER_SIZE];
+    // Spawn output subscription task (fanout -> WebSocket)
+    // Replaces old PTY reader/send task pipeline with shared fanout + replay support
+    // Note: PromptWatcher now subscribes directly to fanout, no need to feed it here
+    let output_task = {
+        let last_activity_clone = last_activity.clone();
+        tokio::spawn(async move {
             loop {
-                match pty_reader.read(&mut buf) {
-                    Ok(0) => {
-                        // EOF - PTY closed
-                        tracing::debug!("PTY EOF for terminal {}", terminal_id_reader);
-                        break;
-                    }
-                    Ok(n) => {
-                        // Send data to async channel
-                        if tx.blocking_send(buf[..n].to_vec()).is_err() {
-                            tracing::debug!("PTY channel closed for terminal {}", terminal_id_reader);
-                            break;
+                match output_subscription.recv().await {
+                    Ok(chunk) => {
+                        // Update last activity
+                        *last_activity_clone.write().await = Instant::now();
+
+                        if !chunk.text.is_empty() {
+                            let msg = WsMessage::Output { data: chunk.text };
+                            match serde_json::to_string(&msg) {
+                                Ok(json) => {
+                                    if let Err(e) =
+                                        ws_sender.send(Message::Text(json.into())).await
+                                    {
+                                        tracing::debug!(
+                                            terminal_id = %terminal_id_output,
+                                            error = %e,
+                                            "Failed to send output to WebSocket"
+                                        );
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        terminal_id = %terminal_id_output,
+                                        error = %e,
+                                        "Failed to serialize terminal output message"
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Log dropped bytes if any
+                        if chunk.dropped_invalid_bytes > 0 {
+                            tracing::warn!(
+                                terminal_id = %terminal_id_output,
+                                seq = chunk.seq,
+                                dropped_bytes = chunk.dropped_invalid_bytes,
+                                "Dropped invalid UTF-8 bytes in terminal output"
+                            );
                         }
                     }
                     Err(e) => {
-                        tracing::error!("PTY read error for terminal {}: {}", terminal_id_reader, e);
-                        break;
+                        use tokio::sync::broadcast::error::RecvError;
+                        match e {
+                            RecvError::Lagged(skipped) => {
+                                // Recoverable: output burst exceeded channel capacity
+                                // Log and continue receiving from current position
+                                tracing::warn!(
+                                    terminal_id = %terminal_id_output,
+                                    skipped_messages = skipped,
+                                    "Output subscription lagged, skipped messages"
+                                );
+                                continue;
+                            }
+                            RecvError::Closed => {
+                                // Terminal output stream closed
+                                tracing::debug!(
+                                    terminal_id = %terminal_id_output,
+                                    "Output subscription closed"
+                                );
+                                break;
+                            }
+                        }
                     }
                 }
             }
-        }))
-    } else {
-        tracing::warn!("No PTY reader available for terminal {}", terminal_id);
-        None
+        })
     };
 
     // Spawn PTY writer task (async channel -> blocking write)
     // Writer is shared via Arc<Mutex> to support WebSocket reconnection
     let writer_task = if let Some(pty_writer) = writer {
-        let mut rx = ws_rx;
         Some(tokio::task::spawn_blocking(move || {
-            while let Some(data) = rx.blocking_recv() {
+            while let Some(data) = ws_rx.blocking_recv() {
                 // Lock the shared writer for each write operation
                 // Recover from poisoned lock to allow continued input
                 let mut writer_guard = match pty_writer.lock() {
@@ -294,44 +365,6 @@ async fn handle_terminal_socket(
         tracing::warn!("No PTY writer available for terminal {}", terminal_id);
         None
     };
-
-    // Spawn WebSocket send task (PTY output -> WebSocket)
-    // Handles UTF-8 boundary issues with streaming decoder
-    let send_task = tokio::spawn(async move {
-        let mut pending_bytes: Vec<u8> = Vec::new();
-
-        while let Some(bytes) = pty_rx.recv().await {
-            // Append new bytes to pending buffer
-            pending_bytes.extend_from_slice(&bytes);
-
-            // Find the longest valid UTF-8 prefix
-            let (valid_text, remaining) = decode_utf8_streaming(&pending_bytes);
-
-            if !valid_text.is_empty() {
-                // Send output to prompt watcher for detection
-                prompt_watcher
-                    .process_output(&terminal_id_prompt, &valid_text)
-                    .await;
-
-                let msg = WsMessage::Output { data: valid_text };
-                match serde_json::to_string(&msg) {
-                    Ok(json) => {
-                        if ws_sender.send(Message::Text(json.into())).await.is_err() {
-                            tracing::warn!("Failed to send message to WebSocket");
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to serialize message: {}", e);
-                        break;
-                    }
-                }
-            }
-
-            // Keep remaining incomplete bytes for next iteration
-            pending_bytes = remaining;
-        }
-    });
 
     // Spawn heartbeat task
     let heartbeat_task = tokio::spawn(async move {
@@ -379,7 +412,7 @@ async fn handle_terminal_socket(
                                     match ws_msg {
                                         WsMessage::Input { data } => {
                                             // Send to PTY writer
-                                            if let Err(e) = ws_tx.send(data.into_bytes()).await {
+                                            if let Err(e) = ws_tx_input.send(data.into_bytes()).await {
                                                 tracing::error!("Failed to send to PTY: {}", e);
                                                 break;
                                             }
@@ -450,27 +483,21 @@ async fn handle_terminal_socket(
 
     // Wait for any task to complete
     // Use conditional guards to prevent immediate exit when optional tasks are None
-    let reader_task_active = reader_task.is_some();
     let writer_task_active = writer_task.is_some();
-    let mut reader_task = reader_task;
+    let mut output_task = output_task;
+    let mut recv_task = recv_task;
+    let mut heartbeat_task = heartbeat_task;
     let mut writer_task = writer_task;
 
     tokio::select! {
-        _ = send_task => {
-            tracing::debug!("Send task completed for terminal {}", terminal_id);
+        _ = &mut output_task => {
+            tracing::debug!("Output task completed for terminal {}", terminal_id);
         }
-        _ = recv_task => {
+        _ = &mut recv_task => {
             tracing::debug!("Receive task completed for terminal {}", terminal_id);
         }
-        _ = heartbeat_task => {
+        _ = &mut heartbeat_task => {
             tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
-        }
-        _ = async {
-            if let Some(task) = &mut reader_task {
-                let _ = task.await;
-            }
-        }, if reader_task_active => {
-            tracing::debug!("PTY reader task completed for terminal {}", terminal_id);
         }
         _ = async {
             if let Some(task) = &mut writer_task {
@@ -482,35 +509,14 @@ async fn handle_terminal_socket(
     }
 
     // Abort any remaining background tasks to avoid leaks
-    if let Some(task) = reader_task {
-        task.abort();
-    }
+    output_task.abort();
+    recv_task.abort();
+    heartbeat_task.abort();
     if let Some(task) = writer_task {
         task.abort();
     }
 
     tracing::info!("Terminal WebSocket disconnected: {}", terminal_id);
-}
-
-/// Decode UTF-8 from a byte buffer, handling incomplete sequences at the end.
-/// Returns (valid_string, remaining_bytes).
-fn decode_utf8_streaming(bytes: &[u8]) -> (String, Vec<u8>) {
-    // Try to decode the entire buffer
-    match std::str::from_utf8(bytes) {
-        Ok(s) => (s.to_string(), Vec::new()),
-        Err(e) => {
-            // Get the valid portion
-            let valid_up_to = e.valid_up_to();
-            let valid_str = std::str::from_utf8(&bytes[..valid_up_to])
-                .unwrap_or("")
-                .to_string();
-
-            // Keep the remaining bytes (potentially incomplete UTF-8 sequence)
-            let remaining = bytes[valid_up_to..].to_vec();
-
-            (valid_str, remaining)
-        }
-    }
 }
 
 #[cfg(test)]
@@ -573,32 +579,6 @@ mod tests {
             }
             _ => panic!("Expected Resize message"),
         }
-    }
-
-    #[test]
-    fn test_decode_utf8_streaming_complete() {
-        let bytes = "Hello, World!".as_bytes();
-        let (text, remaining) = decode_utf8_streaming(bytes);
-        assert_eq!(text, "Hello, World!");
-        assert!(remaining.is_empty());
-    }
-
-    #[test]
-    fn test_decode_utf8_streaming_incomplete() {
-        // UTF-8 for "你好" is [228, 189, 160, 229, 165, 189]
-        // Incomplete sequence: first character complete, second incomplete
-        let bytes = vec![228, 189, 160, 229, 165]; // "你" + incomplete "好"
-        let (text, remaining) = decode_utf8_streaming(&bytes);
-        assert_eq!(text, "你");
-        assert_eq!(remaining, vec![229, 165]);
-    }
-
-    #[test]
-    fn test_decode_utf8_streaming_empty() {
-        let bytes: &[u8] = &[];
-        let (text, remaining) = decode_utf8_streaming(bytes);
-        assert!(text.is_empty());
-        assert!(remaining.is_empty());
     }
 
     #[test]

@@ -4,13 +4,18 @@
 //! Publishes `TerminalPromptDetected` events to MessageBus for Orchestrator processing.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 use std::time::Duration;
 
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, broadcast::error::RecvError, oneshot};
+use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use crate::services::orchestrator::message_bus::SharedMessageBus;
+use crate::services::terminal::process::ProcessManager;
 use crate::services::orchestrator::types::{
     PromptState, TerminalPromptEvent, TerminalPromptStateMachine,
 };
@@ -115,21 +120,35 @@ impl TerminalWatchState {
 // Prompt Watcher
 // ============================================================================
 
+struct WatchTaskHandle {
+    task_id: u64,
+    task_handle: JoinHandle<()>,
+}
+
 /// Watches PTY output for interactive prompts and publishes events
 #[derive(Clone)]
 pub struct PromptWatcher {
     /// Message bus for publishing events
     message_bus: SharedMessageBus,
+    /// Process manager for OutputFanout subscriptions
+    process_manager: Arc<ProcessManager>,
     /// Watched terminals state
     terminals: Arc<RwLock<HashMap<String, TerminalWatchState>>>,
+    /// Active background output subscriptions by terminal_id
+    active_subscriptions: Arc<RwLock<HashMap<String, WatchTaskHandle>>>,
+    /// Monotonic task ID for safe replacement/cleanup
+    next_task_id: Arc<AtomicU64>,
 }
 
 impl PromptWatcher {
     /// Create a new prompt watcher
-    pub fn new(message_bus: SharedMessageBus) -> Self {
+    pub fn new(message_bus: SharedMessageBus, process_manager: Arc<ProcessManager>) -> Self {
         Self {
             message_bus,
+            process_manager,
             terminals: Arc::new(RwLock::new(HashMap::new())),
+            active_subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            next_task_id: Arc::new(AtomicU64::new(1)),
         }
     }
 
@@ -148,8 +167,11 @@ impl PromptWatcher {
             session_id.to_string(),
         );
 
-        let mut terminals = self.terminals.write().await;
-        terminals.insert(terminal_id.to_string(), state);
+        {
+            let mut terminals = self.terminals.write().await;
+            terminals.insert(terminal_id.to_string(), state);
+        }
+        self.spawn_output_subscription_task(terminal_id).await;
 
         tracing::debug!(
             terminal_id = %terminal_id,
@@ -161,13 +183,119 @@ impl PromptWatcher {
 
     /// Unregister a terminal from watching
     pub async fn unregister(&self, terminal_id: &str) {
-        let mut terminals = self.terminals.write().await;
-        terminals.remove(terminal_id);
+        {
+            let mut terminals = self.terminals.write().await;
+            terminals.remove(terminal_id);
+        }
+        let task_handle = {
+            let mut active_subscriptions = self.active_subscriptions.write().await;
+            active_subscriptions
+                .remove(terminal_id)
+                .map(|handle| handle.task_handle)
+        };
+        if let Some(task_handle) = task_handle {
+            task_handle.abort();
+        }
 
         tracing::debug!(
             terminal_id = %terminal_id,
             "Unregistered terminal from prompt watching"
         );
+    }
+
+    async fn spawn_output_subscription_task(&self, terminal_id: &str) {
+        let task_id = self.next_task_id.fetch_add(1, Ordering::Relaxed);
+        let process_manager = Arc::clone(&self.process_manager);
+        let watcher = self.clone();
+        let active_subscriptions = Arc::clone(&self.active_subscriptions);
+        let terminal_id_for_task = terminal_id.to_string();
+        let (start_tx, start_rx) = oneshot::channel::<()>();
+
+        let task_handle = tokio::spawn(async move {
+            if start_rx.await.is_err() {
+                return;
+            }
+
+            let mut subscription = match process_manager
+                .subscribe_output(&terminal_id_for_task, None)
+                .await
+            {
+                Ok(subscription) => subscription,
+                Err(e) => {
+                    tracing::warn!(
+                        terminal_id = %terminal_id_for_task,
+                        error = %e,
+                        "Failed to subscribe PromptWatcher to terminal output"
+                    );
+                    Self::remove_subscription_if_current(
+                        &active_subscriptions,
+                        &terminal_id_for_task,
+                        task_id,
+                    )
+                    .await;
+                    return;
+                }
+            };
+
+            loop {
+                match subscription.recv().await {
+                    Ok(chunk) => {
+                        if !chunk.text.is_empty() {
+                            watcher.process_output(&terminal_id_for_task, &chunk.text).await;
+                        }
+                        if chunk.dropped_invalid_bytes > 0 {
+                            tracing::warn!(
+                                terminal_id = %terminal_id_for_task,
+                                seq = chunk.seq,
+                                dropped_bytes = chunk.dropped_invalid_bytes,
+                                "Dropped invalid UTF-8 bytes in prompt watcher stream"
+                            );
+                        }
+                    }
+                    Err(RecvError::Lagged(skipped)) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id_for_task,
+                            skipped = %skipped,
+                            "PromptWatcher output subscription lagged"
+                        );
+                    }
+                    Err(RecvError::Closed) => {
+                        break;
+                    }
+                }
+            }
+
+            Self::remove_subscription_if_current(&active_subscriptions, &terminal_id_for_task, task_id)
+                .await;
+        });
+
+        let replaced = {
+            let mut active_subscriptions = self.active_subscriptions.write().await;
+            active_subscriptions.insert(
+                terminal_id.to_string(),
+                WatchTaskHandle { task_id, task_handle },
+            )
+        };
+        if let Some(previous) = replaced {
+            previous.task_handle.abort();
+        }
+
+        let _ = start_tx.send(());
+    }
+
+    async fn remove_subscription_if_current(
+        active_subscriptions: &Arc<RwLock<HashMap<String, WatchTaskHandle>>>,
+        terminal_id: &str,
+        task_id: u64,
+    ) {
+        let mut active_subscriptions = active_subscriptions.write().await;
+        let should_remove = matches!(
+            active_subscriptions.get(terminal_id),
+            Some(handle) if handle.task_id == task_id
+        );
+        if should_remove {
+            active_subscriptions.remove(terminal_id);
+        }
     }
 
     /// Process PTY output for a terminal
@@ -262,7 +390,9 @@ impl PromptWatcher {
     /// Check if a terminal is registered
     pub async fn is_registered(&self, terminal_id: &str) -> bool {
         let terminals = self.terminals.read().await;
-        terminals.contains_key(terminal_id)
+        let subscriptions = self.active_subscriptions.read().await;
+        // Terminal is truly registered only if both state and active subscription exist
+        terminals.contains_key(terminal_id) && subscriptions.contains_key(terminal_id)
     }
 }
 
@@ -277,7 +407,8 @@ mod tests {
 
     fn create_test_watcher() -> PromptWatcher {
         let message_bus = Arc::new(MessageBus::new(100));
-        PromptWatcher::new(message_bus)
+        let process_manager = Arc::new(ProcessManager::new());
+        PromptWatcher::new(message_bus, process_manager)
     }
 
     #[tokio::test]
