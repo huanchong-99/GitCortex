@@ -14,6 +14,7 @@ pub mod launcher;
 pub mod process;
 pub mod prompt_detector;
 pub mod prompt_watcher;
+pub mod utf8_decoder;
 
 pub use bridge::TerminalBridge;
 pub use detector::CliDetector;
@@ -24,3 +25,4 @@ pub use prompt_detector::{
     build_arrow_sequence, ARROW_DOWN, ARROW_UP,
 };
 pub use prompt_watcher::PromptWatcher;
+pub use utf8_decoder::{Utf8DecodeChunk, Utf8DecodeStats, Utf8StreamDecoder};
