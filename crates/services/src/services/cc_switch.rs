@@ -31,31 +31,98 @@ use crate::services::terminal::process::{SpawnCommand, SpawnEnv};
 // Authentication Skip Helpers
 // ============================================================================
 
+/// Creates Codex auth.json in CODEX_HOME with API key
+fn create_codex_auth(codex_home: &Path, api_key: &str) -> anyhow::Result<()> {
+    let auth_path = codex_home.join("auth.json");
+
+    let auth_content = serde_json::json!({
+        "OPENAI_API_KEY": api_key
+    });
+
+    let auth_str = serde_json::to_string_pretty(&auth_content)?;
+    std::fs::write(&auth_path, auth_str)
+        .map_err(|e| anyhow::anyhow!("Failed to write Codex auth.json: {}", e))?;
+
+    // Set restrictive permissions on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(&auth_path, std::fs::Permissions::from_mode(0o600)) {
+            tracing::warn!(
+                auth_path = %auth_path.display(),
+                error = %e,
+                "Failed to set restrictive permissions on Codex auth.json"
+            );
+        }
+    }
+
+    tracing::debug!(
+        codex_home = %codex_home.display(),
+        "Created Codex auth.json for authentication skip"
+    );
+
+    Ok(())
+}
+
+/// Resolve Codex wire protocol.
+/// Default to `responses` for OpenAI-compatible gateways.
+/// Allow override via env: GITCORTEX_CODEX_WIRE_API=responses|codex
+fn resolve_codex_wire_api() -> String {
+    if let Ok(raw) = std::env::var("GITCORTEX_CODEX_WIRE_API") {
+        let normalized = raw.trim().to_ascii_lowercase();
+        if normalized == "responses" || normalized == "codex" {
+            return normalized;
+        }
+        tracing::warn!(
+            configured = %raw,
+            "Invalid GITCORTEX_CODEX_WIRE_API value; expected 'responses' or 'codex', falling back to 'responses'"
+        );
+    }
+
+    "responses".to_string()
+}
+
 /// Creates Codex config.toml in CODEX_HOME to skip authentication
-fn create_codex_config(codex_home: &Path, base_url: Option<&str>, model: &str) -> anyhow::Result<()> {
+fn create_codex_config(
+    codex_home: &Path,
+    base_url: Option<&str>,
+    model: &str,
+    api_key: &str,
+) -> anyhow::Result<()> {
     let config_path = codex_home.join("config.toml");
 
-    let base_url_str = base_url.unwrap_or("https://api.openai.com/v1");
+    // Use a custom provider when a custom base URL is configured.
+    let (provider_key, base_url_str) = match base_url {
+        Some(url) => ("custom", url),
+        None => ("openai", "https://api.openai.com/v1"),
+    };
+    let wire_api = resolve_codex_wire_api();
 
-    let config_content = format!(
-        r#"forced_login_method = "api"
-model_provider = "openai"
+    let mut config_content = format!(
+        r#"model_provider = "{}"
 model = "{}"
 
-[model_providers.openai]
-name = "OpenAI"
+[model_providers.{}]
+name = "{}"
 base_url = "{}"
-env_key = "OPENAI_API_KEY"
-wire_api = "responses"
+api_key = "{}"
 "#,
-        model, base_url_str
+        provider_key, model, provider_key, provider_key, base_url_str, api_key
     );
+
+    // Default to OpenAI Responses API for compatibility with most custom gateways.
+    // Set GITCORTEX_CODEX_WIRE_API=codex when provider explicitly requires /codex.
+    config_content.push_str(&format!("wire_api = \"{}\"\n", wire_api));
 
     std::fs::write(&config_path, config_content)
         .map_err(|e| anyhow::anyhow!("Failed to write Codex config.toml: {}", e))?;
 
-    tracing::debug!(
+    tracing::info!(
         codex_home = %codex_home.display(),
+        config_path = %config_path.display(),
+        model_provider = %provider_key,
+        base_url = %base_url_str,
+        wire_api = %wire_api,
         "Created Codex config.toml for authentication skip"
     );
 
@@ -479,14 +546,11 @@ impl CCSwitchService {
                 let api_key = terminal
                     .get_custom_api_key()?
                     .ok_or_else(|| anyhow::anyhow!("Codex requires API key"))?;
-                env.set.insert("OPENAI_API_KEY".to_string(), api_key);
+                env.set.insert("OPENAI_API_KEY".to_string(), api_key.clone());
 
-                // Handle base URL
-                if let Some(base_url) = &terminal.custom_base_url {
-                    env.set.insert("OPENAI_BASE_URL".to_string(), base_url.clone());
-                } else {
-                    env.unset.push("OPENAI_BASE_URL".to_string());
-                }
+                // Avoid inherited OPENAI_BASE_URL overriding generated provider config.
+                // Endpoint selection should come from CODEX_HOME/config.toml only.
+                env.unset.push("OPENAI_BASE_URL".to_string());
 
                 // Create isolated CODEX_HOME directory for this terminal
                 // Sanitize terminal ID to prevent path traversal attacks
@@ -533,14 +597,21 @@ impl CCSwitchService {
                     .clone()
                     .unwrap_or_else(|| model_config.name.clone());
 
-                // Create config.toml to skip authentication
-                if let Err(e) = create_codex_config(&codex_home, terminal.custom_base_url.as_deref(), &model) {
-                    tracing::warn!(
-                        terminal_id = %terminal.id,
-                        error = %e,
-                        "Failed to create Codex config for authentication skip, continuing anyway"
-                    );
-                }
+                // Create auth.json with API key (required for non-interactive auth)
+                create_codex_auth(&codex_home, &api_key).map_err(|e| {
+                    anyhow::anyhow!("Failed to create Codex auth.json for authentication skip: {e}")
+                })?;
+
+                // Create config.toml with explicit provider/api_key
+                create_codex_config(
+                    &codex_home,
+                    terminal.custom_base_url.as_deref(),
+                    &model,
+                    &api_key,
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!("Failed to create Codex config for authentication skip: {e}")
+                })?;
 
                 env.set.insert(
                     "CODEX_HOME".to_string(),
@@ -550,8 +621,6 @@ impl CCSwitchService {
                 // CLI arguments (higher priority than config files)
                 args.push("--model".to_string());
                 args.push(model);
-                args.push("--config".to_string());
-                args.push("forced_login_method=\"api\"".to_string());
 
                 tracing::debug!(
                     terminal_id = %terminal.id,

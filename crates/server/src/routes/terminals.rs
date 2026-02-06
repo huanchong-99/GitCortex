@@ -184,7 +184,27 @@ pub async fn start_terminal(
     // Get working directory from workflow task
     let working_dir = get_terminal_working_dir(&deployment, &terminal.workflow_task_id)
         .await
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+        .map_err(|e| {
+            ApiError::Internal(format!(
+                "Failed to resolve working directory for terminal {} (workflow_task_id={}): {}",
+                id, terminal.workflow_task_id, e
+            ))
+        })?;
+
+    if !working_dir.exists() {
+        return Err(ApiError::BadRequest(format!(
+            "Working directory does not exist: {}",
+            working_dir.display()
+        )));
+    }
+    if !working_dir.is_dir() {
+        return Err(ApiError::BadRequest(format!(
+            "Working directory is not a directory: {}",
+            working_dir.display()
+        )));
+    }
+
+    tracing::info!(terminal_id = %id, working_dir = %working_dir.display(), "Resolved terminal working directory");
 
     // Transition to starting before spawn
     Terminal::update_status(&deployment.db().pool, &id, "starting")
@@ -301,7 +321,7 @@ async fn get_terminal_working_dir(
     let project_uuid = uuid::Uuid::from_slice(&project_id)
         .map_err(|e| anyhow::anyhow!("Invalid project_id format: {}", e))?;
 
-    // Get default_agent_working_dir from project
+    // 1) Prefer project.default_agent_working_dir
     let working_dir: Option<String> = sqlx::query_scalar(
         "SELECT default_agent_working_dir FROM projects WHERE id = ?"
     )
@@ -310,13 +330,34 @@ async fn get_terminal_working_dir(
     .await?
     .flatten();
 
-    if let Some(dir) = working_dir {
-        if !dir.is_empty() {
-            return Ok(std::path::PathBuf::from(dir));
-        }
+    if let Some(dir) = working_dir.filter(|dir| !dir.trim().is_empty()) {
+        return Ok(std::path::PathBuf::from(dir));
     }
 
-    Err(anyhow::anyhow!("Could not determine working directory: project has no default_agent_working_dir configured"))
+    // 2) Fallback to first repo path in project
+    let repo_working_dir: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT r.path
+        FROM repos r
+        INNER JOIN project_repos pr ON pr.repo_id = r.id
+        WHERE pr.project_id = ?
+        ORDER BY r.display_name ASC
+        LIMIT 1
+        "#
+    )
+    .bind(project_uuid)
+    .fetch_optional(&deployment.db().pool)
+    .await?
+    .flatten();
+
+    if let Some(dir) = repo_working_dir.filter(|dir| !dir.trim().is_empty()) {
+        return Ok(std::path::PathBuf::from(dir));
+    }
+
+    Err(anyhow::anyhow!(
+        "Could not determine working directory: project {} has no default_agent_working_dir and no repositories",
+        project_uuid
+    ))
 }
 
 /// Stop terminal endpoint
