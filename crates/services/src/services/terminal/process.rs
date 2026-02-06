@@ -10,9 +10,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use super::output_fanout::{OutputFanout, OutputFanoutConfig, OutputSubscription};
+use super::utf8_decoder::Utf8StreamDecoder;
 use db::DBService;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, task::JoinHandle};
 use uuid::Uuid;
 
 // ============================================================================
@@ -24,6 +26,15 @@ pub const DEFAULT_COLS: u16 = 80;
 
 /// Default terminal rows
 pub const DEFAULT_ROWS: u16 = 24;
+
+/// Reader buffer size for background PTY output fanout
+pub const PROCESS_PTY_READ_BUFFER_SIZE: usize = 4096;
+
+/// Default replay chunk retention per terminal stream
+pub const PROCESS_REPLAY_MAX_CHUNKS: usize = 512;
+
+/// Default replay byte retention per terminal stream
+pub const PROCESS_REPLAY_MAX_BYTES: usize = 1024 * 1024;
 
 // ============================================================================
 // Spawn Configuration (Process Isolation)
@@ -188,6 +199,10 @@ struct TrackedProcess {
     shared_writer: Option<Arc<Mutex<PtyWriter>>>,
     /// Isolated CODEX_HOME path (for Codex terminals, cleaned up on exit)
     codex_home: Option<PathBuf>,
+    /// Output fanout hub (single reader -> multi-subscriber)
+    output_fanout: Arc<OutputFanout>,
+    /// Background PTY reader task
+    reader_task: Option<JoinHandle<()>>,
 }
 
 // ============================================================================
@@ -285,6 +300,61 @@ impl ProcessManager {
                 );
             }
         }
+    }
+
+    /// Spawn dedicated PTY reader task for output fanout.
+    fn spawn_output_reader_task(
+        terminal_id: &str,
+        mut reader: PtyReader,
+        output_fanout: Arc<OutputFanout>,
+    ) -> JoinHandle<()> {
+        let terminal_id = terminal_id.to_string();
+        tokio::task::spawn_blocking(move || {
+            let mut decoder = Utf8StreamDecoder::new();
+            let mut buf = [0u8; PROCESS_PTY_READ_BUFFER_SIZE];
+
+            loop {
+                match reader.0.read(&mut buf) {
+                    Ok(0) => {
+                        // EOF reached - flush any pending incomplete UTF-8 tail
+                        if let Some(tail_text) = decoder.flush_lossy_tail() {
+                            let _ = output_fanout.publish(tail_text, 0);
+                        }
+                        tracing::debug!(
+                            terminal_id = %terminal_id,
+                            "Background PTY reader reached EOF"
+                        );
+                        break;
+                    }
+                    Ok(n) => {
+                        let decoded = decoder.decode_chunk(&buf[..n]);
+                        if !decoded.text.is_empty() || decoded.dropped_invalid_bytes > 0 {
+                            let _ = output_fanout.publish(
+                                decoded.text,
+                                decoded.dropped_invalid_bytes,
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id,
+                            error = %e,
+                            "Background PTY reader stopped with error"
+                        );
+                        break;
+                    }
+                }
+            }
+        })
+    }
+
+    /// Create default output fanout configuration.
+    fn default_output_fanout() -> Arc<OutputFanout> {
+        Arc::new(OutputFanout::new(OutputFanoutConfig {
+            replay_max_chunks: PROCESS_REPLAY_MAX_CHUNKS,
+            replay_max_bytes: PROCESS_REPLAY_MAX_BYTES,
+            ..OutputFanoutConfig::default()
+        }))
     }
 
     /// Spawns a new terminal process with PTY using SpawnCommand configuration.
@@ -452,6 +522,24 @@ impl ProcessManager {
             }
         }
 
+        // Initialize output fanout and background reader
+        let output_fanout = Self::default_output_fanout();
+        let reader_task = match pair.master.try_clone_reader() {
+            Ok(reader) => Some(Self::spawn_output_reader_task(
+                terminal_id,
+                PtyReader(reader),
+                Arc::clone(&output_fanout),
+            )),
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    error = %e,
+                    "Failed to initialize background PTY reader for fanout"
+                );
+                None
+            }
+        };
+
         // Store tracked process
         let mut processes = self.processes.write().await;
         processes.insert(
@@ -461,6 +549,8 @@ impl ProcessManager {
                 master: Mutex::new(pair.master),
                 shared_writer: None,
                 codex_home,
+                output_fanout,
+                reader_task,
             },
         );
 
@@ -579,6 +669,24 @@ impl ProcessManager {
             }
         }
 
+        // Initialize output fanout and background reader
+        let output_fanout = Self::default_output_fanout();
+        let reader_task = match pair.master.try_clone_reader() {
+            Ok(reader) => Some(Self::spawn_output_reader_task(
+                terminal_id,
+                PtyReader(reader),
+                Arc::clone(&output_fanout),
+            )),
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    error = %e,
+                    "Failed to initialize background PTY reader for fanout"
+                );
+                None
+            }
+        };
+
         // Store tracked process
         let mut processes = self.processes.write().await;
         processes.insert(
@@ -588,6 +696,8 @@ impl ProcessManager {
                 master: Mutex::new(pair.master),
                 shared_writer: None,
                 codex_home: None, // Legacy spawn_pty doesn't support CODEX_HOME
+                output_fanout,
+                reader_task,
             },
         );
 
@@ -691,6 +801,11 @@ impl ProcessManager {
         };
 
         if let Some(mut tracked) = tracked {
+            // Abort background reader task first
+            if let Some(task) = tracked.reader_task.take() {
+                task.abort();
+            }
+
             // Try to kill the child process
             if let Err(e) = tracked.child.kill() {
                 tracing::warn!(
@@ -740,19 +855,24 @@ impl ProcessManager {
                 })
                 .collect();
 
-            // Remove dead processes and capture CODEX_HOME for cleanup
+            // Remove dead processes and capture resources for cleanup
             let mut targets = Vec::new();
             for id in dead_ids {
-                if let Some(tracked) = processes.remove(&id) {
-                    targets.push((id, tracked.codex_home));
+                if let Some(mut tracked) = processes.remove(&id) {
+                    targets.push((id, tracked.codex_home, tracked.reader_task.take()));
                 }
             }
 
             targets
         };
 
-        // Clean up CODEX_HOME directories outside the lock
-        for (id, codex_home) in cleanup_targets {
+        // Clean up resources outside the lock
+        for (id, codex_home, reader_task) in cleanup_targets {
+            // Abort background reader task
+            if let Some(task) = reader_task {
+                task.abort();
+            }
+            // Clean up CODEX_HOME directory
             if let Some(path) = codex_home {
                 Self::cleanup_codex_home(&id, &path);
             }
@@ -772,34 +892,20 @@ impl ProcessManager {
         if let Some(tracked) = processes.get_mut(terminal_id) {
             let session_id = Uuid::new_v4().to_string();
 
-            // Lock the master to get reader/writer
-            let master = match tracked.master.lock() {
-                Ok(m) => m,
-                Err(e) => {
-                    tracing::error!(
-                        terminal_id = %terminal_id,
-                        error = %e,
-                        "Failed to lock PTY master"
-                    );
-                    return None;
-                }
-            };
-
-            // Clone reader on each call (portable-pty supports multiple readers)
-            let reader = match master.try_clone_reader() {
-                Ok(r) => Some(PtyReader(r)),
-                Err(e) => {
-                    tracing::error!(
-                        terminal_id = %terminal_id,
-                        error = %e,
-                        "Failed to clone PTY reader"
-                    );
-                    None
-                }
-            };
-
             // Initialize shared writer on first call, then reuse for reconnections
             if tracked.shared_writer.is_none() {
+                let master = match tracked.master.lock() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::error!(
+                            terminal_id = %terminal_id,
+                            error = %e,
+                            "Failed to lock PTY master"
+                        );
+                        return None;
+                    }
+                };
+
                 match master.take_writer() {
                     Ok(w) => {
                         tracked.shared_writer = Some(Arc::new(Mutex::new(PtyWriter(w))));
@@ -821,9 +927,6 @@ impl ProcessManager {
             // Clone the Arc reference for the caller
             let writer = tracked.shared_writer.as_ref().map(Arc::clone);
 
-            // Drop the lock before accessing child
-            drop(master);
-
             // Get PID from child
             let pid = tracked.child.process_id().unwrap_or(0);
 
@@ -831,12 +934,42 @@ impl ProcessManager {
                 pid,
                 session_id,
                 terminal_id: terminal_id.to_string(),
-                reader,
+                // Reader is now owned by background fanout task (single-reader constraint)
+                reader: None,
                 writer,
             })
         } else {
             None
         }
+    }
+
+    /// Subscribe to terminal output stream with replay support.
+    ///
+    /// - `from_seq = None`: replay retained window from earliest.
+    /// - `from_seq = Some(n)`: replay from `n + 1`.
+    ///
+    /// This enables late subscribers (like PromptWatcher) to receive output
+    /// that was emitted before they subscribed, preventing "first-screen prompt loss".
+    pub async fn subscribe_output(
+        &self,
+        terminal_id: &str,
+        from_seq: Option<u64>,
+    ) -> anyhow::Result<OutputSubscription> {
+        let processes = self.processes.read().await;
+        let tracked = processes
+            .get(terminal_id)
+            .ok_or_else(|| anyhow::anyhow!("Terminal not found: {terminal_id}"))?;
+        Ok(tracked.output_fanout.subscribe(from_seq))
+    }
+
+    /// Get latest emitted output sequence for a terminal.
+    ///
+    /// Returns None if terminal doesn't exist, or 0 if no output has been emitted yet.
+    pub async fn latest_output_seq(&self, terminal_id: &str) -> Option<u64> {
+        let processes = self.processes.read().await;
+        processes
+            .get(terminal_id)
+            .map(|tracked| tracked.output_fanout.latest_seq())
     }
 }
 

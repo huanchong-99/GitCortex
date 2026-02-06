@@ -108,6 +108,7 @@ export interface TerminalConfig {
   cliTypeId: string;    // CLI 类型 (claude-code, gemini-cli, codex)
   modelConfigId: string; // 关联的模型配置 ID
   role?: string;        // 角色描述
+  autoConfirm?: boolean; // 自动确认提示（默认 true）
 }
 
 /** 斜杠命令配置 (步骤5) */
@@ -286,6 +287,7 @@ export function wizardConfigToCreateRequest(
               customApiKey: model.apiKey || null,
               role: terminal.role,
               roleDescription: undefined,
+              autoConfirm: terminal.autoConfirm ?? true,
               orderIndex: terminal.orderIndex,
             };
           }),

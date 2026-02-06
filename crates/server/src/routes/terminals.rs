@@ -270,6 +270,45 @@ pub async fn start_terminal(
         );
     }
 
+    // Register PromptWatcher for background prompt detection
+    // This enables auto-confirm to work even without WebSocket connection
+    if let Some(pty_session_id) = terminal.pty_session_id.as_ref() {
+        if !pty_session_id.trim().is_empty() {
+            // Get workflow_id from workflow_task
+            match db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id).await {
+                Ok(Some(task)) => {
+                    deployment.prompt_watcher().register(
+                        &id,
+                        &task.workflow_id,
+                        &terminal.workflow_task_id,
+                        pty_session_id,
+                    ).await;
+                    tracing::info!(
+                        terminal_id = %id,
+                        workflow_id = %task.workflow_id,
+                        pty_session_id = %pty_session_id,
+                        "PromptWatcher registered for background prompt detection"
+                    );
+                }
+                Ok(None) => {
+                    tracing::warn!(
+                        terminal_id = %id,
+                        workflow_task_id = %terminal.workflow_task_id,
+                        "Skipped PromptWatcher registration: workflow task not found"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        terminal_id = %id,
+                        workflow_task_id = %terminal.workflow_task_id,
+                        error = %e,
+                        "Failed to query workflow task for PromptWatcher registration (non-fatal)"
+                    );
+                }
+            }
+        }
+    }
+
     tracing::info!(
         terminal_id = %id,
         pid = handle.pid,
@@ -373,6 +412,9 @@ pub async fn stop_terminal(
     if let Err(e) = deployment.process_manager().kill_terminal(&id).await {
         tracing::warn!("Failed to kill terminal {}: {}", id, e);
     }
+
+    // Ensure prompt watcher state/task is cleaned up for this terminal
+    deployment.prompt_watcher().unregister(&id).await;
 
     // Reset terminal status for restart (not_started allows re-starting)
     Terminal::update_status(&deployment.db().pool, &id, "not_started").await?;

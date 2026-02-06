@@ -102,6 +102,7 @@ export interface CreateWorkflowRequest {
       customApiKey?: string | null;
       role?: string;
       roleDescription?: string;
+      autoConfirm?: boolean;
       orderIndex: number;
     }>;
   }>;

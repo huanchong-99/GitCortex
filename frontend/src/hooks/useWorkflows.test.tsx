@@ -209,13 +209,27 @@ describe('useCreateWorkflow', () => {
     };
 
     const requestData: CreateWorkflowRequest = {
-      project_id: 'project-1',
+      projectId: 'project-1',
       name: 'New Workflow',
       description: 'New description',
-      config: mockWorkflow.config,
+      tasks: [
+        {
+          name: 'Task 1',
+          orderIndex: 0,
+          terminals: [
+            {
+              cliTypeId: 'claude-code',
+              modelConfigId: 'model-1',
+              orderIndex: 0,
+              autoConfirm: true,
+            },
+          ],
+        },
+      ],
     };
 
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(newWorkflow)));
+    const fetchMock = vi.fn(() => createSuccessResponse(newWorkflow));
+    vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderHook(() => useCreateWorkflow(), {
       wrapper,
@@ -225,6 +239,12 @@ describe('useCreateWorkflow', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(newWorkflow);
+
+    // Verify autoConfirm is included in request body
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const requestBody = JSON.parse(requestInit.body as string);
+    expect(requestBody.tasks[0].terminals[0].autoConfirm).toBe(true);
   });
 
   it('should handle creation errors', async () => {
