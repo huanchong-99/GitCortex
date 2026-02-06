@@ -8,6 +8,7 @@ use axum::{
     routing::get,
     Router,
 };
+use db::models::{Terminal, WorkflowTask};
 use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
@@ -135,6 +136,75 @@ async fn handle_terminal_socket(
         }
     };
 
+    // Auto-register terminal for prompt watching if not already registered
+    let prompt_watcher = deployment.prompt_watcher().clone();
+    if prompt_watcher.is_registered(&terminal_id).await {
+        tracing::trace!(
+            terminal_id = %terminal_id,
+            "Terminal already registered for prompt watching"
+        );
+    } else {
+        match Terminal::find_by_id(&deployment.db().pool, &terminal_id).await {
+            Ok(Some(terminal)) => {
+                let task_id = terminal.workflow_task_id.clone();
+                let pty_session_id = terminal.pty_session_id.clone();
+
+                match WorkflowTask::find_by_id(&deployment.db().pool, &task_id).await {
+                    Ok(Some(task)) => match pty_session_id {
+                        Some(session_id) if !session_id.trim().is_empty() => {
+                            let workflow_id = task.workflow_id;
+                            prompt_watcher
+                                .register(&terminal_id, &workflow_id, &task_id, &session_id)
+                                .await;
+                            tracing::info!(
+                                terminal_id = %terminal_id,
+                                workflow_id = %workflow_id,
+                                task_id = %task_id,
+                                pty_session_id = %session_id,
+                                "Auto-registered terminal for prompt watching"
+                            );
+                        }
+                        _ => {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                task_id = %task_id,
+                                "Skipped prompt watcher auto-registration: missing pty_session_id"
+                            );
+                        }
+                    },
+                    Ok(None) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id,
+                            workflow_task_id = %task_id,
+                            "Skipped prompt watcher auto-registration: workflow task not found"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id,
+                            workflow_task_id = %task_id,
+                            error = %e,
+                            "Failed to query workflow task for prompt watcher auto-registration"
+                        );
+                    }
+                }
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    "Skipped prompt watcher auto-registration: terminal not found in database"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    error = %e,
+                    "Failed to query terminal for prompt watcher auto-registration"
+                );
+            }
+        }
+    }
+
     // Extract PTY reader and writer
     let reader = process_handle.reader;
     let writer = process_handle.writer;
@@ -159,7 +229,6 @@ async fn handle_terminal_socket(
     // Clone process_manager for resize operations
     let process_manager = deployment.process_manager().clone();
     let terminal_id_resize = terminal_id.clone();
-    let prompt_watcher = deployment.prompt_watcher().clone();
     let terminal_id_prompt = terminal_id.clone();
 
     // Spawn PTY reader task (blocking read -> async channel)
