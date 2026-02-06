@@ -16,8 +16,9 @@ use super::{
     },
     llm::{LLMClient, build_terminal_completion_prompt, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
+    prompt_handler::PromptHandler,
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
-    types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus, CodeIssue},
+    types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus, TerminalPromptEvent, CodeIssue},
 };
 use crate::services::{error_handler::ErrorHandler, template_renderer::{TemplateRenderer, WorkflowContext}};
 
@@ -29,6 +30,7 @@ pub struct OrchestratorAgent {
     llm_client: Box<dyn LLMClient>,
     db: Arc<DBService>,
     error_handler: ErrorHandler,
+    prompt_handler: PromptHandler,
 }
 
 impl OrchestratorAgent {
@@ -42,6 +44,7 @@ impl OrchestratorAgent {
         let llm_client = create_llm_client(&config)?;
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
         let error_handler = ErrorHandler::new(db.clone(), message_bus.clone());
+        let prompt_handler = PromptHandler::new(message_bus.clone());
 
         Ok(Self {
             config,
@@ -50,6 +53,7 @@ impl OrchestratorAgent {
             llm_client,
             db,
             error_handler,
+            prompt_handler,
         })
     }
 
@@ -64,6 +68,7 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<Self> {
         let state = Arc::new(RwLock::new(OrchestratorState::new(workflow_id)));
         let error_handler = ErrorHandler::new(db.clone(), message_bus.clone());
+        let prompt_handler = PromptHandler::new(message_bus.clone());
 
         Ok(Self {
             config,
@@ -72,6 +77,7 @@ impl OrchestratorAgent {
             llm_client,
             db,
             error_handler,
+            prompt_handler,
         })
     }
 
@@ -125,6 +131,9 @@ impl OrchestratorAgent {
             BusMessage::TerminalCompleted(event) => {
                 self.handle_terminal_completed(event).await?;
             }
+            BusMessage::TerminalPromptDetected(event) => {
+                self.handle_terminal_prompt_detected(event).await?;
+            }
             BusMessage::GitEvent {
                 workflow_id,
                 commit_hash,
@@ -140,6 +149,22 @@ impl OrchestratorAgent {
             _ => {}
         }
         Ok(false)
+    }
+
+    /// Handles terminal prompt detected events.
+    async fn handle_terminal_prompt_detected(
+        &self,
+        event: TerminalPromptEvent,
+    ) -> anyhow::Result<()> {
+        if let Some(decision) = self.prompt_handler.handle_prompt_event(&event).await {
+            tracing::info!(
+                terminal_id = %event.terminal_id,
+                prompt_kind = ?event.prompt.kind,
+                decision = ?decision,
+                "Handled terminal prompt event"
+            );
+        }
+        Ok(())
     }
 
     /// Handles terminal completion events.

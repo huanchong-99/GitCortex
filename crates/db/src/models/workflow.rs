@@ -756,8 +756,8 @@ impl Workflow {
                     INSERT INTO terminal (
                         id, workflow_task_id, cli_type_id, model_config_id,
                         custom_base_url, custom_api_key, role, role_description,
-                        order_index, status, created_at, updated_at
-                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                        order_index, status, auto_confirm, created_at, updated_at
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
                     ",
                 )
                 .bind(&terminal.id)
@@ -770,6 +770,7 @@ impl Workflow {
                 .bind(&terminal.role_description)
                 .bind(terminal.order_index)
                 .bind(&terminal.status)
+                .bind(terminal.auto_confirm)
                 .bind(terminal.created_at)
                 .bind(terminal.updated_at)
                 .execute(&mut *tx)

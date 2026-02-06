@@ -159,6 +159,8 @@ async fn handle_terminal_socket(
     // Clone process_manager for resize operations
     let process_manager = deployment.process_manager().clone();
     let terminal_id_resize = terminal_id.clone();
+    let prompt_watcher = deployment.prompt_watcher().clone();
+    let terminal_id_prompt = terminal_id.clone();
 
     // Spawn PTY reader task (blocking read -> async channel)
     let reader_task = if let Some(mut pty_reader) = reader {
@@ -237,6 +239,11 @@ async fn handle_terminal_socket(
             let (valid_text, remaining) = decode_utf8_streaming(&pending_bytes);
 
             if !valid_text.is_empty() {
+                // Send output to prompt watcher for detection
+                prompt_watcher
+                    .process_output(&terminal_id_prompt, &valid_text)
+                    .await;
+
                 let msg = WsMessage::Output { data: valid_text };
                 match serde_json::to_string(&msg) {
                     Ok(json) => {

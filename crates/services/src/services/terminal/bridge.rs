@@ -99,6 +99,9 @@ impl TerminalBridge {
         if session_id.is_empty() {
             return Err(anyhow::anyhow!("pty_session_id is empty"));
         }
+        if terminal_id.trim().is_empty() {
+            return Err(anyhow::anyhow!("terminal_id is empty"));
+        }
 
         // Check if already registered
         {
@@ -113,10 +116,14 @@ impl TerminalBridge {
             }
         }
 
-        // Subscribe to the PTY session topic
-        let mut rx = self.message_bus.subscribe(session_id).await;
+        // Subscribe to both the new terminal-input topic and legacy PTY-session topic
+        let terminal_input_topic = format!("terminal.input.{}", terminal_id);
+        let mut rx_terminal_input = self.message_bus.subscribe(&terminal_input_topic).await;
+        let mut rx_legacy = self.message_bus.subscribe(session_id).await;
+
         let process_manager = Arc::clone(&self.process_manager);
         let session_id_owned = session_id.to_string();
+        let terminal_input_topic_owned = terminal_input_topic.clone();
         let terminal_id_owned = terminal_id.to_string();
         let terminal_id_for_task = terminal_id.to_string();
         let active_sessions = Arc::clone(&self.active_sessions);
@@ -127,7 +134,9 @@ impl TerminalBridge {
                 process_manager,
                 terminal_id_for_task.clone(),
                 session_id_owned.clone(),
-                &mut rx,
+                terminal_input_topic_owned.clone(),
+                &mut rx_terminal_input,
+                &mut rx_legacy,
             )
             .await;
 
@@ -182,6 +191,7 @@ impl TerminalBridge {
         tracing::info!(
             terminal_id = %terminal_id,
             pty_session_id = %session_id,
+            terminal_input_topic = %terminal_input_topic,
             "Terminal bridge registered"
         );
 
@@ -210,12 +220,84 @@ impl TerminalBridge {
         self.active_sessions.read().await.len()
     }
 
+    /// Helper method to forward a bus message to PTY stdin.
+    async fn forward_bus_message(
+        tx: &mpsc::Sender<Vec<u8>>,
+        terminal_id: &str,
+        pty_session_id: &str,
+        msg: Option<BusMessage>,
+    ) -> anyhow::Result<bool> {
+        match msg {
+            Some(BusMessage::TerminalMessage { message }) => {
+                let payload = Self::normalize_message(&message);
+                if payload.is_empty() {
+                    return Ok(false);
+                }
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    pty_session_id = %pty_session_id,
+                    message_len = payload.len(),
+                    "Forwarding legacy TerminalMessage to PTY stdin"
+                );
+                tx.send(payload.into_bytes())
+                    .await
+                    .map_err(|_| anyhow::anyhow!("PTY writer channel closed"))?;
+                Ok(false)
+            }
+            Some(BusMessage::TerminalInput {
+                terminal_id: message_terminal_id,
+                session_id: message_session_id,
+                input,
+                ..
+            }) => {
+                // Strict routing check: accept only matching terminal or session
+                if message_terminal_id != terminal_id && message_session_id != pty_session_id {
+                    return Ok(false);
+                }
+
+                let payload = Self::normalize_message(&input);
+                if payload.is_empty() {
+                    return Ok(false);
+                }
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    pty_session_id = %pty_session_id,
+                    message_len = payload.len(),
+                    "Forwarding TerminalInput to PTY stdin"
+                );
+                tx.send(payload.into_bytes())
+                    .await
+                    .map_err(|_| anyhow::anyhow!("PTY writer channel closed"))?;
+                Ok(false)
+            }
+            Some(BusMessage::Shutdown) => {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    pty_session_id = %pty_session_id,
+                    "Terminal bridge received shutdown"
+                );
+                Ok(true)
+            }
+            Some(_) => Ok(false),
+            None => {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    pty_session_id = %pty_session_id,
+                    "Terminal bridge channel closed"
+                );
+                Ok(true)
+            }
+        }
+    }
+
     /// Main bridge loop that forwards messages to PTY stdin.
     async fn run_bridge(
         process_manager: Arc<ProcessManager>,
         terminal_id: String,
         pty_session_id: String,
-        rx: &mut mpsc::Receiver<BusMessage>,
+        terminal_input_topic: String,
+        rx_terminal_input: &mut mpsc::Receiver<BusMessage>,
+        rx_legacy: &mut mpsc::Receiver<BusMessage>,
     ) -> anyhow::Result<()> {
         // Get PTY handle
         let handle = process_manager
@@ -260,46 +342,23 @@ impl TerminalBridge {
             tokio::time::interval(Duration::from_secs(BRIDGE_HEALTH_INTERVAL_SECS));
         health_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
+        tracing::debug!(
+            terminal_id = %terminal_id,
+            pty_session_id = %pty_session_id,
+            terminal_input_topic = %terminal_input_topic,
+            "Terminal bridge loop started"
+        );
+
         loop {
             tokio::select! {
-                msg = rx.recv() => {
-                    match msg {
-                        Some(BusMessage::TerminalMessage { message }) => {
-                            let payload = Self::normalize_message(&message);
-                            if payload.is_empty() {
-                                continue;
-                            }
-
-                            tracing::debug!(
-                                terminal_id = %terminal_id,
-                                pty_session_id = %pty_session_id,
-                                message_len = payload.len(),
-                                "Forwarding message to PTY stdin"
-                            );
-
-                            if tx.send(payload.into_bytes()).await.is_err() {
-                                return Err(anyhow::anyhow!("PTY writer channel closed"));
-                            }
-                        }
-                        Some(BusMessage::Shutdown) => {
-                            tracing::debug!(
-                                terminal_id = %terminal_id,
-                                pty_session_id = %pty_session_id,
-                                "Terminal bridge received shutdown"
-                            );
-                            break;
-                        }
-                        Some(_) => {
-                            // Ignore other message types
-                        }
-                        None => {
-                            tracing::debug!(
-                                terminal_id = %terminal_id,
-                                pty_session_id = %pty_session_id,
-                                "Terminal bridge channel closed"
-                            );
-                            break;
-                        }
+                msg = rx_terminal_input.recv() => {
+                    if Self::forward_bus_message(&tx, &terminal_id, &pty_session_id, msg).await? {
+                        break;
+                    }
+                }
+                msg = rx_legacy.recv() => {
+                    if Self::forward_bus_message(&tx, &terminal_id, &pty_session_id, msg).await? {
+                        break;
                     }
                 }
                 _ = health_interval.tick() => {

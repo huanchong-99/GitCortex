@@ -7,6 +7,8 @@ use tokio::sync::{RwLock, broadcast, mpsc};
 use super::constants::WORKFLOW_TOPIC_PREFIX;
 use super::types::{OrchestratorInstruction, PromptDecision, TerminalCompletionEvent, TerminalPromptEvent};
 
+const TERMINAL_INPUT_TOPIC_PREFIX: &str = "terminal.input.";
+
 /// Messages routed through the orchestrator bus.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
@@ -173,7 +175,10 @@ impl MessageBus {
             input: input.to_string(),
             decision,
         };
-        // Broadcast to all listeners (including TerminalBridge)
+        // Publish to terminal-specific topic for targeted routing
+        let topic = format!("{}{}", TERMINAL_INPUT_TOPIC_PREFIX, terminal_id);
+        let _ = self.publish(&topic, message.clone()).await;
+        // Also broadcast for legacy compatibility
         let _ = self.broadcast(message);
     }
 

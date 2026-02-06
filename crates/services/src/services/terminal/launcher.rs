@@ -24,6 +24,7 @@ use executors::{
 
 use super::bridge::TerminalBridge;
 use super::process::{ProcessHandle, ProcessManager, DEFAULT_COLS, DEFAULT_ROWS};
+use super::prompt_watcher::PromptWatcher;
 use crate::services::cc_switch::{CCSwitchService, CCSwitch};
 use crate::services::orchestrator::SharedMessageBus;
 
@@ -35,6 +36,8 @@ pub struct TerminalLauncher {
     working_dir: PathBuf,
     /// Optional terminal bridge for MessageBus -> PTY stdin forwarding
     terminal_bridge: Option<TerminalBridge>,
+    /// Optional prompt watcher for PTY output prompt detection
+    prompt_watcher: Option<PromptWatcher>,
 }
 
 /// Result of a terminal launch operation
@@ -66,6 +69,7 @@ impl TerminalLauncher {
             process_manager,
             working_dir,
             terminal_bridge: None,
+            prompt_watcher: None,
         }
     }
 
@@ -86,13 +90,15 @@ impl TerminalLauncher {
         working_dir: PathBuf,
         message_bus: SharedMessageBus,
     ) -> Self {
-        let terminal_bridge = TerminalBridge::new(message_bus, Arc::clone(&process_manager));
+        let terminal_bridge = TerminalBridge::new(message_bus.clone(), Arc::clone(&process_manager));
+        let prompt_watcher = PromptWatcher::new(message_bus);
         Self {
             db,
             cc_switch,
             process_manager,
             working_dir,
             terminal_bridge: Some(terminal_bridge),
+            prompt_watcher: Some(prompt_watcher),
         }
     }
 
@@ -303,6 +309,41 @@ impl TerminalLauncher {
                     }
                 }
 
+                // Register prompt watcher for PTY output prompt detection
+                if let Some(ref watcher) = self.prompt_watcher {
+                    match self.get_workflow_id_for_terminal(&terminal.workflow_task_id).await {
+                        Ok(Some(workflow_id)) => {
+                            watcher.register(
+                                &terminal_id,
+                                &workflow_id,
+                                &terminal.workflow_task_id,
+                                &handle.session_id,
+                            ).await;
+                            tracing::debug!(
+                                terminal_id = %terminal_id,
+                                workflow_id = %workflow_id,
+                                pty_session_id = %handle.session_id,
+                                "Prompt watcher registered successfully"
+                            );
+                        }
+                        Ok(None) => {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                workflow_task_id = %terminal.workflow_task_id,
+                                "Could not resolve workflow_id for prompt watcher registration"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                workflow_task_id = %terminal.workflow_task_id,
+                                error = %e,
+                                "Failed to register prompt watcher (non-fatal)"
+                            );
+                        }
+                    }
+                }
+
                 tracing::info!("Terminal {} started with PID {}", terminal_id, handle.pid);
 
                 LaunchResult {
@@ -340,6 +381,22 @@ impl TerminalLauncher {
             "cursor-agent" => "cursor".to_string(),
             _ => cli_name.to_string(),
         }
+    }
+
+    /// Get workflow ID for a terminal by querying workflow_task table
+    async fn get_workflow_id_for_terminal(
+        &self,
+        workflow_task_id: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let workflow_id: Option<String> = sqlx::query_scalar(
+            "SELECT workflow_id FROM workflow_task WHERE id = ?"
+        )
+        .bind(workflow_task_id)
+        .fetch_optional(&self.db.pool)
+        .await?
+        .flatten();
+
+        Ok(workflow_id)
     }
 
     /// Get workspace ID for a terminal by traversing workflow_task -> task -> workspace

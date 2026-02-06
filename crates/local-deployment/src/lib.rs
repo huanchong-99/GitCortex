@@ -31,7 +31,7 @@ use services::services::{
     project::ProjectService,
     queued_message::QueuedMessageService,
     repo::RepoService,
-    terminal::process::ProcessManager,
+    terminal::{PromptWatcher, process::ProcessManager},
 };
 use tokio::sync::RwLock;
 use utils::{
@@ -67,6 +67,7 @@ pub struct LocalDeployment {
     orchestrator_runtime: OrchestratorRuntime,
     process_manager: Arc<ProcessManager>,
     message_bus: SharedMessageBus,
+    prompt_watcher: PromptWatcher,
 }
 
 #[derive(Debug, Clone)]
@@ -174,6 +175,7 @@ impl Deployment for LocalDeployment {
         // Create message bus and orchestrator runtime
         let message_bus = Arc::new(MessageBus::new(1000));
         let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus.clone());
+        let prompt_watcher = PromptWatcher::new(message_bus.clone());
 
         let process_manager = Arc::new(ProcessManager::new());
 
@@ -203,6 +205,7 @@ impl Deployment for LocalDeployment {
             orchestrator_runtime,
             process_manager,
             message_bus,
+            prompt_watcher,
         };
 
         Ok(deployment)
@@ -281,6 +284,11 @@ impl LocalDeployment {
     /// Get the shared message bus for WebSocket event broadcasting.
     pub fn message_bus(&self) -> &SharedMessageBus {
         &self.message_bus
+    }
+
+    /// Get the prompt watcher for terminal prompt detection.
+    pub fn prompt_watcher(&self) -> &PromptWatcher {
+        &self.prompt_watcher
     }
 
     /// Reconcile terminal statuses on startup
