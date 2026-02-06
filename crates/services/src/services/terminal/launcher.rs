@@ -83,15 +83,16 @@ impl TerminalLauncher {
     /// * `process_manager` - Process manager for lifecycle management
     /// * `working_dir` - Working directory for spawned processes
     /// * `message_bus` - Shared message bus for terminal bridge
+    /// * `prompt_watcher` - Shared prompt watcher instance from deployment
     pub fn with_message_bus(
         db: Arc<DBService>,
         cc_switch: Arc<CCSwitchService>,
         process_manager: Arc<ProcessManager>,
         working_dir: PathBuf,
         message_bus: SharedMessageBus,
+        prompt_watcher: PromptWatcher,
     ) -> Self {
         let terminal_bridge = TerminalBridge::new(message_bus.clone(), Arc::clone(&process_manager));
-        let prompt_watcher = PromptWatcher::new(message_bus);
         Self {
             db,
             cc_switch,

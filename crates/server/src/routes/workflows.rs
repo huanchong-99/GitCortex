@@ -704,12 +704,14 @@ async fn prepare_workflow(
     let cc_switch = Arc::new(CCSwitchService::new(db_arc.clone()));
     let process_manager = deployment.process_manager().clone();
     let message_bus = deployment.message_bus().clone();
+    let prompt_watcher = deployment.prompt_watcher().clone();
     let launcher = TerminalLauncher::with_message_bus(
         db_arc,
         cc_switch,
         process_manager,
         working_dir,
         message_bus,
+        prompt_watcher,
     );
 
     let launch_results = launcher.launch_all(&workflow_id).await.map_err(|e| {
