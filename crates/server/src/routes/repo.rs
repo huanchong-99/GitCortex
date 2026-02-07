@@ -12,6 +12,7 @@ use db::models::{
 use deployment::Deployment;
 use serde::Deserialize;
 use services::services::{file_search::SearchQuery, git::GitBranch};
+use std::path::{Component, PathBuf};
 use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -40,6 +41,34 @@ pub struct InitRepoRequest {
 #[ts(export)]
 pub struct BatchRepoRequest {
     pub ids: Vec<Uuid>,
+}
+
+fn resolve_repo_file_path_for_editor(
+    repo_path: &std::path::Path,
+    file_path: &str,
+) -> Result<PathBuf, ApiError> {
+    let trimmed_file_path = file_path.trim();
+    if trimmed_file_path.is_empty() {
+        return Ok(repo_path.to_path_buf());
+    }
+
+    let relative_path = PathBuf::from(trimmed_file_path);
+    if relative_path.is_absolute() {
+        return Err(ApiError::BadRequest(
+            "file_path must be relative to the repository root".to_string(),
+        ));
+    }
+
+    if relative_path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_) | Component::RootDir))
+    {
+        return Err(ApiError::BadRequest(
+            "file_path must stay within the selected repository".to_string(),
+        ));
+    }
+
+    Ok(repo_path.join(relative_path))
 }
 
 pub async fn register_repo(
@@ -139,12 +168,26 @@ pub async fn open_repo_in_editor(
         config.editor.with_override(editor_type_str)
     };
 
-    match editor_config.open_file(&repo.path).await {
+    let file_path = payload
+        .as_ref()
+        .and_then(|request| request.file_path.as_deref())
+        .filter(|value| !value.trim().is_empty());
+
+    let path = if let Some(file_path) = file_path {
+        resolve_repo_file_path_for_editor(repo.path.as_path(), file_path)?
+    } else {
+        repo.path.clone()
+    };
+
+    match editor_config
+        .open_file_with_hint(path.as_path(), Some(file_path.is_some()))
+        .await
+    {
         Ok(url) => {
             tracing::info!(
                 "Opened editor for repo {} at path: {}{}",
                 repo_id,
-                repo.path.to_string_lossy(),
+                path.to_string_lossy(),
                 if url.is_some() { " (remote mode)" } else { "" }
             );
 

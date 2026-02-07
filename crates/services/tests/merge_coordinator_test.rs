@@ -2,12 +2,13 @@
 //!
 //! Test merge coordinator functionality for merging task branches into base branch.
 
-use std::sync::Arc;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
-use services::merge_coordinator::MergeCoordinator;
-use services::git::GitService;
-use services::orchestrator::message_bus::{MessageBus, BusMessage};
+use services::{
+    git::GitService,
+    merge_coordinator::MergeCoordinator,
+    orchestrator::message_bus::{BusMessage, MessageBus},
+};
 
 #[test]
 fn test_merge_coordinator_creation() {
@@ -27,10 +28,11 @@ fn test_merge_coordinator_struct_fields() {
     // This is a compile-time check that the struct exists with correct types
 
     // If this compiles, the struct definition is correct
-    use services::merge_coordinator::MergeCoordinator;
-    use services::orchestrator::message_bus::SharedMessageBus;
-    use services::git::GitService;
     use db::DBService;
+    use services::{
+        git::GitService, merge_coordinator::MergeCoordinator,
+        orchestrator::message_bus::SharedMessageBus,
+    };
 
     // Just verify types line up - won't actually run without DB instance
     let _message_bus: Option<SharedMessageBus> = None;
@@ -78,4 +80,3 @@ fn test_merge_coordinator_methods_exist() {
 // 1. MergeCoordinator struct exists and compiles
 // 2. Required dependencies (DBService, MessageBus, GitService) are compatible
 // 3. Constants and types are correctly defined
-

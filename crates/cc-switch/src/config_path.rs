@@ -3,6 +3,7 @@
 //! 提供各 CLI 配置文件的路径获取功能。
 
 use std::path::{Path, PathBuf};
+
 use crate::error::{CCSwitchError, Result};
 
 /// 获取用户主目录

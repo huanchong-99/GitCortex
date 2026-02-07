@@ -1,16 +1,18 @@
 //! CLI Type API Routes
 
-use axum::{
-    extract::{Path, State},
-    routing::get,
-    Router,
-    response::Json as ResponseJson,
-};
-use db::models::{CliType, ModelConfig, CliDetectionStatus, CliType as CliTypeModel};
-use deployment::Deployment;
-use crate::{error::ApiError, DeploymentImpl};
-use services::services::terminal::detector::CliDetector;
 use std::sync::Arc;
+
+use axum::{
+    Router,
+    extract::{Path, State},
+    response::Json as ResponseJson,
+    routing::get,
+};
+use db::models::{CliDetectionStatus, CliType, CliType as CliTypeModel, ModelConfig};
+use deployment::Deployment;
+use services::services::terminal::detector::CliDetector;
+
+use crate::{DeploymentImpl, error::ApiError};
 
 /// Create CLI types router
 pub fn cli_types_routes() -> Router<DeploymentImpl> {
@@ -37,7 +39,9 @@ async fn detect_cli_types(
     let db = Arc::new(deployment.db().clone());
     let detector = CliDetector::new(db);
 
-    let results = detector.detect_all().await
+    let results = detector
+        .detect_all()
+        .await
         .map_err(|e| ApiError::Internal(format!("Failed to detect CLIs: {}", e)))?;
 
     Ok(ResponseJson(results))

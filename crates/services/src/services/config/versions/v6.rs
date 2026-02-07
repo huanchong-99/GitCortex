@@ -72,7 +72,9 @@ impl Config {
                             tracing::warn!("Failed to backup profiles.json: {}", e);
                         } else {
                             tracing::info!("Custom profiles.json backed up to {:?}", backup_path);
-                            tracing::info!("Please review your custom profiles after migration to v6");
+                            tracing::info!(
+                                "Please review your custom profiles after migration to v6"
+                            );
                         }
                     } else {
                         tracing::warn!(

@@ -2,15 +2,14 @@
 //!
 //! Provides persistence mechanisms for orchestrator state to enable recovery from crashes.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
+use db::DBService;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-use db::DBService;
 use super::{
     constants::WORKFLOW_STATUS_RUNNING,
     state::{OrchestratorState, TaskExecutionState},
@@ -132,9 +131,8 @@ impl StatePersistence {
     pub async fn save_state(&self, state: &OrchestratorState) -> Result<()> {
         let workflow_id = &state.workflow_id;
         let persisted: PersistedState = state.to_owned().into();
-        let state_json =
-            serde_json::to_string(&persisted)
-                .map_err(|e| anyhow!("Failed to serialize state: {}", e))?;
+        let state_json = serde_json::to_string(&persisted)
+            .map_err(|e| anyhow!("Failed to serialize state: {}", e))?;
 
         debug!("Saving state for workflow {}", workflow_id);
 
@@ -179,9 +177,8 @@ impl StatePersistence {
             .map_err(|e| anyhow!("Failed to load state from database: {}", e))?;
 
         if let Some((Some(state_json),)) = row {
-            let persisted: PersistedState =
-                serde_json::from_str(&state_json)
-                    .map_err(|e| anyhow!("Failed to deserialize state: {}", e))?;
+            let persisted: PersistedState = serde_json::from_str(&state_json)
+                .map_err(|e| anyhow!("Failed to deserialize state: {}", e))?;
 
             let mut state = OrchestratorState::new(workflow_id.to_string());
             state.task_states = persisted
@@ -229,7 +226,10 @@ impl StatePersistence {
         if state.is_some() {
             info!("Successfully recovered state for workflow {}", workflow_id);
         } else {
-            warn!("No persisted state found for running workflow {}", workflow_id);
+            warn!(
+                "No persisted state found for running workflow {}",
+                workflow_id
+            );
         }
 
         Ok(state)
@@ -284,11 +284,11 @@ impl StatePersistence {
     /// Restore conversation history
     ///
     /// Loads conversation history for a workflow.
-    pub async fn restore_conversation_history(
-        &self,
-        workflow_id: &str,
-    ) -> Result<Vec<LLMMessage>> {
-        debug!("Restoring conversation history for workflow {}", workflow_id);
+    pub async fn restore_conversation_history(&self, workflow_id: &str) -> Result<Vec<LLMMessage>> {
+        debug!(
+            "Restoring conversation history for workflow {}",
+            workflow_id
+        );
 
         let state = self.load_state(workflow_id).await?;
 

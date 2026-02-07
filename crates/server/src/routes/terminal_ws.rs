@@ -2,11 +2,16 @@
 //!
 //! Provides WebSocket-based terminal I/O using portable-pty for cross-platform support.
 
+use std::time::Duration;
+
 use axum::{
-    extract::{Path, State, WebSocketUpgrade, ws::{Message, WebSocket}},
+    Router,
+    extract::{
+        Path, State, WebSocketUpgrade,
+        ws::{Message, WebSocket},
+    },
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use db::models::{Terminal, WorkflowTask};
 use deployment::Deployment;
@@ -14,12 +19,13 @@ use futures_util::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::time::{timeout, Instant};
+use tokio::{
+    sync::mpsc,
+    time::{Instant, timeout},
+};
 use ts_rs::TS;
-use crate::DeploymentImpl;
-use crate::error::ApiError;
+
+use crate::{DeploymentImpl, error::ApiError};
 
 // ============================================================================
 // Constants
@@ -114,15 +120,14 @@ async fn handle_terminal_socket(
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
     // Get process handle from ProcessManager
-    let process_handle = deployment.process_manager()
-        .get_handle(&terminal_id)
-        .await;
+    let process_handle = deployment.process_manager().get_handle(&terminal_id).await;
 
     let process_handle = match process_handle {
         Some(handle) => handle,
         None => {
             let msg = WsMessage::Error {
-                message: "Terminal process not running. Please start the terminal first.".to_string(),
+                message: "Terminal process not running. Please start the terminal first."
+                    .to_string(),
             };
             let _ = ws_sender
                 .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
@@ -133,83 +138,13 @@ async fn handle_terminal_socket(
         }
     };
 
-    // Auto-register terminal for prompt watching if not already registered
-    let prompt_watcher = deployment.prompt_watcher().clone();
-    if prompt_watcher.is_registered(&terminal_id).await {
-        tracing::trace!(
-            terminal_id = %terminal_id,
-            "Terminal already registered for prompt watching"
-        );
-    } else {
-        match Terminal::find_by_id(&deployment.db().pool, &terminal_id).await {
-            Ok(Some(terminal)) => {
-                let task_id = terminal.workflow_task_id.clone();
-                let pty_session_id = terminal.pty_session_id.clone();
-
-                match WorkflowTask::find_by_id(&deployment.db().pool, &task_id).await {
-                    Ok(Some(task)) => match pty_session_id {
-                        Some(session_id) if !session_id.trim().is_empty() => {
-                            let workflow_id = task.workflow_id;
-                            if let Err(e) = prompt_watcher
-                                .register(&terminal_id, &workflow_id, &task_id, &session_id)
-                                .await {
-                                tracing::warn!(
-                                    terminal_id = %terminal_id,
-                                    workflow_id = %workflow_id,
-                                    task_id = %task_id,
-                                    error = %e,
-                                    "Failed to auto-register terminal for prompt watching"
-                                );
-                            } else {
-                                tracing::info!(
-                                    terminal_id = %terminal_id,
-                                    workflow_id = %workflow_id,
-                                    task_id = %task_id,
-                                    pty_session_id = %session_id,
-                                    "Auto-registered terminal for prompt watching"
-                                );
-                            }
-                        }
-                        _ => {
-                            tracing::warn!(
-                                terminal_id = %terminal_id,
-                                task_id = %task_id,
-                                "Skipped prompt watcher auto-registration: missing pty_session_id"
-                            );
-                        }
-                    },
-                    Ok(None) => {
-                        tracing::warn!(
-                            terminal_id = %terminal_id,
-                            workflow_task_id = %task_id,
-                            "Skipped prompt watcher auto-registration: workflow task not found"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            terminal_id = %terminal_id,
-                            workflow_task_id = %task_id,
-                            error = %e,
-                            "Failed to query workflow task for prompt watcher auto-registration"
-                        );
-                    }
-                }
-            }
-            Ok(None) => {
-                tracing::warn!(
-                    terminal_id = %terminal_id,
-                    "Skipped prompt watcher auto-registration: terminal not found in database"
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    terminal_id = %terminal_id,
-                    error = %e,
-                    "Failed to query terminal for prompt watcher auto-registration"
-                );
-            }
-        }
-    }
+    sync_prompt_watcher_registration(
+        &terminal_id,
+        deployment.prompt_watcher().clone(),
+        deployment.db().pool.clone(),
+        Some(process_handle.session_id.as_str()),
+    )
+    .await;
 
     // Clone process_manager for output subscription and resize operations
     let process_manager = deployment.process_manager().clone();
@@ -283,8 +218,7 @@ async fn handle_terminal_socket(
                             let msg = WsMessage::Output { data: chunk.text };
                             match serde_json::to_string(&msg) {
                                 Ok(json) => {
-                                    if let Err(e) =
-                                        ws_sender.send(Message::Text(json.into())).await
+                                    if let Err(e) = ws_sender.send(Message::Text(json.into())).await
                                     {
                                         tracing::debug!(
                                             terminal_id = %terminal_id_output,
@@ -404,13 +338,8 @@ async fn handle_terminal_socket(
     // Spawn WebSocket receive task (WebSocket input -> PTY)
     let recv_task = tokio::spawn(async move {
         loop {
-            let recv_result = timeout(
-                Duration::from_secs(WS_IDLE_TIMEOUT_SECS),
-                ws_receiver.next()
-            ).await;
-
-            match recv_result {
-                Ok(Some(result)) => {
+            match ws_receiver.next().await {
+                Some(result) => {
                     // Update last activity time
                     *last_activity_recv.write().await = Instant::now();
 
@@ -421,14 +350,19 @@ async fn handle_terminal_socket(
                                     match ws_msg {
                                         WsMessage::Input { data } => {
                                             // Send to PTY writer
-                                            if let Err(e) = ws_tx_input.send(data.into_bytes()).await {
+                                            if let Err(e) =
+                                                ws_tx_input.send(data.into_bytes()).await
+                                            {
                                                 tracing::error!("Failed to send to PTY: {}", e);
                                                 break;
                                             }
                                         }
                                         WsMessage::Resize { cols, rows } => {
                                             // Resize PTY
-                                            if let Err(e) = process_manager.resize(&terminal_id_resize, cols, rows).await {
+                                            if let Err(e) = process_manager
+                                                .resize(&terminal_id_resize, cols, rows)
+                                                .await
+                                            {
                                                 tracing::warn!(
                                                     "Failed to resize terminal {}: {}",
                                                     terminal_id_resize,
@@ -465,7 +399,10 @@ async fn handle_terminal_socket(
                                 tracing::trace!("Received pong: {} bytes", data.len());
                             }
                             Message::Binary(data) => {
-                                tracing::warn!("Received unexpected binary data: {} bytes", data.len());
+                                tracing::warn!(
+                                    "Received unexpected binary data: {} bytes",
+                                    data.len()
+                                );
                             }
                         },
                         Err(e) => {
@@ -474,16 +411,8 @@ async fn handle_terminal_socket(
                         }
                     }
                 }
-                Ok(None) => {
+                None => {
                     tracing::debug!("WebSocket stream ended");
-                    break;
-                }
-                Err(_) => {
-                    tracing::warn!(
-                        "Terminal {} receive timeout after {}s of inactivity",
-                        terminal_id_recv,
-                        WS_IDLE_TIMEOUT_SECS
-                    );
                     break;
                 }
             }
@@ -526,6 +455,123 @@ async fn handle_terminal_socket(
     }
 
     tracing::info!("Terminal WebSocket disconnected: {}", terminal_id);
+}
+
+async fn sync_prompt_watcher_registration(
+    terminal_id: &str,
+    prompt_watcher: services::services::terminal::prompt_watcher::PromptWatcher,
+    db_pool: sqlx::SqlitePool,
+    active_session_id: Option<&str>,
+) {
+    let terminal = match Terminal::find_by_id(&db_pool, terminal_id).await {
+        Ok(Some(terminal)) => terminal,
+        Ok(None) => {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                "Skipped prompt watcher auto-registration: terminal not found in database"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                error = %e,
+                "Failed to query terminal for prompt watcher auto-registration"
+            );
+            return;
+        }
+    };
+
+    if !terminal.auto_confirm {
+        if prompt_watcher.is_registered(terminal_id).await {
+            prompt_watcher.unregister(terminal_id).await;
+            tracing::info!(
+                terminal_id = %terminal_id,
+                "Unregistered prompt watcher because auto_confirm is disabled"
+            );
+        } else {
+            tracing::trace!(
+                terminal_id = %terminal_id,
+                "Prompt watcher remains disabled because auto_confirm is false"
+            );
+        }
+        return;
+    }
+
+    if prompt_watcher.is_registered(terminal_id).await {
+        tracing::trace!(
+            terminal_id = %terminal_id,
+            "Terminal already registered for prompt watching"
+        );
+        return;
+    }
+
+    let task_id = terminal.workflow_task_id.clone();
+    let workflow_id = match WorkflowTask::find_by_id(&db_pool, &task_id).await {
+        Ok(Some(task)) => task.workflow_id,
+        Ok(None) => {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                workflow_task_id = %task_id,
+                "Skipped prompt watcher auto-registration: workflow task not found"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                workflow_task_id = %task_id,
+                error = %e,
+                "Failed to query workflow task for prompt watcher auto-registration"
+            );
+            return;
+        }
+    };
+
+    let pty_session_id = active_session_id
+        .map(|session_id| session_id.to_string())
+        .filter(|session_id| !session_id.trim().is_empty())
+        .or_else(|| {
+            terminal
+                .pty_session_id
+                .filter(|session_id| !session_id.trim().is_empty())
+        });
+
+    let Some(session_id) = pty_session_id else {
+        tracing::warn!(
+            terminal_id = %terminal_id,
+            task_id = %task_id,
+            "Skipped prompt watcher auto-registration: missing pty_session_id"
+        );
+        return;
+    };
+
+    if let Err(e) = prompt_watcher
+        .register(
+            terminal_id,
+            &workflow_id,
+            &task_id,
+            &session_id,
+            terminal.auto_confirm,
+        )
+        .await
+    {
+        tracing::warn!(
+            terminal_id = %terminal_id,
+            workflow_id = %workflow_id,
+            task_id = %task_id,
+            error = %e,
+            "Failed to auto-register terminal for prompt watching"
+        );
+    } else {
+        tracing::info!(
+            terminal_id = %terminal_id,
+            workflow_id = %workflow_id,
+            task_id = %task_id,
+            pty_session_id = %session_id,
+            "Auto-registered terminal for prompt watching"
+        );
+    }
 }
 
 #[cfg(test)]

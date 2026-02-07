@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    str::FromStr,
-    sync::RwLock,
-};
+use std::{collections::HashMap, fs, str::FromStr, sync::RwLock};
 
 use convert_case::{Case, Casing};
 use once_cell::sync::Lazy;
@@ -418,9 +413,7 @@ impl ExecutorConfigs {
                     .expect("No default variant found")
             })
     }
-    pub fn get_recommended_executor_profile(
-        &self,
-    ) -> Result<ExecutorProfileId, ProfileError> {
+    pub fn get_recommended_executor_profile(&self) -> Result<ExecutorProfileId, ProfileError> {
         let mut agents_with_info: Vec<(BaseCodingAgent, AvailabilityInfo)> = Vec::new();
 
         for &base_agent in self.executors.keys() {

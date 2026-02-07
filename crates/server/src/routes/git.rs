@@ -1,11 +1,12 @@
-use axum::{extract::State, response::Json as ResponseJson, routing::post, Router};
+use std::path::PathBuf;
+
+use axum::{Router, extract::State, response::Json as ResponseJson, routing::post};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use ts_rs::TS;
 use utils::response::ApiResponse;
 
-use crate::{error::ApiError, DeploymentImpl};
+use crate::{DeploymentImpl, error::ApiError};
 
 #[derive(Debug, Deserialize, TS)]
 #[ts(export)]

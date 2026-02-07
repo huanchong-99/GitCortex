@@ -516,15 +516,15 @@ impl ExecutionProcess {
             Some(Utc::now())
         };
 
-        sqlx::query!(
+        sqlx::query(
             r#"UPDATE execution_processes
-               SET status = $1, exit_code = $2, completed_at = $3
-               WHERE id = $4"#,
-            status,
-            exit_code,
-            completed_at,
-            id
+               SET status = ?, exit_code = ?, completed_at = ?, updated_at = datetime('now')
+               WHERE id = ?"#,
         )
+        .bind(status)
+        .bind(exit_code)
+        .bind(completed_at)
+        .bind(id)
         .execute(pool)
         .await?;
 
@@ -557,9 +557,8 @@ impl ExecutionProcess {
         )
         .execute(pool)
         .await?;
-        let affected = i64::try_from(result.rows_affected()).map_err(|_| {
-            sqlx::Error::Protocol("rows_affected overflowed i64".into())
-        })?;
+        let affected = i64::try_from(result.rows_affected())
+            .map_err(|_| sqlx::Error::Protocol("rows_affected overflowed i64".into()))?;
         Ok(affected)
     }
 

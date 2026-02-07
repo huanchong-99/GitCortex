@@ -2,8 +2,11 @@
 //!
 //! 提供统一的模型切换接口。
 
-use crate::error::{CCSwitchError, Result};
-use crate::{CliType, claude, codex, gemini};
+use crate::{
+    claude, codex,
+    error::{CCSwitchError, Result},
+    gemini, CliType,
+};
 
 /// 模型切换配置
 #[derive(Debug, Clone)]
@@ -44,31 +47,20 @@ pub async fn switch_model(cli_type: CliType, config: &SwitchConfig) -> Result<()
 
     match cli_type {
         CliType::ClaudeCode => {
-            claude::update_claude_model(
-                config.base_url.as_deref(),
-                &config.api_key,
-                &config.model,
-            ).await
+            claude::update_claude_model(config.base_url.as_deref(), &config.api_key, &config.model)
+                .await
         }
         CliType::Codex => {
-            codex::update_codex_model(
-                config.base_url.as_deref(),
-                &config.api_key,
-                &config.model,
-            ).await
+            codex::update_codex_model(config.base_url.as_deref(), &config.api_key, &config.model)
+                .await
         }
         CliType::Gemini => {
-            gemini::update_gemini_model(
-                config.base_url.as_deref(),
-                &config.api_key,
-                &config.model,
-            ).await
+            gemini::update_gemini_model(config.base_url.as_deref(), &config.api_key, &config.model)
+                .await
         }
-        _ => {
-            Err(CCSwitchError::UnsupportedCli {
-                cli_name: cli_type.as_str().to_string(),
-            })
-        }
+        _ => Err(CCSwitchError::UnsupportedCli {
+            cli_name: cli_type.as_str().to_string(),
+        }),
     }
 }
 

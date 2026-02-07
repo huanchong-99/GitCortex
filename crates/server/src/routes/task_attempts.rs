@@ -7,8 +7,8 @@ pub mod util;
 pub mod workspace_summary;
 
 use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
+    collections::{HashMap, HashSet},
+    path::{Component, Path, PathBuf},
 };
 
 use axum::{
@@ -225,13 +225,10 @@ pub async fn create_task_attempt(
         .collect();
 
     WorkspaceRepo::create_many(pool, workspace.id, &workspace_repos).await?;
-    if let Err(err) = deployment
+    deployment
         .container()
         .start_workspace(&workspace, executor_profile_id.clone())
-        .await
-    {
-        tracing::error!("Failed to start task attempt: {}", err);
-    }
+        .await?;
 
     deployment
         .track_if_analytics_allowed(
@@ -412,6 +409,45 @@ pub struct PushTaskAttemptRequest {
     pub repo_id: Uuid,
 }
 
+async fn finalize_workspace_if_all_repos_merged(
+    pool: &sqlx::SqlitePool,
+    workspace: &Workspace,
+    task_id: Uuid,
+) -> Result<bool, ApiError> {
+    let workspace_repos = WorkspaceRepo::find_by_workspace_id(pool, workspace.id).await?;
+    if workspace_repos.is_empty() {
+        return Ok(false);
+    }
+
+    let merges = Merge::find_by_workspace_id(pool, workspace.id).await?;
+    let mut merged_repo_ids = HashSet::new();
+    for merge in merges {
+        match merge {
+            Merge::Direct(direct_merge) => {
+                merged_repo_ids.insert(direct_merge.repo_id);
+            }
+            Merge::Pr(pr_merge) => {
+                if matches!(pr_merge.pr_info.status, MergeStatus::Merged) {
+                    merged_repo_ids.insert(pr_merge.repo_id);
+                }
+            }
+        }
+    }
+
+    let all_repos_merged = workspace_repos
+        .iter()
+        .all(|workspace_repo| merged_repo_ids.contains(&workspace_repo.repo_id));
+
+    if all_repos_merged {
+        Task::update_status(pool, task_id, TaskStatus::Done).await?;
+        if !workspace.pinned {
+            Workspace::set_archived(pool, workspace.id, true).await?;
+        }
+    }
+
+    Ok(all_repos_merged)
+}
+
 #[axum::debug_handler]
 pub async fn merge_task_attempt(
     Extension(workspace): Extension<Workspace>,
@@ -469,9 +505,14 @@ pub async fn merge_task_attempt(
         &merge_commit_id,
     )
     .await?;
-    Task::update_status(pool, task.id, TaskStatus::Done).await?;
-    if !workspace.pinned {
-        Workspace::set_archived(pool, workspace.id, true).await?;
+    let all_repos_merged =
+        finalize_workspace_if_all_repos_merged(pool, &workspace, task.id).await?;
+    if !all_repos_merged {
+        tracing::info!(
+            workspace_id = %workspace.id,
+            repo_id = %workspace_repo.repo_id,
+            "Repository merged, waiting for remaining repositories before marking task done"
+        );
     }
 
     // Stop any running dev servers for this workspace
@@ -499,7 +540,9 @@ pub async fn merge_task_attempt(
         }
     }
 
-    tracing::debug!("Task {} status updated successfully", task.id);
+    if all_repos_merged {
+        tracing::debug!("Task {} marked done after all repositories merged", task.id);
+    }
 
     deployment
         .track_if_analytics_allowed(
@@ -587,13 +630,163 @@ pub enum PushError {
 
 #[derive(serde::Deserialize, TS)]
 pub struct OpenEditorRequest {
-    editor_type: Option<String>,
-    file_path: Option<String>,
+    #[serde(default)]
+    pub editor_type: Option<String>,
+    #[serde(default)]
+    pub file_path: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub git_repo_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, TS)]
 pub struct OpenEditorResponse {
     pub url: Option<String>,
+}
+
+fn normalize_editor_repo_path(path: &str) -> String {
+    path.replace('\\', "/").trim_end_matches('/').to_string()
+}
+
+fn resolve_workspace_repo_for_editor<'a>(
+    repositories: &'a [Repo],
+    requested_repo_path: Option<&str>,
+) -> Result<Option<&'a Repo>, ApiError> {
+    if let Some(requested_repo_path) = requested_repo_path {
+        let requested_repo_path = requested_repo_path.trim();
+        if !requested_repo_path.is_empty() {
+            let requested_repo_path = normalize_editor_repo_path(requested_repo_path);
+            return repositories
+                .iter()
+                .find(|repo| {
+                    normalize_editor_repo_path(&repo.path.to_string_lossy()) == requested_repo_path
+                        || repo.name == requested_repo_path
+                })
+                .map(Some)
+                .ok_or_else(|| {
+                    ApiError::BadRequest(
+                        "Requested repository is not part of this task attempt".to_string(),
+                    )
+                });
+        }
+    }
+
+    Ok(repositories.first().filter(|_| repositories.len() == 1))
+}
+
+fn resolve_workspace_file_open_root(
+    workspace_path: &Path,
+    selected_repo: Option<&Repo>,
+) -> PathBuf {
+    if let Some(selected_repo) = selected_repo {
+        return workspace_path.join(&selected_repo.name);
+    }
+
+    workspace_path.to_path_buf()
+}
+
+fn resolve_workspace_file_path_for_editor(
+    base_path: &Path,
+    file_path: &str,
+    selected_repo_name: Option<&str>,
+) -> Result<PathBuf, ApiError> {
+    let trimmed_file_path = file_path.trim();
+    if trimmed_file_path.is_empty() {
+        return Ok(base_path.to_path_buf());
+    }
+
+    let mut relative_path = PathBuf::from(trimmed_file_path);
+    if relative_path.is_absolute() {
+        return Err(ApiError::BadRequest(
+            "file_path must be relative to the selected root".to_string(),
+        ));
+    }
+
+    if relative_path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_) | Component::RootDir))
+    {
+        return Err(ApiError::BadRequest(
+            "file_path must stay within the selected root".to_string(),
+        ));
+    }
+
+    if let Some(repo_name) = selected_repo_name
+        && let Ok(stripped) = relative_path.strip_prefix(repo_name)
+    {
+        if stripped.as_os_str().is_empty() {
+            return Ok(base_path.to_path_buf());
+        }
+        relative_path = stripped.to_path_buf();
+    }
+
+    Ok(base_path.join(relative_path))
+}
+
+#[cfg(test)]
+mod open_editor_path_tests {
+    use super::{
+        normalize_editor_repo_path, resolve_workspace_file_path_for_editor,
+    };
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn strips_repo_prefix_for_single_repo_workspace_file_path() {
+        let resolved = resolve_workspace_file_path_for_editor(
+            Path::new("/workspace/repo-a"),
+            "repo-a/src/main.rs",
+            Some("repo-a"),
+        )
+        .expect("path should resolve");
+
+        assert_eq!(
+            resolved,
+            Path::new("/workspace/repo-a")
+                .join("src")
+                .join("main.rs")
+        );
+    }
+
+    #[test]
+    fn rejects_parent_dir_traversal_in_file_path() {
+        let result = resolve_workspace_file_path_for_editor(
+            Path::new("/workspace"),
+            "../outside.txt",
+            None,
+        );
+
+        assert!(result.is_err(), "path traversal must be rejected");
+    }
+
+    #[test]
+    fn normalizes_repo_path_slashes_and_trailing_separator() {
+        let normalized = normalize_editor_repo_path(r"C:\work\repo-a\");
+        assert_eq!(normalized, "C:/work/repo-a");
+    }
+
+    #[test]
+    fn file_open_root_prefers_selected_repo() {
+        let selected_repo = db::models::repo::Repo {
+            id: uuid::Uuid::nil(),
+            path: "/workspace/repo-a".into(),
+            name: "repo-a".to_string(),
+            display_name: "repo-a".to_string(),
+            setup_script: None,
+            cleanup_script: None,
+            copy_files: None,
+            parallel_setup_script: false,
+            dev_server_script: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        let root = super::resolve_workspace_file_open_root(
+            Path::new("/workspace"),
+            Some(&selected_repo),
+        );
+
+        assert_eq!(root, PathBuf::from("/workspace").join("repo-a"));
+    }
 }
 
 pub async fn open_task_attempt_in_editor(
@@ -610,20 +803,30 @@ pub async fn open_task_attempt_in_editor(
 
     let workspace_path = Path::new(&container_ref);
 
-    // For single-repo projects, open from the repo directory
+    // Resolve repo context when explicitly selected or when single-repo.
     let workspace_repos =
         WorkspaceRepo::find_repos_for_workspace(&deployment.db().pool, workspace.id).await?;
-    let workspace_path = if workspace_repos.len() == 1 && payload.file_path.is_none() {
-        workspace_path.join(&workspace_repos[0].name)
-    } else {
-        workspace_path.to_path_buf()
-    };
+    let selected_repo =
+        resolve_workspace_repo_for_editor(&workspace_repos, payload.git_repo_path.as_deref())?;
 
-    // If a specific file path is provided, use it; otherwise use the base path
-    let path = if let Some(file_path) = payload.file_path.as_ref() {
-        workspace_path.join(file_path)
+    let file_path = payload
+        .file_path
+        .as_deref()
+        .filter(|value| !value.trim().is_empty());
+
+    let base_path = resolve_workspace_file_open_root(
+        workspace_path,
+        selected_repo,
+    );
+
+    let path = if let Some(file_path) = file_path {
+        resolve_workspace_file_path_for_editor(
+            &base_path,
+            file_path,
+            selected_repo.map(|repo| repo.name.as_str()),
+        )?
     } else {
-        workspace_path
+        base_path
     };
 
     let editor_config = {
@@ -632,7 +835,10 @@ pub async fn open_task_attempt_in_editor(
         config.editor.with_override(editor_type_str)
     };
 
-    match editor_config.open_file(path.as_path()).await {
+    match editor_config
+        .open_file_with_hint(path.as_path(), Some(file_path.is_some()))
+        .await
+    {
         Ok(url) => {
             tracing::info!(
                 "Opened editor for task attempt {} at path: {}{}",
@@ -1096,13 +1302,8 @@ pub async fn rebase_task_attempt(
         .git()
         .check_branch_exists(&repo.path, &new_base_branch)?
     {
-        WorkspaceRepo::update_target_branch(
-            pool,
-            workspace.id,
-            payload.repo_id,
-            &new_base_branch,
-        )
-        .await?;
+        WorkspaceRepo::update_target_branch(pool, workspace.id, payload.repo_id, &new_base_branch)
+            .await?;
     } else {
         return Ok(ResponseJson(ApiResponse::error(
             format!("Branch '{new_base_branch}' does not exist in the repository").as_str(),

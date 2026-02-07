@@ -38,7 +38,7 @@ export function useTaskMutations(projectId?: string) {
         });
       }
       if (projectId) {
-        navigate(`${paths.task(projectId, createdTask.id)}/attempts/latest`);
+        navigate(paths.task(projectId, createdTask.id));
       }
     },
     onError: (err) => {
@@ -84,7 +84,10 @@ export function useTaskMutations(projectId?: string) {
     onSuccess: (_: unknown, taskId: string) => {
       invalidateQueries(taskId);
       // Remove single-task cache entry to avoid stale data flashes
-      queryClient.removeQueries({ queryKey: ['task', taskId], exact: true });
+      queryClient.removeQueries({
+        queryKey: taskKeys.byId(taskId),
+        exact: true,
+      });
       // Invalidate all task relationships caches (safe approach since we don't know parent)
       queryClient.invalidateQueries({ queryKey: taskRelationshipsKeys.all });
       // Invalidate workspace summaries so they refresh with the deleted workspace removed

@@ -4,8 +4,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::{RwLock, broadcast, mpsc};
 
-use super::constants::WORKFLOW_TOPIC_PREFIX;
-use super::types::{OrchestratorInstruction, PromptDecision, TerminalCompletionEvent, TerminalPromptEvent};
+use super::{
+    constants::WORKFLOW_TOPIC_PREFIX,
+    types::{
+        OrchestratorInstruction, PromptDecision, TerminalCompletionEvent, TerminalPromptEvent,
+    },
+};
 
 const TERMINAL_INPUT_TOPIC_PREFIX: &str = "terminal.input.";
 
@@ -160,7 +164,8 @@ impl MessageBus {
     /// Publishes a terminal completion event to workflow topic and broadcast channel.
     pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
         let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, event.workflow_id);
-        let _ = self.publish(&topic, BusMessage::TerminalCompleted(event.clone()))
+        let _ = self
+            .publish(&topic, BusMessage::TerminalCompleted(event.clone()))
             .await;
         let _ = self.broadcast(BusMessage::TerminalCompleted(event));
     }
@@ -193,7 +198,8 @@ impl MessageBus {
     /// Called by PromptWatcher when an interactive prompt is detected in PTY output.
     pub async fn publish_terminal_prompt_detected(&self, event: TerminalPromptEvent) {
         let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, event.workflow_id);
-        let _ = self.publish(&topic, BusMessage::TerminalPromptDetected(event.clone()))
+        let _ = self
+            .publish(&topic, BusMessage::TerminalPromptDetected(event.clone()))
             .await;
         let _ = self.broadcast(BusMessage::TerminalPromptDetected(event));
     }

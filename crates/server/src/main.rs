@@ -9,14 +9,17 @@
     clippy::too_many_lines
 )]
 
+use std::sync::Arc;
+
 use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
 use dotenv;
-use server::{DeploymentImpl, routes};
-use server::routes::{SharedSubscriptionHub, event_bridge::EventBridge, subscription_hub::SubscriptionHub};
+use server::{
+    DeploymentImpl, routes,
+    routes::{SharedSubscriptionHub, event_bridge::EventBridge, subscription_hub::SubscriptionHub},
+};
 use services::services::container::ContainerService;
 use sqlx::Error as SqlxError;
-use std::sync::Arc;
 use strip_ansi_escapes::strip;
 use thiserror::Error;
 use tracing_subscriber::{EnvFilter, prelude::*};

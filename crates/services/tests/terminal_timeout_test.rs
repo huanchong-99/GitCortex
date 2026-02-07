@@ -1,9 +1,10 @@
 // Test for terminal timeout functionality
 // This test ensures that terminal operations properly handle timeout scenarios
 
+use std::time::Duration;
+
 use services::services::terminal::process::ProcessManager;
 use tokio::process::Command;
-use std::time::Duration;
 
 #[cfg(test)]
 mod tests {
@@ -79,8 +80,14 @@ mod tests {
             .await;
 
         // Should be running
-        assert!(manager.is_running("long-running").await, "Process should be running");
-        assert!(!manager.is_running("non-existent").await, "Non-existent process should not be running");
+        assert!(
+            manager.is_running("long-running").await,
+            "Process should be running"
+        );
+        assert!(
+            !manager.is_running("non-existent").await,
+            "Non-existent process should not be running"
+        );
 
         // Cleanup is not needed for long-running process
         // It will be killed when the test completes
@@ -95,12 +102,20 @@ mod tests {
         // Spawn multiple quick-exit processes
         for i in 0..3 {
             let result = manager
-                .spawn(&format!("terminal-{}", i), quick_exit_cmd(), temp_dir.path())
+                .spawn(
+                    &format!("terminal-{}", i),
+                    quick_exit_cmd(),
+                    temp_dir.path(),
+                )
                 .await;
             assert!(result.is_ok(), "Spawn {} should succeed", i);
         }
 
-        assert_eq!(manager.list_running().await.len(), 3, "All processes should be tracked");
+        assert_eq!(
+            manager.list_running().await.len(),
+            3,
+            "All processes should be tracked"
+        );
 
         // Wait for processes to exit
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -108,6 +123,10 @@ mod tests {
         // Cleanup should remove all dead processes
         manager.cleanup().await;
 
-        assert_eq!(manager.list_running().await.len(), 0, "All dead processes should be removed");
+        assert_eq!(
+            manager.list_running().await.len(),
+            0,
+            "All dead processes should be removed"
+        );
     }
 }

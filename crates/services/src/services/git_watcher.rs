@@ -3,15 +3,23 @@
 //! Monitors git repositories for commits containing workflow metadata
 //! and publishes events to the message bus.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-use anyhow::{Result, Context, anyhow};
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
+
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::services::orchestrator::{MessageBus, TerminalCompletionEvent, TerminalCompletionStatus, CommitMetadata as OrchestratorCommitMetadata, CodeIssue};
+use crate::services::orchestrator::{
+    CodeIssue, CommitMetadata as OrchestratorCommitMetadata, MessageBus, TerminalCompletionEvent,
+    TerminalCompletionStatus,
+};
 
 /// Configuration for GitWatcher
 #[derive(Clone, Debug)]
@@ -268,10 +276,7 @@ impl GitWatcher {
                 };
 
                 if should_process {
-                    tracing::info!(
-                        "New commit detected: {}",
-                        latest_commit.hash
-                    );
+                    tracing::info!("New commit detected: {}", latest_commit.hash);
 
                     // Process the new commit
                     if let Err(e) = self.handle_new_commit(latest_commit).await {
@@ -307,7 +312,10 @@ impl GitWatcher {
             ))?;
 
         if !output.status.success() {
-            anyhow::bail!("git log failed: {}", String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!(
+                "git log failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
 
         let result = String::from_utf8_lossy(&output.stdout);
@@ -332,7 +340,9 @@ impl GitWatcher {
             ))?;
 
         let branch = if branch_output.status.success() {
-            String::from_utf8_lossy(&branch_output.stdout).trim().to_string()
+            String::from_utf8_lossy(&branch_output.stdout)
+                .trim()
+                .to_string()
         } else {
             tracing::warn!(
                 "Failed to get branch name: {}",
@@ -381,12 +391,7 @@ impl GitWatcher {
 
                 // Publish GitEvent for commits without METADATA
                 self.message_bus
-                    .publish_git_event(
-                        workflow_id,
-                        &commit.hash,
-                        &commit.branch,
-                        &commit.message,
-                    )
+                    .publish_git_event(workflow_id, &commit.hash, &commit.branch, &commit.message)
                     .await;
 
                 tracing::info!(
@@ -413,7 +418,10 @@ impl GitWatcher {
             "review_reject" => TerminalCompletionStatus::ReviewReject,
             "failed" => TerminalCompletionStatus::Failed,
             _ => {
-                tracing::warn!("Unknown status '{}', defaulting to Completed", metadata.status);
+                tracing::warn!(
+                    "Unknown status '{}', defaulting to Completed",
+                    metadata.status
+                );
                 TerminalCompletionStatus::Completed
             }
         };
@@ -430,9 +438,7 @@ impl GitWatcher {
         };
 
         // Publish to message bus
-        self.message_bus
-            .publish_terminal_completed(event)
-            .await;
+        self.message_bus.publish_terminal_completed(event).await;
 
         tracing::info!(
             "Published TerminalCompleted event for terminal {}",
@@ -452,8 +458,9 @@ impl GitWatcher {
 ///
 /// Returns error if metadata separator is not found or required fields are missing.
 pub fn parse_commit_metadata(message: &str) -> Result<CommitMetadata> {
-    CommitMetadata::parse(message)
-        .ok_or_else(|| anyhow!("Failed to parse commit metadata: separator not found or required fields missing"))
+    CommitMetadata::parse(message).ok_or_else(|| {
+        anyhow!("Failed to parse commit metadata: separator not found or required fields missing")
+    })
 }
 
 #[cfg(test)]
@@ -541,7 +548,10 @@ task_id: task-456
 # missing terminal_id and status"#;
 
         let metadata = CommitMetadata::parse(message);
-        assert!(metadata.is_none(), "Should return None when required fields are missing");
+        assert!(
+            metadata.is_none(),
+            "Should return None when required fields are missing"
+        );
     }
 
     #[test]
@@ -549,7 +559,10 @@ task_id: task-456
         let message = "Normal commit without any metadata section";
 
         let metadata = CommitMetadata::parse(message);
-        assert!(metadata.is_none(), "Should return None for commits without metadata");
+        assert!(
+            metadata.is_none(),
+            "Should return None for commits without metadata"
+        );
     }
 
     // Tests for the standalone parse_commit_metadata function

@@ -359,7 +359,7 @@ export function TaskFollowUpSection({
 
   // Separate logic for when textarea should be disabled vs when send button should be disabled
   const canTypeFollowUp = useMemo(() => {
-    if (!workspaceId || processes.length === 0 || isSendingFollowUp) {
+    if (!workspaceId || isSendingFollowUp) {
       return false;
     }
 
@@ -369,7 +369,6 @@ export function TaskFollowUpSection({
     return true;
   }, [
     workspaceId,
-    processes.length,
     isSendingFollowUp,
     isRetryActive,
     hasPendingApproval,
@@ -396,25 +395,92 @@ export function TaskFollowUpSection({
   ]);
   const isEditable = !isRetryActive && !hasPendingApproval;
 
-  const hasAnyScript = true;
+  const hasSetupScript = useMemo(
+    () => repos.some((repo) => repo.setupScript != null),
+    [repos]
+  );
+  const hasCleanupScript = useMemo(
+    () => repos.some((repo) => repo.cleanupScript != null),
+    [repos]
+  );
+  const hasAnyScript = hasSetupScript || hasCleanupScript;
+
+  const getRunScriptErrorMessage = useCallback(
+    (
+      errorType: string | undefined,
+      fallbackMessage: string,
+      noScriptMessage: string
+    ) => {
+      if (errorType === 'no_script_configured') {
+        return noScriptMessage;
+      }
+      if (errorType === 'process_already_running') {
+        return t('followUp.scriptsDisabledWhileRunning');
+      }
+      return fallbackMessage;
+    },
+    [t]
+  );
 
   const handleRunSetupScript = useCallback(async () => {
-    if (!workspaceId || isAttemptRunning) return;
+    if (!workspaceId || isAttemptRunning || !hasSetupScript) return;
+    setFollowUpError(null);
+
     try {
-      await attemptsApi.runSetupScript(workspaceId);
+      const result = await attemptsApi.runSetupScript(workspaceId);
+      if (!result.success) {
+        setFollowUpError(
+          getRunScriptErrorMessage(
+            result.error?.type,
+            result.message ?? 'Failed to run setup script',
+            t('followUp.noSetupScript')
+          )
+        );
+      }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      setFollowUpError(`Failed to run setup script: ${errorMessage}`);
       console.error('Failed to run setup script:', error);
     }
-  }, [workspaceId, isAttemptRunning]);
+  }, [
+    workspaceId,
+    isAttemptRunning,
+    hasSetupScript,
+    setFollowUpError,
+    getRunScriptErrorMessage,
+    t,
+  ]);
 
   const handleRunCleanupScript = useCallback(async () => {
-    if (!workspaceId || isAttemptRunning) return;
+    if (!workspaceId || isAttemptRunning || !hasCleanupScript) return;
+    setFollowUpError(null);
+
     try {
-      await attemptsApi.runCleanupScript(workspaceId);
+      const result = await attemptsApi.runCleanupScript(workspaceId);
+      if (!result.success) {
+        setFollowUpError(
+          getRunScriptErrorMessage(
+            result.error?.type,
+            result.message ?? 'Failed to run cleanup script',
+            t('followUp.noCleanupScript')
+          )
+        );
+      }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      setFollowUpError(`Failed to run cleanup script: ${errorMessage}`);
       console.error('Failed to run cleanup script:', error);
     }
-  }, [workspaceId, isAttemptRunning]);
+  }, [
+    workspaceId,
+    isAttemptRunning,
+    hasCleanupScript,
+    setFollowUpError,
+    getRunScriptErrorMessage,
+    t,
+  ]);
 
   // Handler to queue the current message for execution after agent finishes
   const handleQueueMessage = useCallback(async () => {
@@ -845,12 +911,16 @@ export function TaskFollowUpSection({
                 </Tooltip>
               </TooltipProvider>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleRunSetupScript}>
-                  {t('followUp.runSetupScript')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleRunCleanupScript}>
-                  {t('followUp.runCleanupScript')}
-                </DropdownMenuItem>
+                {hasSetupScript && (
+                  <DropdownMenuItem onClick={handleRunSetupScript}>
+                    {t('followUp.runSetupScript')}
+                  </DropdownMenuItem>
+                )}
+                {hasCleanupScript && (
+                  <DropdownMenuItem onClick={handleRunCleanupScript}>
+                    {t('followUp.runCleanupScript')}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

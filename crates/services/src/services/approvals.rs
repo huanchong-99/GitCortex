@@ -296,7 +296,10 @@ pub(crate) async fn ensure_task_in_review(pool: &SqlitePool, execution_process_i
 
 /// Find a matching tool use entry that hasn't been assigned to an approval yet
 /// Matches by tool call id from tool metadata
-fn find_matching_tool_use(store: &MsgStore, tool_call_id: &str) -> Option<(usize, NormalizedEntry)> {
+fn find_matching_tool_use(
+    store: &MsgStore,
+    tool_call_id: &str,
+) -> Option<(usize, NormalizedEntry)> {
     let history = store.get_history();
 
     // Single loop through history
@@ -382,12 +385,9 @@ mod tests {
             executors::logs::utils::patch::ConversationPatch::add_normalized_entry(2, read_baz),
         );
 
-        let (idx_foo, _) =
-            find_matching_tool_use(&store, "foo-id").expect("Should match foo.rs");
-        let (idx_bar, _) =
-            find_matching_tool_use(&store, "bar-id").expect("Should match bar.rs");
-        let (idx_baz, _) =
-            find_matching_tool_use(&store, "baz-id").expect("Should match baz.rs");
+        let (idx_foo, _) = find_matching_tool_use(&store, "foo-id").expect("Should match foo.rs");
+        let (idx_bar, _) = find_matching_tool_use(&store, "bar-id").expect("Should match bar.rs");
+        let (idx_baz, _) = find_matching_tool_use(&store, "baz-id").expect("Should match baz.rs");
 
         assert_eq!(idx_foo, 0, "foo.rs should match first entry");
         assert_eq!(idx_bar, 1, "bar.rs should match second entry");

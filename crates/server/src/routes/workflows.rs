@@ -1,7 +1,6 @@
 //! Workflow API Routes
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -15,13 +14,14 @@ use db::models::{
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
-use services::services::orchestrator::TerminalCoordinator;
-use services::services::terminal::TerminalLauncher;
-use services::services::cc_switch::CCSwitchService;
-use std::path::PathBuf;
 use serde_json::json;
-use utils::response::ApiResponse;
-use utils::text;
+use services::services::{
+    cc_switch::CCSwitchService,
+    git::GitServiceError,
+    orchestrator::{BusMessage, TerminalCoordinator},
+    terminal::TerminalLauncher,
+};
+use utils::{response::ApiResponse, text};
 use uuid::Uuid;
 
 // Import DTOs
@@ -150,29 +150,33 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
     // Validate each task
     for (task_index, task) in req.tasks.iter().enumerate() {
         if task.name.trim().is_empty() {
-            return Err(ApiError::BadRequest(
-                format!("task[{}].name is required", task_index)
-            ));
+            return Err(ApiError::BadRequest(format!(
+                "task[{}].name is required",
+                task_index
+            )));
         }
 
         if task.terminals.is_empty() {
-            return Err(ApiError::BadRequest(
-                format!("task[{}].terminals must not be empty", task_index)
-            ));
+            return Err(ApiError::BadRequest(format!(
+                "task[{}].terminals must not be empty",
+                task_index
+            )));
         }
 
         // Validate each terminal
         for (terminal_index, terminal) in task.terminals.iter().enumerate() {
             if terminal.cli_type_id.trim().is_empty() {
-                return Err(ApiError::BadRequest(
-                    format!("task[{}].terminal[{}].cliTypeId is required", task_index, terminal_index)
-                ));
+                return Err(ApiError::BadRequest(format!(
+                    "task[{}].terminal[{}].cliTypeId is required",
+                    task_index, terminal_index
+                )));
             }
 
             if terminal.model_config_id.trim().is_empty() {
-                return Err(ApiError::BadRequest(
-                    format!("task[{}].terminal[{}].modelConfigId is required", task_index, terminal_index)
-                ));
+                return Err(ApiError::BadRequest(format!(
+                    "task[{}].terminal[{}].modelConfigId is required",
+                    task_index, terminal_index
+                )));
             }
         }
     }
@@ -181,18 +185,21 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
     if let Some(ref commands) = req.commands {
         for (cmd_index, cmd) in commands.iter().enumerate() {
             if cmd.preset_id.trim().is_empty() {
-                return Err(ApiError::BadRequest(
-                    format!("commands[{}].presetId is required", cmd_index)
-                ));
+                return Err(ApiError::BadRequest(format!(
+                    "commands[{}].presetId is required",
+                    cmd_index
+                )));
             }
 
             // Validate custom_params JSON format if provided
             if let Some(ref params) = cmd.custom_params {
                 if !params.trim().is_empty() {
-                    serde_json::from_str::<serde_json::Value>(params)
-                        .map_err(|_| ApiError::BadRequest(
-                            format!("commands[{}].customParams must be valid JSON", cmd_index)
-                        ))?;
+                    serde_json::from_str::<serde_json::Value>(params).map_err(|_| {
+                        ApiError::BadRequest(format!(
+                            "commands[{}].customParams must be valid JSON",
+                            cmd_index
+                        ))
+                    })?;
                 }
             }
         }
@@ -209,7 +216,8 @@ async fn validate_cli_and_model_configs(
     req: &CreateWorkflowRequest,
 ) -> Result<(), ApiError> {
     // Collect unique model_config_id references with CLI type and inline config
-    let mut model_config_refs: HashMap<String, (String, Option<InlineModelConfig>)> = HashMap::new();
+    let mut model_config_refs: HashMap<String, (String, Option<InlineModelConfig>)> =
+        HashMap::new();
 
     // Helper to track model config references
     let mut track_ref = |cli_type_id: &str,
@@ -269,7 +277,8 @@ async fn validate_cli_and_model_configs(
     // Validate each unique model_config_id
     for (model_config_id, (cli_type_id, inline)) in model_config_refs {
         // Validate CLI type exists
-        let cli_type = CliType::find_by_id(pool, &cli_type_id).await
+        let cli_type = CliType::find_by_id(pool, &cli_type_id)
+            .await
             .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
 
         if cli_type.is_none() {
@@ -279,7 +288,8 @@ async fn validate_cli_and_model_configs(
         }
 
         // Validate model config exists or create from inline data
-        let model_config = ModelConfig::find_by_id(pool, &model_config_id).await
+        let model_config = ModelConfig::find_by_id(pool, &model_config_id)
+            .await
             .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
 
         let model_config = match model_config {
@@ -458,7 +468,10 @@ async fn create_workflow(
         let task = WorkflowTask {
             id: task_id.clone(),
             workflow_id: workflow_id.clone(),
-            vk_task_id: None,
+            vk_task_id: task_req
+                .id
+                .as_deref()
+                .and_then(|id| Uuid::parse_str(id).ok()),
             name: task_req.name.clone(),
             description: task_req.description.clone(),
             branch,
@@ -500,11 +513,9 @@ async fn create_workflow(
 
             // Encrypt and store API key if provided
             if let Some(custom_api_key) = terminal_req.custom_api_key.as_deref() {
-                terminal
-                    .set_custom_api_key(custom_api_key)
-                    .map_err(|e| ApiError::BadRequest(format!(
-                        "Failed to encrypt terminal API key: {e}"
-                    )))?;
+                terminal.set_custom_api_key(custom_api_key).map_err(|e| {
+                    ApiError::BadRequest(format!("Failed to encrypt terminal API key: {e}"))
+                })?;
             }
 
             terminals.push(terminal);
@@ -514,7 +525,8 @@ async fn create_workflow(
     }
 
     // 3. Execute transactional creation (workflow + tasks + terminals)
-    Workflow::create_with_tasks(&deployment.db().pool, &workflow, task_rows).await
+    Workflow::create_with_tasks(&deployment.db().pool, &workflow, task_rows)
+        .await
         .map_err(|e| ApiError::BadRequest(format!("Failed to create workflow: {e}")))?;
 
     // 4. Create slash command associations (after workflow exists)
@@ -528,10 +540,12 @@ async fn create_workflow(
             if let Some(ref params) = cmd_req.custom_params {
                 if !params.trim().is_empty() {
                     // Validate JSON format
-                    serde_json::from_str::<serde_json::Value>(params)
-                        .map_err(|_| ApiError::BadRequest(
-                            format!("Invalid JSON in custom_params for preset {}", cmd_req.preset_id)
-                        ))?;
+                    serde_json::from_str::<serde_json::Value>(params).map_err(|_| {
+                        ApiError::BadRequest(format!(
+                            "Invalid JSON in custom_params for preset {}",
+                            cmd_req.preset_id
+                        ))
+                    })?;
                 }
             }
 
@@ -568,7 +582,11 @@ async fn create_workflow(
     }
 
     // Convert to DTO
-    let dto = WorkflowDetailDto::from_workflow_with_terminals(&workflow, &task_details, &commands_with_presets);
+    let dto = WorkflowDetailDto::from_workflow_with_terminals(
+        &workflow,
+        &task_details,
+        &commands_with_presets,
+    );
 
     Ok(ResponseJson(ApiResponse::success(dto)))
 }
@@ -608,7 +626,11 @@ async fn get_workflow(
     }
 
     // Convert to DTO
-    let dto = WorkflowDetailDto::from_workflow_with_terminals(&workflow, &task_details, &commands_with_presets);
+    let dto = WorkflowDetailDto::from_workflow_with_terminals(
+        &workflow,
+        &task_details,
+        &commands_with_presets,
+    );
 
     Ok(ResponseJson(ApiResponse::success(dto)))
 }
@@ -632,6 +654,191 @@ async fn update_workflow_status(
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     Workflow::update_status(&deployment.db().pool, &workflow_id, &req.status).await?;
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+async fn rollback_prepare_failure(deployment: &DeploymentImpl, workflow_id: &str, reason: &str) {
+    tracing::warn!(
+        workflow_id = %workflow_id,
+        reason = %reason,
+        "Rolling back workflow prepare state"
+    );
+
+    let terminals = match Terminal::find_by_workflow(&deployment.db().pool, workflow_id).await {
+        Ok(terminals) => terminals,
+        Err(e) => {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to list terminals during prepare rollback"
+            );
+            Vec::new()
+        }
+    };
+    let workflow_topic = format!("workflow:{}", workflow_id);
+
+    for terminal in terminals {
+        if let Err(e) = deployment
+            .process_manager()
+            .kill_terminal(&terminal.id)
+            .await
+        {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to kill terminal process during prepare rollback"
+            );
+        }
+
+        deployment.prompt_watcher().unregister(&terminal.id).await;
+
+        if let Err(e) =
+            Terminal::update_process(&deployment.db().pool, &terminal.id, None, None).await
+        {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to clear terminal process binding during prepare rollback"
+            );
+        }
+
+        if let Err(e) =
+            Terminal::update_session(&deployment.db().pool, &terminal.id, None, None).await
+        {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to clear terminal session binding during prepare rollback"
+            );
+        }
+
+        if let Err(e) =
+            Terminal::update_status(&deployment.db().pool, &terminal.id, "not_started").await
+        {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to reset terminal status during prepare rollback"
+            );
+        } else {
+            let message = BusMessage::TerminalStatusUpdate {
+                workflow_id: workflow_id.to_string(),
+                terminal_id: terminal.id.clone(),
+                status: "not_started".to_string(),
+            };
+            if let Err(e) = deployment
+                .message_bus()
+                .publish(&workflow_topic, message.clone())
+                .await
+            {
+                tracing::warn!(
+                    workflow_id = %workflow_id,
+                    terminal_id = %terminal.id,
+                    error = %e,
+                    "Failed to publish terminal rollback status"
+                );
+            }
+            if let Err(e) = deployment.message_bus().broadcast(message) {
+                tracing::warn!(
+                    workflow_id = %workflow_id,
+                    terminal_id = %terminal.id,
+                    error = %e,
+                    "Failed to broadcast terminal rollback status"
+                );
+            }
+        }
+    }
+
+    if let Err(e) = Workflow::update_status(&deployment.db().pool, workflow_id, "failed").await {
+        tracing::warn!(
+            workflow_id = %workflow_id,
+            error = %e,
+            "Failed to set workflow status during prepare rollback"
+        );
+    }
+}
+
+async fn refresh_prompt_watcher_registrations(deployment: &DeploymentImpl, workflow_id: &str) {
+    let terminals = match Terminal::find_by_workflow(&deployment.db().pool, workflow_id).await {
+        Ok(terminals) => terminals,
+        Err(e) => {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to load terminals for prompt watcher refresh"
+            );
+            return;
+        }
+    };
+
+    if terminals.is_empty() {
+        return;
+    }
+
+    let tasks = match WorkflowTask::find_by_workflow(&deployment.db().pool, workflow_id).await {
+        Ok(tasks) => tasks,
+        Err(e) => {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to load tasks for prompt watcher refresh"
+            );
+            return;
+        }
+    };
+
+    let workflow_by_task: HashMap<String, String> = tasks
+        .into_iter()
+        .map(|task| (task.id, task.workflow_id))
+        .collect();
+
+    for terminal in terminals {
+        if !terminal.auto_confirm {
+            deployment.prompt_watcher().unregister(&terminal.id).await;
+            continue;
+        }
+
+        let Some(session_id) = terminal
+            .pty_session_id
+            .clone()
+            .filter(|session_id| !session_id.trim().is_empty())
+        else {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                terminal_id = %terminal.id,
+                "Skipped prompt watcher refresh registration: missing pty_session_id"
+            );
+            continue;
+        };
+
+        let resolved_workflow_id = workflow_by_task
+            .get(&terminal.workflow_task_id)
+            .cloned()
+            .unwrap_or_else(|| workflow_id.to_string());
+
+        if let Err(e) = deployment
+            .prompt_watcher()
+            .register(
+                &terminal.id,
+                &resolved_workflow_id,
+                &terminal.workflow_task_id,
+                &session_id,
+                terminal.auto_confirm,
+            )
+            .await
+        {
+            tracing::warn!(
+                workflow_id = %resolved_workflow_id,
+                terminal_id = %terminal.id,
+                task_id = %terminal.workflow_task_id,
+                error = %e,
+                "Failed to refresh prompt watcher registration"
+            );
+        }
+    }
 }
 
 /// POST /api/workflows/:workflow_id/prepare
@@ -663,9 +870,10 @@ async fn prepare_workflow(
     // Note: Model configuration is now handled at spawn time via environment variable injection,
     // not by the coordinator. This provides process-level isolation for concurrent workflows.
     let db_arc = Arc::new(deployment.db().clone());
-    let coordinator = TerminalCoordinator::new(db_arc.clone());
+    let coordinator =
+        TerminalCoordinator::with_message_bus(db_arc.clone(), deployment.message_bus().clone());
 
-    // Step 1: Transition terminals to "waiting" status using TerminalCoordinator
+    // Step 1: Transition terminals to "starting" status using TerminalCoordinator
     if let Err(e) = coordinator.start_terminals_for_workflow(&workflow_id).await {
         // Log the error for debugging
         tracing::error!(
@@ -674,15 +882,7 @@ async fn prepare_workflow(
             "Failed to prepare workflow terminals"
         );
 
-        // Roll back: reset all terminals to "not_started" status
-        if let Ok(terminals) = Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await {
-            for terminal in &terminals {
-                let _ = Terminal::update_status(&deployment.db().pool, &terminal.id, "not_started").await;
-            }
-        }
-
-        // Roll back workflow status to "failed"
-        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+        rollback_prepare_failure(&deployment, &workflow_id, "terminal preparation failed").await;
 
         return Err(ApiError::Internal(format!(
             "Failed to prepare workflow terminals: {e}"
@@ -690,9 +890,27 @@ async fn prepare_workflow(
     }
 
     // Step 2: Get working directory from project
-    let project = Project::find_by_id(&deployment.db().pool, workflow.project_id)
-        .await?
-        .ok_or_else(|| ApiError::NotFound("Project not found".to_string()))?;
+    let project = match Project::find_by_id(&deployment.db().pool, workflow.project_id).await {
+        Ok(Some(project)) => project,
+        Ok(None) => {
+            rollback_prepare_failure(
+                &deployment,
+                &workflow_id,
+                "project not found during prepare",
+            )
+            .await;
+            return Err(ApiError::NotFound("Project not found".to_string()));
+        }
+        Err(e) => {
+            rollback_prepare_failure(
+                &deployment,
+                &workflow_id,
+                "project lookup failed during prepare",
+            )
+            .await;
+            return Err(e.into());
+        }
+    };
 
     let working_dir = project
         .default_agent_working_dir
@@ -714,21 +932,40 @@ async fn prepare_workflow(
         prompt_watcher,
     );
 
-    let launch_results = launcher.launch_all(&workflow_id).await.map_err(|e| {
-        tracing::error!(
-            workflow_id = %workflow_id,
-            error = %e,
-            "Failed to launch workflow terminals"
-        );
-        ApiError::Internal(format!("Failed to launch workflow terminals: {e}"))
-    })?;
+    let launch_results = match launcher.launch_all(&workflow_id).await {
+        Ok(results) => results,
+        Err(e) => {
+            tracing::error!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to launch workflow terminals"
+            );
+
+            rollback_prepare_failure(
+                &deployment,
+                &workflow_id,
+                "terminal launch error during prepare",
+            )
+            .await;
+
+            return Err(ApiError::Internal(format!(
+                "Failed to launch workflow terminals: {e}"
+            )));
+        }
+    };
 
     // Check if any terminal failed to launch
     // Extract error info before any await to avoid Send issues with LaunchResult
     let failed_error_msgs: Vec<String> = launch_results
         .iter()
         .filter(|r| !r.success)
-        .map(|r| format!("{}: {}", r.terminal_id, r.error.as_deref().unwrap_or("unknown")))
+        .map(|r| {
+            format!(
+                "{}: {}",
+                r.terminal_id,
+                r.error.as_deref().unwrap_or("unknown")
+            )
+        })
         .collect();
 
     let launched_count = launch_results.len();
@@ -742,8 +979,8 @@ async fn prepare_workflow(
             "Some terminals failed to launch"
         );
 
-        // Roll back workflow status to "failed"
-        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+        rollback_prepare_failure(&deployment, &workflow_id, "partial terminal launch failure")
+            .await;
 
         return Err(ApiError::Internal(format!(
             "Failed to launch terminals: {}",
@@ -765,11 +1002,15 @@ async fn prepare_workflow(
             "Failed to set workflow ready status"
         );
 
-        // Roll back workflow status to "failed" (terminals remain in "waiting" state)
-        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+        rollback_prepare_failure(
+            &deployment,
+            &workflow_id,
+            "failed to finalize prepare status",
+        )
+        .await;
 
         return Err(ApiError::Internal(
-            "Failed to finalize workflow preparation".to_string()
+            "Failed to finalize workflow preparation".to_string(),
         ));
     }
 
@@ -795,7 +1036,7 @@ async fn start_workflow(
     // Verify orchestrator is enabled (only check needed at API level)
     if !workflow.orchestrator_enabled {
         return Err(ApiError::BadRequest(
-            "Cannot start workflow: orchestrator is not enabled".to_string()
+            "Cannot start workflow: orchestrator is not enabled".to_string(),
         ));
     }
 
@@ -827,6 +1068,8 @@ async fn start_workflow(
             ApiError::Internal(format!("Failed to start workflow"))
         })?;
 
+    refresh_prompt_watcher_registrations(&deployment, &workflow_id).await;
+
     // Note: Workflow::set_started is called inside OrchestratorRuntime::start_workflow
     // to ensure the status update happens atomically with runtime startup
 
@@ -855,13 +1098,10 @@ async fn pause_workflow(
     // Stop the orchestrator runtime if it's active
     let runtime = deployment.orchestrator_runtime();
     if runtime.is_running(&workflow_id).await {
-        runtime
-            .stop_workflow(&workflow_id)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to stop workflow {} for pause: {:?}", workflow_id, e);
-                ApiError::Internal("Failed to pause workflow".to_string())
-            })?;
+        runtime.stop_workflow(&workflow_id).await.map_err(|e| {
+            tracing::error!("Failed to stop workflow {} for pause: {:?}", workflow_id, e);
+            ApiError::Internal("Failed to pause workflow".to_string())
+        })?;
     }
 
     // Mark workflow as paused
@@ -898,13 +1138,29 @@ async fn stop_workflow(
     // Stop the orchestrator runtime if it's active
     let runtime = deployment.orchestrator_runtime();
     if runtime.is_running(&workflow_id).await {
-        runtime
-            .stop_workflow(&workflow_id)
+        runtime.stop_workflow(&workflow_id).await.map_err(|e| {
+            tracing::error!("Failed to stop workflow {}: {:?}", workflow_id, e);
+            ApiError::Internal("Failed to stop workflow".to_string())
+        })?;
+    }
+
+    // Stop all terminal process chains and cleanup prompt watcher registrations.
+    let terminals = Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    for terminal in &terminals {
+        if let Err(e) = deployment
+            .process_manager()
+            .kill_terminal(&terminal.id)
             .await
-            .map_err(|e| {
-                tracing::error!("Failed to stop workflow {}: {:?}", workflow_id, e);
-                ApiError::Internal("Failed to stop workflow".to_string())
-            })?;
+        {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to kill terminal process while stopping workflow"
+            );
+        }
+
+        deployment.prompt_watcher().unregister(&terminal.id).await;
     }
 
     // Mark workflow as cancelled
@@ -918,11 +1174,11 @@ async fn stop_workflow(
         }
     }
 
-    // Mark all terminals as cancelled
-    let terminals = Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    // Mark all terminals as cancelled and clear process binding
     for terminal in &terminals {
         if terminal.status != "completed" {
             Terminal::update_status(&deployment.db().pool, &terminal.id, "cancelled").await?;
+            Terminal::update_process(&deployment.db().pool, &terminal.id, None, None).await?;
         }
     }
 
@@ -992,19 +1248,18 @@ async fn update_task_status(
 
     if task.workflow_id != workflow_id {
         return Err(ApiError::BadRequest(
-            "Task does not belong to this workflow".to_string()
+            "Task does not belong to this workflow".to_string(),
         ));
     }
 
     // Validate status value - support both backend and frontend status names
     let valid_statuses = [
-        "pending",       // Initial state
-        "in_progress",   // Backend: task is being worked on
-        "running",       // Frontend Kanban: task is running
-        "review_pending", // Frontend Kanban: awaiting review
-        "completed",     // Task completed successfully
-        "failed",        // Task failed
-        "cancelled",     // Task was cancelled
+        "pending",        // Initial state
+        "running",        // Task is being worked on
+        "review_pending", // Awaiting review
+        "completed",      // Task completed successfully
+        "failed",         // Task failed
+        "cancelled",      // Task was cancelled
     ];
     if !valid_statuses.contains(&req.status.as_str()) {
         return Err(ApiError::BadRequest(format!(
@@ -1046,8 +1301,17 @@ async fn list_task_terminals(
 async fn merge_workflow(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<String>,
-    Json(_payload): Json<MergeWorkflowRequest>,
+    Json(payload): Json<MergeWorkflowRequest>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
+    if let Some(strategy) = payload.merge_strategy.as_deref()
+        && !strategy.eq_ignore_ascii_case("squash")
+    {
+        return Err(ApiError::BadRequest(format!(
+            "Unsupported merge strategy '{}': only 'squash' is supported",
+            strategy
+        )));
+    }
+
     // Check workflow exists
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
@@ -1056,21 +1320,137 @@ async fn merge_workflow(
     // Validate workflow is in appropriate state for merging
     // Allow merging from "running" or "completed" states
     let current_status = workflow.status.as_str();
-    if current_status != "running" && current_status != "completed" && current_status != "starting" {
+    if current_status != "running" && current_status != "completed" && current_status != "starting"
+    {
         return Err(ApiError::BadRequest(format!(
             "Cannot merge workflow with status '{}': expected 'running', 'completed', or 'starting'",
             current_status
         )));
     }
 
-    // Update workflow status to "completed" after merge
+    let project = Project::find_by_id(&deployment.db().pool, workflow.project_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Project not found".to_string()))?;
+
+    let base_repo_path = project
+        .default_agent_working_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            ApiError::BadRequest(
+                "Cannot merge workflow: project has no default agent working directory".to_string(),
+            )
+        })?;
+
+    if !base_repo_path.exists() {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot merge workflow: base repository path does not exist ({})",
+            base_repo_path.display()
+        )));
+    }
+
+    let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    if tasks.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Cannot merge workflow: no tasks found".to_string(),
+        ));
+    }
+
+    let unfinished_tasks: Vec<String> = tasks
+        .iter()
+        .filter(|task| task.status != "completed")
+        .map(|task| format!("{}({})", task.id, task.status))
+        .collect();
+
+    if !unfinished_tasks.is_empty() {
+        return Err(ApiError::Conflict(format!(
+            "Cannot merge workflow: unfinished tasks found [{}]",
+            unfinished_tasks.join(", ")
+        )));
+    }
+
+    Workflow::update_status(&deployment.db().pool, &workflow_id, "merging").await?;
+
+    let mut merged_tasks = Vec::new();
+    for task in tasks {
+        let task_id = task.id.clone();
+        let task_branch = task.branch.trim();
+        if task_branch.is_empty() {
+            let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+            return Err(ApiError::BadRequest(format!(
+                "Cannot merge task {}: branch is empty",
+                task_id
+            )));
+        }
+
+        let task_worktree_path = base_repo_path.join("worktrees").join(task_branch);
+        if !task_worktree_path.exists() {
+            let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
+            return Err(ApiError::BadRequest(format!(
+                "Cannot merge task {}: worktree path does not exist ({})",
+                task_id,
+                task_worktree_path.display()
+            )));
+        }
+
+        let commit_message = format!("Merge task {} ({})", task_id, task_branch);
+        match deployment.git().merge_changes(
+            &base_repo_path,
+            &task_worktree_path,
+            task_branch,
+            &workflow.target_branch,
+            &commit_message,
+        ) {
+            Ok(commit_sha) => {
+                merged_tasks.push(json!({
+                    "taskId": task_id,
+                    "branch": task_branch,
+                    "commitSha": commit_sha,
+                }));
+            }
+            Err(err) => {
+                let should_keep_merging_status = matches!(
+                    &err,
+                    GitServiceError::MergeConflicts(_)
+                        | GitServiceError::BranchesDiverged(_)
+                        | GitServiceError::WorktreeDirty(_, _)
+                        | GitServiceError::RebaseInProgress
+                );
+
+                let fallback_status = if should_keep_merging_status {
+                    "merging"
+                } else {
+                    "failed"
+                };
+                if let Err(status_err) =
+                    Workflow::update_status(&deployment.db().pool, &workflow_id, fallback_status)
+                        .await
+                {
+                    tracing::warn!(
+                        workflow_id = %workflow_id,
+                        status = fallback_status,
+                        error = %status_err,
+                        "Failed to update workflow status after merge failure"
+                    );
+                }
+
+                return Err(ApiError::from(err));
+            }
+        }
+    }
+
     Workflow::update_status(&deployment.db().pool, &workflow_id, "completed").await?;
 
     // Return success response
     let result = json!({
         "success": true,
         "message": "Merge completed successfully",
-        "workflow_id": workflow_id
+        "workflow_id": workflow_id,
+        "workflowId": workflow_id,
+        "targetBranch": workflow.target_branch,
+        "mergedTasks": merged_tasks
     });
 
     Ok(ResponseJson(ApiResponse::success(result)))

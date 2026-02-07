@@ -2,12 +2,11 @@
 //!
 //! Run with: cargo bench --bench workflow_bench
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use db::models::workflow::{Workflow, WorkflowStatus};
-use sqlx::SqlitePool;
-use sqlx::Row;
-use uuid::Uuid;
 use chrono::Utc;
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use db::models::workflow::{Workflow, WorkflowStatus};
+use sqlx::{Row, SqlitePool};
+use uuid::Uuid;
 
 /// Create a test workflow for benchmarking
 fn create_test_workflow(project_id: &str) -> Workflow {
@@ -365,7 +364,7 @@ fn bench_find_by_project_with_status(c: &mut Criterion) {
                     SELECT * FROM workflow
                     WHERE project_id = ? AND status IN ('created', 'ready', 'running')
                     ORDER BY created_at DESC
-                    "
+                    ",
                 )
                 .bind(black_box("test-project"))
                 .fetch_all(&pool)

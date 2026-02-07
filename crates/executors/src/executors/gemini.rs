@@ -133,9 +133,7 @@ impl StandardCodingAgentExecutor for Gemini {
             };
         }
 
-        let mcp_config_found = self
-            .default_mcp_config_path()
-            .is_some_and(|p| p.exists());
+        let mcp_config_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
 
         let installation_indicator_found = dirs::home_dir()
             .is_some_and(|home| home.join(".gemini").join("installation_id").exists());

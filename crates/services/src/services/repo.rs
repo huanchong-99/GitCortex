@@ -74,9 +74,10 @@ impl RepoService {
         let normalized_path = self.normalize_path(path)?;
         self.validate_git_repo_path(&normalized_path)?;
 
-        let name = normalized_path
-            .file_name()
-            .map_or_else(|| "unnamed".to_string(), |n| n.to_string_lossy().to_string());
+        let name = normalized_path.file_name().map_or_else(
+            || "unnamed".to_string(),
+            |n| n.to_string_lossy().to_string(),
+        );
 
         let display_name = display_name.unwrap_or(&name);
 

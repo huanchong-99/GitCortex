@@ -13,8 +13,4 @@ pub mod services;
 pub mod utils;
 
 // Re-export commonly used modules for convenience
-pub use services::git;
-pub use services::git_watcher;
-pub use services::merge_coordinator;
-pub use services::orchestrator;
-pub use services::terminal;
+pub use services::{git, git_watcher, merge_coordinator, orchestrator, terminal};

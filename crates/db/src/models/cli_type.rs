@@ -118,7 +118,7 @@ impl CliType {
                    install_guide_url, config_file_path, is_system, created_at
             FROM cli_type
             ORDER BY is_system DESC, name ASC
-            "
+            ",
         )
         .fetch_all(pool)
         .await
@@ -132,7 +132,7 @@ impl CliType {
                    install_guide_url, config_file_path, is_system, created_at
             FROM cli_type
             WHERE id = ?
-            "
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -147,7 +147,7 @@ impl CliType {
                    install_guide_url, config_file_path, is_system, created_at
             FROM cli_type
             WHERE name = ?
-            "
+            ",
         )
         .bind(name)
         .fetch_optional(pool)
@@ -165,7 +165,7 @@ impl ModelConfig {
             FROM model_config
             WHERE cli_type_id = ?
             ORDER BY is_default DESC, name ASC
-            "
+            ",
         )
         .bind(cli_type_id)
         .fetch_all(pool)
@@ -180,7 +180,7 @@ impl ModelConfig {
                    is_default, is_official, created_at, updated_at
             FROM model_config
             WHERE id = ?
-            "
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -211,7 +211,7 @@ impl ModelConfig {
                 is_default, is_official, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, ?6, ?7)
             RETURNING *
-            "
+            ",
         )
         .bind(id)
         .bind(cli_type_id)
@@ -236,7 +236,10 @@ impl ModelConfig {
     }
 
     /// Get default model for a CLI type
-    pub async fn find_default_for_cli(pool: &SqlitePool, cli_type_id: &str) -> sqlx::Result<Option<Self>> {
+    pub async fn find_default_for_cli(
+        pool: &SqlitePool,
+        cli_type_id: &str,
+    ) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, ModelConfig>(
             r"
             SELECT id, cli_type_id, name, display_name, api_model_id,
@@ -244,7 +247,7 @@ impl ModelConfig {
             FROM model_config
             WHERE cli_type_id = ? AND is_default = 1
             LIMIT 1
-            "
+            ",
         )
         .bind(cli_type_id)
         .fetch_optional(pool)
@@ -259,7 +262,7 @@ impl ModelConfig {
                    is_default, is_official, created_at, updated_at
             FROM model_config
             ORDER BY cli_type_id, is_default DESC, name ASC
-            "
+            ",
         )
         .fetch_all(pool)
         .await

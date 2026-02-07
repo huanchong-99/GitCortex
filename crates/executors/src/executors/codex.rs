@@ -219,12 +219,10 @@ impl StandardCodingAgentExecutor for Codex {
             };
         }
 
-        let mcp_config_found = self
-            .default_mcp_config_path()
-            .is_some_and(|p| p.exists());
+        let mcp_config_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
 
-        let installation_indicator_found = codex_home()
-            .is_some_and(|home| home.join("version.json").exists());
+        let installation_indicator_found =
+            codex_home().is_some_and(|home| home.join("version.json").exists());
 
         if mcp_config_found || installation_indicator_found {
             AvailabilityInfo::InstallationFound

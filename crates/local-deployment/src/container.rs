@@ -789,8 +789,9 @@ impl LocalContainerService {
         let base_executor = if let Some(profile) =
             ExecutionProcess::latest_executor_profile_for_session(&self.db.pool, ctx.session.id)
                 .await
-                .map_err(|e| ContainerError::Other(anyhow!("Failed to get executor profile: {e}")))?
-        {
+                .map_err(|e| {
+                    ContainerError::Other(anyhow!("Failed to get executor profile: {e}"))
+                })? {
             profile.executor
         } else {
             // No prior execution - use session's executor field
@@ -800,9 +801,7 @@ impl LocalContainerService {
                 ))
             })?;
             BaseCodingAgent::from_str(&executor_str.replace('-', "_").to_ascii_uppercase())
-                .map_err(|_| {
-                    ContainerError::Other(anyhow!("Invalid executor: {executor_str}"))
-                })?
+                .map_err(|_| ContainerError::Other(anyhow!("Invalid executor: {executor_str}")))?
         };
 
         let executor_profile_id = ExecutorProfileId {

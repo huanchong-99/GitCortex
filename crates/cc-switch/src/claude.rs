@@ -3,12 +3,16 @@
 //! Claude Code 使用 JSON 格式的配置文件：
 //! - ~/.claude/settings.json - 主配置文件
 
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::Path;
-use crate::error::Result;
-use crate::config_path::{get_claude_settings_path, ensure_parent_dir_exists};
-use crate::atomic_write::atomic_write_json;
+
+use crate::{
+    atomic_write::atomic_write_json,
+    config_path::{ensure_parent_dir_exists, get_claude_settings_path},
+    error::Result,
+};
 
 /// Claude Code 配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -30,7 +34,10 @@ pub struct ClaudeEnvConfig {
     pub base_url: Option<String>,
 
     /// API Token
-    #[serde(rename = "ANTHROPIC_AUTH_TOKEN", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ANTHROPIC_AUTH_TOKEN",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub auth_token: Option<String>,
 
     /// API Key (备选)
@@ -42,15 +49,24 @@ pub struct ClaudeEnvConfig {
     pub model: Option<String>,
 
     /// Haiku 模型
-    #[serde(rename = "ANTHROPIC_DEFAULT_HAIKU_MODEL", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub haiku_model: Option<String>,
 
     /// Sonnet 模型
-    #[serde(rename = "ANTHROPIC_DEFAULT_SONNET_MODEL", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ANTHROPIC_DEFAULT_SONNET_MODEL",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub sonnet_model: Option<String>,
 
     /// Opus 模型
-    #[serde(rename = "ANTHROPIC_DEFAULT_OPUS_MODEL", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub opus_model: Option<String>,
 
     /// 其他环境变量
@@ -93,11 +109,7 @@ pub async fn write_claude_config_to(path: &Path, config: &ClaudeConfig) -> Resul
 /// - `base_url`: API Base URL（可选，None 表示使用官方 API）
 /// - `api_key`: API Key
 /// - `model`: 模型名称
-pub async fn update_claude_model(
-    base_url: Option<&str>,
-    api_key: &str,
-    model: &str,
-) -> Result<()> {
+pub async fn update_claude_model(base_url: Option<&str>, api_key: &str, model: &str) -> Result<()> {
     let mut config = read_claude_config().await?;
 
     config.env.base_url = base_url.map(ToString::to_string);
@@ -109,8 +121,9 @@ pub async fn update_claude_model(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::tempdir;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_read_write_claude_config() {

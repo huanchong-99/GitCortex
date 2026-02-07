@@ -17,7 +17,6 @@ interface Props {
 export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const { t } = useTranslation('workflow');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
   const readyTerminalIdsRef = useRef<Set<string>>(new Set());
   const [, forceUpdate] = useState({});
   const startingTerminalIdsRef = useRef<Set<string>>(new Set());
@@ -56,7 +55,6 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     startingTerminalIdsRef.current.add(terminalId);
     // Mark as auto-started only after confirming we can start
     autoStartedRef.current.add(terminalId);
-    setIsStarting(true);
     try {
       const response = await fetch(`/api/terminals/${terminalId}/start`, {
         method: 'POST',
@@ -100,7 +98,6 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
       forceUpdate({});
     } finally {
       startingTerminalIdsRef.current.delete(terminalId);
-      setIsStarting(startingTerminalIdsRef.current.size > 0);
     }
   }, [resetAutoStart]);
 

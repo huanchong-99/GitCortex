@@ -10,12 +10,18 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use super::output_fanout::{OutputFanout, OutputFanoutConfig, OutputSubscription};
-use super::utf8_decoder::Utf8StreamDecoder;
 use db::DBService;
-use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
-use tokio::{sync::RwLock, task::JoinHandle};
+use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
+use tokio::{
+    sync::{Mutex as AsyncMutex, RwLock},
+    task::JoinHandle,
+};
 use uuid::Uuid;
+
+use super::{
+    output_fanout::{OutputFanout, OutputFanoutConfig, OutputSubscription},
+    utf8_decoder::Utf8StreamDecoder,
+};
 
 // ============================================================================
 // PTY Size Configuration
@@ -331,10 +337,8 @@ impl ProcessManager {
                     Ok(n) => {
                         let decoded = decoder.decode_chunk(&buf[..n]);
                         if !decoded.text.is_empty() || decoded.dropped_invalid_bytes > 0 {
-                            let _ = output_fanout.publish(
-                                decoded.text,
-                                decoded.dropped_invalid_bytes,
-                            );
+                            let _ =
+                                output_fanout.publish(decoded.text, decoded.dropped_invalid_bytes);
                         }
                     }
                     Err(e) => {
@@ -387,18 +391,14 @@ impl ProcessManager {
         rows: u16,
     ) -> anyhow::Result<ProcessHandle> {
         // Capture CODEX_HOME for cleanup on process exit (and on early failures via guard)
-        let codex_home = config
-            .env
-            .set
-            .get("CODEX_HOME")
-            .and_then(|value| {
-                let trimmed = value.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(PathBuf::from(trimmed))
-                }
-            });
+        let codex_home = config.env.set.get("CODEX_HOME").and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(trimmed))
+            }
+        });
         let mut codex_home_guard = CodexHomeGuard::new(terminal_id, codex_home.clone());
 
         // Create PTY system
@@ -482,18 +482,14 @@ impl ProcessManager {
         }
 
         // Capture CODEX_HOME for cleanup on process exit
-        let codex_home = config
-            .env
-            .set
-            .get("CODEX_HOME")
-            .and_then(|value| {
-                let trimmed = value.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(PathBuf::from(trimmed))
-                }
-            });
+        let codex_home = config.env.set.get("CODEX_HOME").and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(trimmed))
+            }
+        });
 
         // Spawn child process on slave PTY
         let mut child = pair
@@ -768,7 +764,9 @@ impl ProcessManager {
     pub fn kill(&self, pid: u32) -> anyhow::Result<()> {
         // Safety check: PID 0 is invalid and could cause unintended behavior
         if pid == 0 {
-            return Err(anyhow::anyhow!("Invalid PID 0: cannot kill process with PID 0"));
+            return Err(anyhow::anyhow!(
+                "Invalid PID 0: cannot kill process with PID 0"
+            ));
         }
 
         #[cfg(unix)]
@@ -1016,6 +1014,7 @@ impl ProcessManager {
         );
         let terminal_id_owned = terminal_id.to_string();
         let log_type_owned = log_type.to_string();
+        let processes = Arc::clone(&self.processes);
 
         let logger_task = tokio::spawn(async move {
             loop {
@@ -1034,11 +1033,45 @@ impl ProcessManager {
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        let resume_from = subscription.last_seq();
                         tracing::warn!(
                             terminal_id = %terminal_id_owned,
                             skipped = %skipped,
-                            "Terminal logger output subscription lagged"
+                            resume_from_seq = resume_from,
+                            "Terminal logger output subscription lagged; attempting replay recovery"
                         );
+
+                        logger
+                            .append(&format!(
+                                "[{}] output stream lagged: skipped={} replay_from_seq={}",
+                                log_type_owned, skipped, resume_from
+                            ))
+                            .await;
+
+                        let recovered_subscription = {
+                            let tracked = processes.read().await;
+                            tracked
+                                .get(&terminal_id_owned)
+                                .map(|process| process.output_fanout.subscribe(Some(resume_from)))
+                        };
+
+                        match recovered_subscription {
+                            Some(new_subscription) => {
+                                subscription = new_subscription;
+                                tracing::info!(
+                                    terminal_id = %terminal_id_owned,
+                                    resume_from_seq = resume_from,
+                                    "Terminal logger subscription recovered after lag"
+                                );
+                            }
+                            None => {
+                                tracing::warn!(
+                                    terminal_id = %terminal_id_owned,
+                                    "Terminal logger lag recovery aborted: terminal not found"
+                                );
+                                break;
+                            }
+                        }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         tracing::debug!(
@@ -1085,6 +1118,7 @@ pub const DEFAULT_MAX_BUFFER_SIZE: usize = 1000;
 
 pub struct TerminalLogger {
     buffer: Arc<RwLock<Vec<String>>>,
+    flush_lock: Arc<AsyncMutex<()>>,
     flush_interval_secs: u64,
     max_buffer_size: usize,
     db: Arc<DBService>,
@@ -1117,6 +1151,7 @@ impl TerminalLogger {
     ) -> Self {
         Self {
             buffer: Arc::new(RwLock::new(Vec::new())),
+            flush_lock: Arc::new(AsyncMutex::new(())),
             flush_interval_secs,
             max_buffer_size: max_buffer_size.max(1),
             db,
@@ -1132,15 +1167,61 @@ impl TerminalLogger {
         log_type: &str,
         entries: &[String],
     ) -> anyhow::Result<()> {
-        use db::models::terminal::TerminalLog;
-        for line in entries {
-            TerminalLog::create(&db.pool, terminal_id, log_type, line).await?;
+        if entries.is_empty() {
+            return Ok(());
         }
+
+        let mut tx = db.pool.begin().await?;
+        for line in entries {
+            sqlx::query(
+                r#"
+                INSERT INTO terminal_log (id, terminal_id, log_type, content, created_at)
+                VALUES (?1, ?2, ?3, ?4, ?5)
+                "#,
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(terminal_id)
+            .bind(log_type)
+            .bind(line)
+            .bind(chrono::Utc::now())
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn flush_buffer(
+        buffer: &Arc<RwLock<Vec<String>>>,
+        flush_lock: &Arc<AsyncMutex<()>>,
+        db: &DBService,
+        terminal_id: &str,
+        log_type: &str,
+    ) -> anyhow::Result<()> {
+        let _flush_guard = flush_lock.lock().await;
+
+        let entries = {
+            let buffer = buffer.read().await;
+            if buffer.is_empty() {
+                return Ok(());
+            }
+            buffer.clone()
+        };
+
+        Self::persist_entries(db, terminal_id, log_type, &entries).await?;
+
+        let mut buffer = buffer.write().await;
+        let drained = entries.len().min(buffer.len());
+        if drained > 0 {
+            buffer.drain(..drained);
+        }
+
         Ok(())
     }
 
     fn start_flush_task(self) -> Self {
         let buffer = Arc::clone(&self.buffer);
+        let flush_lock = Arc::clone(&self.flush_lock);
         let interval_secs = self.flush_interval_secs;
         let db = Arc::clone(&self.db);
         let terminal_id = self.terminal_id.clone();
@@ -1151,25 +1232,15 @@ impl TerminalLogger {
                 tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
             loop {
                 interval.tick().await;
-                let entries = {
-                    let mut buffer = buffer.write().await;
-                    if buffer.is_empty() {
-                        Vec::new()
-                    } else {
-                        buffer.drain(..).collect::<Vec<_>>()
-                    }
-                };
-
-                if entries.is_empty() {
-                    continue;
-                }
-
                 if let Err(e) =
-                    Self::persist_entries(&db, &terminal_id, &log_type, &entries).await
+                    Self::flush_buffer(&buffer, &flush_lock, &db, &terminal_id, &log_type).await
                 {
-                    tracing::error!("Failed to persist terminal logs: {e}");
-                    let mut buffer = buffer.write().await;
-                    buffer.splice(0..0, entries);
+                    tracing::error!(
+                        terminal_id = %terminal_id,
+                        log_type = %log_type,
+                        error = %e,
+                        "Failed to persist terminal logs in flush task"
+                    );
                 }
             }
         });
@@ -1178,23 +1249,31 @@ impl TerminalLogger {
     }
 
     pub async fn append(&self, line: &str) {
-        let entries = {
+        let should_flush = {
             let mut buffer = self.buffer.write().await;
             buffer.push(line.to_string());
-
-            if buffer.len() < self.max_buffer_size {
-                return;
-            }
-
-            buffer.drain(..).collect::<Vec<_>>()
+            buffer.len() >= self.max_buffer_size
         };
 
-        if let Err(e) =
-            Self::persist_entries(&self.db, &self.terminal_id, &self.log_type, &entries).await
+        if !should_flush {
+            return;
+        }
+
+        if let Err(e) = Self::flush_buffer(
+            &self.buffer,
+            &self.flush_lock,
+            &self.db,
+            &self.terminal_id,
+            &self.log_type,
+        )
+        .await
         {
-            tracing::error!("Failed to persist terminal logs: {e}");
-            let mut buffer = self.buffer.write().await;
-            buffer.splice(0..0, entries);
+            tracing::error!(
+                terminal_id = %self.terminal_id,
+                log_type = %self.log_type,
+                error = %e,
+                "Failed to persist terminal logs in append-triggered flush"
+            );
         }
     }
 }
@@ -1264,24 +1343,36 @@ mod tests {
         let handle1 = manager.get_handle("test-terminal").await;
         assert!(handle1.is_some());
         let handle1 = handle1.unwrap();
-        assert!(handle1.reader.is_none(), "Reader should be None (owned by fanout task)");
+        assert!(
+            handle1.reader.is_none(),
+            "Reader should be None (owned by fanout task)"
+        );
         assert!(handle1.writer.is_some());
 
         // Second call should also return handle with shared writer
         let handle2 = manager.get_handle("test-terminal").await;
         assert!(handle2.is_some());
         let handle2 = handle2.unwrap();
-        assert!(handle2.reader.is_none(), "Reader should be None (owned by fanout task)");
+        assert!(
+            handle2.reader.is_none(),
+            "Reader should be None (owned by fanout task)"
+        );
         assert!(handle2.writer.is_some());
 
         // Verify that writers are the same Arc (shared)
         let writer1 = handle1.writer.as_ref().unwrap();
         let writer2 = handle2.writer.as_ref().unwrap();
-        assert!(Arc::ptr_eq(writer1, writer2), "Writers should be shared via Arc");
+        assert!(
+            Arc::ptr_eq(writer1, writer2),
+            "Writers should be shared via Arc"
+        );
 
         // Verify subscribe_output works (new API for reading output)
         let subscription = manager.subscribe_output("test-terminal", None).await;
-        assert!(subscription.is_ok(), "Should be able to subscribe to output");
+        assert!(
+            subscription.is_ok(),
+            "Should be able to subscribe to output"
+        );
 
         // Cleanup
         let _ = manager.kill_terminal("test-terminal").await;

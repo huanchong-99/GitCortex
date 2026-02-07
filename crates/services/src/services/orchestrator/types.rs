@@ -5,10 +5,9 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 // Prompt Types (re-exported from terminal module for convenience)
 // ============================================================================
-
 pub use crate::services::terminal::{
-    ArrowSelectOption, DetectedPrompt, PromptDetector, PromptKind,
-    build_arrow_sequence, ARROW_DOWN, ARROW_UP,
+    ARROW_DOWN, ARROW_UP, ArrowSelectOption, DetectedPrompt, PromptDetector, PromptKind,
+    build_arrow_sequence,
 };
 
 /// 主 Agent 指令类型
@@ -137,6 +136,8 @@ pub struct TerminalPromptEvent {
     pub task_id: String,
     /// PTY session ID for sending responses
     pub session_id: String,
+    /// Whether auto-confirm is enabled for this terminal
+    pub auto_confirm: bool,
     /// Detected prompt details
     pub prompt: DetectedPrompt,
     /// Timestamp when prompt was detected
@@ -197,7 +198,11 @@ impl PromptDecision {
     /// Create an LLM decision for YesNo prompts
     pub fn llm_yes_no(answer_yes: bool, reasoning: String) -> Self {
         Self::LLMDecision {
-            response: if answer_yes { "y\n".to_string() } else { "n\n".to_string() },
+            response: if answer_yes {
+                "y\n".to_string()
+            } else {
+                "n\n".to_string()
+            },
             reasoning,
             target_index: None,
         }
@@ -358,4 +363,3 @@ impl TerminalPromptStateMachine {
         chrono::Utc::now() - self.last_state_change > timeout
     }
 }
-

@@ -4,8 +4,11 @@
 //! 防止写入过程中断导致配置文件损坏。
 
 use std::path::Path;
-use crate::error::{CCSwitchError, Result};
-use crate::config_path::ensure_parent_dir_exists;
+
+use crate::{
+    config_path::ensure_parent_dir_exists,
+    error::{CCSwitchError, Result},
+};
 
 /// 原子写入文件
 ///
@@ -25,37 +28,76 @@ use crate::config_path::ensure_parent_dir_exists;
 pub async fn atomic_write(path: &Path, data: &[u8]) -> Result<()> {
     use tokio::io::AsyncWriteExt;
 
-    // 确保父目录存在
     ensure_parent_dir_exists(path).await?;
 
-    // 创建临时文件（在同一目录下，确保重命名是原子的）
     let parent = path.parent().unwrap_or(Path::new("."));
     let temp_path = parent.join(format!(
         ".{}.tmp.{}",
         path.file_name().map_or_else(
             || "config".to_string(),
-            |n| n.to_string_lossy().to_string()
+            |name| name.to_string_lossy().to_string()
         ),
         std::process::id()
     ));
 
-    // 写入临时文件
     let mut file = tokio::fs::File::create(&temp_path).await?;
     file.write_all(data).await?;
-    file.sync_all().await?; // 确保数据写入磁盘
+    file.sync_all().await?;
     drop(file);
 
-    // 原子重命名
-    tokio::fs::rename(&temp_path, path).await.map_err(|e| {
-        // 清理临时文件
-        let _ = std::fs::remove_file(&temp_path);
-        CCSwitchError::AtomicWriteError(format!(
-            "Failed to rename {} to {}: {}",
-            temp_path.display(),
-            path.display(),
-            e
-        ))
-    })?;
+    #[cfg(not(windows))]
+    {
+        tokio::fs::rename(&temp_path, path).await.map_err(|error| {
+            let _ = std::fs::remove_file(&temp_path);
+            CCSwitchError::AtomicWriteError(format!(
+                "Failed to rename {} to {}: {}",
+                temp_path.display(),
+                path.display(),
+                error
+            ))
+        })?;
+    }
+
+    #[cfg(windows)]
+    {
+        if let Err(first_error) = tokio::fs::rename(&temp_path, path).await {
+            if matches!(
+                first_error.kind(),
+                std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::PermissionDenied
+            ) {
+                if let Err(remove_error) = tokio::fs::remove_file(path).await {
+                    if remove_error.kind() != std::io::ErrorKind::NotFound {
+                        let _ = std::fs::remove_file(&temp_path);
+                        return Err(CCSwitchError::AtomicWriteError(format!(
+                            "Failed to remove existing target {} before rename: {}",
+                            path.display(),
+                            remove_error
+                        )));
+                    }
+                }
+
+                tokio::fs::rename(&temp_path, path)
+                    .await
+                    .map_err(|rename_error| {
+                        let _ = std::fs::remove_file(&temp_path);
+                        CCSwitchError::AtomicWriteError(format!(
+                            "Failed to rename {} to {} after removing existing target: {}",
+                            temp_path.display(),
+                            path.display(),
+                            rename_error
+                        ))
+                    })?;
+            } else {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(CCSwitchError::AtomicWriteError(format!(
+                    "Failed to rename {} to {}: {}",
+                    temp_path.display(),
+                    path.display(),
+                    first_error
+                )));
+            }
+        }
+    }
 
     Ok(())
 }
@@ -73,8 +115,9 @@ pub async fn atomic_write_text(path: &Path, text: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::tempdir;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_atomic_write() {
@@ -85,6 +128,18 @@ mod tests {
 
         let content = tokio::fs::read_to_string(&path).await.unwrap();
         assert_eq!(content, "hello world");
+    }
+
+    #[tokio::test]
+    async fn test_atomic_write_overwrites_existing_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("existing.txt");
+
+        tokio::fs::write(&path, "old").await.unwrap();
+        atomic_write(&path, b"new").await.unwrap();
+
+        let content = tokio::fs::read_to_string(&path).await.unwrap();
+        assert_eq!(content, "new");
     }
 
     #[tokio::test]

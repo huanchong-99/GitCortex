@@ -4,11 +4,10 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
+use services::services::orchestrator::BusMessage;
 use ts_rs::TS;
 use uuid::Uuid;
-
-use services::services::orchestrator::BusMessage;
 
 // ============================================================================
 // Event Types
@@ -264,10 +263,11 @@ impl WsEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use services::services::orchestrator::types::{
         TerminalCompletionEvent, TerminalCompletionStatus,
     };
+
+    use super::*;
 
     #[test]
     fn test_ws_event_serialization() {
@@ -428,7 +428,11 @@ mod tests {
         for event_type in types {
             let event = WsEvent::new(event_type, json!({}));
             let json = serde_json::to_string(&event).unwrap();
-            assert!(json.contains("."), "Event type should contain dot: {:?}", event_type);
+            assert!(
+                json.contains("."),
+                "Event type should contain dot: {:?}",
+                event_type
+            );
         }
     }
 }

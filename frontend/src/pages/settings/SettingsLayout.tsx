@@ -16,6 +16,7 @@ import { useHotkeysContext } from 'react-hotkeys-hook';
 import { useKeyExit } from '@/keyboard/hooks';
 import { Scope } from '@/keyboard/registry';
 import { usePreviousPath } from '@/hooks/usePreviousPath';
+import { useUserSystem } from '@/components/ConfigProvider';
 
 const settingsNavigation = [
   {
@@ -46,8 +47,13 @@ const settingsNavigation = [
 
 export function SettingsLayout() {
   const { t } = useTranslation('settings');
+  const { remoteFeaturesEnabled } = useUserSystem();
   const { enableScope, disableScope } = useHotkeysContext();
   const goToPreviousPath = usePreviousPath();
+
+  const visibleSettingsNavigation = settingsNavigation.filter(
+    (item) => item.path !== 'organizations' || remoteFeaturesEnabled
+  );
 
   // Enable SETTINGS scope when component mounts
   useEffect(() => {
@@ -82,7 +88,7 @@ export function SettingsLayout() {
           <aside className="w-full lg:w-64 lg:shrink-0 lg:sticky lg:top-24 lg:h-fit lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
             <div className="space-y-1">
               <nav className="space-y-1">
-                {settingsNavigation.map((item) => {
+                {visibleSettingsNavigation.map((item) => {
                   const Icon = item.icon;
                   return (
                     <NavLink

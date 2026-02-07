@@ -216,12 +216,10 @@ impl StandardCodingAgentExecutor for Copilot {
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {
-        let mcp_config_found = self
-            .default_mcp_config_path()
-            .is_some_and(|p| p.exists());
+        let mcp_config_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
 
-        let installation_indicator_found = dirs::home_dir()
-            .is_some_and(|home| home.join(".copilot").join("config.json").exists());
+        let installation_indicator_found =
+            dirs::home_dir().is_some_and(|home| home.join(".copilot").join("config.json").exists());
 
         if mcp_config_found || installation_indicator_found {
             AvailabilityInfo::InstallationFound

@@ -1,16 +1,22 @@
-use services::services::terminal::TerminalLauncher;
-use db::{DBService, models::Terminal, models::session::Session, models::execution_process::ExecutionProcess};
-use uuid::Uuid;
+use std::{str::FromStr, sync::Arc};
+
 use chrono::Utc;
-use std::sync::Arc;
+use db::{
+    DBService,
+    models::{Terminal, execution_process::ExecutionProcess, session::Session},
+};
+use services::services::terminal::TerminalLauncher;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use std::str::FromStr;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_terminal_launch_creates_session() {
     // Setup encryption key for API key encryption
     unsafe {
-        std::env::set_var("GITCORTEX_ENCRYPTION_KEY", "12345678901234567890123456789012");
+        std::env::set_var(
+            "GITCORTEX_ENCRYPTION_KEY",
+            "12345678901234567890123456789012",
+        );
     }
 
     // Setup: Create in-memory DB with migrations
@@ -28,23 +34,23 @@ async fn test_terminal_launch_creates_session() {
     migrator.run(&pool).await.unwrap();
 
     let db = Arc::new(DBService { pool: pool.clone() });
-    let cc_switch = Arc::new(services::services::cc_switch::CCSwitchService::new(Arc::clone(&db)));
+    let cc_switch = Arc::new(services::services::cc_switch::CCSwitchService::new(
+        Arc::clone(&db),
+    ));
     let process_manager = Arc::new(services::services::terminal::ProcessManager::new());
     let working_dir = std::env::temp_dir();
     let launcher = TerminalLauncher::new(Arc::clone(&db), cc_switch, process_manager, working_dir);
 
     // Create test project
     let project_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)"
-    )
-    .bind(project_id)
-    .bind("test-project")
-    .bind(Utc::now())
-    .bind(Utc::now())
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
+        .bind(project_id)
+        .bind("test-project")
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap();
 
     // Create task
     let task_id = Uuid::new_v4();
@@ -142,17 +148,28 @@ async fn test_terminal_launch_creates_session() {
         updated_at: Utc::now(),
     };
     // Set encrypted API key for cc_switch
-    terminal.set_custom_api_key("test-api-key-12345").expect("Failed to set API key");
+    terminal
+        .set_custom_api_key("test-api-key-12345")
+        .expect("Failed to set API key");
     Terminal::create(&pool, &terminal).await.unwrap();
 
     // Execute launch_terminal
     let result = launcher.launch_terminal(&terminal).await;
 
     // Verify session was created
-    let updated_terminal = Terminal::find_by_id(&pool, &terminal_id).await.unwrap().unwrap();
+    let updated_terminal = Terminal::find_by_id(&pool, &terminal_id)
+        .await
+        .unwrap()
+        .unwrap();
 
-    assert!(updated_terminal.session_id.is_some(), "session_id should be set");
-    assert!(updated_terminal.execution_process_id.is_some(), "execution_process_id should be set");
+    assert!(
+        updated_terminal.session_id.is_some(),
+        "session_id should be set"
+    );
+    assert!(
+        updated_terminal.execution_process_id.is_some(),
+        "execution_process_id should be set"
+    );
 
     // Verify session exists in database
     let session_id = Uuid::parse_str(&updated_terminal.session_id.unwrap()).unwrap();
@@ -163,13 +180,21 @@ async fn test_terminal_launch_creates_session() {
 
     // Verify execution process exists
     let exec_process_id = Uuid::parse_str(&updated_terminal.execution_process_id.unwrap()).unwrap();
-    let exec_process = ExecutionProcess::find_by_id(&pool, exec_process_id).await.unwrap();
+    let exec_process = ExecutionProcess::find_by_id(&pool, exec_process_id)
+        .await
+        .unwrap();
     assert!(exec_process.is_some(), "ExecutionProcess should exist");
     let exec_process = exec_process.unwrap();
     assert_eq!(exec_process.session_id, session_id);
-    assert_eq!(exec_process.run_reason, db::models::execution_process::ExecutionProcessRunReason::CodingAgent);
+    assert_eq!(
+        exec_process.run_reason,
+        db::models::execution_process::ExecutionProcessRunReason::CodingAgent
+    );
 
     // Process should be spawned
     assert!(result.success, "Launch should succeed");
-    assert!(result.process_handle.is_some(), "Process handle should exist");
+    assert!(
+        result.process_handle.is_some(),
+        "Process handle should exist"
+    );
 }

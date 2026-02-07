@@ -4,14 +4,16 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::Utc;
+use db::DBService;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use db::DBService;
-use crate::services::orchestrator::constants::WORKFLOW_STATUS_FAILED;
-use crate::services::orchestrator::message_bus::{BusMessage, SharedMessageBus};
+use crate::services::orchestrator::{
+    constants::WORKFLOW_STATUS_FAILED,
+    message_bus::{BusMessage, SharedMessageBus},
+};
 
 /// Error Handler Service
 ///
@@ -24,10 +26,7 @@ pub struct ErrorHandler {
 impl ErrorHandler {
     /// Create a new error handler
     pub fn new(db: Arc<DBService>, message_bus: SharedMessageBus) -> Self {
-        Self {
-            db,
-            message_bus,
-        }
+        Self { db, message_bus }
     }
 
     /// Handle terminal failure
@@ -47,13 +46,9 @@ impl ErrorHandler {
         );
 
         // 1. Update workflow status to failed
-        db::models::Workflow::update_status(
-            &self.db.pool,
-            workflow_id,
-            WORKFLOW_STATUS_FAILED,
-        )
-        .await
-        .map_err(|e| anyhow!("Failed to update workflow status: {}", e))?;
+        db::models::Workflow::update_status(&self.db.pool, workflow_id, WORKFLOW_STATUS_FAILED)
+            .await
+            .map_err(|e| anyhow!("Failed to update workflow status: {}", e))?;
 
         info!("Workflow {} marked as failed", workflow_id);
 
@@ -78,10 +73,7 @@ impl ErrorHandler {
             .publish(&format!("workflow:{}", workflow_id), event)
             .await?;
 
-        error!(
-            "Error handling complete for workflow {}",
-            workflow_id
-        );
+        error!("Error handling complete for workflow {}", workflow_id);
 
         Ok(())
     }
@@ -102,8 +94,8 @@ impl ErrorHandler {
         );
 
         // 1. Check if error terminal already exists for this workflow
-        let existing_terminals = db::models::Terminal::find_by_workflow(&self.db.pool, workflow_id)
-            .await?;
+        let existing_terminals =
+            db::models::Terminal::find_by_workflow(&self.db.pool, workflow_id).await?;
 
         let error_terminal = existing_terminals
             .iter()
@@ -114,12 +106,7 @@ impl ErrorHandler {
             info!("Found existing error terminal: {}", terminal.id);
 
             // Update terminal status to "waiting"
-            db::models::Terminal::update_status(
-                &self.db.pool,
-                &terminal.id,
-                "waiting",
-            )
-            .await?;
+            db::models::Terminal::update_status(&self.db.pool, &terminal.id, "waiting").await?;
 
             // Send error message to terminal
             let pty_session_id = terminal
@@ -142,11 +129,13 @@ impl ErrorHandler {
             info!("Creating new error terminal");
 
             // Get workflow task to associate error terminal with
-            let tasks = db::models::WorkflowTask::find_by_workflow(&self.db.pool, workflow_id)
-                .await?;
+            let tasks =
+                db::models::WorkflowTask::find_by_workflow(&self.db.pool, workflow_id).await?;
 
             // Use the first task or create a task for error handling
-            let task = tasks.first().ok_or_else(|| anyhow!("No tasks found for workflow"))?;
+            let task = tasks
+                .first()
+                .ok_or_else(|| anyhow!("No tasks found for workflow"))?;
 
             // Get default CLI type and model config (use system defaults)
             // For now, we'll use the first CLI type and model config we can find

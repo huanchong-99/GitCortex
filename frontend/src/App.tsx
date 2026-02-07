@@ -49,7 +49,8 @@ import { WorkspacesLanding } from '@/pages/ui-new/WorkspacesLanding';
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
 function AppContent() {
-  const { config, analyticsUserId, updateAndSaveConfig } = useUserSystem();
+  const { config, analyticsUserId, updateAndSaveConfig, remoteFeaturesEnabled } =
+    useUserSystem();
   const posthog = usePostHog();
   const { isSignedIn } = useAuth();
 
@@ -148,10 +149,12 @@ function AppContent() {
                 <Route path="general" element={<GeneralSettings />} />
                 <Route path="projects" element={<ProjectSettings />} />
                 <Route path="repos" element={<ReposSettings />} />
-                <Route
-                  path="organizations"
-                  element={<OrganizationSettings />}
-                />
+                {remoteFeaturesEnabled && (
+                  <Route
+                    path="organizations"
+                    element={<OrganizationSettings />}
+                  />
+                )}
                 <Route path="agents" element={<AgentSettings />} />
                 <Route path="mcp" element={<McpSettings />} />
               </Route>

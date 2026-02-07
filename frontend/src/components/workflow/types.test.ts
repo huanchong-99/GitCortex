@@ -126,12 +126,14 @@ describe('Workflow Types', () => {
         targetBranch: 'main',
         tasks: [
           {
+            id: 'task-0',
             name: 'Task 1',
             description: 'First task',
             branch: 'feat/task-1',
             orderIndex: 0,
             terminals: [
               {
+                id: 'term-1',
                 cliTypeId: 'claude-code',
                 modelConfigId: 'model-1',
                 customBaseUrl: null,
@@ -178,7 +180,7 @@ describe('Workflow Types', () => {
       config.advanced.mergeTerminal.modelConfigId = 'model-1';
 
       expect(() => wizardConfigToCreateRequest('proj-1', config)).toThrow(
-        'Task "Task" has no terminals assigned'
+        'Task "Task" terminals mismatch: expected 1, got 0'
       );
     });
   });

@@ -79,7 +79,9 @@ impl Utf8StreamDecoder {
                 Err(error) => {
                     let valid_prefix_len = error.valid_up_to();
                     if valid_prefix_len > 0 {
-                        if let Ok(valid_prefix) = std::str::from_utf8(&remaining[..valid_prefix_len]) {
+                        if let Ok(valid_prefix) =
+                            std::str::from_utf8(&remaining[..valid_prefix_len])
+                        {
                             output.push_str(valid_prefix);
                         }
                         cursor += valid_prefix_len;

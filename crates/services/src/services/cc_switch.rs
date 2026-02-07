@@ -17,8 +17,8 @@
 //! - Gemini: `--yolo`
 
 use std::{path::Path, sync::Arc};
-use async_trait::async_trait;
 
+use async_trait::async_trait;
 use cc_switch::{CliType as CcCliType, ModelSwitcher, SwitchConfig, read_claude_config};
 use db::{
     DBService,
@@ -47,7 +47,8 @@ fn create_codex_auth(codex_home: &Path, api_key: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Err(e) = std::fs::set_permissions(&auth_path, std::fs::Permissions::from_mode(0o600)) {
+        if let Err(e) = std::fs::set_permissions(&auth_path, std::fs::Permissions::from_mode(0o600))
+        {
             tracing::warn!(
                 auth_path = %auth_path.display(),
                 error = %e,
@@ -137,11 +138,14 @@ fn create_claude_config(claude_home: &Path) -> anyhow::Result<()> {
     // Preserve other fields if file exists
     let config_content = if config_path.exists() {
         let existing = std::fs::read_to_string(&config_path)?;
-        let mut value: serde_json::Value = serde_json::from_str(&existing)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let mut value: serde_json::Value =
+            serde_json::from_str(&existing).unwrap_or_else(|_| serde_json::json!({}));
 
         if let Some(obj) = value.as_object_mut() {
-            obj.insert("primaryApiKey".to_string(), serde_json::Value::String("any".to_string()));
+            obj.insert(
+                "primaryApiKey".to_string(),
+                serde_json::Value::String("any".to_string()),
+            );
         }
 
         serde_json::to_string_pretty(&value)?
@@ -163,7 +167,12 @@ fn create_claude_config(claude_home: &Path) -> anyhow::Result<()> {
 }
 
 /// Creates Gemini .env in isolated directory to skip authentication
-fn create_gemini_env(gemini_home: &Path, api_key: &str, base_url: Option<&str>, model: &str) -> anyhow::Result<()> {
+fn create_gemini_env(
+    gemini_home: &Path,
+    api_key: &str,
+    base_url: Option<&str>,
+    model: &str,
+) -> anyhow::Result<()> {
     let env_path = gemini_home.join(".env");
 
     let mut env_content = format!("GEMINI_API_KEY={}\nGEMINI_MODEL={}\n", api_key, model);
@@ -179,7 +188,8 @@ fn create_gemini_env(gemini_home: &Path, api_key: &str, base_url: Option<&str>, 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Err(e) = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600)) {
+        if let Err(e) = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600))
+        {
             tracing::warn!(
                 env_path = %env_path.display(),
                 error = %e,
@@ -197,7 +207,11 @@ fn create_gemini_env(gemini_home: &Path, api_key: &str, base_url: Option<&str>, 
 }
 
 /// Creates OpenCode config in isolated directory
-fn create_opencode_config(opencode_home: &Path, base_url: Option<&str>, model: &str) -> anyhow::Result<()> {
+fn create_opencode_config(
+    opencode_home: &Path,
+    base_url: Option<&str>,
+    model: &str,
+) -> anyhow::Result<()> {
     let config_path = opencode_home.join("opencode.json");
 
     let base_url_str = base_url.unwrap_or("https://api.openai.com/v1");
@@ -261,10 +275,7 @@ fn apply_auto_confirm_args(cli: &CcCliType, args: &mut Vec<String>, auto_confirm
 #[async_trait]
 pub trait CCSwitch: Send + Sync {
     /// Switch model configuration for a terminal
-    async fn switch_for_terminal(
-        &self,
-        terminal: &Terminal,
-    ) -> anyhow::Result<()>;
+    async fn switch_for_terminal(&self, terminal: &Terminal) -> anyhow::Result<()>;
 }
 
 /// CC-Switch 服务
@@ -285,13 +296,12 @@ impl CCSwitchService {
         &self,
         workflow_task_id: &str,
     ) -> anyhow::Result<(Option<String>, Option<String>)> {
-        let workflow_id: Option<String> = sqlx::query_scalar(
-            "SELECT workflow_id FROM workflow_task WHERE id = ? LIMIT 1",
-        )
-        .bind(workflow_task_id)
-        .fetch_optional(&self.db.pool)
-        .await?
-        .flatten();
+        let workflow_id: Option<String> =
+            sqlx::query_scalar("SELECT workflow_id FROM workflow_task WHERE id = ? LIMIT 1")
+                .bind(workflow_task_id)
+                .fetch_optional(&self.db.pool)
+                .await?
+                .flatten();
 
         let Some(workflow_id) = workflow_id else {
             return Ok((None, None));
@@ -472,7 +482,10 @@ impl CCSwitchService {
         };
 
         // Only Claude Code, Codex, and Gemini support environment-based configuration
-        if !matches!(cli, CcCliType::ClaudeCode | CcCliType::Codex | CcCliType::Gemini) {
+        if !matches!(
+            cli,
+            CcCliType::ClaudeCode | CcCliType::Codex | CcCliType::Gemini
+        ) {
             tracing::warn!(
                 cli_name = %cli_type.name,
                 terminal_id = %terminal.id,
@@ -494,25 +507,41 @@ impl CCSwitchService {
         match cli {
             CcCliType::ClaudeCode => {
                 // Create isolated Claude home directory
-                let safe_id: String = terminal.id
+                let safe_id: String = terminal
+                    .id
                     .chars()
-                    .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
                     .take(64)
                     .collect();
                 let base_dir = std::env::temp_dir().join("gitcortex");
                 std::fs::create_dir_all(&base_dir).map_err(|e| {
-                    anyhow::anyhow!("Failed to create Claude home base directory {}: {e}", base_dir.display())
+                    anyhow::anyhow!(
+                        "Failed to create Claude home base directory {}: {e}",
+                        base_dir.display()
+                    )
                 })?;
                 let claude_home = base_dir.join(format!("claude-{}", safe_id));
                 std::fs::create_dir_all(&claude_home).map_err(|e| {
-                    anyhow::anyhow!("Failed to create Claude home directory {}: {e}", claude_home.display())
+                    anyhow::anyhow!(
+                        "Failed to create Claude home directory {}: {e}",
+                        claude_home.display()
+                    )
                 })?;
 
                 // Set restrictive permissions on Unix
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    if let Err(e) = std::fs::set_permissions(&claude_home, std::fs::Permissions::from_mode(0o700)) {
+                    if let Err(e) = std::fs::set_permissions(
+                        &claude_home,
+                        std::fs::Permissions::from_mode(0o700),
+                    ) {
                         tracing::warn!(
                             terminal_id = %terminal.id,
                             claude_home = %claude_home.display(),
@@ -532,11 +561,15 @@ impl CCSwitchService {
                 }
 
                 // Set CLAUDE_HOME to isolated directory
-                env.set.insert("CLAUDE_HOME".to_string(), claude_home.to_string_lossy().to_string());
+                env.set.insert(
+                    "CLAUDE_HOME".to_string(),
+                    claude_home.to_string_lossy().to_string(),
+                );
 
                 // Handle base URL: set if provided, otherwise remove inherited
                 if let Some(base_url) = &terminal.custom_base_url {
-                    env.set.insert("ANTHROPIC_BASE_URL".to_string(), base_url.clone());
+                    env.set
+                        .insert("ANTHROPIC_BASE_URL".to_string(), base_url.clone());
                 } else {
                     env.unset.push("ANTHROPIC_BASE_URL".to_string());
                 }
@@ -573,9 +606,12 @@ impl CCSwitchService {
                     .clone()
                     .unwrap_or_else(|| model_config.name.clone());
                 env.set.insert("ANTHROPIC_MODEL".to_string(), model.clone());
-                env.set.insert("ANTHROPIC_DEFAULT_HAIKU_MODEL".to_string(), model.clone());
-                env.set.insert("ANTHROPIC_DEFAULT_SONNET_MODEL".to_string(), model.clone());
-                env.set.insert("ANTHROPIC_DEFAULT_OPUS_MODEL".to_string(), model);
+                env.set
+                    .insert("ANTHROPIC_DEFAULT_HAIKU_MODEL".to_string(), model.clone());
+                env.set
+                    .insert("ANTHROPIC_DEFAULT_SONNET_MODEL".to_string(), model.clone());
+                env.set
+                    .insert("ANTHROPIC_DEFAULT_OPUS_MODEL".to_string(), model);
 
                 tracing::debug!(
                     terminal_id = %terminal.id,
@@ -605,7 +641,8 @@ impl CCSwitchService {
                         "Codex requires API key (set terminal.custom_api_key or workflow.orchestrator_config.api_key)"
                     )
                 })?;
-                env.set.insert("OPENAI_API_KEY".to_string(), api_key.clone());
+                env.set
+                    .insert("OPENAI_API_KEY".to_string(), api_key.clone());
 
                 if used_workflow_fallback {
                     tracing::info!(
@@ -623,9 +660,16 @@ impl CCSwitchService {
 
                 // Create isolated CODEX_HOME directory for this terminal
                 // Sanitize terminal ID to prevent path traversal attacks
-                let safe_id: String = terminal.id
+                let safe_id: String = terminal
+                    .id
                     .chars()
-                    .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
                     .take(64)
                     .collect();
                 let base_dir = std::env::temp_dir().join("gitcortex");
@@ -672,13 +716,8 @@ impl CCSwitchService {
                 })?;
 
                 // Create config.toml with explicit provider/api_key
-                create_codex_config(
-                    &codex_home,
-                    effective_base_url.as_deref(),
-                    &model,
-                    &api_key,
-                )
-                .map_err(|e| {
+                create_codex_config(&codex_home, effective_base_url.as_deref(), &model, &api_key)
+                    .map_err(|e| {
                     anyhow::anyhow!("Failed to create Codex config for authentication skip: {e}")
                 })?;
 
@@ -705,25 +744,41 @@ impl CCSwitchService {
                     .ok_or_else(|| anyhow::anyhow!("Gemini requires API key"))?;
 
                 // Create isolated Gemini home directory
-                let safe_id: String = terminal.id
+                let safe_id: String = terminal
+                    .id
                     .chars()
-                    .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
                     .take(64)
                     .collect();
                 let base_dir = std::env::temp_dir().join("gitcortex");
                 std::fs::create_dir_all(&base_dir).map_err(|e| {
-                    anyhow::anyhow!("Failed to create Gemini home base directory {}: {e}", base_dir.display())
+                    anyhow::anyhow!(
+                        "Failed to create Gemini home base directory {}: {e}",
+                        base_dir.display()
+                    )
                 })?;
                 let gemini_home = base_dir.join(format!("gemini-{}", safe_id));
                 std::fs::create_dir_all(&gemini_home).map_err(|e| {
-                    anyhow::anyhow!("Failed to create Gemini home directory {}: {e}", gemini_home.display())
+                    anyhow::anyhow!(
+                        "Failed to create Gemini home directory {}: {e}",
+                        gemini_home.display()
+                    )
                 })?;
 
                 // Set restrictive permissions on Unix
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    if let Err(e) = std::fs::set_permissions(&gemini_home, std::fs::Permissions::from_mode(0o700)) {
+                    if let Err(e) = std::fs::set_permissions(
+                        &gemini_home,
+                        std::fs::Permissions::from_mode(0o700),
+                    ) {
                         tracing::warn!(
                             terminal_id = %terminal.id,
                             gemini_home = %gemini_home.display(),
@@ -740,7 +795,12 @@ impl CCSwitchService {
                     .unwrap_or_else(|| model_config.name.clone());
 
                 // Create .env to skip authentication
-                if let Err(e) = create_gemini_env(&gemini_home, &api_key, terminal.custom_base_url.as_deref(), &model) {
+                if let Err(e) = create_gemini_env(
+                    &gemini_home,
+                    &api_key,
+                    terminal.custom_base_url.as_deref(),
+                    &model,
+                ) {
                     tracing::warn!(
                         terminal_id = %terminal.id,
                         error = %e,
@@ -749,11 +809,15 @@ impl CCSwitchService {
                 }
 
                 // Set GEMINI_HOME to isolated directory (Gemini CLI respects this)
-                env.set.insert("GEMINI_HOME".to_string(), gemini_home.to_string_lossy().to_string());
+                env.set.insert(
+                    "GEMINI_HOME".to_string(),
+                    gemini_home.to_string_lossy().to_string(),
+                );
 
                 // Handle base URL
                 if let Some(base_url) = &terminal.custom_base_url {
-                    env.set.insert("GOOGLE_GEMINI_BASE_URL".to_string(), base_url.clone());
+                    env.set
+                        .insert("GOOGLE_GEMINI_BASE_URL".to_string(), base_url.clone());
                 } else {
                     env.unset.push("GOOGLE_GEMINI_BASE_URL".to_string());
                 }
@@ -803,7 +867,10 @@ impl CCSwitchService {
     /// Batch switch models for workflow startup
     ///
     /// Switches model configuration for all terminals in sequence.
-    #[deprecated(since = "0.2.0", note = "Use build_launch_config instead to avoid modifying global config")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use build_launch_config instead to avoid modifying global config"
+    )]
     pub async fn switch_for_terminals(&self, terminals: &[Terminal]) -> anyhow::Result<()> {
         for terminal in terminals {
             #[allow(deprecated)]
@@ -835,10 +902,12 @@ impl CCSwitchService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::Arc;
+
     use db::DBService;
     use sqlx::sqlite::SqlitePoolOptions;
-    use std::sync::Arc;
+
+    use super::*;
 
     // Test helper to create in-memory database
     async fn setup_test_db() -> Arc<DBService> {

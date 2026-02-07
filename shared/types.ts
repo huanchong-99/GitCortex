@@ -8,7 +8,7 @@ export type WorkflowDetailDto = { id: string, projectId: string, name: string, d
 
 export type WorkflowTaskDto = { id: string, workflowId: string, vkTaskId: string | null, name: string, description: string | null, branch: string, status: string, orderIndex: number, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, terminals: Array<TerminalDto>, };
 
-export type TerminalDto = { id: string, workflowTaskId: string, cliTypeId: string, modelConfigId: string, customBaseUrl: string | null, customApiKey: string | null, role: string | null, roleDescription: string | null, orderIndex: number, status: string, createdAt: string, updatedAt: string, };
+export type TerminalDto = { id: string, workflowTaskId: string, cliTypeId: string, modelConfigId: string, customBaseUrl: string | null, customApiKey?: string, role: string | null, roleDescription: string | null, orderIndex: number, status: string, createdAt: string, updatedAt: string, };
 
 export type WorkflowCommandDto = { id: string, workflowId: string, presetId: string, orderIndex: number, customParams: string | null, createdAt: string, preset: SlashCommandPresetDto, };
 
@@ -224,6 +224,8 @@ export type UpdateMcpServersBody = { servers: { [key in string]?: JsonValue }, }
 
 export type GetMcpServerResponse = { mcp_config: McpConfig, config_path: string, };
 
+export type McpConfigError = { code: string, message: string, };
+
 export type CheckEditorAvailabilityQuery = { editor_type: EditorType, };
 
 export type CheckEditorAvailabilityResponse = { available: boolean, };
@@ -252,7 +254,7 @@ export type StartReviewRequest = { executor_profile_id: ExecutorProfileId, addit
 
 export type ReviewError = { "type": "process_already_running" };
 
-export type OpenEditorRequest = { editor_type: string | null, file_path: string | null, };
+export type OpenEditorRequest = { editor_type: string | null, file_path: string | null, git_repo_path?: string | null, };
 
 export type OpenEditorResponse = { url: string | null, };
 

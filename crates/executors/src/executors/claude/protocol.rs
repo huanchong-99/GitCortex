@@ -138,21 +138,19 @@ impl ProtocolPeer {
                 callback_id,
                 input,
                 tool_use_id,
-            } => {
-                match client.on_hook_callback(&callback_id, input, tool_use_id) {
-                    Ok(hook_output) => {
-                        if let Err(e) = self.send_hook_response(request_id, hook_output).await {
-                            tracing::error!("Failed to send hook callback result: {e}");
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Error in on_hook_callback: {e}");
-                        if let Err(e2) = self.send_error(request_id, e.to_string()).await {
-                            tracing::error!("Failed to send error response: {e2}");
-                        }
+            } => match client.on_hook_callback(&callback_id, input, tool_use_id) {
+                Ok(hook_output) => {
+                    if let Err(e) = self.send_hook_response(request_id, hook_output).await {
+                        tracing::error!("Failed to send hook callback result: {e}");
                     }
                 }
-            }
+                Err(e) => {
+                    tracing::error!("Error in on_hook_callback: {e}");
+                    if let Err(e2) = self.send_error(request_id, e.to_string()).await {
+                        tracing::error!("Failed to send error response: {e2}");
+                    }
+                }
+            },
         }
     }
 

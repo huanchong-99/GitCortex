@@ -5,9 +5,9 @@ use std::{
     sync::Arc,
 };
 
-use once_cell::sync::Lazy;
 use agent_client_protocol::{self as acp, SessionNotification};
 use futures::StreamExt;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
 use workspace_utils::{approvals::ApprovalStatus, msg_store::MsgStore};
@@ -592,9 +592,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
             if out.is_empty() { None } else { Some(out) }
         }
 
-        fn convert_tool_status(
-            status: agent_client_protocol::ToolCallStatus,
-        ) -> LogToolStatus {
+        fn convert_tool_status(status: agent_client_protocol::ToolCallStatus) -> LogToolStatus {
             match status {
                 agent_client_protocol::ToolCallStatus::Pending
                 | agent_client_protocol::ToolCallStatus::InProgress => LogToolStatus::Created,

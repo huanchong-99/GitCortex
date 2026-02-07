@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::Deserialize;
 use thiserror::Error;
 use uuid::Uuid;
@@ -85,9 +85,10 @@ pub fn verify_and_extract_subject(token: &str, secret: &str) -> Result<Uuid, Tok
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use jsonwebtoken::{EncodingKey, Header, encode};
     use serde::Serialize;
+
+    use super::*;
 
     /// Test claims structure for generating tokens
     #[derive(Debug, Serialize)]
@@ -185,4 +186,3 @@ mod tests {
         assert!(matches!(err, TokenClaimsError::Decode(_)));
     }
 }
-

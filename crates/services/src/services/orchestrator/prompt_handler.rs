@@ -5,20 +5,21 @@
 //!
 //! ## Decision Strategy
 //!
-//! 1. **EnterConfirm** (high confidence, no dangerous keywords): Auto-send `\n`
+//! 1. **auto_confirm=false**: Ask user for every prompt (never auto-respond)
+//! 2. **EnterConfirm** (high confidence, no dangerous keywords): Auto-send `\n`
 //! 2. **Password**: Always ask user (never auto-respond)
 //! 3. **Dangerous keywords detected**: Escalate to LLM or ask user
 //! 4. **YesNo/Choice/ArrowSelect/Input**: LLM decision
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use super::message_bus::SharedMessageBus;
-use super::types::{
-    DetectedPrompt, PromptDecision, PromptKind, TerminalPromptEvent,
-    TerminalPromptStateMachine,
+use super::{
+    message_bus::SharedMessageBus,
+    types::{
+        DetectedPrompt, PromptDecision, PromptKind, TerminalPromptEvent, TerminalPromptStateMachine,
+    },
 };
 
 // ============================================================================
@@ -103,10 +104,7 @@ impl PromptHandler {
     /// Handle a terminal prompt event
     ///
     /// Returns the decision made, or None if the prompt should be skipped.
-    pub async fn handle_prompt_event(
-        &self,
-        event: &TerminalPromptEvent,
-    ) -> Option<PromptDecision> {
+    pub async fn handle_prompt_event(&self, event: &TerminalPromptEvent) -> Option<PromptDecision> {
         // Get or create state machine for this terminal
         let mut state_machines = self.state_machines.write().await;
         let state_machine = state_machines
@@ -128,7 +126,7 @@ impl PromptHandler {
         state_machine.on_deciding();
 
         // Make decision based on prompt type and context
-        let decision = self.make_decision(&event.prompt).await;
+        let decision = self.make_decision(&event.prompt, event.auto_confirm).await;
 
         // Update state machine based on decision
         match &decision {
@@ -171,7 +169,7 @@ impl PromptHandler {
     }
 
     /// Make a decision for a detected prompt
-    async fn make_decision(&self, prompt: &DetectedPrompt) -> PromptDecision {
+    async fn make_decision(&self, prompt: &DetectedPrompt, auto_confirm: bool) -> PromptDecision {
         // Rule 1: Password prompts always require user intervention
         if prompt.kind == PromptKind::Password {
             tracing::info!(
@@ -181,7 +179,20 @@ impl PromptHandler {
             return PromptDecision::ask_password();
         }
 
-        // Rule 2: Dangerous keywords escalate to user (conservative approach)
+        // Rule 2: auto_confirm disabled means always ask user
+        if !auto_confirm {
+            tracing::info!(
+                prompt_kind = ?prompt.kind,
+                raw_text = %prompt.raw_text,
+                "Auto-confirm disabled for terminal - requiring user intervention"
+            );
+            return PromptDecision::AskUser {
+                reason: "Auto-confirm disabled for this terminal".to_string(),
+                suggestions: self.get_suggestions_for_prompt(prompt),
+            };
+        }
+
+        // Rule 3: Dangerous keywords escalate to user (conservative approach)
         if prompt.has_dangerous_keywords {
             tracing::warn!(
                 prompt_kind = ?prompt.kind,
@@ -197,7 +208,7 @@ impl PromptHandler {
             };
         }
 
-        // Rule 3: EnterConfirm with high confidence - auto-confirm
+        // Rule 4: EnterConfirm with high confidence - auto-confirm
         if prompt.kind == PromptKind::EnterConfirm
             && prompt.confidence >= AUTO_CONFIRM_CONFIDENCE_THRESHOLD
         {
@@ -209,7 +220,7 @@ impl PromptHandler {
             return PromptDecision::auto_enter();
         }
 
-        // Rule 4: Other prompts - use rule-based defaults or LLM
+        // Rule 5: Other prompts - use rule-based defaults or LLM
         // For now, use conservative rule-based defaults
         // TODO: Integrate actual LLM call when LLM service is available
         self.make_rule_based_decision(prompt).await
@@ -305,11 +316,10 @@ impl PromptHandler {
     fn get_suggestions_for_prompt(&self, prompt: &DetectedPrompt) -> Option<Vec<String>> {
         match prompt.kind {
             PromptKind::YesNo => Some(vec!["y".to_string(), "n".to_string()]),
-            PromptKind::ArrowSelect => {
-                prompt.options.as_ref().map(|opts| {
-                    opts.iter().map(|o| o.label.clone()).collect()
-                })
-            }
+            PromptKind::ArrowSelect => prompt
+                .options
+                .as_ref()
+                .map(|opts| opts.iter().map(|o| o.label.clone()).collect()),
             _ => None,
         }
     }
@@ -375,9 +385,7 @@ pub fn build_llm_decision_prompt(request: &LLMPromptDecisionRequest) -> String {
 - Text: {}
 - Has dangerous keywords: {}
 "#,
-        request.prompt_kind,
-        request.prompt_text,
-        request.has_dangerous_keywords
+        request.prompt_kind, request.prompt_text, request.has_dangerous_keywords
     );
 
     if let Some(ref options) = request.options {
@@ -428,8 +436,9 @@ Analyze the prompt and decide how to respond. Return a JSON object with:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::orchestrator::message_bus::MessageBus;
-    use crate::services::terminal::prompt_detector::DetectedPrompt;
+    use crate::services::{
+        orchestrator::message_bus::MessageBus, terminal::prompt_detector::DetectedPrompt,
+    };
 
     fn create_test_handler() -> PromptHandler {
         let message_bus = Arc::new(MessageBus::new(100));
@@ -445,7 +454,7 @@ mod tests {
         let handler = create_test_handler();
         let prompt = create_test_prompt(PromptKind::Password, "Enter password:", 0.95);
 
-        let decision = handler.make_decision(&prompt).await;
+        let decision = handler.make_decision(&prompt, true).await;
 
         match decision {
             PromptDecision::AskUser { reason, .. } => {
@@ -460,7 +469,7 @@ mod tests {
         let handler = create_test_handler();
         let prompt = create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.90);
 
-        let decision = handler.make_decision(&prompt).await;
+        let decision = handler.make_decision(&prompt, true).await;
 
         match decision {
             PromptDecision::AutoConfirm { response, .. } => {
@@ -475,7 +484,7 @@ mod tests {
         let handler = create_test_handler();
         let prompt = create_test_prompt(PromptKind::YesNo, "Continue? [y/n]", 0.90);
 
-        let decision = handler.make_decision(&prompt).await;
+        let decision = handler.make_decision(&prompt, true).await;
 
         match decision {
             PromptDecision::LLMDecision { response, .. } => {
@@ -490,7 +499,7 @@ mod tests {
         let handler = create_test_handler();
         let prompt = create_test_prompt(PromptKind::Input, "Enter your name:", 0.85);
 
-        let decision = handler.make_decision(&prompt).await;
+        let decision = handler.make_decision(&prompt, true).await;
 
         match decision {
             PromptDecision::AskUser { .. } => {}
@@ -505,13 +514,28 @@ mod tests {
         // Manually set dangerous keywords flag
         prompt.has_dangerous_keywords = true;
 
-        let decision = handler.make_decision(&prompt).await;
+        let decision = handler.make_decision(&prompt, true).await;
 
         match decision {
             PromptDecision::AskUser { reason, .. } => {
                 assert!(reason.contains("Dangerous"));
             }
             _ => panic!("Expected AskUser decision for dangerous prompt"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_auto_confirm_disabled_always_asks_user() {
+        let handler = create_test_handler();
+        let prompt = create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.95);
+
+        let decision = handler.make_decision(&prompt, false).await;
+
+        match decision {
+            PromptDecision::AskUser { reason, .. } => {
+                assert!(reason.contains("Auto-confirm disabled"));
+            }
+            _ => panic!("Expected AskUser decision when auto_confirm=false"),
         }
     }
 

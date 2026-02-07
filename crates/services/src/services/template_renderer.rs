@@ -3,11 +3,12 @@
 //! This module provides template rendering functionality using Handlebars.
 //! It supports rendering prompt templates with custom parameters and workflow context.
 
+use std::collections::HashMap;
+
 use anyhow::Result;
 use handlebars::{Handlebars, RenderError};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
 
 /// Template renderer for slash command prompts
 #[derive(Clone)]
@@ -104,11 +105,7 @@ pub struct WorkflowContext {
 
 impl WorkflowContext {
     /// Create a new workflow context
-    pub fn new(
-        name: String,
-        description: Option<String>,
-        target_branch: String,
-    ) -> Self {
+    pub fn new(name: String, description: Option<String>, target_branch: String) -> Self {
         Self {
             name,
             description,
@@ -137,10 +134,7 @@ pub struct TemplateContext {
 
 impl TemplateContext {
     /// Create a new template context
-    pub fn new(
-        custom_params: Option<String>,
-        workflow_context: Option<WorkflowContext>,
-    ) -> Self {
+    pub fn new(custom_params: Option<String>, workflow_context: Option<WorkflowContext>) -> Self {
         Self {
             custom_params,
             workflow_context,
@@ -212,16 +206,16 @@ mod tests {
     #[test]
     fn test_render_with_current_task() {
         let renderer = create_renderer();
-        let template = "Current task: {{workflow.currentTask}} on branch {{workflow.currentBranch}}";
-        let ctx = WorkflowContext::new(
-            "My Workflow".to_string(),
-            None,
-            "main".to_string(),
-        )
-        .with_current_task("Task 1".to_string(), "workflow/task-1".to_string());
+        let template =
+            "Current task: {{workflow.currentTask}} on branch {{workflow.currentBranch}}";
+        let ctx = WorkflowContext::new("My Workflow".to_string(), None, "main".to_string())
+            .with_current_task("Task 1".to_string(), "workflow/task-1".to_string());
         let result = renderer.render(template, None, Some(&ctx));
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "Current task: Task 1 on branch workflow/task-1");
+        assert_eq!(
+            result.unwrap(),
+            "Current task: Task 1 on branch workflow/task-1"
+        );
     }
 
     #[test]
@@ -229,11 +223,7 @@ mod tests {
         let renderer = create_renderer();
         let template = "{{greeting}} {{workflow.name}}: {{instruction}}";
         let params = r#"{"greeting": "Please", "instruction": "do the work"}"#;
-        let ctx = WorkflowContext::new(
-            "Test WF".to_string(),
-            None,
-            "main".to_string(),
-        );
+        let ctx = WorkflowContext::new("Test WF".to_string(), None, "main".to_string());
         let result = renderer.render(template, Some(params), Some(&ctx));
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Please Test WF: do the work");
@@ -245,7 +235,12 @@ mod tests {
         let template = "Hello {{name}}";
         let result = renderer.render(template, Some("invalid json"), None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid custom_params JSON"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid custom_params JSON")
+        );
     }
 
     #[test]
@@ -255,7 +250,12 @@ mod tests {
         // No params provided, strict mode should fail
         let result = renderer.render(template, None, None);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Template rendering failed"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Template rendering failed")
+        );
     }
 
     #[test]
@@ -321,8 +321,12 @@ mod tests {
 
     #[test]
     fn test_workflow_context_builder() {
-        let ctx = WorkflowContext::new("WF".to_string(), Some("desc".to_string()), "dev".to_string())
-            .with_current_task("Task 1".to_string(), "branch-1".to_string());
+        let ctx = WorkflowContext::new(
+            "WF".to_string(),
+            Some("desc".to_string()),
+            "dev".to_string(),
+        )
+        .with_current_task("Task 1".to_string(), "branch-1".to_string());
 
         assert_eq!(ctx.name, "WF");
         assert_eq!(ctx.description, Some("desc".to_string()));

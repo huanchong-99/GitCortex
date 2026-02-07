@@ -2,10 +2,9 @@ use axum::{
     Extension, Router,
     routing::{IntoMakeService, get},
 };
+pub use subscription_hub::SharedSubscriptionHub;
 
 use crate::{DeploymentImpl, middleware::require_api_token};
-
-pub use subscription_hub::SharedSubscriptionHub;
 
 pub mod approvals;
 pub mod cli_types;
@@ -13,8 +12,8 @@ pub mod config;
 pub mod containers;
 pub mod filesystem;
 // pub mod github;
-pub mod events;
 pub mod event_bridge;
+pub mod events;
 pub mod execution_processes;
 pub mod frontend;
 pub mod git;
@@ -28,17 +27,17 @@ pub mod repo;
 pub mod scratch;
 pub mod sessions;
 pub mod shared_tasks_types;
+pub mod slash_commands;
 pub mod subscription_hub;
 pub mod tags;
 pub mod task_attempts;
 pub mod tasks;
-pub mod terminals;
 pub mod terminal_ws;
+pub mod terminals;
 pub mod workflow_events;
 pub mod workflow_ws;
 pub mod workflows;
 pub mod workflows_dto;
-pub mod slash_commands;
 
 pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub) -> IntoMakeService<Router> {
     // Create routers with different middleware layers

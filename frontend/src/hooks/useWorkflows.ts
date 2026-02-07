@@ -19,6 +19,7 @@ export type WorkflowStatusEnum =
   | 'starting'
   | 'running'
   | 'paused'
+  | 'merging'
   | 'completed'
   | 'failed'
   | 'cancelled';
@@ -37,6 +38,7 @@ export const WORKFLOW_STATUS_TRANSITIONS: Record<WorkflowStatusEnum, WorkflowAct
   starting: { canPrepare: false, canStart: false, canPause: false, canStop: true, canDelete: false },
   running: { canPrepare: false, canStart: false, canPause: true, canStop: true, canDelete: false },
   paused: { canPrepare: false, canStart: true, canPause: false, canStop: true, canDelete: true },
+  merging: { canPrepare: false, canStart: false, canPause: false, canStop: true, canDelete: false },
   completed: { canPrepare: false, canStart: false, canPause: false, canStop: false, canDelete: true },
   failed: { canPrepare: true, canStart: false, canPause: false, canStop: false, canDelete: true },
   cancelled: { canPrepare: false, canStart: false, canPause: false, canStop: false, canDelete: true },

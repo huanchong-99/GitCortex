@@ -3,9 +3,8 @@ use axum::{
     http::{Method, Request, StatusCode},
 };
 use serde_json::json;
-use tower::ServiceExt;
-
 use server::create_app;
+use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_stop_terminal_endpoint() {

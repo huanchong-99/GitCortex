@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
+use db::models::task::TaskStatus;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
-
-use db::models::task::TaskStatus;
 
 /// Type-only definitions for shared-task shapes (remote sharing is disabled).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

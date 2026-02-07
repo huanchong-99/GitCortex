@@ -161,10 +161,7 @@ pub trait ContainerService {
     }
 
     /// Finalize task execution by updating status to InReview and sending notifications
-    async fn finalize_task(
-        &self,
-        ctx: &ExecutionContext,
-    ) {
+    async fn finalize_task(&self, ctx: &ExecutionContext) {
         match Task::update_status(&self.db().pool, ctx.task.id, TaskStatus::InReview).await {
             Ok(()) => {
                 // Task status updated successfully
@@ -466,7 +463,8 @@ pub trait ContainerService {
 
     async fn try_stop(&self, workspace: &Workspace, include_dev_server: bool) {
         // stop execution processes for this workspace's sessions
-        let Ok(sessions) = Session::find_by_workspace_id(&self.db().pool, workspace.id).await else {
+        let Ok(sessions) = Session::find_by_workspace_id(&self.db().pool, workspace.id).await
+        else {
             return;
         };
 

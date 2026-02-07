@@ -269,8 +269,7 @@ fn get_fresh_path_blocking() -> Option<String> {
     };
 
     use winreg::{
-        HKEY,
-        RegKey,
+        HKEY, RegKey,
         enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ},
     };
 

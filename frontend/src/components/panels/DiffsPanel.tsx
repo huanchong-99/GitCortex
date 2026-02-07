@@ -67,34 +67,34 @@ export function DiffsPanel({ selectedAttempt, gitOps }: DiffsPanelProps) {
     return () => clearTimeout(timer);
   }, [loadingState]);
 
-  if (diffs.length > 0 && loadingState === 'loading') {
+  useEffect(() => {
+    if (diffs.length === 0 || loadingState !== 'loading') return;
     setLoadingState('loaded');
-  }
+  }, [diffs.length, loadingState]);
 
-  if (diffs.length > 0) {
+  useEffect(() => {
+    if (diffs.length === 0) return;
+
     const newDiffs = diffs
       .map((d, index) => ({ diff: d, index }))
-      .filter((d) => {
-        const id = getDiffId(d);
-        return !processedIds.has(id);
-      });
+      .filter((entry) => !processedIds.has(getDiffId(entry)));
 
-    if (newDiffs.length > 0) {
-      const newIds = newDiffs.map(getDiffId);
-      const toCollapse = newDiffs
-        .filter(
-          ({ diff }) =>
-            DEFAULT_DIFF_COLLAPSE_DEFAULTS[diff.change] ||
-            exceedsMaxLineCount(diff, DEFAULT_COLLAPSE_MAX_LINES)
-        )
-        .map(getDiffId);
+    if (newDiffs.length === 0) return;
 
-      setProcessedIds((prev) => new Set([...prev, ...newIds]));
-      if (toCollapse.length > 0) {
-        setCollapsedIds((prev) => new Set([...prev, ...toCollapse]));
-      }
+    const newIds = newDiffs.map(getDiffId);
+    const toCollapse = newDiffs
+      .filter(
+        ({ diff }) =>
+          DEFAULT_DIFF_COLLAPSE_DEFAULTS[diff.change] ||
+          exceedsMaxLineCount(diff, DEFAULT_COLLAPSE_MAX_LINES)
+      )
+      .map(getDiffId);
+
+    setProcessedIds((prev) => new Set([...prev, ...newIds]));
+    if (toCollapse.length > 0) {
+      setCollapsedIds((prev) => new Set([...prev, ...toCollapse]));
     }
-  }
+  }, [diffs, processedIds]);
 
   const loading = loadingState === 'loading';
 

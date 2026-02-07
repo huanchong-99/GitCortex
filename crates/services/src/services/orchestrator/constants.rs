@@ -43,7 +43,7 @@ mod tests {
     #[test]
     fn test_all_workflow_status_constants_exist() {
         let _ = WORKFLOW_STATUS_PENDING;
-        let _ = WORKFLOW_STATUS_READY;      // This is missing
+        let _ = WORKFLOW_STATUS_READY; // This is missing
         let _ = WORKFLOW_STATUS_RUNNING;
         let _ = WORKFLOW_STATUS_COMPLETED;
         let _ = WORKFLOW_STATUS_FAILED;

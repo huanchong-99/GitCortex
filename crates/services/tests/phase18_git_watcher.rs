@@ -2,13 +2,12 @@
 //!
 //! Tests for Git commit detection and workflow event handling.
 
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-use std::time::Duration;
+use std::{fs, path::PathBuf, process::Command, time::Duration};
 
-use services::services::git_watcher::{GitWatcher, GitWatcherConfig, CommitMetadata};
-use services::services::orchestrator::{MessageBus, BusMessage};
+use services::services::{
+    git_watcher::{CommitMetadata, GitWatcher, GitWatcherConfig},
+    orchestrator::{BusMessage, MessageBus},
+};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -59,8 +58,11 @@ fn create_commit_with_metadata(
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    fs::write(repo_path.join("task.txt"), format!("Content: {}", timestamp))
-        .expect("write task file");
+    fs::write(
+        repo_path.join("task.txt"),
+        format!("Content: {}", timestamp),
+    )
+    .expect("write task file");
 
     run_git(repo_path, &["add", "."]);
 
@@ -104,7 +106,13 @@ async fn test_git_watcher_detects_commit_with_metadata() {
     let task_id = Uuid::new_v4().to_string();
     let terminal_id = Uuid::new_v4().to_string();
 
-    create_commit_with_metadata(&repo_path, &workflow_id, &task_id, &terminal_id, "completed");
+    create_commit_with_metadata(
+        &repo_path,
+        &workflow_id,
+        &task_id,
+        &terminal_id,
+        "completed",
+    );
 
     // Wait for event
     let result = tokio::time::timeout(Duration::from_secs(2), receiver.recv()).await;
@@ -147,11 +155,17 @@ async fn test_git_watcher_ignores_commits_without_metadata() {
     // Create commit WITHOUT metadata
     fs::write(repo_path.join("normal.txt"), "Normal content").expect("write file");
     run_git(&repo_path, &["add", "."]);
-    run_git(&repo_path, &["commit", "-m", "Normal commit without metadata"]);
+    run_git(
+        &repo_path,
+        &["commit", "-m", "Normal commit without metadata"],
+    );
 
     // Should NOT receive any event
     let result = tokio::time::timeout(Duration::from_millis(500), receiver.recv()).await;
-    assert!(result.is_err(), "Should NOT receive event for commit without metadata");
+    assert!(
+        result.is_err(),
+        "Should NOT receive event for commit without metadata"
+    );
 
     watcher_handle.abort();
 }
@@ -278,14 +292,20 @@ task_id: task-456
 status: completed"#;
 
     let result = CommitMetadata::parse(message);
-    assert!(result.is_none(), "Should return None when required fields are missing");
+    assert!(
+        result.is_none(),
+        "Should return None when required fields are missing"
+    );
 }
 
 #[test]
 fn test_commit_metadata_parse_no_metadata_section() {
     let message = "Normal commit without any metadata section";
     let result = CommitMetadata::parse(message);
-    assert!(result.is_none(), "Should return None for commits without metadata");
+    assert!(
+        result.is_none(),
+        "Should return None for commits without metadata"
+    );
 }
 
 #[test]

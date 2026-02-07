@@ -210,6 +210,7 @@ export function GitPanelContainer({
       const response = await repoApi.openEditor(repoId, {
         editor_type: null,
         file_path: null,
+        git_repo_path: undefined,
       });
 
       // If a URL is returned (remote mode), open it in a new tab

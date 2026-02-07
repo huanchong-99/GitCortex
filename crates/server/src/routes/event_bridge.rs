@@ -5,14 +5,11 @@
 
 use std::sync::Arc;
 
-use tokio::sync::broadcast;
-use tokio::task::JoinHandle;
+use services::services::orchestrator::SharedMessageBus;
+use tokio::{sync::broadcast, task::JoinHandle};
 use tracing::{debug, info, warn};
 
-use services::services::orchestrator::SharedMessageBus;
-
-use super::subscription_hub::SharedSubscriptionHub;
-use super::workflow_events::WsEvent;
+use super::{subscription_hub::SharedSubscriptionHub, workflow_events::WsEvent};
 
 // ============================================================================
 // Event Bridge
@@ -58,20 +55,20 @@ impl EventBridge {
                 Ok(message) => {
                     // Convert BusMessage to WsEvent and route to workflow
                     if let Some((workflow_id, event)) = WsEvent::try_from_bus_message(message) {
-                        // Only publish if there are subscribers
-                        if self.hub.has_subscribers(&workflow_id).await {
-                            if let Err(err) = self.hub.publish(&workflow_id, event).await {
-                                debug!(
-                                    ?err,
-                                    workflow_id,
-                                    "Failed to publish event (no subscribers)"
-                                );
-                            }
+                        if let Err(err) = self.hub.publish(&workflow_id, event).await {
+                            debug!(
+                                ?err,
+                                workflow_id, "No active subscribers, event cached for replay"
+                            );
                         }
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                    warn!(skipped, "EventBridge receiver lagged, some messages were dropped");
+                    let notified_channels = self.hub.publish_lagged_to_active(skipped).await;
+                    warn!(
+                        skipped,
+                        notified_channels, "EventBridge receiver lagged, issued recovery signal"
+                    );
                 }
                 Err(broadcast::error::RecvError::Closed) => {
                     info!("MessageBus closed, EventBridge shutting down");
@@ -93,14 +90,16 @@ pub type SharedEventBridge = Arc<EventBridge>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::Arc;
+
     use serde_json::json;
     use services::services::orchestrator::{BusMessage, MessageBus};
-    use std::sync::Arc;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
-    use super::super::subscription_hub::SubscriptionHub;
-    use super::super::workflow_events::WsEventType;
+    use super::{
+        super::{subscription_hub::SubscriptionHub, workflow_events::WsEventType},
+        *,
+    };
 
     #[tokio::test]
     async fn test_event_bridge_routes_status_update() {

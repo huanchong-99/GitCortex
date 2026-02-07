@@ -2,19 +2,20 @@
 //!
 //! Provides `/api/models/list` and `/api/models/verify` for frontend model configuration.
 
+use std::time::Duration;
+
 use axum::{
+    Router,
     extract::{Json, Query},
     http::HeaderMap,
     response::Json as ResponseJson,
     routing::{get, post},
-    Router,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::Duration;
 
-use crate::{error::ApiError, DeploymentImpl};
+use crate::{DeploymentImpl, error::ApiError};
 
 const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com";
 const DEFAULT_ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
@@ -77,7 +78,11 @@ async fn list_models(
             list_anthropic_models(&client, &trim_trailing_slash(&base_url), &api_key).await?
         }
         "google" => list_google_models(&client, &trim_trailing_slash(&base_url), &api_key).await?,
-        other => return Err(ApiError::BadRequest(format!("Unsupported apiType: {other}"))),
+        other => {
+            return Err(ApiError::BadRequest(format!(
+                "Unsupported apiType: {other}"
+            )));
+        }
     };
 
     Ok(ResponseJson(ModelsListResponse { models }))
@@ -128,7 +133,11 @@ async fn verify_model(
             )
             .await
         }
-        other => return Err(ApiError::BadRequest(format!("Unsupported apiType: {other}"))),
+        other => {
+            return Err(ApiError::BadRequest(format!(
+                "Unsupported apiType: {other}"
+            )));
+        }
     };
 
     Ok(ResponseJson(VerifyModelResponse {

@@ -38,10 +38,7 @@ pub fn load_config_from_file(config_path: &PathBuf) -> Config {
 }
 
 /// Saves the config to the given path
-pub fn save_config_to_file(
-    config: &Config,
-    config_path: &PathBuf,
-) -> Result<(), ConfigError> {
+pub fn save_config_to_file(config: &Config, config_path: &PathBuf) -> Result<(), ConfigError> {
     let raw_config = serde_json::to_string_pretty(config)?;
     std::fs::write(config_path, raw_config)?;
     Ok(())

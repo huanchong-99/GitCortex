@@ -62,7 +62,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
     const [error, setError] = useState<string | null>(null);
 
     // Get execution processes for the session to find latest script process
-    const { executionProcesses } = useExecutionProcesses(sessionId);
+    const { executionProcesses } = useExecutionProcesses(sessionId, undefined);
 
     // Find the latest process for this script type
     const latestProcess = useMemo(() => {

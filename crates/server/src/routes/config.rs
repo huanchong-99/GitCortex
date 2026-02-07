@@ -214,6 +214,24 @@ pub struct McpServerQuery {
     executor: BaseCodingAgent,
 }
 
+const MCP_NOT_SUPPORTED_ERROR_CODE: &str = "MCP_NOT_SUPPORTED";
+const MCP_NOT_SUPPORTED_ERROR_MESSAGE: &str = "This executor does not support MCP servers";
+
+#[derive(TS, Debug, Serialize, Deserialize)]
+pub struct McpConfigError {
+    code: String,
+    message: String,
+}
+
+impl McpConfigError {
+    fn not_supported() -> Self {
+        Self {
+            code: MCP_NOT_SUPPORTED_ERROR_CODE.to_string(),
+            message: MCP_NOT_SUPPORTED_ERROR_MESSAGE.to_string(),
+        }
+    }
+}
+
 #[derive(TS, Debug, Serialize, Deserialize)]
 pub struct GetMcpServerResponse {
     // servers: HashMap<String, Value>,
@@ -229,7 +247,7 @@ pub struct UpdateMcpServersBody {
 async fn get_mcp_servers(
     State(_deployment): State<DeploymentImpl>,
     Query(query): Query<McpServerQuery>,
-) -> Result<ResponseJson<ApiResponse<GetMcpServerResponse>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<GetMcpServerResponse, McpConfigError>>, ApiError> {
     let coding_agent = ExecutorConfigs::get_cached()
         .get_coding_agent(&ExecutorProfileId::new(query.executor))
         .ok_or(ConfigError::ValidationError(
@@ -237,8 +255,8 @@ async fn get_mcp_servers(
         ))?;
 
     if !coding_agent.supports_mcp() {
-        return Ok(ResponseJson(ApiResponse::error(
-            "MCP not supported by this executor",
+        return Ok(ResponseJson(ApiResponse::error_with_data(
+            McpConfigError::not_supported(),
         )));
     }
 
@@ -263,7 +281,7 @@ async fn update_mcp_servers(
     State(_deployment): State<DeploymentImpl>,
     Query(query): Query<McpServerQuery>,
     Json(payload): Json<UpdateMcpServersBody>,
-) -> Result<ResponseJson<ApiResponse<String>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<String, McpConfigError>>, ApiError> {
     let profiles = ExecutorConfigs::get_cached();
     let agent = profiles
         .get_coding_agent(&ExecutorProfileId::new(query.executor))
@@ -272,8 +290,8 @@ async fn update_mcp_servers(
         ))?;
 
     if !agent.supports_mcp() {
-        return Ok(ResponseJson(ApiResponse::error(
-            "This executor does not support MCP servers",
+        return Ok(ResponseJson(ApiResponse::error_with_data(
+            McpConfigError::not_supported(),
         )));
     }
 
@@ -322,9 +340,7 @@ async fn update_mcp_servers_in_config(
         (old, new) if old == new => {
             format!("Updated MCP server configuration ({new} server(s))")
         }
-        (old, new) => format!(
-            "Updated MCP server configuration (was {old}, now {new})"
-        ),
+        (old, new) => format!("Updated MCP server configuration (was {old}, now {new})"),
     };
 
     Ok(message)

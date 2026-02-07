@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use once_cell::sync::Lazy;
 use codex_app_server_protocol::{
     JSONRPCNotification, JSONRPCResponse, NewConversationResponse, ServerNotification,
 };
@@ -23,6 +22,7 @@ use codex_protocol::{
     },
 };
 use futures::StreamExt;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -891,11 +891,11 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             timestamp: None,
                             entry_type: NormalizedEntryType::ToolUse {
                                 tool_name: "view_image".to_string(),
-                            action_type: ActionType::FileRead {
-                                path: relative_path.clone(),
+                                action_type: ActionType::FileRead {
+                                    path: relative_path.clone(),
+                                },
+                                status: ToolStatus::Success,
                             },
-                            status: ToolStatus::Success,
-                        },
                             content: relative_path.clone(),
                             metadata: None,
                         },

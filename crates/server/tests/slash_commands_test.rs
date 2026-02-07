@@ -7,13 +7,13 @@
 //! - Deleting command presets
 //! - Input validation (command must start with /, command must be unique, description required)
 
-use server::DeploymentImpl;
-use server::routes::subscription_hub::SubscriptionHub;
-use db::models::SlashCommandPreset;
-use uuid::Uuid;
-use serde_json::json;
-use chrono::Utc;
 use std::sync::Arc;
+
+use chrono::Utc;
+use db::models::SlashCommandPreset;
+use serde_json::json;
+use server::{DeploymentImpl, routes::subscription_hub::SubscriptionHub};
+use uuid::Uuid;
 
 /// Helper: Create a test subscription hub
 fn create_test_hub() -> server::routes::SharedSubscriptionHub {
@@ -22,7 +22,8 @@ fn create_test_hub() -> server::routes::SharedSubscriptionHub {
 
 /// Helper: Setup test environment
 async fn setup_test() -> DeploymentImpl {
-    let deployment = DeploymentImpl::new().await
+    let deployment = DeploymentImpl::new()
+        .await
         .expect("Failed to create deployment");
 
     deployment
@@ -107,7 +108,10 @@ async fn test_create_command_preset_success() {
     assert!(value["data"]["id"].is_string());
     assert_eq!(value["data"]["command"], "/test-command");
     assert_eq!(value["data"]["description"], "Test command description");
-    assert_eq!(value["data"]["promptTemplate"], "Test template with {{variable}}");
+    assert_eq!(
+        value["data"]["promptTemplate"],
+        "Test template with {{variable}}"
+    );
     assert_eq!(value["data"]["isSystem"], false);
 }
 
@@ -266,7 +270,9 @@ async fn test_update_command_preset() {
         .await
         .unwrap();
 
-    let body = hyper::body::to_bytes(create_response.into_body()).await.unwrap();
+    let body = hyper::body::to_bytes(create_response.into_body())
+        .await
+        .unwrap();
     let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let command_id = value["data"]["id"].as_str().unwrap();
 
@@ -292,7 +298,9 @@ async fn test_update_command_preset() {
     assert_eq!(update_response.status(), StatusCode::OK);
 
     // Parse response
-    let body = hyper::body::to_bytes(update_response.into_body()).await.unwrap();
+    let body = hyper::body::to_bytes(update_response.into_body())
+        .await
+        .unwrap();
     let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert_eq!(value["success"], true);
@@ -333,7 +341,9 @@ async fn test_delete_command_preset() {
         .await
         .unwrap();
 
-    let body = hyper::body::to_bytes(create_response.into_body()).await.unwrap();
+    let body = hyper::body::to_bytes(create_response.into_body())
+        .await
+        .unwrap();
     let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let command_id = value["data"]["id"].as_str().unwrap();
 
@@ -364,11 +374,15 @@ async fn test_delete_command_preset() {
         .await
         .unwrap();
 
-    let body = hyper::body::to_bytes(list_response.into_body()).await.unwrap();
+    let body = hyper::body::to_bytes(list_response.into_body())
+        .await
+        .unwrap();
     let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     // The deleted command should not be in the list
     let presets = value["data"].as_array().unwrap();
-    let found = presets.iter().any(|p| p["id"].as_str().unwrap() == command_id);
+    let found = presets
+        .iter()
+        .any(|p| p["id"].as_str().unwrap() == command_id);
     assert!(!found, "Deleted command should not be in list");
 }

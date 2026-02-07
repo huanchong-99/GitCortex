@@ -5,25 +5,63 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
     extract::{Path, Query, State},
     response::Json as ResponseJson,
     routing::{get, post},
-    Router,
 };
 use db::models::terminal::{Terminal, TerminalLog};
 use deployment::Deployment;
 use serde::Deserialize;
-use services::services::cc_switch::CCSwitchService;
-use services::services::terminal::bridge::TerminalBridge;
-use services::services::terminal::process::{DEFAULT_COLS, DEFAULT_ROWS};
+use services::services::{
+    cc_switch::CCSwitchService,
+    orchestrator::BusMessage,
+    terminal::{
+        bridge::TerminalBridge,
+        process::{DEFAULT_COLS, DEFAULT_ROWS},
+    },
+};
 use tokio::process::Command;
 use utils::response::ApiResponse;
 
-use crate::{error::ApiError, DeploymentImpl};
+use crate::{DeploymentImpl, error::ApiError};
+
+async fn broadcast_terminal_status(
+    deployment: &DeploymentImpl,
+    terminal: &Terminal,
+    status: &str,
+) -> anyhow::Result<()> {
+    let task =
+        db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id)
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!("Workflow task {} not found", terminal.workflow_task_id)
+            })?;
+
+    let message = BusMessage::TerminalStatusUpdate {
+        workflow_id: task.workflow_id.clone(),
+        terminal_id: terminal.id.clone(),
+        status: status.to_string(),
+    };
+    let topic = format!("workflow:{}", task.workflow_id);
+
+    deployment
+        .message_bus()
+        .publish(&topic, message.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to publish terminal status: {e}"))?;
+    deployment
+        .message_bus()
+        .broadcast(message)
+        .map_err(|e| anyhow::anyhow!("Failed to broadcast terminal status: {e}"))?;
+
+    Ok(())
+}
 
 /// Terminal state machine: statuses that can directly transition to starting.
 /// For waiting/working, we check if process is actually running first.
-const STARTABLE_TERMINAL_STATUSES: [&str; 5] = ["not_started", "failed", "cancelled", "waiting", "working"];
+const STARTABLE_TERMINAL_STATUSES: [&str; 5] =
+    ["not_started", "failed", "cancelled", "waiting", "working"];
 
 /// Query parameters for terminal logs retrieval
 #[derive(Debug, Deserialize)]
@@ -152,14 +190,19 @@ pub async fn start_terminal(
 
     // Check if terminal is already running
     if deployment.process_manager().is_running(&id).await {
-        return Err(ApiError::Conflict(format!("Terminal {id} is already running")));
+        return Err(ApiError::Conflict(format!(
+            "Terminal {id} is already running"
+        )));
     }
 
     // Get CLI type to determine shell command
-    let cli_type = db::models::cli_type::CliType::find_by_id(&deployment.db().pool, &terminal.cli_type_id)
-        .await
-        .map_err(|e| ApiError::Internal(format!("Failed to fetch CLI type: {e}")))?
-        .ok_or_else(|| ApiError::NotFound(format!("CLI type {} not found", terminal.cli_type_id)))?;
+    let cli_type =
+        db::models::cli_type::CliType::find_by_id(&deployment.db().pool, &terminal.cli_type_id)
+            .await
+            .map_err(|e| ApiError::Internal(format!("Failed to fetch CLI type: {e}")))?
+            .ok_or_else(|| {
+                ApiError::NotFound(format!("CLI type {} not found", terminal.cli_type_id))
+            })?;
 
     // Determine shell command based on CLI type
     let cmd_name = match cli_type.name.as_str() {
@@ -210,6 +253,13 @@ pub async fn start_terminal(
     Terminal::update_status(&deployment.db().pool, &id, "starting")
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to update terminal status: {e}")))?;
+    if let Err(e) = broadcast_terminal_status(&deployment, &terminal, "starting").await {
+        tracing::warn!(
+            terminal_id = %id,
+            error = %e,
+            "Failed to broadcast starting terminal status"
+        );
+    }
 
     // Build spawn configuration with auto-confirm flags using CCSwitchService
     let cc_switch = CCSwitchService::new(Arc::new(deployment.db().clone()));
@@ -221,7 +271,18 @@ pub async fn start_terminal(
         Err(e) => {
             // On config build failure, reset status
             let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
-            return Err(ApiError::Internal(format!("Failed to build launch config: {e}")));
+            if let Err(event_err) =
+                broadcast_terminal_status(&deployment, &terminal, "failed").await
+            {
+                tracing::warn!(
+                    terminal_id = %id,
+                    error = %event_err,
+                    "Failed to broadcast failed terminal status"
+                );
+            }
+            return Err(ApiError::Internal(format!(
+                "Failed to build launch config: {e}"
+            )));
         }
     };
 
@@ -236,16 +297,43 @@ pub async fn start_terminal(
             // On spawn failure, set status to failed
             let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
             let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
-            return Err(ApiError::Internal(format!("Failed to spawn terminal process: {e}")));
+            if let Err(event_err) =
+                broadcast_terminal_status(&deployment, &terminal, "failed").await
+            {
+                tracing::warn!(
+                    terminal_id = %id,
+                    error = %event_err,
+                    "Failed to broadcast failed terminal status"
+                );
+            }
+            return Err(ApiError::Internal(format!(
+                "Failed to spawn terminal process: {e}"
+            )));
         }
     };
 
     // Update terminal status in database
-    if let Err(e) = Terminal::set_started(&deployment.db().pool, &id).await {
+    if let Err(e) = Terminal::set_waiting(&deployment.db().pool, &id).await {
         let _ = deployment.process_manager().kill_terminal(&id).await;
         let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
         let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
-        return Err(ApiError::Internal(format!("Failed to update terminal status: {e}")));
+        if let Err(event_err) = broadcast_terminal_status(&deployment, &terminal, "failed").await {
+            tracing::warn!(
+                terminal_id = %id,
+                error = %event_err,
+                "Failed to broadcast failed terminal status"
+            );
+        }
+        return Err(ApiError::Internal(format!(
+            "Failed to update terminal status: {e}"
+        )));
+    }
+    if let Err(e) = broadcast_terminal_status(&deployment, &terminal, "waiting").await {
+        tracing::warn!(
+            terminal_id = %id,
+            error = %e,
+            "Failed to broadcast waiting terminal status"
+        );
     }
 
     let pid = i32::try_from(handle.pid).ok();
@@ -255,7 +343,16 @@ pub async fn start_terminal(
         let _ = deployment.process_manager().kill_terminal(&id).await;
         let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
         let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
-        return Err(ApiError::Internal(format!("Failed to update terminal process info: {e}")));
+        if let Err(event_err) = broadcast_terminal_status(&deployment, &terminal, "failed").await {
+            tracing::warn!(
+                terminal_id = %id,
+                error = %event_err,
+                "Failed to broadcast failed terminal status"
+            );
+        }
+        return Err(ApiError::Internal(format!(
+            "Failed to update terminal process info: {e}"
+        )));
     }
 
     // Attach terminal logger for output persistence (Phase 26)
@@ -264,14 +361,28 @@ pub async fn start_terminal(
         .attach_terminal_logger(Arc::new(deployment.db().clone()), &id, "stdout", 1)
         .await
     {
-        tracing::warn!(
+        tracing::error!(
             terminal_id = %id,
             error = %e,
-            "Failed to attach terminal logger (non-fatal, logs won't persist)"
+            "Failed to attach terminal logger; rolling back manual start"
         );
-    } else {
-        tracing::debug!(terminal_id = %id, "Terminal logger attached for output persistence");
+
+        let _ = deployment.process_manager().kill_terminal(&id).await;
+        let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
+        let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
+        if let Err(event_err) = broadcast_terminal_status(&deployment, &terminal, "failed").await {
+            tracing::warn!(
+                terminal_id = %id,
+                error = %event_err,
+                "Failed to broadcast failed terminal status"
+            );
+        }
+
+        return Err(ApiError::Internal(format!(
+            "Failed to attach terminal logger: {e}"
+        )));
     }
+    tracing::debug!(terminal_id = %id, "Terminal logger attached for output persistence");
 
     // Register terminal bridge for MessageBus -> PTY stdin forwarding
     let terminal_bridge = TerminalBridge::new(
@@ -296,44 +407,62 @@ pub async fn start_terminal(
     // Register PromptWatcher for background prompt detection
     // This enables auto-confirm to work even without WebSocket connection
     // Use handle.session_id (the actual PTY session) not terminal.pty_session_id (stale DB value)
-    match db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id).await {
-        Ok(Some(task)) => {
-            if let Err(e) = deployment.prompt_watcher().register(
-                &id,
-                &task.workflow_id,
-                &terminal.workflow_task_id,
-                &handle.session_id,
-            ).await {
+    if !terminal.auto_confirm {
+        deployment.prompt_watcher().unregister(&id).await;
+        tracing::debug!(
+            terminal_id = %id,
+            "Skipped PromptWatcher registration because auto_confirm is disabled"
+        );
+    } else {
+        match db::models::WorkflowTask::find_by_id(
+            &deployment.db().pool,
+            &terminal.workflow_task_id,
+        )
+        .await
+        {
+            Ok(Some(task)) => {
+                if let Err(e) = deployment
+                    .prompt_watcher()
+                    .register(
+                        &id,
+                        &task.workflow_id,
+                        &terminal.workflow_task_id,
+                        &handle.session_id,
+                        terminal.auto_confirm,
+                    )
+                    .await
+                {
+                    tracing::warn!(
+                        terminal_id = %id,
+                        workflow_id = %task.workflow_id,
+                        pty_session_id = %handle.session_id,
+                        error = %e,
+                        "Failed to register PromptWatcher for background prompt detection"
+                    );
+                } else {
+                    tracing::info!(
+                        terminal_id = %id,
+                        workflow_id = %task.workflow_id,
+                        pty_session_id = %handle.session_id,
+                        "PromptWatcher registered for background prompt detection"
+                    );
+                }
+            }
+            Ok(None) => {
                 tracing::warn!(
                     terminal_id = %id,
-                    workflow_id = %task.workflow_id,
-                    pty_session_id = %handle.session_id,
-                    error = %e,
-                    "Failed to register PromptWatcher for background prompt detection"
-                );
-            } else {
-                tracing::info!(
-                    terminal_id = %id,
-                    workflow_id = %task.workflow_id,
-                    pty_session_id = %handle.session_id,
-                    "PromptWatcher registered for background prompt detection"
+                    workflow_task_id = %terminal.workflow_task_id,
+                    "Skipped PromptWatcher registration: workflow task not found"
                 );
             }
-        }
-        Ok(None) => {
-            tracing::warn!(
-                terminal_id = %id,
-                workflow_task_id = %terminal.workflow_task_id,
-                "Skipped PromptWatcher registration: workflow task not found"
-            );
-        }
-        Err(e) => {
-            tracing::warn!(
-                terminal_id = %id,
-                workflow_task_id = %terminal.workflow_task_id,
-                error = %e,
-                "Failed to query workflow task for PromptWatcher registration (non-fatal)"
-            );
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %id,
+                    workflow_task_id = %terminal.workflow_task_id,
+                    error = %e,
+                    "Failed to query workflow task for PromptWatcher registration (non-fatal)"
+                );
+            }
         }
     }
 
@@ -348,7 +477,7 @@ pub async fn start_terminal(
         "terminal_id": id,
         "pid": handle.pid,
         "session_id": handle.session_id,
-        "status": "started",
+        "status": "waiting",
         "auto_confirm": terminal.auto_confirm
     }))))
 }
@@ -359,43 +488,38 @@ async fn get_terminal_working_dir(
     workflow_task_id: &str,
 ) -> anyhow::Result<std::path::PathBuf> {
     // Get workflow_id from workflow_task
-    let workflow_id: Option<String> = sqlx::query_scalar(
-        "SELECT workflow_id FROM workflow_task WHERE id = ?"
-    )
-    .bind(workflow_task_id)
-    .fetch_optional(&deployment.db().pool)
-    .await?
-    .flatten();
+    let workflow_id: Option<String> =
+        sqlx::query_scalar("SELECT workflow_id FROM workflow_task WHERE id = ?")
+            .bind(workflow_task_id)
+            .fetch_optional(&deployment.db().pool)
+            .await?
+            .flatten();
 
-    let workflow_id = workflow_id.ok_or_else(|| {
-        anyhow::anyhow!("Workflow task {} not found", workflow_task_id)
-    })?;
+    let workflow_id = workflow_id
+        .ok_or_else(|| anyhow::anyhow!("Workflow task {} not found", workflow_task_id))?;
 
     // Get project_id from workflow
-    let project_id: Option<Vec<u8>> = sqlx::query_scalar(
-        "SELECT project_id FROM workflow WHERE id = ?"
-    )
-    .bind(&workflow_id)
-    .fetch_optional(&deployment.db().pool)
-    .await?
-    .flatten();
+    let project_id: Option<Vec<u8>> =
+        sqlx::query_scalar("SELECT project_id FROM workflow WHERE id = ?")
+            .bind(&workflow_id)
+            .fetch_optional(&deployment.db().pool)
+            .await?
+            .flatten();
 
-    let project_id = project_id.ok_or_else(|| {
-        anyhow::anyhow!("Workflow {} not found", workflow_id)
-    })?;
+    let project_id =
+        project_id.ok_or_else(|| anyhow::anyhow!("Workflow {} not found", workflow_id))?;
 
     // Convert project_id bytes to UUID string
     let project_uuid = uuid::Uuid::from_slice(&project_id)
         .map_err(|e| anyhow::anyhow!("Invalid project_id format: {}", e))?;
 
     // 1) Prefer project.default_agent_working_dir
-    let working_dir: Option<String> = sqlx::query_scalar(
-        "SELECT default_agent_working_dir FROM projects WHERE id = ?"
-    )
-    .bind(project_uuid)
-    .fetch_optional(&deployment.db().pool)
-    .await?
-    .flatten();
+    let working_dir: Option<String> =
+        sqlx::query_scalar("SELECT default_agent_working_dir FROM projects WHERE id = ?")
+            .bind(project_uuid)
+            .fetch_optional(&deployment.db().pool)
+            .await?
+            .flatten();
 
     if let Some(dir) = working_dir.filter(|dir| !dir.trim().is_empty()) {
         return Ok(std::path::PathBuf::from(dir));
@@ -410,7 +534,7 @@ async fn get_terminal_working_dir(
         WHERE pr.project_id = ?
         ORDER BY r.display_name ASC
         LIMIT 1
-        "#
+        "#,
     )
     .bind(project_uuid)
     .fetch_optional(&deployment.db().pool)
@@ -436,6 +560,10 @@ pub async fn stop_terminal(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<String>>, ApiError> {
+    // Ensure terminal exists first to avoid false success on nonexistent id
+    let terminal = Terminal::find_by_id(&deployment.db().pool, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("not_found".to_string()))?;
     // Best-effort kill in case the process is still running
     if let Err(e) = deployment.process_manager().kill_terminal(&id).await {
         tracing::warn!("Failed to kill terminal {}: {}", id, e);
@@ -447,6 +575,13 @@ pub async fn stop_terminal(
     // Reset terminal status for restart (not_started allows re-starting)
     Terminal::update_status(&deployment.db().pool, &id, "not_started").await?;
     Terminal::update_process(&deployment.db().pool, &id, None, None).await?;
+    if let Err(e) = broadcast_terminal_status(&deployment, &terminal, "not_started").await {
+        tracing::warn!(
+            terminal_id = %id,
+            error = %e,
+            "Failed to broadcast not_started terminal status"
+        );
+    }
 
     tracing::info!("Terminal {} stopped and reset successfully", id);
 

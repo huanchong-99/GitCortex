@@ -22,6 +22,7 @@ interface UseExecutionProcessesResult {
  */
 export const useExecutionProcesses = (
   sessionId: string | undefined,
+  attemptId: string | undefined,
   opts?: { showSoftDeleted?: boolean }
 ): UseExecutionProcessesResult => {
   const showSoftDeleted = opts?.showSoftDeleted;
@@ -29,6 +30,9 @@ export const useExecutionProcesses = (
 
   if (sessionId) {
     const params = new URLSearchParams({ session_id: sessionId });
+    if (attemptId) {
+      params.set('attempt_id', attemptId);
+    }
     if (typeof showSoftDeleted === 'boolean') {
       params.set('show_soft_deleted', String(showSoftDeleted));
     }

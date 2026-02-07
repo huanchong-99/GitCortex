@@ -15,7 +15,20 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 /// Terminal Status Enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Type,
+    Serialize,
+    Deserialize,
+    TS,
+    EnumString,
+    Display,
+    Default,
+)]
 #[sqlx(type_name = "terminal_status", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
@@ -118,7 +131,9 @@ pub struct Terminal {
 }
 
 /// Terminal Log Type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize, TS, EnumString, Display,
+)]
 #[sqlx(type_name = "terminal_log_type", rename_all = "lowercase")]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "lowercase")]
@@ -319,7 +334,7 @@ impl Terminal {
                 order_index, status, auto_confirm, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
             RETURNING *
-            "
+            ",
         )
         .bind(&terminal.id)
         .bind(&terminal.workflow_task_id)
@@ -340,22 +355,23 @@ impl Terminal {
 
     /// Find terminal by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
-        sqlx::query_as::<_, Terminal>(
-            r"SELECT * FROM terminal WHERE id = ?"
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, Terminal>(r"SELECT * FROM terminal WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Find terminals by task
-    pub async fn find_by_task(pool: &SqlitePool, workflow_task_id: &str) -> sqlx::Result<Vec<Self>> {
+    pub async fn find_by_task(
+        pool: &SqlitePool,
+        workflow_task_id: &str,
+    ) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, Terminal>(
             r"
             SELECT * FROM terminal
             WHERE workflow_task_id = ?
             ORDER BY order_index ASC
-            "
+            ",
         )
         .bind(workflow_task_id)
         .fetch_all(pool)
@@ -370,7 +386,7 @@ impl Terminal {
             INNER JOIN workflow_task wt ON t.workflow_task_id = wt.id
             WHERE wt.workflow_id = ?
             ORDER BY wt.order_index ASC, t.order_index ASC
-            "
+            ",
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -385,7 +401,7 @@ impl Terminal {
             UPDATE terminal
             SET status = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(status)
         .bind(now)
@@ -408,7 +424,7 @@ impl Terminal {
             UPDATE terminal
             SET process_id = ?, pty_session_id = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(process_id)
         .bind(pty_session_id)
@@ -432,7 +448,7 @@ impl Terminal {
             UPDATE terminal
             SET session_id = ?, execution_process_id = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(session_id)
         .bind(execution_process_id)
@@ -456,7 +472,7 @@ impl Terminal {
             UPDATE terminal
             SET last_commit_hash = ?, last_commit_message = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(commit_hash)
         .bind(commit_message)
@@ -467,8 +483,27 @@ impl Terminal {
         Ok(())
     }
 
-    /// Set terminal started
-    pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+    /// Set terminal to starting status (process is preparing to spawn)
+    pub async fn set_starting(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+        let now = Utc::now();
+        let status = TerminalStatus::Starting.to_string();
+        sqlx::query(
+            r"
+            UPDATE terminal
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+            ",
+        )
+        .bind(status)
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Set terminal to waiting status (process started, waiting for instructions)
+    pub async fn set_waiting(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         let now = Utc::now();
         let status = TerminalStatus::Waiting.to_string();
         sqlx::query(
@@ -476,7 +511,7 @@ impl Terminal {
             UPDATE terminal
             SET status = ?, started_at = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(status)
         .bind(now)
@@ -487,6 +522,11 @@ impl Terminal {
         Ok(())
     }
 
+    /// Backward-compatible alias for set_waiting.
+    pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+        Self::set_waiting(pool, id).await
+    }
+
     /// Set terminal completed
     pub async fn set_completed(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
         let now = Utc::now();
@@ -495,7 +535,7 @@ impl Terminal {
             UPDATE terminal
             SET status = ?, completed_at = ?, updated_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(status)
         .bind(now)
@@ -522,7 +562,7 @@ impl TerminalLog {
             INSERT INTO terminal_log (id, terminal_id, log_type, content, created_at)
             VALUES (?1, ?2, ?3, ?4, ?5)
             RETURNING *
-            "
+            ",
         )
         .bind(&id)
         .bind(terminal_id)
@@ -546,7 +586,7 @@ impl TerminalLog {
             WHERE terminal_id = ?
             ORDER BY created_at DESC
             LIMIT ?
-            "
+            ",
         )
         .bind(terminal_id)
         .bind(limit)
@@ -557,9 +597,10 @@ impl TerminalLog {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use serial_test::serial;
     use serde_json::json;
+    use serial_test::serial;
+
+    use super::*;
 
     fn with_var<F>(key: &str, value: Option<&str>, f: F)
     where
@@ -584,7 +625,10 @@ mod tests {
         }))
         .expect("deserialization should succeed");
 
-        assert!(request.auto_confirm, "auto_confirm should default to true when not specified");
+        assert!(
+            request.auto_confirm,
+            "auto_confirm should default to true when not specified"
+        );
     }
 
     #[test]
@@ -596,7 +640,10 @@ mod tests {
         }))
         .expect("deserialization should succeed");
 
-        assert!(!request.auto_confirm, "auto_confirm should respect explicit false value");
+        assert!(
+            !request.auto_confirm,
+            "auto_confirm should respect explicit false value"
+        );
     }
 
     #[test]
@@ -608,7 +655,10 @@ mod tests {
         }))
         .expect("deserialization should succeed");
 
-        assert!(request.auto_confirm, "auto_confirm should respect explicit true value");
+        assert!(
+            request.auto_confirm,
+            "auto_confirm should respect explicit true value"
+        );
     }
 
     #[test]
@@ -698,10 +748,12 @@ mod tests {
             // Should fail without encryption key
             let result = terminal.set_custom_api_key("sk-test");
             assert!(result.is_err());
-            assert!(result
-                .unwrap_err()
-                .to_string()
-                .contains("GITCORTEX_ENCRYPTION_KEY"));
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("GITCORTEX_ENCRYPTION_KEY")
+            );
         });
     }
 
@@ -898,7 +950,7 @@ impl GitEvent {
                 commit_message, metadata, process_status, created_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)
             RETURNING *
-            "
+            ",
         )
         .bind(&id)
         .bind(workflow_id)
@@ -919,7 +971,7 @@ impl GitEvent {
             SELECT * FROM git_event
             WHERE workflow_id = ? AND process_status = 'pending'
             ORDER BY created_at ASC
-            "
+            ",
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -939,7 +991,7 @@ impl GitEvent {
             UPDATE git_event
             SET process_status = ?, agent_response = ?, processed_at = ?
             WHERE id = ?
-            "
+            ",
         )
         .bind(status)
         .bind(agent_response)

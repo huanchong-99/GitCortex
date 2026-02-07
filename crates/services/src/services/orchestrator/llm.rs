@@ -1,15 +1,12 @@
 //! LLM client abstractions and implementations.
 
-use std::future::Future;
-use std::num::NonZeroU32;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{future::Future, num::NonZeroU32, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use governor::{
+    Quota, RateLimiter,
     clock::DefaultClock,
     state::{InMemoryState, NotKeyed},
-    Quota, RateLimiter,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -27,10 +24,7 @@ pub trait LLMClient: Send + Sync {
 }
 
 /// Retries an async operation with exponential backoff.
-pub async fn retry_with_backoff<T, E, F, Fut>(
-    max_retries: u32,
-    mut operation: F,
-) -> Result<T, E>
+pub async fn retry_with_backoff<T, E, F, Fut>(max_retries: u32, mut operation: F) -> Result<T, E>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
@@ -326,8 +320,9 @@ pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn 
 
 #[cfg(test)]
 mod rate_limit_tests {
-    use super::*;
     use tokio::time::sleep;
+
+    use super::*;
 
     fn test_messages() -> Vec<LLMMessage> {
         vec![LLMMessage {

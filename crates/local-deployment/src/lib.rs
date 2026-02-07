@@ -12,7 +12,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use db::{models::terminal::Terminal, DBService};
+use db::{DBService, models::terminal::Terminal};
 use deployment::{Deployment, DeploymentError};
 use executors::profile::ExecutorConfigs;
 use services::services::{
@@ -174,7 +174,8 @@ impl Deployment for LocalDeployment {
 
         // Create message bus and orchestrator runtime
         let message_bus = Arc::new(MessageBus::new(1000));
-        let orchestrator_runtime = OrchestratorRuntime::new(Arc::new(db.clone()), message_bus.clone());
+        let orchestrator_runtime =
+            OrchestratorRuntime::new(Arc::new(db.clone()), message_bus.clone());
         let process_manager = Arc::new(ProcessManager::new());
         let prompt_watcher = PromptWatcher::new(message_bus.clone(), process_manager.clone());
 
@@ -331,7 +332,9 @@ impl LocalDeployment {
     }
 
     pub fn remote_client(&self) -> Result<(), DeploymentError> {
-        Err(DeploymentError::Other(anyhow::anyhow!("Remote client not configured")))
+        Err(DeploymentError::Other(anyhow::anyhow!(
+            "Remote client not configured"
+        )))
     }
 
     pub async fn get_login_status(&self) -> LoginStatus {

@@ -16,9 +16,11 @@ pub mod types;
 
 pub use agent::OrchestratorAgent;
 pub use config::OrchestratorConfig;
-pub use llm::{LLMClient, OpenAICompatibleClient, create_llm_client, build_terminal_completion_prompt};
 #[cfg(test)]
 pub use llm::MockLLMClient;
+pub use llm::{
+    LLMClient, OpenAICompatibleClient, build_terminal_completion_prompt, create_llm_client,
+};
 pub use message_bus::{BusMessage, MessageBus, SharedMessageBus};
 pub use prompt_handler::PromptHandler;
 pub use runtime::{OrchestratorRuntime, RuntimeConfig};
@@ -26,6 +28,6 @@ pub use state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState
 pub use terminal_coordinator::TerminalCoordinator;
 pub use types::*;
 
+mod terminal_coordinator_test;
 #[cfg(test)]
 mod tests;
-mod terminal_coordinator_test;

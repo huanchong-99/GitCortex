@@ -10,7 +10,10 @@ export type TerminalStatus =
   | 'waiting'
   | 'working'
   | 'completed'
-  | 'failed';
+  | 'failed'
+  | 'cancelled'
+  | 'review_passed'
+  | 'review_rejected';
 
 export interface Terminal {
   id: string;
@@ -51,6 +54,18 @@ const STATUS_STYLES: Record<
   completed: {
     icon: <Check className="w-5 h-5 text-green-500" strokeWidth={3} />,
     className: 'text-green-500',
+  },
+  cancelled: {
+    icon: <X className="w-5 h-5 text-red-500" strokeWidth={3} />,
+    className: 'text-red-500',
+  },
+  review_passed: {
+    icon: <Check className="w-5 h-5 text-green-500" strokeWidth={3} />,
+    className: 'text-green-500',
+  },
+  review_rejected: {
+    icon: <X className="w-5 h-5 text-red-500" strokeWidth={3} />,
+    className: 'text-red-500',
   },
   failed: {
     icon: <X className="w-5 h-5 text-red-500" strokeWidth={3} />,

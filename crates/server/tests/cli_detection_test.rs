@@ -3,21 +3,25 @@
 //! These tests verify that CLI detection works through the HTTP API,
 //! returning proper installation status for available and unavailable CLIs.
 
-use server::DeploymentImpl;
-use db::models::{CliType};
-use uuid::Uuid;
 use std::time::Duration;
+
+use db::models::CliType;
+use server::DeploymentImpl;
 use tokio::time::timeout;
+use uuid::Uuid;
 
 /// Helper: Setup test environment with CLI types
 async fn setup_test() -> (DeploymentImpl, reqwest::Client) {
-    let deployment = DeploymentImpl::new().await
+    let deployment = DeploymentImpl::new()
+        .await
         .expect("Failed to create deployment");
 
     // Start the server in background
     let deployment_clone = deployment.clone();
     tokio::spawn(async move {
-        deployment_clone.serve("127.0.0.1:0").await
+        deployment_clone
+            .serve("127.0.0.1:0")
+            .await
             .expect("Failed to start server");
     });
 

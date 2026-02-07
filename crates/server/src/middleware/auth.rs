@@ -18,7 +18,7 @@
 
 use axum::{
     extract::Request,
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     middleware::Next,
     response::Response,
 };
@@ -87,10 +87,16 @@ pub async fn require_api_token(req: Request, next: Next) -> Result<Response, Sta
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use axum::{body::Body, http::{Request, StatusCode}, routing::get, Router};
+    use axum::{
+        Router,
+        body::Body,
+        http::{Request, StatusCode},
+        routing::get,
+    };
     use serial_test::serial;
     use tower::ServiceExt;
+
+    use super::*;
 
     /// Test handler that returns OK
     async fn test_handler() -> &'static str {
@@ -114,12 +120,7 @@ mod tests {
 
         // Request without auth header should succeed
         let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/test")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::builder().uri("/test").body(Body::empty()).unwrap())
             .await
             .unwrap();
 
@@ -136,12 +137,7 @@ mod tests {
 
         // Request without auth header should fail
         let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/test")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::builder().uri("/test").body(Body::empty()).unwrap())
             .await
             .unwrap();
 

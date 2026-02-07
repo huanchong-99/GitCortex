@@ -3,9 +3,12 @@
 //! Manages broadcast channels for each workflow, allowing multiple WebSocket
 //! connections to subscribe to events for a specific workflow.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 
 use super::workflow_events::WsEvent;
 
@@ -31,6 +34,10 @@ pub struct SubscriptionHub {
     capacity: usize,
     /// Map of workflow_id -> broadcast sender.
     senders: Arc<RwLock<HashMap<String, broadcast::Sender<WsEvent>>>>,
+    /// Per-workflow event cache used when no subscribers are connected.
+    pending_events: Arc<RwLock<HashMap<String, VecDeque<WsEvent>>>>,
+    /// Maximum number of cached events retained per workflow.
+    pending_limit: usize,
 }
 
 /// Shared subscription hub type alias.
@@ -42,6 +49,8 @@ impl SubscriptionHub {
         Self {
             capacity,
             senders: Arc::new(RwLock::new(HashMap::new())),
+            pending_events: Arc::new(RwLock::new(HashMap::new())),
+            pending_limit: capacity.max(1),
         }
     }
 
@@ -49,8 +58,28 @@ impl SubscriptionHub {
     ///
     /// Returns a receiver that will receive all events published to this workflow.
     pub async fn subscribe(&self, workflow_id: &str) -> broadcast::Receiver<WsEvent> {
-        let sender = self.get_or_create_sender(workflow_id).await;
-        sender.subscribe()
+        let (sender, receiver, should_replay_pending) = {
+            let mut senders = self.senders.write().await;
+            let sender = if let Some(sender) = senders.get(workflow_id).cloned() {
+                sender
+            } else {
+                let (sender, _) = broadcast::channel(self.capacity);
+                senders.insert(workflow_id.to_string(), sender.clone());
+                tracing::debug!("Created new channel for workflow: {}", workflow_id);
+                sender
+            };
+
+            let should_replay_pending = sender.receiver_count() == 0;
+            let receiver = sender.subscribe();
+
+            (sender, receiver, should_replay_pending)
+        };
+
+        if should_replay_pending {
+            self.replay_pending_events(workflow_id, &sender).await;
+        }
+
+        receiver
     }
 
     /// Publish an event to all subscribers of a workflow.
@@ -62,8 +91,41 @@ impl SubscriptionHub {
         workflow_id: &str,
         event: WsEvent,
     ) -> Result<usize, broadcast::error::SendError<WsEvent>> {
-        let sender = self.get_or_create_sender(workflow_id).await;
+        let Some(sender) = self.get_sender(workflow_id).await else {
+            self.cache_pending_event(workflow_id, event.clone()).await;
+            return Err(broadcast::error::SendError(event));
+        };
+
+        if sender.receiver_count() == 0 {
+            self.cache_pending_event(workflow_id, event.clone()).await;
+            return Err(broadcast::error::SendError(event));
+        }
+
         sender.send(event)
+    }
+
+    /// Publish lagged notification to all active workflow subscribers.
+    ///
+    /// Returns the number of workflow channels that received the lagged event.
+    pub async fn publish_lagged_to_active(&self, skipped: u64) -> usize {
+        let active_senders: Vec<broadcast::Sender<WsEvent>> = {
+            let senders = self.senders.read().await;
+            senders
+                .values()
+                .filter(|sender| sender.receiver_count() > 0)
+                .cloned()
+                .collect()
+        };
+
+        if active_senders.is_empty() {
+            return 0;
+        }
+
+        let lagged_event = WsEvent::lagged(skipped);
+        active_senders
+            .iter()
+            .filter(|sender| sender.send(lagged_event.clone()).is_ok())
+            .count()
     }
 
     /// Get the number of active subscribers for a workflow.
@@ -98,6 +160,44 @@ impl SubscriptionHub {
     /// Get the number of active workflow channels.
     pub async fn channel_count(&self) -> usize {
         self.senders.read().await.len()
+    }
+
+    async fn get_sender(&self, workflow_id: &str) -> Option<broadcast::Sender<WsEvent>> {
+        self.senders.read().await.get(workflow_id).cloned()
+    }
+
+    async fn cache_pending_event(&self, workflow_id: &str, event: WsEvent) {
+        let mut pending_events = self.pending_events.write().await;
+        let queue = pending_events.entry(workflow_id.to_string()).or_default();
+        queue.push_back(event);
+
+        while queue.len() > self.pending_limit {
+            queue.pop_front();
+        }
+    }
+
+    async fn replay_pending_events(&self, workflow_id: &str, sender: &broadcast::Sender<WsEvent>) {
+        let pending_events = {
+            let mut pending_events = self.pending_events.write().await;
+            pending_events.remove(workflow_id).unwrap_or_default()
+        };
+
+        if pending_events.is_empty() {
+            return;
+        }
+
+        let replay_count = pending_events.len();
+        for event in pending_events {
+            if sender.send(event).is_err() {
+                break;
+            }
+        }
+
+        tracing::debug!(
+            workflow_id,
+            replay_count,
+            "Replayed pending workflow events to first subscriber"
+        );
     }
 
     /// Get or create a broadcast sender for a workflow.
@@ -136,10 +236,10 @@ impl Default for SubscriptionHub {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+    use tokio::time::Duration;
 
-    use super::super::workflow_events::WsEventType;
+    use super::{super::workflow_events::WsEventType, *};
 
     #[tokio::test]
     async fn test_subscription_hub_creation() {
@@ -206,19 +306,11 @@ mod tests {
         hub.publish("workflow-1", event).await.unwrap();
 
         // workflow-1 should receive
-        let result1 = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            rx1.recv(),
-        )
-        .await;
+        let result1 = tokio::time::timeout(std::time::Duration::from_millis(100), rx1.recv()).await;
         assert!(result1.is_ok());
 
         // workflow-2 should NOT receive (timeout)
-        let result2 = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            rx2.recv(),
-        )
-        .await;
+        let result2 = tokio::time::timeout(std::time::Duration::from_millis(100), rx2.recv()).await;
         assert!(result2.is_err()); // Timeout
     }
 
@@ -262,6 +354,31 @@ mod tests {
 
         // Should fail because no subscribers
         assert!(result.is_err());
+        assert_eq!(hub.channel_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_publish_without_subscribers_replays_from_cache() {
+        let hub = SubscriptionHub::new(100);
+
+        let event = WsEvent::new(
+            WsEventType::WorkflowStatusChanged,
+            json!({"status": "queued"}),
+        );
+
+        let result = hub.publish("workflow-1", event.clone()).await;
+        assert!(result.is_err());
+        assert_eq!(hub.channel_count().await, 0);
+
+        let mut rx = hub.subscribe("workflow-1").await;
+        assert_eq!(hub.channel_count().await, 1);
+
+        let replayed = tokio::time::timeout(Duration::from_millis(100), rx.recv()).await;
+        assert!(replayed.is_ok());
+
+        let replayed = replayed.unwrap().unwrap();
+        assert_eq!(replayed.event_type, event.event_type);
+        assert_eq!(replayed.payload["status"], "queued");
     }
 
     #[tokio::test]

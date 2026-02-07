@@ -4,22 +4,26 @@
 //! Events include workflow status changes, terminal updates, git commits, etc.
 
 use axum::{
-    extract::{Path, State, WebSocketUpgrade, ws::{Message, WebSocket}},
+    Extension, Router,
+    extract::{
+        Path, State, WebSocketUpgrade,
+        ws::{Message, WebSocket},
+    },
     response::IntoResponse,
     routing::get,
-    Extension, Router,
 };
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::broadcast;
-use tokio::time::{interval, Duration};
+use tokio::{
+    sync::broadcast,
+    time::{Duration, interval},
+};
 use tracing::{debug, info, warn};
 
-use crate::error::ApiError;
-use crate::DeploymentImpl;
-
-use super::subscription_hub::SharedSubscriptionHub;
-use super::terminal_ws::validate_terminal_id;
-use super::workflow_events::WsEvent;
+use super::{
+    subscription_hub::SharedSubscriptionHub, terminal_ws::validate_terminal_id,
+    workflow_events::WsEvent,
+};
+use crate::{DeploymentImpl, error::ApiError};
 
 // ============================================================================
 // Constants

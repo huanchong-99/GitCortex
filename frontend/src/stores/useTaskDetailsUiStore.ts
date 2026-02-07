@@ -59,13 +59,15 @@ const useTaskDetailsUiStore = create<TaskDetailsUiStore>((set, get) => ({
   },
 }));
 
-export const useTaskStopping = (taskId: string) => {
+export const useTaskStopping = (taskId?: string) => {
   const { getUiState, setUiState } = useTaskDetailsUiStore();
-  const { isStopping } = getUiState(taskId);
+  const { isStopping } = taskId
+    ? getUiState(taskId)
+    : { isStopping: false };
 
   return {
     isStopping,
     setIsStopping: (value: boolean) =>
-      setUiState(taskId, { isStopping: value }),
+      taskId ? setUiState(taskId, { isStopping: value }) : undefined,
   };
 };

@@ -10,26 +10,25 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use uuid::Uuid;
-
 use db::{
     DBService,
     models::{
-        terminal::Terminal,
+        execution_process::{ExecutionProcess, ExecutionProcessRunReason},
         session::Session,
-        execution_process::ExecutionProcess,
-        execution_process::ExecutionProcessRunReason,
+        terminal::Terminal,
     },
 };
 use services::services::{
     cc_switch::CCSwitchService,
     terminal::{CliDetector, ProcessManager, TerminalLauncher},
 };
+use uuid::Uuid;
 
 /// Setup in-memory database for testing
 async fn setup_test_db() -> Arc<DBService> {
-    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
     use std::str::FromStr;
+
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
     // Disable foreign keys for testing (simplifies test setup)
     let options = SqliteConnectOptions::from_str(":memory:")
@@ -49,20 +48,16 @@ async fn setup_test_db() -> Arc<DBService> {
 }
 
 /// Create test data: project, workflow, task, workspace, and terminal
-async fn create_test_terminal_data(
-    db: &Arc<DBService>,
-) -> (String, String, String) {
+async fn create_test_terminal_data(db: &Arc<DBService>) -> (String, String, String) {
     let project_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)"
-    )
-    .bind(project_id)
-    .bind("test-project")
-    .bind(Utc::now())
-    .bind(Utc::now())
-    .execute(&db.pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
+        .bind(project_id)
+        .bind("test-project")
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
 
     let task_id = Uuid::new_v4();
     sqlx::query(
@@ -185,8 +180,7 @@ async fn test_terminal_full_lifecycle() {
     );
 
     // Create test data
-    let (workflow_id, workflow_task_id, _workspace_id) =
-        create_test_terminal_data(&db).await;
+    let (workflow_id, workflow_task_id, _workspace_id) = create_test_terminal_data(&db).await;
 
     // Use pre-seeded cli_type and model_config from migrations
     let cli_type_id = "cli-claude-code";

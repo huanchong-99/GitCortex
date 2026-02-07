@@ -3,8 +3,8 @@
 //! This test verifies that slash command route handlers correctly access the database pool
 //! through deployment.db().pool instead of the non-existent deployment.pool field.
 
-use server::DeploymentImpl;
 use local_deployment::LocalDeployment;
+use server::DeploymentImpl;
 
 #[tokio::test]
 async fn test_slash_commands_pool_access() {
@@ -12,19 +12,26 @@ async fn test_slash_commands_pool_access() {
     // Before the fix, this would fail with "no field named `pool` on type `DeploymentImpl`"
 
     // Create a deployment instance
-    let deployment = LocalDeployment::new().await.expect("Failed to create deployment");
+    let deployment = LocalDeployment::new()
+        .await
+        .expect("Failed to create deployment");
 
     // Access the pool through the db() method
     let _pool = &deployment.db().pool;
 
     // If we got here without compilation errors, the fix is working
-    assert!(true, "Successfully accessed pool through deployment.db().pool");
+    assert!(
+        true,
+        "Successfully accessed pool through deployment.db().pool"
+    );
 }
 
 #[tokio::test]
 async fn test_slash_commands_pool_is_accessible() {
     // Verify that the pool is actually accessible and functional
-    let deployment = LocalDeployment::new().await.expect("Failed to create deployment");
+    let deployment = LocalDeployment::new()
+        .await
+        .expect("Failed to create deployment");
 
     // Try to execute a simple query to verify the pool works
     let result = sqlx::query("SELECT 1")

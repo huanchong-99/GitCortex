@@ -18,6 +18,7 @@ function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'com
     case 'ready':
       return 'idle';
     case 'running':
+    case 'merging':
       return 'running';
     case 'paused':
       return 'paused';
@@ -39,6 +40,7 @@ function StatusBadge({ status }: { status: string }) {
   const statusColors: Record<string, string> = {
     ready: 'bg-blue-500/20 text-blue-600 border-blue-500/30',
     running: 'bg-green-500/20 text-green-600 border-green-500/30',
+    merging: 'bg-green-500/20 text-green-600 border-green-500/30',
     paused: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30',
     completed: 'bg-gray-500/20 text-gray-600 border-gray-500/30',
     failed: 'bg-red-500/20 text-red-600 border-red-500/30',

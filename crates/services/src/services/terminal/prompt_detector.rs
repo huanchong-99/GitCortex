@@ -133,8 +133,10 @@ impl DetectedPrompt {
 
 /// Password/sensitive input detection
 static PASSWORD_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(password|passphrase|token|secret|api[_\s]?key|credential|private[_\s]?key)\b")
-        .expect("Invalid PASSWORD_RE regex")
+    Regex::new(
+        r"(?i)\b(password|passphrase|token|secret|api[_\s]?key|credential|private[_\s]?key)\b",
+    )
+    .expect("Invalid PASSWORD_RE regex")
 });
 
 /// Input field detection (free-form text input)
@@ -157,8 +159,7 @@ static SELECT_MARKER_RE: Lazy<Regex> = Lazy::new(|| {
 
 /// Selected marker patterns (indicates current selection)
 static SELECTED_MARKER_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[\s]*(>|\*|❯|▸|→|\[x\]|\(x\)|●)")
-        .expect("Invalid SELECTED_MARKER_RE regex")
+    Regex::new(r"^[\s]*(>|\*|❯|▸|→|\[x\]|\(x\)|●)").expect("Invalid SELECTED_MARKER_RE regex")
 });
 
 /// Choice detection (single-line options with multiple choices)
@@ -172,8 +173,7 @@ static CHOICE_RE: Lazy<Regex> = Lazy::new(|| {
 /// Indented option line (for arrow select without explicit marker)
 static OPTION_INDENTED_RE: Lazy<Regex> = Lazy::new(|| {
     // Matches lines with 2+ leading spaces followed by non-whitespace content
-    Regex::new(r"^[\s]{2,}(\S.*)$")
-        .expect("Invalid OPTION_INDENTED_RE regex")
+    Regex::new(r"^[\s]{2,}(\S.*)$").expect("Invalid OPTION_INDENTED_RE regex")
 });
 
 /// Yes/No detection

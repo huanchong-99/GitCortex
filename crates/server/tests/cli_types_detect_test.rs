@@ -4,13 +4,16 @@
 //! 1. The CliDetector import path is correct
 //! 2. Arc<DBService> can be properly created from deployment
 
-use server::DeploymentImpl;
 use std::sync::Arc;
+
+use server::DeploymentImpl;
 
 #[tokio::test]
 async fn test_cli_detector_arc_creation() {
     // Create a deployment instance
-    let deployment = DeploymentImpl::new().await.expect("Failed to create deployment");
+    let deployment = DeploymentImpl::new()
+        .await
+        .expect("Failed to create deployment");
 
     // This should fail initially because:
     // 1. Import path is wrong (services::terminal::detector vs services::services::terminal::detector)
@@ -30,7 +33,9 @@ async fn test_cli_detector_correct_import_path() {
     use services::services::terminal::detector::CliDetector;
 
     // Create a deployment
-    let deployment = DeploymentImpl::new().await.expect("Failed to create deployment");
+    let deployment = DeploymentImpl::new()
+        .await
+        .expect("Failed to create deployment");
 
     // Create Arc<DBService> properly
     let db = Arc::new(deployment.db().clone());

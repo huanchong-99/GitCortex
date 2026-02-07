@@ -119,7 +119,10 @@ fn select_project(projects: &[ClaudeProject]) -> Result<SessionSelection, Review
         return Ok(SessionSelection::Skipped);
     }
 
-    let project = &projects[selection];
+    // items = [skip_top, project_0..project_n-1, skip_bottom]
+    // non-skip selection must map to project index by subtracting top skip offset
+    let project_index = selection - 1;
+    let project = &projects[project_index];
     let sessions = discover_sessions(project)?;
 
     // Return all session paths from this project

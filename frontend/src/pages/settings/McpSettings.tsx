@@ -26,43 +26,72 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { JSONEditor } from '@/components/ui/json-editor';
 import { Loader2 } from 'lucide-react';
-import type { BaseCodingAgent, ExecutorConfig } from 'shared/types';
+import type { BaseCodingAgent } from 'shared/types';
 import { McpConfig } from 'shared/types';
 import { useUserSystem } from '@/components/ConfigProvider';
-import { mcpServersApi } from '@/lib/api';
+import { ApiError, mcpServersApi } from '@/lib/api';
 import { McpConfigStrategyGeneral } from '@/lib/mcpStrategies';
+
+const MCP_NOT_SUPPORTED_ERROR_CODE = 'MCP_NOT_SUPPORTED';
+
+interface McpUiError {
+  code: string | null;
+  message: string;
+}
 
 export function McpSettings() {
   const { t } = useTranslation('settings');
   const { config, profiles } = useUserSystem();
   const [mcpServers, setMcpServers] = useState('{}');
   const [mcpConfig, setMcpConfig] = useState<McpConfig | null>(null);
-  const [mcpError, setMcpError] = useState<string | null>(null);
+  const [mcpError, setMcpError] = useState<McpUiError | null>(null);
   const [mcpLoading, setMcpLoading] = useState(true);
-  const [selectedProfile, setSelectedProfile] = useState<ExecutorConfig | null>(
+  const [selectedProfileKey, setSelectedProfileKey] = useState<BaseCodingAgent | null>(
     null
   );
   const [mcpApplying, setMcpApplying] = useState(false);
   const [mcpConfigPath, setMcpConfigPath] = useState<string>('');
   const [success, setSuccess] = useState(false);
 
-  // Initialize selected profile when config loads
-  useEffect(() => {
-    if (config?.executor_profile && profiles && !selectedProfile) {
-      // Find the current profile
-      const currentProfile = profiles[config.executor_profile.executor];
-      if (currentProfile) {
-        setSelectedProfile(currentProfile);
-      } else if (Object.keys(profiles).length > 0) {
-        // Default to first profile if current profile not found
-        setSelectedProfile(Object.values(profiles)[0]);
+  const toMcpUiError = (err: unknown, fallbackMessage: string): McpUiError => {
+    if (err instanceof ApiError && err.error_data) {
+      const errorData = err.error_data as { code?: string; message?: string };
+      if (errorData.code || errorData.message) {
+        return {
+          code: errorData.code ?? null,
+          message: errorData.message ?? err.message,
+        };
       }
     }
-  }, [config?.executor_profile, profiles, selectedProfile]);
+
+    if (err instanceof Error) {
+      return { code: null, message: err.message };
+    }
+
+    return { code: null, message: fallbackMessage };
+  };
+
+  // Initialize selected profile when config loads
+  useEffect(() => {
+    if (!profiles || selectedProfileKey) {
+      return;
+    }
+
+    const currentExecutor = config?.executor_profile?.executor;
+    if (currentExecutor && profiles[currentExecutor]) {
+      setSelectedProfileKey(currentExecutor as BaseCodingAgent);
+      return;
+    }
+
+    const firstProfileKey = Object.keys(profiles)[0];
+    if (firstProfileKey) {
+      setSelectedProfileKey(firstProfileKey as BaseCodingAgent);
+    }
+  }, [config?.executor_profile, profiles, selectedProfileKey]);
 
   // Load existing MCP configuration when selected profile changes
   useEffect(() => {
-    const loadMcpServersForProfile = async (profile: ExecutorConfig) => {
+    const loadMcpServersForProfile = async (profileKey: BaseCodingAgent) => {
       // Reset state when loading
       setMcpLoading(true);
       setMcpError(null);
@@ -70,17 +99,8 @@ export function McpSettings() {
       setMcpConfigPath('');
 
       try {
-        // Load MCP servers for the selected profile/agent
-        // Find the key for this profile
-        const profileKey = profiles
-          ? Object.keys(profiles).find((key) => profiles[key] === profile)
-          : null;
-        if (!profileKey) {
-          throw new Error('Profile key not found');
-        }
-
         const result = await mcpServersApi.load({
-          executor: profileKey as BaseCodingAgent,
+          executor: profileKey,
         });
         // Store the McpConfig from backend
         setMcpConfig(result.mcp_config);
@@ -92,24 +112,20 @@ export function McpSettings() {
         setMcpServers(configJson);
         setMcpConfigPath(result.config_path);
       } catch (err: unknown) {
-        if (
-          err instanceof Error &&
-          err.message.includes('does not support MCP')
-        ) {
-          setMcpError(err.message);
-        } else {
-          console.error('Error loading MCP servers:', err);
-        }
+        setMcpError(
+          toMcpUiError(err, t('settings.mcp.errors.loadFailed'))
+        );
+        console.error('Error loading MCP servers:', err);
       } finally {
         setMcpLoading(false);
       }
     };
 
     // Load MCP servers for the selected profile
-    if (selectedProfile) {
-      loadMcpServersForProfile(selectedProfile);
+    if (selectedProfileKey) {
+      loadMcpServersForProfile(selectedProfileKey);
     }
-  }, [selectedProfile, profiles]);
+  }, [selectedProfileKey, t]);
 
   const handleMcpServersChange = (value: string) => {
     setMcpServers(value);
@@ -123,20 +139,25 @@ export function McpSettings() {
         McpConfigStrategyGeneral.validateFullConfig(mcpConfig, parsedConfig);
       } catch (err) {
         if (err instanceof SyntaxError) {
-          setMcpError(t('settings.mcp.errors.invalidJson'));
+          setMcpError({
+            code: null,
+            message: t('settings.mcp.errors.invalidJson'),
+          });
         } else {
-          setMcpError(
-            err instanceof Error
-              ? err.message
-              : t('settings.mcp.errors.validationError')
-          );
+          setMcpError({
+            code: null,
+            message:
+              err instanceof Error
+                ? err.message
+                : t('settings.mcp.errors.validationError'),
+          });
         }
       }
     }
   };
 
   const handleApplyMcpServers = async () => {
-    if (!selectedProfile || !mcpConfig) return;
+    if (!selectedProfileKey || !mcpConfig) return;
 
     setMcpApplying(true);
     setMcpError(null);
@@ -153,19 +174,9 @@ export function McpSettings() {
               fullConfig
             );
 
-          // Find the key for the selected profile
-          const selectedProfileKey = profiles
-            ? Object.keys(profiles).find(
-                (key) => profiles[key] === selectedProfile
-              )
-            : null;
-          if (!selectedProfileKey) {
-            throw new Error('Selected profile key not found');
-          }
-
           await mcpServersApi.save(
             {
-              executor: selectedProfileKey as BaseCodingAgent,
+              executor: selectedProfileKey,
             },
             { servers: mcpServersConfig }
           );
@@ -175,18 +186,22 @@ export function McpSettings() {
           setTimeout(() => setSuccess(false), 3000);
         } catch (mcpErr) {
           if (mcpErr instanceof SyntaxError) {
-            setMcpError(t('settings.mcp.errors.invalidJson'));
+            setMcpError({
+              code: null,
+              message: t('settings.mcp.errors.invalidJson'),
+            });
           } else {
             setMcpError(
-              mcpErr instanceof Error
-                ? mcpErr.message
-                : t('settings.mcp.errors.saveFailed')
+              toMcpUiError(mcpErr, t('settings.mcp.errors.saveFailed'))
             );
           }
         }
       }
     } catch (err) {
-      setMcpError(t('settings.mcp.errors.applyFailed'));
+      setMcpError({
+        code: null,
+        message: t('settings.mcp.errors.applyFailed'),
+      });
       console.error('Error applying MCP servers:', err);
     } finally {
       setMcpApplying(false);
@@ -205,13 +220,17 @@ export function McpSettings() {
       setMcpError(null);
     } catch (err) {
       console.error(err);
-      setMcpError(
-        err instanceof Error
-          ? err.message
-          : t('settings.mcp.errors.addServerFailed')
-      );
+      setMcpError({
+        code: null,
+        message:
+          err instanceof Error
+            ? err.message
+            : t('settings.mcp.errors.addServerFailed'),
+      });
     }
   };
+
+  const isMcpUnsupported = mcpError?.code === MCP_NOT_SUPPORTED_ERROR_CODE;
 
   const preconfiguredObj = (mcpConfig?.preconfigured ?? {}) as Record<
     string,
@@ -246,7 +265,7 @@ export function McpSettings() {
       {mcpError && (
         <Alert variant="destructive">
           <AlertDescription>
-            {t('settings.mcp.errors.mcpError', { error: mcpError })}
+            {t('settings.mcp.errors.mcpError', { error: mcpError.message })}
           </AlertDescription>
         </Alert>
       )}
@@ -270,16 +289,10 @@ export function McpSettings() {
               {t('settings.mcp.labels.agent')}
             </Label>
             <Select
-              value={
-                selectedProfile
-                  ? Object.keys(profiles || {}).find(
-                      (key) => profiles![key] === selectedProfile
-                    ) || ''
-                  : ''
-              }
+              value={selectedProfileKey ?? ''}
               onValueChange={(value: string) => {
-                const profile = profiles?.[value];
-                if (profile) setSelectedProfile(profile);
+                if (!profiles?.[value]) return;
+                setSelectedProfileKey(value as BaseCodingAgent);
               }}
             >
               <SelectTrigger id="mcp-executor">
@@ -303,7 +316,7 @@ export function McpSettings() {
             </p>
           </div>
 
-          {mcpError && mcpError.includes('does not support MCP') ? (
+          {isMcpUnsupported ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
               <div className="flex">
                 <div className="ml-3">
@@ -311,7 +324,7 @@ export function McpSettings() {
                     {t('settings.mcp.errors.notSupported')}
                   </h3>
                   <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-                    <p>{mcpError}</p>
+                    <p>{mcpError?.message}</p>
                     <p className="mt-1">
                       {t('settings.mcp.errors.supportMessage')}
                     </p>
@@ -338,9 +351,9 @@ export function McpSettings() {
                 disabled={mcpLoading}
                 minHeight={300}
               />
-              {mcpError && !mcpError.includes('does not support MCP') && (
+              {mcpError && !isMcpUnsupported && (
                 <p className="text-sm text-destructive dark:text-red-400">
-                  {mcpError}
+                  {mcpError.message}
                 </p>
               )}
               <div className="text-sm text-muted-foreground">

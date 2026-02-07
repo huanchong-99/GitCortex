@@ -6,9 +6,11 @@
 //! - Retain bounded replay history to prevent "first-screen prompt loss".
 //! - Provide monotonic sequence numbers for dedupe and resume.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+    time::SystemTime,
+};
 
 use tokio::sync::broadcast;
 
@@ -159,7 +161,11 @@ impl OutputFanout {
             last_seq = last.seq;
         }
 
-        OutputSubscription { replay, rx, last_seq }
+        OutputSubscription {
+            replay,
+            rx,
+            last_seq,
+        }
     }
 }
 
@@ -192,8 +198,9 @@ impl OutputSubscription {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio::time::{Duration, timeout};
+
+    use super::*;
 
     #[test]
     fn test_publish_seq_increments() {
@@ -218,8 +225,14 @@ mod tests {
         fanout.publish("second".to_string(), 0);
 
         let mut sub = fanout.subscribe(None);
-        let first = timeout(Duration::from_secs(1), sub.recv()).await.unwrap().unwrap();
-        let second = timeout(Duration::from_secs(1), sub.recv()).await.unwrap().unwrap();
+        let first = timeout(Duration::from_secs(1), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let second = timeout(Duration::from_secs(1), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(first.text, "first");
         assert_eq!(second.text, "second");
         assert_eq!(second.seq, 2);
@@ -234,7 +247,10 @@ mod tests {
         let mut sub = fanout.subscribe(Some(2));
         fanout.publish("new-3".to_string(), 0);
 
-        let chunk = timeout(Duration::from_secs(1), sub.recv()).await.unwrap().unwrap();
+        let chunk = timeout(Duration::from_secs(1), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(chunk.seq, 3);
         assert_eq!(chunk.text, "new-3");
     }
@@ -252,8 +268,14 @@ mod tests {
         fanout.publish("3".to_string(), 0);
 
         let mut sub = fanout.subscribe(None);
-        let c1 = timeout(Duration::from_secs(1), sub.recv()).await.unwrap().unwrap();
-        let c2 = timeout(Duration::from_secs(1), sub.recv()).await.unwrap().unwrap();
+        let c1 = timeout(Duration::from_secs(1), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let c2 = timeout(Duration::from_secs(1), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
         // First chunk should be evicted, only last 2 retained
         assert_eq!(c1.text, "2");
         assert_eq!(c2.text, "3");
@@ -268,8 +290,14 @@ mod tests {
 
         fanout.publish("broadcast".to_string(), 0);
 
-        let chunk1 = timeout(Duration::from_secs(1), sub1.recv()).await.unwrap().unwrap();
-        let chunk2 = timeout(Duration::from_secs(1), sub2.recv()).await.unwrap().unwrap();
+        let chunk1 = timeout(Duration::from_secs(1), sub1.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let chunk2 = timeout(Duration::from_secs(1), sub2.recv())
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(chunk1.text, "broadcast");
         assert_eq!(chunk2.text, "broadcast");
@@ -296,7 +324,10 @@ mod tests {
         assert_eq!(chunk.dropped_invalid_bytes, 5);
 
         let mut sub = fanout.subscribe(None);
-        let received = timeout(Duration::from_secs(1), sub.recv()).await.unwrap().unwrap();
+        let received = timeout(Duration::from_secs(1), sub.recv())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(received.dropped_invalid_bytes, 5);
     }
 }

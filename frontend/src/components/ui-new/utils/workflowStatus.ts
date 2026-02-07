@@ -56,6 +56,12 @@ const WORKFLOW_STATUS_CONFIG: Record<string, StatusConfig> = {
     tone: 'brand',
     icon: Play,
   },
+  merging: {
+    key: 'workflow:status.merging',
+    tone: 'brand',
+    icon: Loader2,
+    spin: true,
+  },
   paused: {
     key: 'workflow:status.paused',
     tone: 'warning',

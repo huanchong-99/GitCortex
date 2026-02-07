@@ -3,23 +3,31 @@
 //! Monitors PTY output streams and detects interactive prompts.
 //! Publishes `TerminalPromptDetected` events to MessageBus for Orchestrator processing.
 
-use std::collections::HashMap;
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
 };
-use std::time::Duration;
 
-use tokio::sync::{RwLock, broadcast::error::RecvError, oneshot};
-use tokio::task::JoinHandle;
-use tokio::time::Instant;
-
-use crate::services::orchestrator::message_bus::SharedMessageBus;
-use crate::services::terminal::process::ProcessManager;
-use crate::services::orchestrator::types::{
-    PromptState, TerminalPromptEvent, TerminalPromptStateMachine,
+use tokio::{
+    sync::{RwLock, broadcast::error::RecvError, oneshot},
+    task::JoinHandle,
+    time::Instant,
 };
-use crate::services::terminal::prompt_detector::{DetectedPrompt, PromptDetector};
+
+use crate::services::{
+    orchestrator::{
+        message_bus::SharedMessageBus,
+        types::{PromptState, TerminalPromptEvent, TerminalPromptStateMachine},
+    },
+    terminal::{
+        process::ProcessManager,
+        prompt_detector::{DetectedPrompt, PromptDetector},
+    },
+};
 
 // ============================================================================
 // Constants
@@ -49,6 +57,8 @@ struct TerminalWatchState {
     task_id: String,
     /// PTY session ID
     session_id: String,
+    /// Whether auto-confirm is enabled for this terminal
+    auto_confirm: bool,
     /// Prompt detector instance
     detector: PromptDetector,
     /// Prompt state machine
@@ -58,12 +68,19 @@ struct TerminalWatchState {
 }
 
 impl TerminalWatchState {
-    fn new(terminal_id: String, workflow_id: String, task_id: String, session_id: String) -> Self {
+    fn new(
+        terminal_id: String,
+        workflow_id: String,
+        task_id: String,
+        session_id: String,
+        auto_confirm: bool,
+    ) -> Self {
         Self {
             terminal_id,
             workflow_id,
             task_id,
             session_id,
+            auto_confirm,
             detector: PromptDetector::new(),
             state_machine: TerminalPromptStateMachine::new(),
             last_detection: None,
@@ -159,24 +176,41 @@ impl PromptWatcher {
         workflow_id: &str,
         task_id: &str,
         session_id: &str,
+        auto_confirm: bool,
     ) -> anyhow::Result<()> {
+        if !auto_confirm {
+            self.unregister(terminal_id).await;
+            tracing::debug!(
+                terminal_id = %terminal_id,
+                workflow_id = %workflow_id,
+                "Skipped prompt watcher registration because auto_confirm is disabled"
+            );
+            return Ok(());
+        }
+
         let state = TerminalWatchState::new(
             terminal_id.to_string(),
             workflow_id.to_string(),
             task_id.to_string(),
             session_id.to_string(),
+            auto_confirm,
         );
 
         {
             let mut terminals = self.terminals.write().await;
             terminals.insert(terminal_id.to_string(), state);
         }
-        self.spawn_output_subscription_task(terminal_id).await?;
+        if let Err(e) = self.spawn_output_subscription_task(terminal_id).await {
+            let mut terminals = self.terminals.write().await;
+            terminals.remove(terminal_id);
+            return Err(e);
+        }
 
         tracing::debug!(
             terminal_id = %terminal_id,
             workflow_id = %workflow_id,
             session_id = %session_id,
+            auto_confirm,
             "Registered terminal for prompt watching"
         );
         Ok(())
@@ -231,7 +265,9 @@ impl PromptWatcher {
                     subscription
                 }
                 Err(e) => {
-                    let _ = ready_tx.send(Err(anyhow::anyhow!("PromptWatcher subscription failed: {e}")));
+                    let _ = ready_tx.send(Err(anyhow::anyhow!(
+                        "PromptWatcher subscription failed: {e}"
+                    )));
                     tracing::warn!(
                         terminal_id = %terminal_id_for_task,
                         error = %e,
@@ -251,7 +287,9 @@ impl PromptWatcher {
                 match subscription.recv().await {
                     Ok(chunk) => {
                         if !chunk.text.is_empty() {
-                            watcher.process_output(&terminal_id_for_task, &chunk.text).await;
+                            watcher
+                                .process_output(&terminal_id_for_task, &chunk.text)
+                                .await;
                         }
                         if chunk.dropped_invalid_bytes > 0 {
                             tracing::warn!(
@@ -275,15 +313,22 @@ impl PromptWatcher {
                 }
             }
 
-            Self::remove_subscription_if_current(&active_subscriptions, &terminal_id_for_task, task_id)
-                .await;
+            Self::remove_subscription_if_current(
+                &active_subscriptions,
+                &terminal_id_for_task,
+                task_id,
+            )
+            .await;
         });
 
         let replaced = {
             let mut active_subscriptions = self.active_subscriptions.write().await;
             active_subscriptions.insert(
                 terminal_id.to_string(),
-                WatchTaskHandle { task_id, task_handle },
+                WatchTaskHandle {
+                    task_id,
+                    task_handle,
+                },
             )
         };
         if let Some(previous) = replaced {
@@ -347,6 +392,7 @@ impl PromptWatcher {
                     workflow_id: state.workflow_id.clone(),
                     task_id: state.task_id.clone(),
                     session_id: state.session_id.clone(),
+                    auto_confirm: state.auto_confirm,
                     prompt: prompt.clone(),
                     detected_at: chrono::Utc::now(),
                 };
@@ -361,7 +407,9 @@ impl PromptWatcher {
 
                 // Publish event (drop lock first to avoid deadlock)
                 drop(terminals);
-                self.message_bus.publish_terminal_prompt_detected(event).await;
+                self.message_bus
+                    .publish_terminal_prompt_detected(event)
+                    .await;
                 return;
             }
         }
@@ -438,14 +486,31 @@ mod tests {
         // Registration will fail because no terminal exists in ProcessManager
         // This is expected in unit tests - we're testing state management, not integration
         let result = watcher
-            .register("term-1", "workflow-1", "task-1", "session-1")
+            .register("term-1", "workflow-1", "task-1", "session-1", true)
             .await;
 
         // Registration should fail with terminal not found
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Terminal not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Terminal not found")
+        );
 
         // Terminal should not be registered since subscription failed
+        assert!(!watcher.is_registered("term-1").await);
+    }
+
+    #[tokio::test]
+    async fn test_register_skips_when_auto_confirm_disabled() {
+        let watcher = create_test_watcher();
+
+        let result = watcher
+            .register("term-1", "workflow-1", "task-1", "session-1", false)
+            .await;
+
+        assert!(result.is_ok());
         assert!(!watcher.is_registered("term-1").await);
     }
 

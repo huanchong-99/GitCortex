@@ -13,8 +13,8 @@ fn escape_pointer_segment(s: &str) -> String {
 /// Helper functions for creating task-specific patches
 pub mod task_patch {
     use super::{
-        AddOperation, Patch, PatchOperation, RemoveOperation, ReplaceOperation, TaskWithAttemptStatus,
-        Uuid, escape_pointer_segment,
+        AddOperation, Patch, PatchOperation, RemoveOperation, ReplaceOperation,
+        TaskWithAttemptStatus, Uuid, escape_pointer_segment,
     };
 
     fn task_path(task_id: Uuid) -> String {
@@ -187,9 +187,7 @@ pub mod workspace_patch {
 /// Helper functions for creating scratch-specific patches.
 /// All patches use path "/scratch" - filtering is done by matching id and payload type in the value.
 pub mod scratch_patch {
-    use super::{
-        AddOperation, Patch, PatchOperation, ReplaceOperation, Scratch, Uuid,
-    };
+    use super::{AddOperation, Patch, PatchOperation, ReplaceOperation, Scratch, Uuid};
 
     const SCRATCH_PATH: &str = "/scratch";
 

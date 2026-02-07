@@ -324,20 +324,19 @@ impl Workspace {
     pub async fn find_expired_for_cleanup(
         pool: &SqlitePool,
     ) -> Result<Vec<Workspace>, sqlx::Error> {
-        sqlx::query_as!(
-            Workspace,
+        sqlx::query(
             r#"
             SELECT
-                w.id as "id!: Uuid",
-                w.task_id as "task_id!: Uuid",
+                w.id,
+                w.task_id,
                 w.container_ref,
-                w.branch as "branch!",
+                w.branch,
                 w.agent_working_dir,
-                w.setup_completed_at as "setup_completed_at: DateTime<Utc>",
-                w.created_at as "created_at!: DateTime<Utc>",
-                w.updated_at as "updated_at!: DateTime<Utc>",
-                w.archived as "archived!: bool",
-                w.pinned as "pinned!: bool",
+                w.setup_completed_at,
+                w.created_at,
+                w.updated_at,
+                w.archived,
+                w.pinned,
                 w.name
             FROM workspaces w
             JOIN tasks t ON w.task_id = t.id
@@ -359,9 +358,9 @@ impl Workspace {
                 END
             ) > datetime(
                 MAX(
-                    max(
-                        datetime(w.updated_at),
-                        datetime(ep.completed_at)
+                    COALESCE(
+                        datetime(ep.completed_at),
+                        datetime(w.updated_at)
                     )
                 )
             )
@@ -371,8 +370,26 @@ impl Workspace {
                     ELSE w.updated_at
                 END
             ) ASC
-            "#
+            "#,
         )
+        .try_map(|row: sqlx::sqlite::SqliteRow| {
+            use sqlx::Row;
+
+            let branch: String = row.try_get("branch")?;
+            Ok(Workspace {
+                id: row.try_get("id")?,
+                task_id: row.try_get("task_id")?,
+                container_ref: row.try_get("container_ref")?,
+                branch,
+                agent_working_dir: row.try_get("agent_working_dir")?,
+                setup_completed_at: row.try_get("setup_completed_at")?,
+                created_at: row.try_get("created_at")?,
+                updated_at: row.try_get("updated_at")?,
+                archived: row.try_get("archived")?,
+                pinned: row.try_get("pinned")?,
+                name: row.try_get("name")?,
+            })
+        })
         .fetch_all(pool)
         .await
     }

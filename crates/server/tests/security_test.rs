@@ -13,10 +13,11 @@
 //! IMPORTANT: The test process sets GITCORTEX_ENCRYPTION_KEY for its own direct DB access,
 //! but the server process must have been started with the SAME key for proper encryption verification.
 
+use std::time::Duration;
+
 use db::DBService;
 use reqwest::Client;
-use serde_json::{json, Value};
-use std::time::Duration;
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 const SERVER_URL: &str = "http://localhost:3001";
@@ -40,8 +41,7 @@ fn test_project_id() -> String {
 
 /// Get test API key from environment or use fallback
 fn get_test_api_key() -> String {
-    std::env::var("TEST_ORCHESTRATOR_API_KEY")
-        .unwrap_or_else(|_| "sk-test-key-12345".to_string())
+    std::env::var("TEST_ORCHESTRATOR_API_KEY").unwrap_or_else(|_| "sk-test-key-12345".to_string())
 }
 
 /// Set encryption key for tests
@@ -138,7 +138,11 @@ fn extract_workflow_id(response: &Value) -> Option<String> {
     response
         .pointer("/data/id")
         .and_then(|v| v.as_str())
-        .or_else(|| response.pointer("/data/workflow/id").and_then(|v| v.as_str()))
+        .or_else(|| {
+            response
+                .pointer("/data/workflow/id")
+                .and_then(|v| v.as_str())
+        })
         .or_else(|| response.pointer("/workflow/id").and_then(|v| v.as_str()))
         .map(|id| id.to_string())
 }
@@ -195,7 +199,11 @@ async fn test_api_key_not_exposed_in_api_response() {
 
     let status = response.status();
     let response_text = response.text().await.expect("Failed to read response");
-    assert_eq!(status, 200, "Workflow creation failed with status: {}", status);
+    assert_eq!(
+        status, 200,
+        "Workflow creation failed with status: {}",
+        status
+    );
 
     // Check that API key is not exposed in response
     assert!(
@@ -212,10 +220,10 @@ async fn test_api_key_not_exposed_in_api_response() {
     );
 
     // Parse response and extract workflow ID
-    let response_json: Value = serde_json::from_str(&response_text)
-        .expect("Failed to parse workflow response JSON");
-    let workflow_id = extract_workflow_id(&response_json)
-        .expect("Workflow ID not found in response");
+    let response_json: Value =
+        serde_json::from_str(&response_text).expect("Failed to parse workflow response JSON");
+    let workflow_id =
+        extract_workflow_id(&response_json).expect("Workflow ID not found in response");
 
     // Verify GET request also doesn't expose the key
     let get_response = client
@@ -224,7 +232,10 @@ async fn test_api_key_not_exposed_in_api_response() {
         .await
         .expect("Failed to get workflow");
 
-    let get_text = get_response.text().await.expect("Failed to read get response");
+    let get_text = get_response
+        .text()
+        .await
+        .expect("Failed to read get response");
     assert!(
         !get_text.contains("orchestratorApiKey"),
         "GET response exposed orchestratorApiKey"
@@ -297,18 +308,20 @@ async fn test_api_key_encrypted_in_database() {
 
     let status = response.status();
     let response_text = response.text().await.expect("Failed to read response");
-    assert_eq!(status, 200, "Workflow creation failed with status: {}", status);
+    assert_eq!(
+        status, 200,
+        "Workflow creation failed with status: {}",
+        status
+    );
 
     // Parse response and extract workflow ID
-    let response_json: Value = serde_json::from_str(&response_text)
-        .expect("Failed to parse workflow response JSON");
-    let workflow_id = extract_workflow_id(&response_json)
-        .expect("Workflow ID not found in response");
+    let response_json: Value =
+        serde_json::from_str(&response_text).expect("Failed to parse workflow response JSON");
+    let workflow_id =
+        extract_workflow_id(&response_json).expect("Workflow ID not found in response");
 
     // Query database directly to verify encryption
-    let db = DBService::new()
-        .await
-        .expect("Failed to open database");
+    let db = DBService::new().await.expect("Failed to open database");
 
     let workflow = db::models::Workflow::find_by_id(&db.pool, &workflow_id)
         .await
@@ -391,7 +404,11 @@ async fn test_terminal_api_key_encrypted_in_database() {
 
     let status = response.status();
     let response_text = response.text().await.expect("Failed to read response");
-    assert_eq!(status, 200, "Workflow creation failed with status: {}", status);
+    assert_eq!(
+        status, 200,
+        "Workflow creation failed with status: {}",
+        status
+    );
 
     // Check that terminal API key is not exposed in response
     assert!(
@@ -408,15 +425,13 @@ async fn test_terminal_api_key_encrypted_in_database() {
     );
 
     // Parse response and extract workflow ID
-    let response_json: Value = serde_json::from_str(&response_text)
-        .expect("Failed to parse workflow response JSON");
-    let workflow_id = extract_workflow_id(&response_json)
-        .expect("Workflow ID not found in response");
+    let response_json: Value =
+        serde_json::from_str(&response_text).expect("Failed to parse workflow response JSON");
+    let workflow_id =
+        extract_workflow_id(&response_json).expect("Workflow ID not found in response");
 
     // Query database directly to verify encryption
-    let db = DBService::new()
-        .await
-        .expect("Failed to open database");
+    let db = DBService::new().await.expect("Failed to open database");
 
     // Get the first terminal from the first task
     let tasks = db::models::WorkflowTask::find_by_workflow(&db.pool, &workflow_id)
@@ -434,7 +449,9 @@ async fn test_terminal_api_key_encrypted_in_database() {
     let terminal = &terminals[0];
 
     // Verify the encrypted value is stored
-    let encrypted = terminal.custom_api_key.as_ref()
+    let encrypted = terminal
+        .custom_api_key
+        .as_ref()
         .expect("Encrypted terminal API key not stored");
 
     assert_ne!(
@@ -460,7 +477,10 @@ async fn test_terminal_api_key_encrypted_in_database() {
         .await
         .expect("Failed to get workflow");
 
-    let get_text = get_response.text().await.expect("Failed to read get response");
+    let get_text = get_response
+        .text()
+        .await
+        .expect("Failed to read get response");
     assert!(
         !get_text.contains(terminal_api_key),
         "GET response exposed plaintext terminal API key"
@@ -522,8 +542,8 @@ async fn test_terminal_api_key_not_exposed_in_dto() {
     assert_eq!(status, 200, "Workflow creation failed: {}", response_text);
 
     // Parse response
-    let response_json: Value = serde_json::from_str(&response_text)
-        .expect("Failed to parse workflow response JSON");
+    let response_json: Value =
+        serde_json::from_str(&response_text).expect("Failed to parse workflow response JSON");
 
     // Check that terminals array exists and doesn't expose API keys
     if let Some(tasks) = response_json.pointer("/data/tasks") {
@@ -532,7 +552,11 @@ async fn test_terminal_api_key_not_exposed_in_dto() {
                 // Verify customApiKey is null or not present
                 let api_key = terminal.pointer("/customApiKey");
                 assert!(
-                    api_key.is_none() || api_key.and_then(|v| v.as_str()).map(|s| s.is_empty()).unwrap_or(false),
+                    api_key.is_none()
+                        || api_key
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.is_empty())
+                            .unwrap_or(false),
                     "Terminal DTO exposed customApiKey: {:?}",
                     api_key
                 );

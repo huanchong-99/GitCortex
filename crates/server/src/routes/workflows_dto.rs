@@ -72,6 +72,7 @@ pub struct TerminalDto {
     pub cli_type_id: String,
     pub model_config_id: String,
     pub custom_base_url: Option<String>,
+    #[ts(optional)]
     #[serde(skip_serializing)]
     pub custom_api_key: Option<String>,
     pub role: Option<String>,

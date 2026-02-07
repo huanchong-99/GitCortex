@@ -253,19 +253,20 @@ export function wizardConfigToCreateRequest(
       customApiKey: null,
     },
     targetBranch: config.advanced.targetBranch,
-    tasks: config.tasks
-      .sort((a, b) => parseInt(a.id.split('-')[1]) - parseInt(b.id.split('-')[1]))
-      .map((task, taskIndex) => {
+    tasks: config.tasks.map((task, taskIndex) => {
         // Find terminals for this task
         const taskTerminals = config.terminals
           .filter(t => t.taskId === task.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);
 
-        if (taskTerminals.length === 0) {
-          throw new Error(`Task "${task.name}" has no terminals assigned`);
+        if (taskTerminals.length !== task.terminalCount) {
+          throw new Error(
+            `Task "${task.name}" terminals mismatch: expected ${task.terminalCount}, got ${taskTerminals.length}`
+          );
         }
 
         return {
+          id: task.id,
           name: task.name,
           description: task.description,
           branch: task.branch,
@@ -277,6 +278,7 @@ export function wizardConfigToCreateRequest(
             }
 
             return {
+              id: terminal.id,
               cliTypeId: terminal.cliTypeId,
               modelConfigId: terminal.modelConfigId,
               modelConfig: {

@@ -200,7 +200,7 @@ export function SessionChatBoxContainer({
   // Fetch processes from last session to get full profile (only in new session mode)
   const lastSessionId = isNewSessionMode ? sessions?.[0]?.id : undefined;
   const { executionProcesses: lastSessionProcesses } =
-    useExecutionProcesses(lastSessionId);
+    useExecutionProcesses(lastSessionId, workspaceId);
 
   // Compute latestProfileId: current processes > last session processes > session metadata
   const latestProfileId = useMemo(() => {

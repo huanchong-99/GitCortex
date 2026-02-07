@@ -1,3 +1,8 @@
+#[cfg(windows)]
+use std::num::NonZeroIsize;
+#[cfg(windows)]
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
 use axum::{
     Router,
     extract::{Query, State},
@@ -5,20 +10,15 @@ use axum::{
     routing::{get, post},
 };
 use deployment::Deployment;
-use serde::{Deserialize, Serialize};
-use services::services::filesystem::{DirectoryEntry, DirectoryListResponse, FilesystemError};
-use ts_rs::TS;
-use utils::response::ApiResponse;
-
 #[cfg(windows)]
 use raw_window_handle::{
     DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawDisplayHandle,
     RawWindowHandle, Win32WindowHandle, WindowHandle, WindowsDisplayHandle,
 };
-#[cfg(windows)]
-use std::num::NonZeroIsize;
-#[cfg(windows)]
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use serde::{Deserialize, Serialize};
+use services::services::filesystem::{DirectoryEntry, DirectoryListResponse, FilesystemError};
+use ts_rs::TS;
+use utils::response::ApiResponse;
 #[cfg(windows)]
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 #[cfg(windows)]
@@ -99,14 +99,15 @@ pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerRespon
         // Wrap entire dialog creation and invocation in catch_unwind
         // to handle panics from rfd (e.g., GUI unavailable in headless/remote sessions)
         catch_unwind(AssertUnwindSafe(|| {
-            let mut dialog = rfd::FileDialog::new()
-                .set_title("Select Project Directory");
+            let mut dialog = rfd::FileDialog::new().set_title("Select Project Directory");
 
             // Bind to foreground window to ensure dialog appears in front
             if let Some(parent) = parent_hwnd {
                 dialog = dialog.set_parent(&parent);
             } else {
-                tracing::warn!("No foreground window found; folder picker may open behind other windows");
+                tracing::warn!(
+                    "No foreground window found; folder picker may open behind other windows"
+                );
             }
 
             dialog.pick_folder()
@@ -128,7 +129,9 @@ pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerRespon
             cancelled: true,
         }))),
         Err(_) => {
-            tracing::error!("Folder picker panicked - GUI may be unavailable (headless/remote session)");
+            tracing::error!(
+                "Folder picker panicked - GUI may be unavailable (headless/remote session)"
+            );
             Ok(ResponseJson(ApiResponse::error(
                 "Folder picker failed to open. This may happen in headless or remote desktop sessions. Please enter the path manually.",
             )))
@@ -139,14 +142,20 @@ pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerRespon
 /// Stub for non-Windows platforms - folder picker is not supported.
 #[cfg(not(windows))]
 pub async fn pick_folder() -> Result<ResponseJson<ApiResponse<FolderPickerResponse>>, ApiError> {
-    Err(ApiError::Internal("Folder picker is only supported on Windows".to_string()))
+    Err(ApiError::Internal(
+        "Folder picker is only supported on Windows".to_string(),
+    ))
 }
 
 pub async fn list_directory(
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<ListDirectoryQuery>,
 ) -> Result<ResponseJson<ApiResponse<DirectoryListResponse>>, ApiError> {
-    match deployment.filesystem().list_directory_async(query.path).await {
+    match deployment
+        .filesystem()
+        .list_directory_async(query.path)
+        .await
+    {
         Ok(response) => Ok(ResponseJson(ApiResponse::success(response))),
         Err(FilesystemError::DirectoryDoesNotExist) => {
             Ok(ResponseJson(ApiResponse::error("Directory does not exist")))

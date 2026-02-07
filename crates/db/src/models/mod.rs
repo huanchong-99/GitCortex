@@ -16,9 +16,9 @@ pub mod workspace_repo;
 
 // GitCortex Workflow models
 pub mod cli_type;
-pub mod workflow;
 pub mod terminal;
+pub mod workflow;
 
 pub use cli_type::*;
-pub use workflow::*;
 pub use terminal::*;
+pub use workflow::*;

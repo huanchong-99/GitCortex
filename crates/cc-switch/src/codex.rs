@@ -6,9 +6,12 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::error::{CCSwitchError, Result};
-use crate::config_path::{get_codex_auth_path, get_codex_config_path, ensure_parent_dir_exists};
-use crate::atomic_write::{atomic_write_json, atomic_write_text};
+
+use crate::{
+    atomic_write::{atomic_write_json, atomic_write_text},
+    config_path::{ensure_parent_dir_exists, get_codex_auth_path, get_codex_config_path},
+    error::{CCSwitchError, Result},
+};
 
 /// Codex 认证配置 (auth.json)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -76,17 +79,14 @@ pub async fn read_codex_config() -> Result<CodexModelConfig> {
 pub async fn write_codex_config(config: &CodexModelConfig) -> Result<()> {
     let path = get_codex_config_path()?;
     ensure_parent_dir_exists(&path).await?;
-    let toml_str = toml::to_string_pretty(config)
-        .map_err(|e| CCSwitchError::InvalidConfig { message: e.to_string() })?;
+    let toml_str = toml::to_string_pretty(config).map_err(|e| CCSwitchError::InvalidConfig {
+        message: e.to_string(),
+    })?;
     atomic_write_text(&path, &toml_str).await
 }
 
 /// 更新 Codex 模型配置
-pub async fn update_codex_model(
-    base_url: Option<&str>,
-    api_key: &str,
-    model: &str,
-) -> Result<()> {
+pub async fn update_codex_model(base_url: Option<&str>, api_key: &str, model: &str) -> Result<()> {
     // 更新 auth.json
     let mut auth = read_codex_auth().await?;
     auth.openai_api_key = Some(api_key.to_string());

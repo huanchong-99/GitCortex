@@ -238,13 +238,8 @@ impl FilesystemService {
                 return Err(FilesystemError::PathOutsideAllowedRoots);
             }
 
-            self.list_git_repos_with_timeout(
-                resolved_paths,
-                timeout_ms,
-                hard_timeout_ms,
-                max_depth,
-            )
-            .await
+            self.list_git_repos_with_timeout(resolved_paths, timeout_ms, hard_timeout_ms, max_depth)
+                .await
         }
     }
 

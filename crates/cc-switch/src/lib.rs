@@ -29,19 +29,19 @@
 //! switch_model(CliType::ClaudeCode, "sonnet", &config).await?;
 //! ```
 
-pub mod error;
-pub mod config_path;
 pub mod atomic_write;
 pub mod claude;
 pub mod codex;
+pub mod config_path;
+pub mod error;
 pub mod gemini;
 pub mod switcher;
 
-pub use error::{CCSwitchError, Result};
-pub use config_path::*;
 pub use atomic_write::*;
 pub use claude::*;
 pub use codex::*;
+pub use config_path::*;
+pub use error::{CCSwitchError, Result};
 pub use gemini::*;
 pub use switcher::*;
 

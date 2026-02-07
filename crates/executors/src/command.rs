@@ -119,6 +119,9 @@ impl CommandBuilder {
 
     fn build(&self, additional_args: &[String]) -> Result<CommandParts, CommandBuildError> {
         let mut parts = split_command_line(&self.simple_join(additional_args))?;
+        if parts.is_empty() {
+            return Err(CommandBuildError::EmptyCommand);
+        }
 
         let program = parts.remove(0);
         Ok(CommandParts::new(program, parts))
@@ -147,7 +150,33 @@ fn split_command_line(input: &str) -> Result<Vec<String>, CommandBuildError> {
 
     #[cfg(not(windows))]
     {
-        shlex::split(input).ok_or_else(|| CommandBuildError::InvalidBase(input.to_string()))
+        let parts =
+            shlex::split(input).ok_or_else(|| CommandBuildError::InvalidBase(input.to_string()))?;
+        if parts.is_empty() {
+            Err(CommandBuildError::EmptyCommand)
+        } else {
+            Ok(parts)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_base_returns_empty_command_error() {
+        let builder = CommandBuilder::new("");
+        let err = builder
+            .build_initial()
+            .expect_err("empty base should not build command");
+        assert!(matches!(err, CommandBuildError::EmptyCommand));
+    }
+
+    #[test]
+    fn split_empty_input_returns_empty_command_error() {
+        let err = split_command_line("").expect_err("empty command line should fail");
+        assert!(matches!(err, CommandBuildError::EmptyCommand));
     }
 }
 

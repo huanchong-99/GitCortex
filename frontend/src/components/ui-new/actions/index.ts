@@ -650,6 +650,7 @@ export const Actions = {
         const response = await attemptsApi.openEditor(ctx.currentWorkspaceId, {
           editor_type: null,
           file_path: null,
+          git_repo_path: undefined,
         });
         if (response.url) {
           window.open(response.url, '_blank');

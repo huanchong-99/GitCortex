@@ -4,16 +4,16 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     response::Json as ResponseJson,
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
 };
+use chrono::Utc;
 use db::models::SlashCommandPreset;
+use deployment::Deployment;
 use serde::Deserialize;
 use utils::response::ApiResponse;
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::{DeploymentImpl, error::ApiError};
-use deployment::Deployment;
 
 // ============================================================================
 // Request/Response Types
@@ -51,7 +51,9 @@ pub async fn list_command_presets(
 ) -> Result<ResponseJson<ApiResponse<Vec<SlashCommandPreset>>>, ApiError> {
     let presets = SlashCommandPreset::find_all(&deployment.db().pool)
         .await
-        .map_err(|e| ApiError::Internal(format!("Failed to fetch command presets: {}", e).into()))?;
+        .map_err(|e| {
+            ApiError::Internal(format!("Failed to fetch command presets: {}", e).into())
+        })?;
 
     Ok(Json(ApiResponse::success(presets)))
 }
@@ -63,14 +65,15 @@ pub async fn get_command_preset(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<SlashCommandPreset>>, ApiError> {
-    let preset = sqlx::query_as::<_, SlashCommandPreset>(
-        "SELECT * FROM slash_command_preset WHERE id = ?"
-    )
-    .bind(&id)
-    .fetch_optional(&deployment.db().pool)
-    .await
-    .map_err(|e| ApiError::Internal(format!("Failed to fetch command preset: {}", e).into()))?
-    .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+    let preset =
+        sqlx::query_as::<_, SlashCommandPreset>("SELECT * FROM slash_command_preset WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&deployment.db().pool)
+            .await
+            .map_err(|e| {
+                ApiError::Internal(format!("Failed to fetch command preset: {}", e).into())
+            })?
+            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
 
     Ok(Json(ApiResponse::success(preset)))
 }
@@ -85,15 +88,13 @@ pub async fn create_command_preset(
     // Validate: command must start with /
     if !req.command.starts_with('/') {
         return Err(ApiError::BadRequest(
-            "Command must start with '/'".to_string()
+            "Command must start with '/'".to_string(),
         ));
     }
 
     // Validate: description is required
     if req.description.trim().is_empty() {
-        return Err(ApiError::BadRequest(
-            "Description is required".to_string()
-        ));
+        return Err(ApiError::BadRequest("Description is required".to_string()));
     }
 
     let id = format!("cmd-{}", Uuid::new_v4());
@@ -146,34 +147,39 @@ pub async fn update_command_preset(
     Json(req): Json<UpdateSlashCommandRequest>,
 ) -> Result<ResponseJson<ApiResponse<SlashCommandPreset>>, ApiError> {
     // First fetch the existing preset
-    let existing = sqlx::query_as::<_, SlashCommandPreset>(
-        "SELECT * FROM slash_command_preset WHERE id = ?"
-    )
-    .bind(&id)
-    .fetch_optional(&deployment.db().pool)
-    .await
-    .map_err(|e| ApiError::Internal(format!("Failed to fetch command preset: {}", e).into()))?
-    .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+    let existing =
+        sqlx::query_as::<_, SlashCommandPreset>("SELECT * FROM slash_command_preset WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&deployment.db().pool)
+            .await
+            .map_err(|e| {
+                ApiError::Internal(format!("Failed to fetch command preset: {}", e).into())
+            })?
+            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
 
     // Don't allow modifying system presets
     if existing.is_system {
         return Err(ApiError::Forbidden(
-            "Cannot modify system built-in commands".to_string()
+            "Cannot modify system built-in commands".to_string(),
         ));
     }
 
     let now = Utc::now();
 
     // Build update query dynamically based on provided fields
-    let description = req.description.unwrap_or_else(|| existing.description.clone());
-    let prompt_template = req.prompt_template.or_else(|| existing.prompt_template.clone());
+    let description = req
+        .description
+        .unwrap_or_else(|| existing.description.clone());
+    let prompt_template = req
+        .prompt_template
+        .or_else(|| existing.prompt_template.clone());
 
     sqlx::query(
         r"
         UPDATE slash_command_preset
         SET description = ?1, prompt_template = ?2, updated_at = ?3
         WHERE id = ?4
-        "
+        ",
     )
     .bind(&description)
     .bind(&prompt_template)
@@ -184,13 +190,14 @@ pub async fn update_command_preset(
     .map_err(|e| ApiError::Internal(format!("Failed to update command preset: {}", e).into()))?;
 
     // Fetch and return the updated preset
-    let updated = sqlx::query_as::<_, SlashCommandPreset>(
-        "SELECT * FROM slash_command_preset WHERE id = ?"
-    )
-    .bind(&id)
-    .fetch_one(&deployment.db().pool)
-    .await
-    .map_err(|e| ApiError::Internal(format!("Failed to fetch updated command preset: {}", e).into()))?;
+    let updated =
+        sqlx::query_as::<_, SlashCommandPreset>("SELECT * FROM slash_command_preset WHERE id = ?")
+            .bind(&id)
+            .fetch_one(&deployment.db().pool)
+            .await
+            .map_err(|e| {
+                ApiError::Internal(format!("Failed to fetch updated command preset: {}", e).into())
+            })?;
 
     Ok(Json(ApiResponse::success(updated)))
 }
@@ -203,19 +210,20 @@ pub async fn delete_command_preset(
     Path(id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<serde_json::Value>>, ApiError> {
     // First fetch the existing preset to check if it's a system preset
-    let existing = sqlx::query_as::<_, SlashCommandPreset>(
-        "SELECT * FROM slash_command_preset WHERE id = ?"
-    )
-    .bind(&id)
-    .fetch_optional(&deployment.db().pool)
-    .await
-    .map_err(|e| ApiError::Internal(format!("Failed to fetch command preset: {}", e).into()))?
-    .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+    let existing =
+        sqlx::query_as::<_, SlashCommandPreset>("SELECT * FROM slash_command_preset WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(&deployment.db().pool)
+            .await
+            .map_err(|e| {
+                ApiError::Internal(format!("Failed to fetch command preset: {}", e).into())
+            })?
+            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
 
     // Don't allow deleting system presets
     if existing.is_system {
         return Err(ApiError::Forbidden(
-            "Cannot delete system built-in commands".to_string()
+            "Cannot delete system built-in commands".to_string(),
         ));
     }
 
@@ -224,13 +232,20 @@ pub async fn delete_command_preset(
         .bind(&id)
         .execute(&deployment.db().pool)
         .await
-        .map_err(|e| ApiError::Internal(format!("Failed to delete command preset: {}", e).into()))?;
+        .map_err(|e| {
+            ApiError::Internal(format!("Failed to delete command preset: {}", e).into())
+        })?;
 
     if result.rows_affected() == 0 {
-        return Err(ApiError::NotFound(format!("Command preset not found: {}", id)));
+        return Err(ApiError::NotFound(format!(
+            "Command preset not found: {}",
+            id
+        )));
     }
 
-    Ok(Json(ApiResponse::success(serde_json::json!({"deleted": id}))))
+    Ok(Json(ApiResponse::success(
+        serde_json::json!({"deleted": id}),
+    )))
 }
 
 // ============================================================================
@@ -240,6 +255,14 @@ pub async fn delete_command_preset(
 /// Create slash commands router
 pub fn slash_commands_routes() -> Router<DeploymentImpl> {
     Router::new()
-        .route("/presets/commands", get(list_command_presets).post(create_command_preset))
-        .route("/presets/commands/{id}", get(get_command_preset).put(update_command_preset).delete(delete_command_preset))
+        .route(
+            "/presets/commands",
+            get(list_command_presets).post(create_command_preset),
+        )
+        .route(
+            "/presets/commands/{id}",
+            get(get_command_preset)
+                .put(update_command_preset)
+                .delete(delete_command_preset),
+        )
 }

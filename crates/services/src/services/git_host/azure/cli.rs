@@ -458,13 +458,10 @@ impl AzCli {
 
     /// Convert Azure PR response to PullRequestInfo.
     fn az_pr_to_info(pr: AzPrResponse) -> PullRequestInfo {
-        let url = pr
-            .repository
-            .and_then(|r| r.web_url)
-            .map_or_else(
-                || format!("pullrequest/{}", pr.pull_request_id),
-                |u| format!("{u}/pullrequest/{}", pr.pull_request_id),
-            );
+        let url = pr.repository.and_then(|r| r.web_url).map_or_else(
+            || format!("pullrequest/{}", pr.pull_request_id),
+            |u| format!("{u}/pullrequest/{}", pr.pull_request_id),
+        );
 
         let status = pr.status.as_deref().unwrap_or("active");
         let merged_at = pr

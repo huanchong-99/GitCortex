@@ -1,13 +1,17 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use db::{DBService, models::Terminal, models::terminal::TerminalLog};
+use db::{
+    DBService,
+    models::{Terminal, terminal::TerminalLog},
+};
 use services::services::terminal::process::TerminalLogger;
 use uuid::Uuid;
 
 async fn setup_db() -> Arc<DBService> {
-    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
     use std::str::FromStr;
+
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
     // Disable foreign keys for testing (simplifies test setup)
     let options = SqliteConnectOptions::from_str(":memory:")
@@ -127,13 +131,8 @@ async fn test_terminal_logger_flushes_on_full_buffer() {
     let db = setup_db().await;
     let terminal_id = create_terminal(&db).await;
 
-    let logger = TerminalLogger::with_max_buffer_size(
-        Arc::clone(&db),
-        terminal_id.clone(),
-        "stdout",
-        60,
-        3,
-    );
+    let logger =
+        TerminalLogger::with_max_buffer_size(Arc::clone(&db), terminal_id.clone(), "stdout", 60, 3);
 
     logger.append("line 1").await;
     logger.append("line 2").await;

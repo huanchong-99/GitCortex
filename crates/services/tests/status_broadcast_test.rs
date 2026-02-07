@@ -46,5 +46,8 @@ async fn test_orchestrator_state_creation() {
 
     let state = OrchestratorState::new("test-workflow".to_string());
     assert_eq!(state.workflow_id, "test-workflow");
-    assert_eq!(state.run_state, services::orchestrator::state::OrchestratorRunState::Idle);
+    assert_eq!(
+        state.run_state,
+        services::orchestrator::state::OrchestratorRunState::Idle
+    );
 }

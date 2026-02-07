@@ -2,24 +2,24 @@
 //!
 //! Manages multiple OrchestratorAgent instances, one per active workflow.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Result};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tokio::time::{timeout, Duration};
-use tracing::{debug, error, info, warn};
-
-use crate::services::git_watcher::{GitWatcher, GitWatcherConfig};
-use super::{
-    constants::{WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_READY},
-    OrchestratorAgent, OrchestratorConfig, SharedMessageBus,
-    persistence::StatePersistence,
-};
+use anyhow::{Result, anyhow};
 use db::DBService;
 use sqlx::Row;
+use tokio::{
+    sync::Mutex,
+    task::JoinHandle,
+    time::{Duration, timeout},
+};
+use tracing::{debug, error, info, warn};
+
+use super::{
+    OrchestratorAgent, OrchestratorConfig, SharedMessageBus,
+    constants::{WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_READY},
+    persistence::StatePersistence,
+};
+use crate::services::git_watcher::{GitWatcher, GitWatcherConfig};
 
 /// Configuration for the OrchestratorRuntime
 #[derive(Debug, Clone)]
@@ -113,16 +113,19 @@ impl OrchestratorRuntime {
         workflow: &db::models::Workflow,
     ) -> Result<Option<GitWatcherHandle>> {
         // Get project to find repo path
-        let project = match db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id).await? {
-            Some(project) => project,
-            None => {
-                warn!(
-                    "Project {} not found for workflow {}, git watcher disabled",
-                    workflow.project_id, workflow_id
-                );
-                return Ok(None);
-            }
-        };
+        let project =
+            match db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id)
+                .await?
+            {
+                Some(project) => project,
+                None => {
+                    warn!(
+                        "Project {} not found for workflow {}, git watcher disabled",
+                        workflow.project_id, workflow_id
+                    );
+                    return Ok(None);
+                }
+            };
 
         // Get repo path from project
         let Some(repo_path) = project.default_agent_working_dir.clone() else {
@@ -161,7 +164,10 @@ impl OrchestratorRuntime {
         // Spawn watcher task
         let task_handle = tokio::spawn(async move {
             if let Err(e) = watcher_clone.watch().await {
-                error!("GitWatcher failed for workflow {}: {}", workflow_id_owned, e);
+                error!(
+                    "GitWatcher failed for workflow {}: {}",
+                    workflow_id_owned, e
+                );
             }
         });
 
@@ -170,7 +176,10 @@ impl OrchestratorRuntime {
             workflow_id, repo_path
         );
 
-        Ok(Some(GitWatcherHandle { watcher, task_handle }))
+        Ok(Some(GitWatcherHandle {
+            watcher,
+            task_handle,
+        }))
     }
 
     /// Stop the GitWatcher for a workflow if running.
@@ -191,13 +200,22 @@ impl OrchestratorRuntime {
 
             match shutdown_result {
                 Ok(Ok(())) => {
-                    info!("GitWatcher for workflow {} shutdown gracefully", workflow_id);
+                    info!(
+                        "GitWatcher for workflow {} shutdown gracefully",
+                        workflow_id
+                    );
                 }
                 Ok(Err(e)) => {
-                    warn!("GitWatcher task failed for workflow {}: {:?}", workflow_id, e);
+                    warn!(
+                        "GitWatcher task failed for workflow {}: {:?}",
+                        workflow_id, e
+                    );
                 }
                 Err(_) => {
-                    warn!("GitWatcher shutdown timeout for workflow {}, aborting", workflow_id);
+                    warn!(
+                        "GitWatcher shutdown timeout for workflow {}, aborting",
+                        workflow_id
+                    );
                     task_handle.abort();
                     task_handle.await.ok();
                 }
@@ -247,12 +265,15 @@ impl OrchestratorRuntime {
                 .get_api_key()?
                 .ok_or_else(|| anyhow!("Orchestrator API key not configured"))?;
 
-            Some(OrchestratorConfig::from_workflow(
-                workflow.orchestrator_api_type.as_deref(),
-                workflow.orchestrator_base_url.as_deref(),
-                Some(&api_key),
-                workflow.orchestrator_model.as_deref(),
-            ).ok_or_else(|| anyhow!("Invalid orchestrator configuration"))?)
+            Some(
+                OrchestratorConfig::from_workflow(
+                    workflow.orchestrator_api_type.as_deref(),
+                    workflow.orchestrator_base_url.as_deref(),
+                    Some(&api_key),
+                    workflow.orchestrator_model.as_deref(),
+                )
+                .ok_or_else(|| anyhow!("Invalid orchestrator configuration"))?,
+            )
         } else {
             None
         };
@@ -268,7 +289,10 @@ impl OrchestratorRuntime {
             Ok(agent) => Arc::new(agent),
             Err(e) => {
                 // Agent creation failed, workflow stays in ready state
-                error!("Failed to create orchestrator agent for workflow {}: {}", workflow_id, e);
+                error!(
+                    "Failed to create orchestrator agent for workflow {}: {}",
+                    workflow_id, e
+                );
                 return Err(e.context("Failed to create orchestrator agent"));
             }
         };
@@ -282,7 +306,10 @@ impl OrchestratorRuntime {
         let workflow_id_owned = workflow_id.to_string();
         let task_handle = tokio::spawn(async move {
             if let Err(e) = agent_clone.run().await {
-                error!("Orchestrator agent failed for workflow {}: {}", workflow_id_owned, e);
+                error!(
+                    "Orchestrator agent failed for workflow {}: {}",
+                    workflow_id_owned, e
+                );
             }
         });
 
@@ -290,10 +317,7 @@ impl OrchestratorRuntime {
         let mut running = self.running_workflows.lock().await;
         running.insert(
             workflow_id.to_string(),
-            RunningWorkflow {
-                agent,
-                task_handle,
-            },
+            RunningWorkflow { agent, task_handle },
         );
         drop(running); // Release lock before logging
 
@@ -305,10 +329,16 @@ impl OrchestratorRuntime {
             }
             Ok(None) => {
                 // GitWatcher not started (no repo path or invalid repo)
-                debug!("GitWatcher not started for workflow {} (no valid repo)", workflow_id);
+                debug!(
+                    "GitWatcher not started for workflow {} (no valid repo)",
+                    workflow_id
+                );
             }
             Err(e) => {
-                warn!("Failed to start GitWatcher for workflow {}: {}", workflow_id, e);
+                warn!(
+                    "Failed to start GitWatcher for workflow {}: {}",
+                    workflow_id, e
+                );
             }
         }
 
@@ -330,13 +360,17 @@ impl OrchestratorRuntime {
         // Remove from running workflows
         let running_workflow = {
             let mut running = self.running_workflows.lock().await;
-            running.remove(workflow_id)
+            running
+                .remove(workflow_id)
                 .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?
         };
 
         // Send shutdown signal via message bus
         self.message_bus
-            .publish(&format!("workflow:{}", workflow_id), super::BusMessage::Shutdown)
+            .publish(
+                &format!("workflow:{}", workflow_id),
+                super::BusMessage::Shutdown,
+            )
             .await?;
 
         info!("Shutdown signal sent for workflow {}", workflow_id);
@@ -415,7 +449,7 @@ impl OrchestratorRuntime {
             SELECT id
             FROM workflow
             WHERE status = 'running'
-            "#
+            "#,
         )
         .fetch_all(pool)
         .await?;
@@ -456,7 +490,10 @@ impl OrchestratorRuntime {
                             workflow_id, e
                         );
                     } else {
-                        info!("Workflow {} marked as failed (state recovered but auto-resume not implemented)", workflow_id);
+                        info!(
+                            "Workflow {} marked as failed (state recovered but auto-resume not implemented)",
+                            workflow_id
+                        );
                     }
                 }
                 Ok(None) => {
@@ -475,7 +512,10 @@ impl OrchestratorRuntime {
                             workflow_id, e
                         );
                     } else {
-                        info!("Workflow {} marked as failed (no state recovered)", workflow_id);
+                        info!(
+                            "Workflow {} marked as failed (no state recovered)",
+                            workflow_id
+                        );
                     }
                 }
                 Err(e) => {

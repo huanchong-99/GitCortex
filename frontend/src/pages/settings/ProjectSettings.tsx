@@ -301,6 +301,7 @@ export function ProjectSettings() {
     try {
       const updateData: UpdateProject = {
         name: draft.name.trim(),
+        defaultAgentWorkingDir: selectedProject.defaultAgentWorkingDir,
       };
 
       updateProject.mutate({

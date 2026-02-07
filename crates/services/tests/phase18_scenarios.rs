@@ -2,15 +2,21 @@
 //!
 //! Tests for concurrent workflows, failure handling, and recovery scenarios.
 
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use chrono::Utc;
-use db::models::{CliType, ModelConfig, Terminal, Workflow, WorkflowTask};
-use db::DBService;
+use db::{
+    DBService,
+    models::{CliType, ModelConfig, Terminal, Workflow, WorkflowTask},
+};
 use once_cell::sync::Lazy;
-use services::services::git_watcher::CommitMetadata;
-use services::services::orchestrator::{MessageBus, OrchestratorRuntime, TerminalCompletionEvent, TerminalCompletionStatus, BusMessage};
+use services::services::{
+    git_watcher::CommitMetadata,
+    orchestrator::{
+        BusMessage, MessageBus, OrchestratorRuntime, TerminalCompletionEvent,
+        TerminalCompletionStatus,
+    },
+};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use tokio::sync::{Mutex, OwnedMutexGuard};
 use uuid::Uuid;
@@ -76,33 +82,21 @@ async fn setup_db() -> Arc<DBService> {
 
 async fn seed_project(db: &DBService) -> String {
     let project_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
-    )
-    .bind(project_id)
-    .bind("Phase18 Test Project")
-    .bind(Utc::now())
-    .bind(Utc::now())
-    .execute(&db.pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
+        .bind(project_id)
+        .bind("Phase18 Test Project")
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
     project_id.to_string()
 }
 
 /// Assert that CLI type and model config exist in database
-async fn assert_cli_model_exists(
-    db: &DBService,
-    cli_type_id: &str,
-    model_config_id: &str,
-) {
-    let cli_type = CliType::find_by_id(&db.pool, cli_type_id)
-        .await
-        .unwrap();
-    assert!(
-        cli_type.is_some(),
-        "Missing CLI type seed: {}",
-        cli_type_id
-    );
+async fn assert_cli_model_exists(db: &DBService, cli_type_id: &str, model_config_id: &str) {
+    let cli_type = CliType::find_by_id(&db.pool, cli_type_id).await.unwrap();
+    assert!(cli_type.is_some(), "Missing CLI type seed: {}", cli_type_id);
 
     let model_config = ModelConfig::find_by_id(&db.pool, model_config_id)
         .await
@@ -114,10 +108,7 @@ async fn assert_cli_model_exists(
     );
 }
 
-async fn create_ready_workflow(
-    db: &DBService,
-    project_id: &str,
-) -> String {
+async fn create_ready_workflow(db: &DBService, project_id: &str) -> String {
     let workflow_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -174,7 +165,11 @@ async fn create_workflow_task(
     .bind(&task_id)
     .bind(workflow_id)
     .bind(task_name)
-    .bind(format!("workflow/{}/{}", workflow_id, task_name.to_lowercase().replace(' ', "-")))
+    .bind(format!(
+        "workflow/{}/{}",
+        workflow_id,
+        task_name.to_lowercase().replace(' ', "-")
+    ))
     .bind("pending")
     .bind(order_index)
     .bind(now)
@@ -186,11 +181,7 @@ async fn create_workflow_task(
     task_id
 }
 
-async fn create_terminal(
-    db: &DBService,
-    task_id: &str,
-    order_index: i32,
-) -> String {
+async fn create_terminal(db: &DBService, task_id: &str, order_index: i32) -> String {
     let terminal_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -261,10 +252,15 @@ async fn test_workflow_status_transition_created_to_ready() {
     .unwrap();
 
     // Update to ready
-    Workflow::update_status(&db.pool, &workflow_id, "ready").await.unwrap();
+    Workflow::update_status(&db.pool, &workflow_id, "ready")
+        .await
+        .unwrap();
 
     // Verify
-    let workflow = Workflow::find_by_id(&db.pool, &workflow_id).await.unwrap().unwrap();
+    let workflow = Workflow::find_by_id(&db.pool, &workflow_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(workflow.status, "ready");
 }
 
@@ -279,7 +275,9 @@ async fn test_workflow_with_tasks_and_terminals() {
     let terminal_id = create_terminal(&db, &task_id, 0).await;
 
     // Verify workflow has tasks
-    let tasks = WorkflowTask::find_by_workflow(&db.pool, &workflow_id).await.unwrap();
+    let tasks = WorkflowTask::find_by_workflow(&db.pool, &workflow_id)
+        .await
+        .unwrap();
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].name, "Task A");
 
@@ -350,13 +348,11 @@ async fn test_message_bus_terminal_completion_event() {
     message_bus.publish_terminal_completed(event.clone()).await;
 
     // Receive the event
-    let received: BusMessage = tokio::time::timeout(
-        std::time::Duration::from_secs(1),
-        receiver.recv(),
-    )
-    .await
-    .expect("Should receive within timeout")
-    .expect("Should receive message");
+    let received: BusMessage =
+        tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+            .await
+            .expect("Should receive within timeout")
+            .expect("Should receive message");
 
     match received {
         BusMessage::TerminalCompleted(e) => {
@@ -378,10 +374,15 @@ async fn test_terminal_status_update_on_failure() {
     let terminal_id = create_terminal(&db, &task_id, 0).await;
 
     // Simulate terminal failure
-    Terminal::set_completed(&db.pool, &terminal_id, "failed").await.unwrap();
+    Terminal::set_completed(&db.pool, &terminal_id, "failed")
+        .await
+        .unwrap();
 
     // Verify terminal status
-    let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
+    let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(terminal.status, "failed");
     assert!(terminal.completed_at.is_some());
 }
@@ -396,9 +397,8 @@ async fn test_multiple_terminals_in_task() {
     let task_id = create_workflow_task(&db, &workflow_id, "Multi-Terminal Task", 0).await;
 
     // Create 3 terminals
-    let _terminal_ids: Vec<String> = futures::future::join_all(
-        (0..3).map(|i| create_terminal(&db, &task_id, i))
-    ).await;
+    let _terminal_ids: Vec<String> =
+        futures::future::join_all((0..3).map(|i| create_terminal(&db, &task_id, i))).await;
 
     // Verify all terminals created
     let terminals = Terminal::find_by_task(&db.pool, &task_id).await.unwrap();
@@ -420,17 +420,30 @@ async fn test_workflow_task_status_transitions() {
     let task_id = create_workflow_task(&db, &workflow_id, "Status Test Task", 0).await;
 
     // Initial status should be pending
-    let task = WorkflowTask::find_by_id(&db.pool, &task_id).await.unwrap().unwrap();
+    let task = WorkflowTask::find_by_id(&db.pool, &task_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(task.status, "pending");
 
     // Update to running
-    WorkflowTask::update_status(&db.pool, &task_id, "running").await.unwrap();
-    let task = WorkflowTask::find_by_id(&db.pool, &task_id).await.unwrap().unwrap();
+    WorkflowTask::update_status(&db.pool, &task_id, "running")
+        .await
+        .unwrap();
+    let task = WorkflowTask::find_by_id(&db.pool, &task_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(task.status, "running");
 
     // Update to completed
-    WorkflowTask::update_status(&db.pool, &task_id, "completed").await.unwrap();
-    let task = WorkflowTask::find_by_id(&db.pool, &task_id).await.unwrap().unwrap();
+    WorkflowTask::update_status(&db.pool, &task_id, "completed")
+        .await
+        .unwrap();
+    let task = WorkflowTask::find_by_id(&db.pool, &task_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(task.status, "completed");
 }
 
@@ -458,7 +471,9 @@ async fn test_workflow_find_by_project() {
     let _wf2 = create_ready_workflow(&db, &project_id).await;
 
     // Find workflows by project
-    let workflows = Workflow::find_by_project(&db.pool, &project_id).await.unwrap();
+    let workflows = Workflow::find_by_project(&db.pool, &project_id)
+        .await
+        .unwrap();
     assert_eq!(workflows.len(), 2);
 }
 
@@ -483,9 +498,15 @@ async fn test_terminal_last_commit_update() {
     .unwrap();
 
     // Verify
-    let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
+    let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(terminal.last_commit_hash, Some("abc123def456".to_string()));
-    assert_eq!(terminal.last_commit_message, Some("feat: implement feature X".to_string()));
+    assert_eq!(
+        terminal.last_commit_message,
+        Some("feat: implement feature X".to_string())
+    );
 }
 
 // ============================================================================
@@ -507,7 +528,10 @@ async fn test_terminal_recovery_marks_waiting_as_failed() {
     Terminal::set_started(&db.pool, &terminal_id).await.unwrap();
 
     // Verify terminal is in waiting state
-    let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
+    let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(terminal.status, "waiting");
     assert!(terminal.started_at.is_some());
 
@@ -520,15 +544,24 @@ async fn test_terminal_recovery_marks_waiting_as_failed() {
         .filter(|t| t.status == "waiting")
         .collect::<Vec<_>>();
 
-    assert_eq!(orphaned_terminals.len(), 1, "Should have one waiting terminal");
+    assert_eq!(
+        orphaned_terminals.len(),
+        1,
+        "Should have one waiting terminal"
+    );
 
     // Mark as failed (recovery action)
     for terminal in orphaned_terminals {
-        Terminal::set_completed(&db.pool, &terminal.id, "failed").await.unwrap();
+        Terminal::set_completed(&db.pool, &terminal.id, "failed")
+            .await
+            .unwrap();
     }
 
     // Verify recovery completed
-    let terminal = Terminal::find_by_id(&db.pool, &terminal_id).await.unwrap().unwrap();
+    let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(terminal.status, "failed");
     assert!(terminal.completed_at.is_some());
 }
@@ -548,18 +581,33 @@ async fn test_workflow_recovery_with_mixed_terminal_states() {
     let terminal3_id = create_terminal(&db, &task_id, 2).await;
 
     // Set different states: completed, waiting (orphaned), not_started
-    Terminal::set_started(&db.pool, &terminal1_id).await.unwrap();
-    Terminal::set_completed(&db.pool, &terminal1_id, "completed").await.unwrap();
+    Terminal::set_started(&db.pool, &terminal1_id)
+        .await
+        .unwrap();
+    Terminal::set_completed(&db.pool, &terminal1_id, "completed")
+        .await
+        .unwrap();
 
-    Terminal::set_started(&db.pool, &terminal2_id).await.unwrap();
+    Terminal::set_started(&db.pool, &terminal2_id)
+        .await
+        .unwrap();
     // terminal2 left in "waiting" state (simulating crash)
 
     // terminal3 stays in "not_started"
 
     // Verify initial states
-    let t1 = Terminal::find_by_id(&db.pool, &terminal1_id).await.unwrap().unwrap();
-    let t2 = Terminal::find_by_id(&db.pool, &terminal2_id).await.unwrap().unwrap();
-    let t3 = Terminal::find_by_id(&db.pool, &terminal3_id).await.unwrap().unwrap();
+    let t1 = Terminal::find_by_id(&db.pool, &terminal1_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let t2 = Terminal::find_by_id(&db.pool, &terminal2_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let t3 = Terminal::find_by_id(&db.pool, &terminal3_id)
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(t1.status, "completed");
     assert_eq!(t2.status, "waiting");
@@ -573,14 +621,34 @@ async fn test_workflow_recovery_with_mixed_terminal_states() {
     assert_eq!(orphaned[0].id, terminal2_id);
 
     // Mark orphaned as failed
-    Terminal::set_completed(&db.pool, &terminal2_id, "failed").await.unwrap();
+    Terminal::set_completed(&db.pool, &terminal2_id, "failed")
+        .await
+        .unwrap();
 
     // Verify final states
-    let t1 = Terminal::find_by_id(&db.pool, &terminal1_id).await.unwrap().unwrap();
-    let t2 = Terminal::find_by_id(&db.pool, &terminal2_id).await.unwrap().unwrap();
-    let t3 = Terminal::find_by_id(&db.pool, &terminal3_id).await.unwrap().unwrap();
+    let t1 = Terminal::find_by_id(&db.pool, &terminal1_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let t2 = Terminal::find_by_id(&db.pool, &terminal2_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let t3 = Terminal::find_by_id(&db.pool, &terminal3_id)
+        .await
+        .unwrap()
+        .unwrap();
 
-    assert_eq!(t1.status, "completed", "Completed terminal should remain completed");
-    assert_eq!(t2.status, "failed", "Orphaned waiting terminal should be marked failed");
-    assert_eq!(t3.status, "not_started", "Not started terminal should remain unchanged");
+    assert_eq!(
+        t1.status, "completed",
+        "Completed terminal should remain completed"
+    );
+    assert_eq!(
+        t2.status, "failed",
+        "Orphaned waiting terminal should be marked failed"
+    );
+    assert_eq!(
+        t3.status, "not_started",
+        "Not started terminal should remain unchanged"
+    );
 }

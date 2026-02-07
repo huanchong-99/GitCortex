@@ -405,9 +405,10 @@ impl TaskServer {
             ));
         }
 
-        let api_response = resp.json::<ApiResponseEnvelope<T>>().await.map_err(|e| {
-            Self::err("Failed to parse VK API response", Some(&e.to_string()))
-        })?;
+        let api_response = resp
+            .json::<ApiResponseEnvelope<T>>()
+            .await
+            .map_err(|e| Self::err("Failed to parse VK API response", Some(&e.to_string())))?;
 
         if !api_response.success {
             let msg = api_response.message.as_deref().unwrap_or("Unknown error");
@@ -439,9 +440,10 @@ impl TaskServer {
             ));
         }
 
-        let api_response = resp.json::<EmptyApiResponse>().await.map_err(|e| {
-            Self::err("Failed to parse VK API response", Some(&e.to_string()))
-        })?;
+        let api_response = resp
+            .json::<EmptyApiResponse>()
+            .await
+            .map_err(|e| Self::err("Failed to parse VK API response", Some(&e.to_string())))?;
 
         if !api_response.success {
             let msg = api_response.message.as_deref().unwrap_or("Unknown error");
@@ -694,7 +696,10 @@ impl TaskServer {
 
         let executor_trimmed = executor.trim();
         if executor_trimmed.is_empty() {
-            return Ok(Self::err("Executor must not be empty.".to_string(), None::<String>));
+            return Ok(Self::err(
+                "Executor must not be empty.".to_string(),
+                None::<String>,
+            ));
         }
 
         let normalized_executor = executor_trimmed.replace('-', "_").to_ascii_uppercase();

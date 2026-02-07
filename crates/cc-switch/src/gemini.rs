@@ -3,11 +3,13 @@
 //! Gemini CLI 使用 .env 格式的配置文件：
 //! - ~/.gemini/.env - 环境变量配置
 
-use std::collections::HashMap;
-use std::hash::BuildHasher;
-use crate::error::Result;
-use crate::config_path::{get_gemini_env_path, ensure_parent_dir_exists};
-use crate::atomic_write::atomic_write_text;
+use std::{collections::HashMap, hash::BuildHasher};
+
+use crate::{
+    atomic_write::atomic_write_text,
+    config_path::{ensure_parent_dir_exists, get_gemini_env_path},
+    error::Result,
+};
 
 /// 解析 .env 文件内容
 pub fn parse_env_file(content: &str) -> HashMap<String, String> {
@@ -68,11 +70,7 @@ pub async fn write_gemini_config<S: BuildHasher>(
 }
 
 /// 更新 Gemini 模型配置
-pub async fn update_gemini_model(
-    base_url: Option<&str>,
-    api_key: &str,
-    model: &str,
-) -> Result<()> {
+pub async fn update_gemini_model(base_url: Option<&str>, api_key: &str, model: &str) -> Result<()> {
     let mut config = read_gemini_config().await?;
 
     // 设置 API Key

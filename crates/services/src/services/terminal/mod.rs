@@ -24,8 +24,8 @@ pub use launcher::{LaunchResult, TerminalLauncher};
 pub use output_fanout::{OutputChunk, OutputFanout, OutputFanoutConfig, OutputSubscription};
 pub use process::{ProcessHandle, ProcessManager};
 pub use prompt_detector::{
-    ArrowSelectOption, DetectedPrompt, PromptDetector, PromptKind,
-    build_arrow_sequence, ARROW_DOWN, ARROW_UP,
+    ARROW_DOWN, ARROW_UP, ArrowSelectOption, DetectedPrompt, PromptDetector, PromptKind,
+    build_arrow_sequence,
 };
 pub use prompt_watcher::PromptWatcher;
 pub use utf8_decoder::{Utf8DecodeChunk, Utf8DecodeStats, Utf8StreamDecoder};

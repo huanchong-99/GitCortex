@@ -281,8 +281,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
                                 metadata: None,
                             };
                             if let Some(id) = current_assistant_message_index {
-                                msg_store
-                                    .push_patch(ConversationPatch::replace(id, replace_entry));
+                                msg_store.push_patch(ConversationPatch::replace(id, replace_entry));
                             } else {
                                 let id = entry_index_provider.next();
                                 current_assistant_message_index = Some(id);
@@ -489,9 +488,7 @@ impl StandardCodingAgentExecutor for CursorAgent {
             return AvailabilityInfo::NotFound;
         }
 
-        let config_files_found = self
-            .default_mcp_config_path()
-            .is_some_and(|p| p.exists());
+        let config_files_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
 
         if config_files_found {
             AvailabilityInfo::InstallationFound

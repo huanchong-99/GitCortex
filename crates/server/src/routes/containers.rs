@@ -7,6 +7,7 @@ use axum::{
 use db::models::workspace::{Workspace, WorkspaceContext};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use sqlx::Error as SqlxError;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
@@ -25,6 +26,13 @@ pub struct ContainerInfo {
     pub attempt_id: Uuid,
 }
 
+fn map_container_lookup_error(error: SqlxError) -> ApiError {
+    match error {
+        SqlxError::RowNotFound => ApiError::NotFound("Container not found".to_string()),
+        other => ApiError::Database(other),
+    }
+}
+
 pub async fn get_container_info(
     Query(query): Query<ContainerQuery>,
     State(deployment): State<DeploymentImpl>,
@@ -32,7 +40,7 @@ pub async fn get_container_info(
     let info =
         Workspace::resolve_container_ref_by_prefix(&deployment.db().pool, &query.container_ref)
             .await
-            .map_err(ApiError::Database)?;
+            .map_err(map_container_lookup_error)?;
 
     Ok(ResponseJson(ApiResponse::success(ContainerInfo {
         project_id: info.project_id,
@@ -45,22 +53,20 @@ pub async fn get_context(
     State(deployment): State<DeploymentImpl>,
     Query(payload): Query<ContainerQuery>,
 ) -> Result<ResponseJson<ApiResponse<WorkspaceContext>>, ApiError> {
-    let result =
-        Workspace::resolve_container_ref(&deployment.db().pool, &payload.container_ref).await;
+    let info =
+        Workspace::resolve_container_ref_by_prefix(&deployment.db().pool, &payload.container_ref)
+            .await
+            .map_err(map_container_lookup_error)?;
 
-    match result {
-        Ok(info) => {
-            let ctx = Workspace::load_context(
-                &deployment.db().pool,
-                info.workspace_id,
-                info.task_id,
-                info.project_id,
-            )
-            .await?;
-            Ok(ResponseJson(ApiResponse::success(ctx)))
-        }
-        Err(e) => Err(ApiError::Database(e)),
-    }
+    let ctx = Workspace::load_context(
+        &deployment.db().pool,
+        info.workspace_id,
+        info.task_id,
+        info.project_id,
+    )
+    .await?;
+
+    Ok(ResponseJson(ApiResponse::success(ctx)))
 }
 
 pub fn router(_deployment: &DeploymentImpl) -> Router<DeploymentImpl> {

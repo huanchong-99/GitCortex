@@ -12,11 +12,12 @@ export function validateStep4Terminals(config: WizardConfig): Record<string, str
   }
 
   config.terminals.forEach((terminal, index) => {
+    const terminalKey = terminal.id.trim() || String(index);
     if (!terminal.cliTypeId.trim()) {
-      errors[`terminal-${index}-cli`] = 'validation.terminals.cliRequired';
+      errors[`terminal-${terminalKey}-cli`] = 'validation.terminals.cliRequired';
     }
     if (!terminal.modelConfigId.trim()) {
-      errors[`terminal-${index}-model`] = 'validation.terminals.modelRequired';
+      errors[`terminal-${terminalKey}-model`] = 'validation.terminals.modelRequired';
     }
   });
 

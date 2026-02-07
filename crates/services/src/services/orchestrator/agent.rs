@@ -1,7 +1,6 @@
 //! Orchestrator agent loop and event handling.
 
-use std::sync::Arc;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::anyhow;
 use db::DBService;
@@ -18,9 +17,15 @@ use super::{
     message_bus::{BusMessage, SharedMessageBus},
     prompt_handler::PromptHandler,
     state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState},
-    types::{OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus, TerminalPromptEvent, CodeIssue},
+    types::{
+        CodeIssue, OrchestratorInstruction, TerminalCompletionEvent, TerminalCompletionStatus,
+        TerminalPromptEvent,
+    },
 };
-use crate::services::{error_handler::ErrorHandler, template_renderer::{TemplateRenderer, WorkflowContext}};
+use crate::services::{
+    error_handler::ErrorHandler,
+    template_renderer::{TemplateRenderer, WorkflowContext},
+};
 
 /// Coordinates workflow execution, message handling, and LLM interactions.
 pub struct OrchestratorAgent {
@@ -208,12 +213,9 @@ impl OrchestratorAgent {
         // Fail fast: if terminal failed, mark task as failed immediately to avoid stalled tasks
         if !success {
             // Terminal failed - mark task as failed immediately
-            if let Err(e) = db::models::WorkflowTask::update_status(
-                &self.db.pool,
-                &event.task_id,
-                "failed",
-            )
-            .await
+            if let Err(e) =
+                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, "failed")
+                    .await
             {
                 tracing::error!("Failed to mark task {} failed: {}", event.task_id, e);
             }
@@ -224,23 +226,17 @@ impl OrchestratorAgent {
             );
         } else if task_failed && task_completed {
             // Task has failures and all terminals are done - mark as failed
-            if let Err(e) = db::models::WorkflowTask::update_status(
-                &self.db.pool,
-                &event.task_id,
-                "failed",
-            )
-            .await
+            if let Err(e) =
+                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, "failed")
+                    .await
             {
                 tracing::error!("Failed to mark task {} failed: {}", event.task_id, e);
             }
         } else if task_completed {
             // Task completed successfully
-            if let Err(e) = db::models::WorkflowTask::update_status(
-                &self.db.pool,
-                &event.task_id,
-                "completed",
-            )
-            .await
+            if let Err(e) =
+                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, "completed")
+                    .await
             {
                 tracing::error!("Failed to mark task {} completed: {}", event.task_id, e);
             }
@@ -276,7 +272,11 @@ impl OrchestratorAgent {
     }
 
     /// Dispatches the next terminal in a task sequence.
-    async fn dispatch_next_terminal(&self, task_id: &str, terminal_index: usize) -> anyhow::Result<()> {
+    async fn dispatch_next_terminal(
+        &self,
+        task_id: &str,
+        terminal_index: usize,
+    ) -> anyhow::Result<()> {
         // Get task
         let task = db::models::WorkflowTask::find_by_id(&self.db.pool, task_id)
             .await
@@ -304,7 +304,8 @@ impl OrchestratorAgent {
 
         // Build and dispatch instruction
         let instruction = Self::build_task_instruction(&task, &terminal);
-        self.dispatch_terminal(task_id, &terminal, &instruction).await
+        self.dispatch_terminal(task_id, &terminal, &instruction)
+            .await
     }
 
     /// Handles Git events emitted by the watcher.
@@ -320,7 +321,9 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<()> {
         tracing::info!(
             "Git event: {} on branch {} - {}",
-            commit_hash, branch, message
+            commit_hash,
+            branch,
+            message
         );
 
         // Check if this commit was already processed (idempotency)
@@ -346,7 +349,8 @@ impl OrchestratorAgent {
                     let mut state = self.state.write().await;
                     state.processed_commits.insert(commit_hash.to_string());
                 }
-                self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message).await?;
+                self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message)
+                    .await?;
                 return Ok(());
             }
         };
@@ -355,7 +359,8 @@ impl OrchestratorAgent {
         if metadata.workflow_id != workflow_id {
             tracing::warn!(
                 "Workflow ID mismatch: expected {}, got {}",
-                workflow_id, metadata.workflow_id
+                workflow_id,
+                metadata.workflow_id
             );
             // Don't mark as processed - another workflow may need this commit
             return Ok(());
@@ -375,29 +380,35 @@ impl OrchestratorAgent {
                     &metadata.task_id,
                     commit_hash,
                     message,
-                ).await?;
+                )
+                .await?;
             }
             "review_pass" => {
                 self.handle_git_review_pass(
                     &metadata.terminal_id,
                     &metadata.task_id,
-                    &metadata.reviewed_terminal.ok_or_else(|| anyhow!("reviewed_terminal required for review_pass"))?,
-                ).await?;
+                    &metadata
+                        .reviewed_terminal
+                        .ok_or_else(|| anyhow!("reviewed_terminal required for review_pass"))?,
+                )
+                .await?;
             }
             "review_reject" => {
                 self.handle_git_review_reject(
                     &metadata.terminal_id,
                     &metadata.task_id,
-                    &metadata.reviewed_terminal.ok_or_else(|| anyhow!("reviewed_terminal required for review_reject"))?,
-                    &metadata.issues.ok_or_else(|| anyhow!("issues required for review_reject"))?,
-                ).await?;
+                    &metadata
+                        .reviewed_terminal
+                        .ok_or_else(|| anyhow!("reviewed_terminal required for review_reject"))?,
+                    &metadata
+                        .issues
+                        .ok_or_else(|| anyhow!("issues required for review_reject"))?,
+                )
+                .await?;
             }
             TERMINAL_STATUS_FAILED => {
-                self.handle_git_terminal_failed(
-                    &metadata.terminal_id,
-                    &metadata.task_id,
-                    message,
-                ).await?;
+                self.handle_git_terminal_failed(&metadata.terminal_id, &metadata.task_id, message)
+                    .await?;
             }
             _ => {
                 tracing::warn!("Unknown status in commit: {}", metadata.status);
@@ -422,7 +433,9 @@ impl OrchestratorAgent {
                 "system",
                 &format!(
                     "Git commit detected on branch '{}': {} - {}",
-                    branch, &commit_hash[..8.min(commit_hash.len())], message
+                    branch,
+                    &commit_hash[..8.min(commit_hash.len())],
+                    message
                 ),
                 &self.config,
             );
@@ -433,7 +446,8 @@ impl OrchestratorAgent {
 
         tracing::info!(
             "Orchestrator awakened for commit {} on workflow {}",
-            commit_hash, workflow_id
+            commit_hash,
+            workflow_id
         );
 
         Ok(())
@@ -449,15 +463,14 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<()> {
         tracing::info!(
             "Terminal {} completed task {} (commit: {})",
-            terminal_id, task_id, commit_hash
+            terminal_id,
+            task_id,
+            commit_hash
         );
 
         // 1. Update terminal status
-        db::models::Terminal::update_status(
-            &self.db.pool,
-            terminal_id,
-            TERMINAL_STATUS_COMPLETED
-        ).await?;
+        db::models::Terminal::update_status(&self.db.pool, terminal_id, TERMINAL_STATUS_COMPLETED)
+            .await?;
 
         // 2. Publish completion event
         let workflow_id = self.state.read().await.workflow_id.clone();
@@ -490,20 +503,23 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<()> {
         tracing::info!(
             "Terminal {} approved work from {}",
-            reviewer_terminal_id, reviewed_terminal_id
+            reviewer_terminal_id,
+            reviewed_terminal_id
         );
 
         // 1. Update reviewed terminal status
         db::models::Terminal::update_status(
             &self.db.pool,
             reviewed_terminal_id,
-            TERMINAL_STATUS_REVIEW_PASSED
-        ).await?;
+            TERMINAL_STATUS_REVIEW_PASSED,
+        )
+        .await?;
 
         // 2. Publish review passed event
         let workflow_id = self.state.read().await.workflow_id.clone();
-        let event = BusMessage::StatusUpdate {
+        let event = BusMessage::TerminalStatusUpdate {
             workflow_id: workflow_id.clone(),
+            terminal_id: reviewed_terminal_id.to_string(),
             status: TERMINAL_STATUS_REVIEW_PASSED.to_string(),
         };
 
@@ -527,20 +543,24 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<()> {
         tracing::warn!(
             "Terminal {} rejected work from {}: {} issues found",
-            reviewer_terminal_id, reviewed_terminal_id, issues.len()
+            reviewer_terminal_id,
+            reviewed_terminal_id,
+            issues.len()
         );
 
         // 1. Update reviewed terminal status
         db::models::Terminal::update_status(
             &self.db.pool,
             reviewed_terminal_id,
-            TERMINAL_STATUS_REVIEW_REJECTED
-        ).await?;
+            TERMINAL_STATUS_REVIEW_REJECTED,
+        )
+        .await?;
 
         // 2. Publish review rejected event
         let workflow_id = self.state.read().await.workflow_id.clone();
-        let event = BusMessage::StatusUpdate {
+        let event = BusMessage::TerminalStatusUpdate {
             workflow_id: workflow_id.clone(),
+            terminal_id: reviewed_terminal_id.to_string(),
             status: TERMINAL_STATUS_REVIEW_REJECTED.to_string(),
         };
 
@@ -563,15 +583,14 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<()> {
         tracing::error!(
             "Terminal {} failed task {}: {}",
-            terminal_id, task_id, error_message
+            terminal_id,
+            task_id,
+            error_message
         );
 
         // 1. Update terminal status
-        db::models::Terminal::update_status(
-            &self.db.pool,
-            terminal_id,
-            TERMINAL_STATUS_FAILED
-        ).await?;
+        db::models::Terminal::update_status(&self.db.pool, terminal_id, TERMINAL_STATUS_FAILED)
+            .await?;
 
         // 2. Publish failure event
         let workflow_id = self.state.read().await.workflow_id.clone();
@@ -647,11 +666,10 @@ impl OrchestratorAgent {
                     tracing::info!("Sending to terminal {}: {}", terminal_id, message);
 
                     // 1. Get terminal from database
-                    let terminal =
-                        db::models::Terminal::find_by_id(&self.db.pool, &terminal_id)
-                            .await
-                            .map_err(|e| anyhow::anyhow!("Failed to get terminal: {e}"))?
-                            .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
+                    let terminal = db::models::Terminal::find_by_id(&self.db.pool, &terminal_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to get terminal: {e}"))?
+                        .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
 
                     // 2. Get PTY session ID
                     let pty_session_id = terminal.pty_session_id.ok_or_else(|| {
@@ -679,21 +697,22 @@ impl OrchestratorAgent {
                     db::models::Workflow::update_status(
                         &self.db.pool,
                         &workflow_id,
-                        WORKFLOW_STATUS_COMPLETED
+                        WORKFLOW_STATUS_COMPLETED,
                     )
                     .await
                     .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {e}"))?;
 
                     // Publish completion event
-                    self.message_bus.publish(
-                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
-                        BusMessage::StatusUpdate {
-                            workflow_id: workflow_id.clone(),
-                            status: WORKFLOW_STATUS_COMPLETED.to_string(),
-                        }
-                    )
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to publish completion event: {e}"))?;
+                    self.message_bus
+                        .publish(
+                            &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                            BusMessage::StatusUpdate {
+                                workflow_id: workflow_id.clone(),
+                                status: WORKFLOW_STATUS_COMPLETED.to_string(),
+                            },
+                        )
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to publish completion event: {e}"))?;
 
                     // Transition to Idle
                     self.state.write().await.run_state = OrchestratorRunState::Idle;
@@ -713,28 +732,32 @@ impl OrchestratorAgent {
                     db::models::Workflow::update_status(
                         &self.db.pool,
                         &workflow_id,
-                        WORKFLOW_STATUS_FAILED
+                        WORKFLOW_STATUS_FAILED,
                     )
                     .await
                     .map_err(|e| anyhow::anyhow!("Failed to update workflow status: {e}"))?;
 
                     // Publish failure event
-                    self.message_bus.publish(
-                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
-                        BusMessage::Error {
-                            workflow_id: workflow_id.clone(),
-                            error: reason.clone(),
-                        }
-                    )
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to publish failure event: {e}"))?;
+                    self.message_bus
+                        .publish(
+                            &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                            BusMessage::Error {
+                                workflow_id: workflow_id.clone(),
+                                error: reason.clone(),
+                            },
+                        )
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to publish failure event: {e}"))?;
 
                     // Transition to Idle
                     self.state.write().await.run_state = OrchestratorRunState::Idle;
 
                     tracing::error!("Workflow {} failed: {}", workflow_id, reason);
                 }
-                OrchestratorInstruction::StartTask { task_id, instruction } => {
+                OrchestratorInstruction::StartTask {
+                    task_id,
+                    instruction,
+                } => {
                     tracing::info!("Starting task {}: {}", task_id, instruction);
 
                     // 1. Get task from database
@@ -769,9 +792,12 @@ impl OrchestratorAgent {
                     // 5. Dispatch the terminal
                     if let Some(index) = next_index {
                         let terminal = terminals.get(index).cloned().ok_or_else(|| {
-                            anyhow::anyhow!("Terminal index {index} out of range for task {task_id}")
+                            anyhow::anyhow!(
+                                "Terminal index {index} out of range for task {task_id}"
+                            )
                         })?;
-                        self.dispatch_terminal(&task.id, &terminal, &instruction).await?;
+                        self.dispatch_terminal(&task.id, &terminal, &instruction)
+                            .await?;
                     } else {
                         tracing::info!("No pending terminals for task {task_id}");
                     }
@@ -841,12 +867,8 @@ impl OrchestratorAgent {
                     .await;
 
                 // Mark task as failed
-                let _ = db::models::WorkflowTask::update_status(
-                    &self.db.pool,
-                    task_id,
-                    "failed",
-                )
-                .await;
+                let _ =
+                    db::models::WorkflowTask::update_status(&self.db.pool, task_id, "failed").await;
 
                 // Broadcast task status update
                 let _ = self
@@ -953,7 +975,10 @@ impl OrchestratorAgent {
             .map_err(|e| anyhow::anyhow!("Failed to get workflow tasks: {e}"))?;
 
         if tasks.is_empty() {
-            tracing::info!("No tasks found for workflow {}, skipping auto-dispatch", workflow_id);
+            tracing::info!(
+                "No tasks found for workflow {}, skipping auto-dispatch",
+                workflow_id
+            );
             return Ok(());
         }
 
@@ -966,18 +991,16 @@ impl OrchestratorAgent {
         for task in tasks {
             // Skip tasks that are already completed, failed, or cancelled
             if task.status == "completed" || task.status == "failed" || task.status == "cancelled" {
-                tracing::debug!(
-                    "Skipping task {} due to status {}",
-                    task.id,
-                    task.status
-                );
+                tracing::debug!("Skipping task {} due to status {}", task.id, task.status);
                 continue;
             }
 
             // Get terminals for this task
             let terminals = db::models::Terminal::find_by_task(&self.db.pool, &task.id)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to get terminals for task {}: {e}", task.id))?;
+                .map_err(|e| {
+                    anyhow::anyhow!("Failed to get terminals for task {}: {e}", task.id)
+                })?;
 
             if terminals.is_empty() {
                 tracing::warn!("No terminals found for task {}, skipping", task.id);
@@ -1004,11 +1027,7 @@ impl OrchestratorAgent {
             };
 
             let Some(terminal) = terminals.get(index).cloned() else {
-                tracing::warn!(
-                    "Terminal index {} out of range for task {}",
-                    index,
-                    task.id
-                );
+                tracing::warn!("Terminal index {} out of range for task {}", index, task.id);
                 continue;
             };
 
@@ -1025,7 +1044,10 @@ impl OrchestratorAgent {
 
             // Build and dispatch instruction
             let instruction = Self::build_task_instruction(&task, &terminal);
-            if let Err(e) = self.dispatch_terminal(&task.id, &terminal, &instruction).await {
+            if let Err(e) = self
+                .dispatch_terminal(&task.id, &terminal, &instruction)
+                .await
+            {
                 tracing::error!(
                     "Failed to auto-dispatch terminal {} for task {}: {}",
                     terminal.id,
@@ -1051,11 +1073,7 @@ impl OrchestratorAgent {
         };
 
         // 2. Update database (synchronously await result)
-        db::models::Workflow::update_status(
-            &self.db.pool,
-            &workflow_id,
-            status,
-        ).await?;
+        db::models::Workflow::update_status(&self.db.pool, &workflow_id, status).await?;
 
         // 3. Publish to message bus (synchronously await result)
         let message = BusMessage::StatusUpdate {
@@ -1065,11 +1083,7 @@ impl OrchestratorAgent {
         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
         self.message_bus.publish(&topic, message).await?;
 
-        tracing::debug!(
-            "Broadcast workflow status: {} -> {}",
-            workflow_id,
-            status
-        );
+        tracing::debug!("Broadcast workflow status: {} -> {}", workflow_id, status);
 
         Ok(())
     }
@@ -1078,7 +1092,11 @@ impl OrchestratorAgent {
     ///
     /// Updates the terminal status in the database and broadcasts
     /// a TerminalStatusUpdate message to the workflow's message bus topic.
-    pub async fn broadcast_terminal_status(&self, terminal_id: &str, status: &str) -> anyhow::Result<()> {
+    pub async fn broadcast_terminal_status(
+        &self,
+        terminal_id: &str,
+        status: &str,
+    ) -> anyhow::Result<()> {
         // 1. Get workflow_id
         let workflow_id = {
             let state = self.state.read().await;
@@ -1086,11 +1104,7 @@ impl OrchestratorAgent {
         };
 
         // 2. Update database (synchronously await result)
-        db::models::Terminal::update_status(
-            &self.db.pool,
-            terminal_id,
-            status,
-        ).await?;
+        db::models::Terminal::update_status(&self.db.pool, terminal_id, status).await?;
 
         // 3. Publish to message bus (synchronously await result)
         let message = BusMessage::TerminalStatusUpdate {
@@ -1101,11 +1115,7 @@ impl OrchestratorAgent {
         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
         self.message_bus.publish(&topic, message).await?;
 
-        tracing::debug!(
-            "Broadcast terminal status: {} -> {}",
-            terminal_id,
-            status
-        );
+        tracing::debug!("Broadcast terminal status: {} -> {}", terminal_id, status);
 
         Ok(())
     }
@@ -1122,11 +1132,7 @@ impl OrchestratorAgent {
         };
 
         // 2. Update database (synchronously await result)
-        db::models::WorkflowTask::update_status(
-            &self.db.pool,
-            task_id,
-            status,
-        ).await?;
+        db::models::WorkflowTask::update_status(&self.db.pool, task_id, status).await?;
 
         // 3. Publish to message bus (synchronously await result)
         let message = BusMessage::TaskStatusUpdate {
@@ -1137,11 +1143,7 @@ impl OrchestratorAgent {
         let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
         self.message_bus.publish(&topic, message).await?;
 
-        tracing::debug!(
-            "Broadcast task status: {} -> {}",
-            task_id,
-            status
-        );
+        tracing::debug!("Broadcast task status: {} -> {}", task_id, status);
 
         Ok(())
     }
@@ -1181,11 +1183,7 @@ impl OrchestratorAgent {
 
         // Merge each task branch
         for (task_id, task_branch) in task_branches {
-            tracing::info!(
-                "Merging task branch {} for task {}",
-                task_branch,
-                task_id
-            );
+            tracing::info!("Merging task branch {} for task {}", task_branch, task_id);
 
             // Determine task worktree path
             let task_worktree_path = base_repo_path.join("worktrees").join(&task_branch);
@@ -1216,10 +1214,8 @@ impl OrchestratorAgent {
                 }
                 Err(e) => {
                     // Check if this is a merge conflict
-                    let is_conflict = matches!(
-                        e,
-                        crate::services::git::GitServiceError::MergeConflicts(_)
-                    );
+                    let is_conflict =
+                        matches!(e, crate::services::git::GitServiceError::MergeConflicts(_));
 
                     if is_conflict {
                         tracing::warn!(
@@ -1232,8 +1228,9 @@ impl OrchestratorAgent {
                         db::models::Workflow::update_status(
                             &self.db.pool,
                             &workflow_id,
-                            WORKFLOW_STATUS_MERGING
-                        ).await?;
+                            WORKFLOW_STATUS_MERGING,
+                        )
+                        .await?;
 
                         // Broadcast merging status
                         let message = BusMessage::StatusUpdate {
@@ -1245,22 +1242,20 @@ impl OrchestratorAgent {
 
                         return Err(anyhow::anyhow!(
                             "Merge conflict detected for task branch {}: {}",
-                            task_branch, e
+                            task_branch,
+                            e
                         ));
                     }
 
                     // Other error - fail workflow
-                    tracing::error!(
-                        "Merge failed for task branch {}: {}",
-                        task_branch,
-                        e
-                    );
+                    tracing::error!("Merge failed for task branch {}: {}", task_branch, e);
 
                     db::models::Workflow::update_status(
                         &self.db.pool,
                         &workflow_id,
-                        WORKFLOW_STATUS_FAILED
-                    ).await?;
+                        WORKFLOW_STATUS_FAILED,
+                    )
+                    .await?;
 
                     let message = BusMessage::Error {
                         workflow_id: workflow_id.clone(),
@@ -1271,7 +1266,8 @@ impl OrchestratorAgent {
 
                     return Err(anyhow::anyhow!(
                         "Merge failed for task branch {}: {}",
-                        task_branch, e
+                        task_branch,
+                        e
                     ));
                 }
             }
@@ -1330,7 +1326,8 @@ impl OrchestratorAgent {
         }
 
         // Load workflow commands
-        let commands = db::models::WorkflowCommand::find_by_workflow(&self.db.pool, &workflow_id).await?;
+        let commands =
+            db::models::WorkflowCommand::find_by_workflow(&self.db.pool, &workflow_id).await?;
 
         if commands.is_empty() {
             tracing::info!("No slash commands configured for workflow {}", workflow_id);
@@ -1340,7 +1337,11 @@ impl OrchestratorAgent {
         // Load all presets
         let all_presets = db::models::SlashCommandPreset::find_all(&self.db.pool).await?;
 
-        tracing::info!("Executing {} slash command(s) for workflow {}", commands.len(), workflow_id);
+        tracing::info!(
+            "Executing {} slash command(s) for workflow {}",
+            commands.len(),
+            workflow_id
+        );
 
         // Create template renderer
         let renderer = TemplateRenderer::new();
@@ -1363,16 +1364,16 @@ impl OrchestratorAgent {
             let template = preset.prompt_template.as_deref().unwrap_or("");
 
             // Render the template with custom params and workflow context
-            let rendered_prompt = renderer.render(
-                template,
-                cmd.custom_params.as_deref(),
-                Some(&workflow_ctx),
-            ).map_err(|e| anyhow::anyhow!(
-                "Failed to render template for command {}: {} (index {})",
-                preset.command,
-                e,
-                index
-            ))?;
+            let rendered_prompt = renderer
+                .render(template, cmd.custom_params.as_deref(), Some(&workflow_ctx))
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to render template for command {}: {} (index {})",
+                        preset.command,
+                        e,
+                        index
+                    )
+                })?;
 
             tracing::info!(
                 "Executing slash command {}: {} (index {})",
@@ -1388,10 +1389,13 @@ impl OrchestratorAgent {
             }
 
             // Send to LLM and get response
-            let response = self.llm_client.chat({
-                let state = self.state.read().await;
-                state.conversation_history.clone()
-            }).await?;
+            let response = self
+                .llm_client
+                .chat({
+                    let state = self.state.read().await;
+                    state.conversation_history.clone()
+                })
+                .await?;
 
             // Add assistant response to conversation
             {

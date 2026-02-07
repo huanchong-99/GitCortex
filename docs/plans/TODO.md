@@ -1,4 +1,4 @@
-# GitCortex 开发进度追踪
+﻿# GitCortex 开发进度追踪
 
 > **自动化说明:** 此文件由 `superpowers-automation` skill 自动更新。
 > 每完成一个任务，对应行的状态会从 `⬜` 更新为 `✅` 并记录完成时间。
@@ -8,11 +8,11 @@
 | 指标 | 值 |
 |------|-----|
 | 总任务数 | 296 |
-| 已完成 | 228 |
+| 已完成 | 288 |
 | 进行中 | 0 |
-| 未开始 | 68 (Phase 21: 2个, Phase 26: 60个, Phase 27: 6个) |
+| 未开始 | 8 (Phase 21: 2个, Phase 27: 6个) |
 | 可选优化 | 5 |
-| **完成率** | **77.0%** |
+| **完成率** | **97.3%** |
 
 > **当前审计分数:** 100/100 (S级)
 > **目标分数:** 100/100 (S级 - 完美代码)
@@ -25,11 +25,10 @@
 > - ✅ 136 个单元测试全部通过
 > - ✅ GitHub Actions CI 通过
 >
-> **下一步:** Phase 26 - 联合审计问题全量修复（阻断级 + 逻辑级 + 兼容级）
-> - 基于 `codex和Claudecode联合分析_三文件增量合并.md` 全量拆解 60 个修复任务（A/B/C 50 + 补充高优先 10）
-> - 前后端/服务层/数据层并行修复，确保跨模块链路一致
-> - 强化回归矩阵：单测 + 集成 + E2E + 稳定性验证
-> - Phase 26 完成后再执行 Docker 容器化（顺延至 Phase 27）
+> **下一步:** Phase 27 - Docker 容器化与一键部署
+> - 基于 Phase 26 已完成链路，推进容器化部署与环境一致性
+> - 完善镜像构建、Compose 编排、健康检查与 CI 集成
+> - 目标：实现 `docker compose up` 一键启动完整服务
 >
 > **核心功能已完成:**
 > - ✅ Phase 20-23: 自动化协调核心 + Git 事件驱动 + WebSocket 事件广播 + 终端进程隔离
@@ -989,11 +988,11 @@
 
 ---
 
-## Phase 26: 联合审计问题全量修复（Codex + Claude）
+## Phase 26: 联合审计问题全量修复（Codex + Claude） ✅
 
 **计划文件:** `2026-02-08-phase-26-unified-audit-fix-plan.md`
 
-> **状态:** 📋 待实施
+> **状态:** ✅ 已完成（2026-02-07）
 > **优先级:** 🔴 最高（阻断级/核心链路修复）
 > **目标:** 修复 `codex和Claudecode联合分析_三文件增量合并.md` 发现的全部 60 个高优先问题
 > **前置条件:** Phase 25 自动确认可靠性修复完成
@@ -1003,81 +1002,81 @@
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 26.1 | 修复 Step4 终端校验键不一致，恢复错误提示与阻断一致性 | ⬜ |  |
-| 26.2 | 修复多任务 Workflow 终端初始化缺失导致提交失败 | ⬜ |  |
-| 26.3 | 移除 DiffsPanel 渲染期 setState，消除渲染抖动/循环风险 | ⬜ |  |
-| 26.4 | stop_workflow 同步停止终端进程，修复“状态已停进程仍跑” | ⬜ |  |
-| 26.5 | Workflow merge 执行真实合并链路，禁止“仅改状态假完成” | ⬜ |  |
-| 26.6 | 统一终端状态枚举与映射，覆盖 cancelled/review_* 状态 | ⬜ |  |
-| 26.7 | 修复 Review 事件误发为 workflow.status_changed 的语义错位 | ⬜ |  |
-| 26.8 | 创建 WorkflowTask 时正确绑定 vk_task_id，恢复终端会话关联 | ⬜ |  |
-| 26.9 | task attempt 启动失败向调用方显式返回错误 | ⬜ |  |
-| 26.10 | 放开无 process 的 Follow-up 输入，避免失败态无法自救 | ⬜ |  |
-| 26.11 | 修复 createTask 后错误跳转 attempts/latest | ⬜ |  |
-| 26.12 | 统一 Slash Command description 校验规则（前后端一致） | ⬜ |  |
-| 26.13 | 修复 Slash Command 重命名命令名无效 | ⬜ |  |
-| 26.14 | 统一 Open Editor 请求字段（file_path / git_repo_path）契约 | ⬜ |  |
-| 26.15 | containers/attempt-context 支持子目录 ref 解析 | ⬜ |  |
-| 26.16 | 容器查询 not found 正确映射为 404（非 500） | ⬜ |  |
-| 26.17 | 修复 Terminal WS 接收超时导致只读会话误断连 | ⬜ |  |
-| 26.18 | stop terminal 对不存在 id 返回 not_found，禁止假成功 | ⬜ |  |
-| 26.19 | 任务列表 executor 可空解码修复，消除潜在 500 | ⬜ |  |
+| 26.1 | 修复 Step4 终端校验键不一致，恢复错误提示与阻断一致性 | ✅ | 2026-02-07 |
+| 26.2 | 修复多任务 Workflow 终端初始化缺失导致提交失败 | ✅ | 2026-02-07 |
+| 26.3 | 移除 DiffsPanel 渲染期 setState，消除渲染抖动/循环风险 | ✅ | 2026-02-07 |
+| 26.4 | stop_workflow 同步停止终端进程，修复“状态已停进程仍跑” | ✅ | 2026-02-07 |
+| 26.5 | Workflow merge 执行真实合并链路，禁止“仅改状态假完成” | ✅ | 2026-02-07 |
+| 26.6 | 统一终端状态枚举与映射，覆盖 cancelled/review_* 状态 | ✅ | 2026-02-07 |
+| 26.7 | 修复 Review 事件误发为 workflow.status_changed 的语义错位 | ✅ | 2026-02-07 |
+| 26.8 | 创建 WorkflowTask 时正确绑定 vk_task_id，恢复终端会话关联 | ✅ | 2026-02-07 |
+| 26.9 | task attempt 启动失败向调用方显式返回错误 | ✅ | 2026-02-07 |
+| 26.10 | 放开无 process 的 Follow-up 输入，避免失败态无法自救 | ✅ | 2026-02-07 |
+| 26.11 | 修复 createTask 后错误跳转 attempts/latest | ✅ | 2026-02-07 |
+| 26.12 | 统一 Slash Command description 校验规则（前后端一致） | ✅ | 2026-02-07 |
+| 26.13 | 修复 Slash Command 重命名命令名无效 | ✅ | 2026-02-07 |
+| 26.14 | 统一 Open Editor 请求字段（file_path / git_repo_path）契约 | ✅ | 2026-02-07 |
+| 26.15 | containers/attempt-context 支持子目录 ref 解析 | ✅ | 2026-02-07 |
+| 26.16 | 容器查询 not found 正确映射为 404（非 500） | ✅ | 2026-02-07 |
+| 26.17 | 修复 Terminal WS 接收超时导致只读会话误断连 | ✅ | 2026-02-07 |
+| 26.18 | stop terminal 对不存在 id 返回 not_found，禁止假成功 | ✅ | 2026-02-07 |
+| 26.19 | 任务列表 executor 可空解码修复，消除潜在 500 | ✅ | 2026-02-07 |
 
 ### P1 - 逻辑级问题（B1-B21）
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 26.20 | useWorkflowEvents 引用计数化，避免多订阅互断 | ⬜ |  |
-| 26.21 | WS Store 支持多 workflow 并行订阅，避免串线覆盖 | ⬜ |  |
-| 26.22 | 前端补齐 terminal.prompt_* 事件类型与消费链路 | ⬜ |  |
-| 26.23 | EventBridge 无订阅场景引入事件补偿/缓存策略 | ⬜ |  |
-| 26.24 | lagged 事件恢复机制，禁止静默丢弃 | ⬜ |  |
-| 26.25 | prepare 部分失败时统一回滚已启动终端 | ⬜ |  |
-| 26.26 | workflow task 状态接口移除/拒绝 in_progress 非法值 | ⬜ |  |
-| 26.27 | 修复单仓 open-editor + file_path 基目录拼接错误 | ⬜ |  |
-| 26.28 | 多仓 merge 不再提前置 Done/归档 workspace | ⬜ |  |
-| 26.29 | 修复删除任务缓存 key 错误导致的详情闪回 | ⬜ |  |
-| 26.30 | 修复 useAttemptExecution 空 key 停止态串扰 | ⬜ |  |
-| 26.31 | Follow-up 脚本入口可用性与 Result 错误处理一致 | ⬜ |  |
-| 26.32 | ExecutionProcessesProvider 纳入 attemptId 维度 | ⬜ |  |
-| 26.33 | subscription_hub 无订阅不创建 channel，抑制增长 | ⬜ |  |
-| 26.34 | workspace 清理 SQL 修复 NULL completed_at 处理 | ⬜ |  |
-| 26.35 | execution_process 完成更新同步刷新 updated_at | ⬜ |  |
-| 26.36 | execution_processes raw logs WS 避免重复拉流 | ⬜ |  |
-| 26.37 | Project Open Editor 路径范围约束（项目内白名单） | ⬜ |  |
-| 26.38 | 远程编辑器 URL 路径编码，支持特殊字符 | ⬜ |  |
-| 26.39 | 远程文件 :1:1 追加规则去本地 is_file 依赖 | ⬜ |  |
-| 26.40 | 组织/远程项目入口与后端能力对齐（支持或禁用） | ⬜ |  |
+| 26.20 | useWorkflowEvents 引用计数化，避免多订阅互断 | ✅ | 2026-02-07 |
+| 26.21 | WS Store 支持多 workflow 并行订阅，避免串线覆盖 | ✅ | 2026-02-07 |
+| 26.22 | 前端补齐 terminal.prompt_* 事件类型与消费链路 | ✅ | 2026-02-07 |
+| 26.23 | EventBridge 无订阅场景引入事件补偿/缓存策略 | ✅ | 2026-02-07 |
+| 26.24 | lagged 事件恢复机制，禁止静默丢弃 | ✅ | 2026-02-07 |
+| 26.25 | prepare 部分失败时统一回滚已启动终端 | ✅ | 2026-02-07 |
+| 26.26 | workflow task 状态接口移除/拒绝 in_progress 非法值 | ✅ | 2026-02-07 |
+| 26.27 | 修复单仓 open-editor + file_path 基目录拼接错误 | ✅ | 2026-02-07 |
+| 26.28 | 多仓 merge 不再提前置 Done/归档 workspace | ✅ | 2026-02-07 |
+| 26.29 | 修复删除任务缓存 key 错误导致的详情闪回 | ✅ | 2026-02-07 |
+| 26.30 | 修复 useAttemptExecution 空 key 停止态串扰 | ✅ | 2026-02-07 |
+| 26.31 | Follow-up 脚本入口可用性与 Result 错误处理一致 | ✅ | 2026-02-07 |
+| 26.32 | ExecutionProcessesProvider 纳入 attemptId 维度 | ✅ | 2026-02-07 |
+| 26.33 | subscription_hub 无订阅不创建 channel，抑制增长 | ✅ | 2026-02-07 |
+| 26.34 | workspace 清理 SQL 修复 NULL completed_at 处理 | ✅ | 2026-02-07 |
+| 26.35 | execution_process 完成更新同步刷新 updated_at | ✅ | 2026-02-07 |
+| 26.36 | execution_processes raw logs WS 避免重复拉流 | ✅ | 2026-02-07 |
+| 26.37 | Project Open Editor 路径范围约束（项目内白名单） | ✅ | 2026-02-07 |
+| 26.38 | 远程编辑器 URL 路径编码，支持特殊字符 | ✅ | 2026-02-07 |
+| 26.39 | 远程文件 :1:1 追加规则去本地 is_file 依赖 | ✅ | 2026-02-07 |
+| 26.40 | 组织/远程项目入口与后端能力对齐（支持或禁用） | ✅ | 2026-02-07 |
 
 ### P2 - 兼容/实现级问题（C1-C10）
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 26.41 | 修复 ProjectSettings 更新类型不完整导致前端检查失败 | ⬜ |  |
-| 26.42 | executors command build 空 base 防 panic 处理 | ⬜ |  |
-| 26.43 | plain_text_processor time_gap 分支丢 chunk 修复 | ⬜ |  |
-| 26.44 | review session selector 双 Skip 索引偏移修复 | ⬜ |  |
-| 26.45 | review 的 gh 检测兼容 Windows（which -> where） | ⬜ |  |
-| 26.46 | cc-switch 原子写入兼容 Windows 已存在目标文件 | ⬜ |  |
-| 26.47 | MCP 不支持错误文案/错误码统一，前端可稳定识别 | ⬜ |  |
-| 26.48 | MCP 保存逻辑使用稳定 profile key（非对象引用） | ⬜ |  |
-| 26.49 | 前端 Workflow 状态枚举补齐 merging 并对齐映射 | ⬜ |  |
-| 26.50 | TerminalDto.customApiKey 序列化与 shared 类型一致化 | ⬜ |  |
+| 26.41 | 修复 ProjectSettings 更新类型不完整导致前端检查失败 | ✅ | 2026-02-07 |
+| 26.42 | executors command build 空 base 防 panic 处理 | ✅ | 2026-02-07 |
+| 26.43 | plain_text_processor time_gap 分支丢 chunk 修复 | ✅ | 2026-02-07 |
+| 26.44 | review session selector 双 Skip 索引偏移修复 | ✅ | 2026-02-07 |
+| 26.45 | review 的 gh 检测兼容 Windows（which -> where） | ✅ | 2026-02-07 |
+| 26.46 | cc-switch 原子写入兼容 Windows 已存在目标文件 | ✅ | 2026-02-07 |
+| 26.47 | MCP 不支持错误文案/错误码统一，前端可稳定识别 | ✅ | 2026-02-07 |
+| 26.48 | MCP 保存逻辑使用稳定 profile key（非对象引用） | ✅ | 2026-02-07 |
+| 26.49 | 前端 Workflow 状态枚举补齐 merging 并对齐映射 | ✅ | 2026-02-07 |
+| 26.50 | TerminalDto.customApiKey 序列化与 shared 类型一致化 | ✅ | 2026-02-07 |
 
 ### P0/P1 - 合并报告补充高优先问题（S1-S10）
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 26.51 | 修复 `Terminal::set_started()` 状态语义错误（waiting/started 对齐） | ⬜ |  |
-| 26.52 | 补齐终端状态变化 WebSocket 事件发布链路（状态变更可观测） | ⬜ |  |
-| 26.53 | 修复 prepare 流程状态转换混乱，避免终端长期卡在 waiting | ⬜ |  |
-| 26.54 | auto_confirm 与 PromptWatcher 注册逻辑打通（配置生效） | ⬜ |  |
-| 26.55 | PromptHandler 决策逻辑接入 auto_confirm（避免策略脱节） | ⬜ |  |
-| 26.56 | 补齐历史数据迁移：旧 terminal 的 auto_confirm 缺省值回填 | ⬜ |  |
-| 26.57 | 修复 Phase 24/25 自动确认集成断点（事件到决策链路一致） | ⬜ |  |
-| 26.58 | 修复手动启动路径 logger 失败处理不一致（失败语义统一） | ⬜ |  |
-| 26.59 | 修复 TerminalLogger flush 恢复机制竞态（避免重复恢复/丢日志） | ⬜ |  |
-| 26.60 | 补强 lagged 场景输出补偿链路（与 26.24 联合验收） | ⬜ |  |
+| 26.51 | 修复 `Terminal::set_started()` 状态语义错误（waiting/started 对齐） | ✅ | 2026-02-07 |
+| 26.52 | 补齐终端状态变化 WebSocket 事件发布链路（状态变更可观测） | ✅ | 2026-02-07 |
+| 26.53 | 修复 prepare 流程状态转换混乱，避免终端长期卡在 waiting | ✅ | 2026-02-07 |
+| 26.54 | auto_confirm 与 PromptWatcher 注册逻辑打通（配置生效） | ✅ | 2026-02-07 |
+| 26.55 | PromptHandler 决策逻辑接入 auto_confirm（避免策略脱节） | ✅ | 2026-02-07 |
+| 26.56 | 补齐历史数据迁移：旧 terminal 的 auto_confirm 缺省值回填 | ✅ | 2026-02-07 |
+| 26.57 | 修复 Phase 24/25 自动确认集成断点（事件到决策链路一致） | ✅ | 2026-02-07 |
+| 26.58 | 修复手动启动路径 logger 失败处理不一致（失败语义统一） | ✅ | 2026-02-07 |
+| 26.59 | 修复 TerminalLogger flush 恢复机制竞态（避免重复恢复/丢日志） | ✅ | 2026-02-07 |
+| 26.60 | 补强 lagged 场景输出补偿链路（与 26.24 联合验收） | ✅ | 2026-02-07 |
 
 **完成标准:**
 - ✅ 报告中 60 个高优先问题全部有对应修复任务与验收条目
@@ -1280,3 +1279,4 @@ pub async fn create_workflow_with_tasks(
 | 2026-01-30 | **Phase 18.3-18.6 性能/安全/文档完成** | Task 18.3-18.6 | 性能测试(终端/WS/DB) + 安全测试(加密/访问控制/注入防护) + Criterion基准 + USER_GUIDE + OPERATIONS_MANUAL + RELEASE_CHECKLIST |
 | 2026-02-04 | **Phase 22 WebSocket 事件广播完成** | Task 22.1-22.20 | 20/20 任务完成 + workflow_events.rs + subscription_hub.rs + event_bridge.rs + workflow_ws.rs + wsStore 增强 + 26 个测试通过 |
 | 2026-02-04 | **Phase 23 终端进程隔离完成** | Task 23.1-23.28 | 28/28 任务完成 + SpawnCommand/SpawnEnv + build_launch_config + CodexHomeGuard RAII + 136 个测试通过 + CI 通过 |
+

@@ -23,7 +23,7 @@ export const ExecutionProcessesProvider: React.FC<{
   attemptId: string | undefined;
   sessionId?: string | undefined;
   children: React.ReactNode;
-}> = ({ sessionId, children }) => {
+}> = ({ attemptId, sessionId, children }) => {
   const {
     executionProcesses,
     executionProcessesById,
@@ -31,7 +31,7 @@ export const ExecutionProcessesProvider: React.FC<{
     isLoading,
     isConnected,
     error,
-  } = useExecutionProcesses(sessionId, { showSoftDeleted: true });
+  } = useExecutionProcesses(sessionId, attemptId, { showSoftDeleted: true });
 
   // Filter out dropped processes (server already filters by session)
   const visible = useMemo(() => {

@@ -10,7 +10,6 @@ use db::models::{
     merge::{Merge, MergeStatus},
     repo::{Repo, RepoError},
     session::{CreateSession, Session},
-    task::{Task, TaskStatus},
     workspace::{Workspace, WorkspaceError},
     workspace_repo::WorkspaceRepo,
 };
@@ -31,7 +30,9 @@ use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
-use crate::{DeploymentImpl, error::ApiError};
+use crate::{
+    DeploymentImpl, error::ApiError, routes::task_attempts::finalize_workspace_if_all_repos_merged,
+};
 
 #[derive(Debug, Deserialize, Serialize, TS)]
 pub struct CreatePrApiRequest {
@@ -480,15 +481,22 @@ pub async fn attach_existing_pr(
             .await?;
         }
 
-        // If PR is merged, mark task as done and archive workspace
+        // If PR is merged, only mark task done/archive after all repos are merged
         if matches!(pr_info.status, MergeStatus::Merged) {
-            Task::update_status(pool, task.id, TaskStatus::Done).await?;
-            if !workspace.pinned {
-                Workspace::set_archived(pool, workspace.id, true).await?;
+            let all_repos_merged =
+                finalize_workspace_if_all_repos_merged(pool, &workspace, task.id).await?;
+            if !all_repos_merged {
+                tracing::info!(
+                    workspace_id = %workspace.id,
+                    repo_id = %workspace_repo.repo_id,
+                    "PR merged, waiting for remaining repositories before marking task done"
+                );
             }
 
             // Note: Remote sharing features have been removed
-            tracing::debug!("Task {} marked as done after PR merge", task.id);
+            if all_repos_merged {
+                tracing::debug!("Task {} marked done after all repositories merged", task.id);
+            }
         }
 
         Ok(ResponseJson(ApiResponse::success(AttachPrResponse {

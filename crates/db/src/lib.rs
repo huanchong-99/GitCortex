@@ -168,8 +168,9 @@ impl DBService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sqlx::Row;
+
+    use super::*;
 
     #[tokio::test]
     async fn workflow_project_created_index_exists() -> Result<(), sqlx::Error> {

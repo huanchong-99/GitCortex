@@ -196,6 +196,8 @@ impl PlainTextLogProcessor {
             return vec![];
         }
 
+        let mut patches = Vec::new();
+
         if !self.buffer.is_empty() {
             // If the new content arrived after the (**Optional**) time threshold between messages, we consider it a new entry.
             // Useful for stderr streams where we want to group related lines into a single entry.
@@ -206,7 +208,7 @@ impl PlainTextLogProcessor {
                 let lines = self.buffer.flush();
                 if !lines.is_empty() {
                     let content = lines.concat();
-                    return vec![self.create_patch(content)];
+                    patches.push(self.create_patch(content));
                 }
                 self.current_entry_index = None;
             }
@@ -221,7 +223,7 @@ impl PlainTextLogProcessor {
         };
 
         if formatted_chunk.is_empty() {
-            return vec![];
+            return patches;
         }
 
         // Let the buffer handle text buffering
@@ -232,11 +234,9 @@ impl PlainTextLogProcessor {
             self.buffer.recompute_len();
             if self.buffer.is_empty() {
                 // Nothing left to process after transformation
-                return vec![];
+                return patches;
             }
         }
-
-        let mut patches = Vec::new();
 
         // Check if we have a custom message boundary predicate
         loop {
@@ -365,7 +365,9 @@ impl PlainTextLogProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::{NormalizedEntryType, ToolStatus};
+    use crate::logs::{
+        NormalizedEntryType, ToolStatus, utils::patch::extract_normalized_entry_from_patch,
+    };
 
     #[test]
     fn test_plain_buffer_flush() {
@@ -490,5 +492,41 @@ mod tests {
         // Next, add actual content; should emit one patch with the content
         let patches = processor.process("real content\n".to_string());
         assert_eq!(patches.len(), 1);
+    }
+
+    #[test]
+    fn test_time_gap_flush_still_processes_current_chunk() {
+        let producer = |content: String| -> NormalizedEntry {
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::SystemMessage,
+                content,
+                metadata: None,
+            }
+        };
+
+        let mut processor = PlainTextLogProcessor::builder()
+            .normalized_entry_producer(producer)
+            .time_gap(Duration::from_millis(10))
+            .index_provider(EntryIndexProvider::test_new())
+            .build();
+
+        let patches = processor.process("first\n".to_string());
+        assert_eq!(patches.len(), 1);
+
+        std::thread::sleep(Duration::from_millis(20));
+
+        let patches = processor.process("second\n".to_string());
+        assert_eq!(patches.len(), 2);
+
+        let first_content = extract_normalized_entry_from_patch(&patches[0])
+            .map(|(_, entry)| entry.content)
+            .expect("first patch content should exist");
+        let second_content = extract_normalized_entry_from_patch(&patches[1])
+            .map(|(_, entry)| entry.content)
+            .expect("second patch content should exist");
+
+        assert_eq!(first_content, "first\n");
+        assert_eq!(second_content, "second\n");
     }
 }

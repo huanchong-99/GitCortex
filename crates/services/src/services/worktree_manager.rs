@@ -5,8 +5,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use once_cell::sync::Lazy;
 use git2::{Error as GitError, Repository};
+use once_cell::sync::Lazy;
 use thiserror::Error;
 use tracing::{debug, info, trace};
 use utils::{path::normalize_macos_private_alias, shell::resolve_executable_path};

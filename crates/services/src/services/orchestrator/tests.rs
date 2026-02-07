@@ -4,15 +4,19 @@
 
 #[cfg(test)]
 mod orchestrator_tests {
+    use std::sync::Arc;
+
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
     use crate::services::orchestrator::{
         BusMessage, CommitMetadata, LLMMessage, MessageBus, MockLLMClient, OrchestratorAgent,
         OrchestratorConfig, OrchestratorInstruction, OrchestratorRunState, OrchestratorState,
-        TerminalCompletionEvent, TerminalCompletionStatus, constants::DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
-        create_llm_client,
+        TerminalCompletionEvent, TerminalCompletionStatus,
+        constants::DEFAULT_LLM_RATE_LIMIT_PER_SECOND, create_llm_client,
     };
-    use std::sync::Arc;
-    use wiremock::{Mock, MockServer, ResponseTemplate};
-    use wiremock::matchers::{method, path};
 
     // Tests will be added in subsequent tasks
 
@@ -618,16 +622,13 @@ mod orchestrator_tests {
 
     #[tokio::test]
     async fn test_agent_creation() {
+        use std::{path::PathBuf, sync::Arc};
+
         use db::DBService;
         use sqlx::sqlite::SqlitePoolOptions;
-        use std::path::PathBuf;
-        use std::sync::Arc;
 
         // Create in-memory database with migrations
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
-            .await
-            .unwrap();
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
 
         // Run migrations
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -638,9 +639,7 @@ mod orchestrator_tests {
             .join("db")
             .join("migrations");
 
-        let migrator = sqlx::migrate::Migrator::new(migration_dir)
-            .await
-            .unwrap();
+        let migrator = sqlx::migrate::Migrator::new(migration_dir).await.unwrap();
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool });
@@ -658,7 +657,10 @@ mod orchestrator_tests {
         };
 
         // Verify config validation works
-        assert!(config.validate().is_ok(), "Config with api_key should be valid");
+        assert!(
+            config.validate().is_ok(),
+            "Config with api_key should be valid"
+        );
 
         // Create mock LLM client for testing
         let mock_llm_client = Box::new(MockLLMClient::new());
@@ -673,7 +675,10 @@ mod orchestrator_tests {
         );
 
         // Verify agent creation succeeds
-        assert!(result.is_ok(), "Agent creation with mock LLM client should succeed");
+        assert!(
+            result.is_ok(),
+            "Agent creation with mock LLM client should succeed"
+        );
 
         let _agent = result.unwrap();
 
@@ -686,17 +691,14 @@ mod orchestrator_tests {
 
     #[tokio::test]
     async fn test_execute_instruction_send_to_terminal() {
+        use std::{path::PathBuf, sync::Arc};
+
         use db::DBService;
         use sqlx::sqlite::SqlitePoolOptions;
-        use std::path::PathBuf;
-        use std::sync::Arc;
         use uuid::Uuid;
 
         // Create in-memory database with migrations
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
-            .await
-            .unwrap();
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
 
         // Run migrations
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -707,9 +709,7 @@ mod orchestrator_tests {
             .join("db")
             .join("migrations");
 
-        let migrator = sqlx::migrate::Migrator::new(migration_dir)
-            .await
-            .unwrap();
+        let migrator = sqlx::migrate::Migrator::new(migration_dir).await.unwrap();
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool: pool.clone() });
@@ -723,7 +723,7 @@ mod orchestrator_tests {
         // First, we need to insert a project (required by workflow)
         let project_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
         )
         .bind(project_id)
         .bind("test-project")
@@ -741,7 +741,7 @@ mod orchestrator_tests {
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "
+            ",
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -762,7 +762,7 @@ mod orchestrator_tests {
                 id, workflow_id, name, branch, order_index,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            "
+            ",
         )
         .bind(&task_id)
         .bind(&workflow_id)
@@ -782,7 +782,7 @@ mod orchestrator_tests {
                 id, workflow_task_id, cli_type_id, model_config_id,
                 order_index, status, pty_session_id, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            "
+            ",
         )
         .bind(&terminal_id)
         .bind(&task_id)
@@ -831,10 +831,8 @@ mod orchestrator_tests {
         });
 
         // Verify message received on terminal topic
-        let timeout = tokio::time::timeout(
-            tokio::time::Duration::from_millis(500),
-            terminal_rx.recv()
-        ).await;
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(500), terminal_rx.recv()).await;
 
         assert!(timeout.is_ok(), "Should receive message within timeout");
 
@@ -851,18 +849,14 @@ mod orchestrator_tests {
 
     #[tokio::test]
     async fn test_execute_instruction_complete_workflow_success() {
-        use db::DBService;
-        use db::models::Workflow;
+        use std::{path::PathBuf, sync::Arc};
+
+        use db::{DBService, models::Workflow};
         use sqlx::sqlite::SqlitePoolOptions;
-        use std::path::PathBuf;
-        use std::sync::Arc;
         use uuid::Uuid;
 
         // Create in-memory database with migrations
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
-            .await
-            .unwrap();
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
 
         // Run migrations
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -873,9 +867,7 @@ mod orchestrator_tests {
             .join("db")
             .join("migrations");
 
-        let migrator = sqlx::migrate::Migrator::new(migration_dir)
-            .await
-            .unwrap();
+        let migrator = sqlx::migrate::Migrator::new(migration_dir).await.unwrap();
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool: pool.clone() });
@@ -886,7 +878,7 @@ mod orchestrator_tests {
         // First, we need to insert a project (required by workflow)
         let project_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
         )
         .bind(project_id)
         .bind("test-project")
@@ -904,7 +896,7 @@ mod orchestrator_tests {
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "
+            ",
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -939,10 +931,13 @@ mod orchestrator_tests {
         .unwrap();
 
         // Subscribe to workflow topic
-        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{workflow_id}")).await;
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{workflow_id}"))
+            .await;
 
         // Execute instruction
-        let instruction_json = r#"{"type":"complete_workflow","summary":"All tasks completed successfully"}"#;
+        let instruction_json =
+            r#"{"type":"complete_workflow","summary":"All tasks completed successfully"}"#;
 
         tokio::spawn(async move {
             let _ = agent.execute_instruction(instruction_json).await;
@@ -959,16 +954,17 @@ mod orchestrator_tests {
         assert_eq!(updated_workflow.status, "completed");
 
         // Verify status update event published
-        let timeout = tokio::time::timeout(
-            tokio::time::Duration::from_millis(500),
-            workflow_rx.recv()
-        ).await;
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(500), workflow_rx.recv()).await;
 
         assert!(timeout.is_ok(), "Should receive status update event");
 
         let msg = timeout.unwrap().unwrap();
         match msg {
-            BusMessage::StatusUpdate { workflow_id: wf_id, status } => {
+            BusMessage::StatusUpdate {
+                workflow_id: wf_id,
+                status,
+            } => {
                 assert_eq!(wf_id, workflow_id);
                 assert_eq!(status, "completed");
             }
@@ -978,18 +974,14 @@ mod orchestrator_tests {
 
     #[tokio::test]
     async fn test_execute_instruction_fail_workflow() {
-        use db::DBService;
-        use db::models::Workflow;
+        use std::{path::PathBuf, sync::Arc};
+
+        use db::{DBService, models::Workflow};
         use sqlx::sqlite::SqlitePoolOptions;
-        use std::path::PathBuf;
-        use std::sync::Arc;
         use uuid::Uuid;
 
         // Create in-memory database with migrations
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
-            .await
-            .unwrap();
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
 
         // Run migrations
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1000,9 +992,7 @@ mod orchestrator_tests {
             .join("db")
             .join("migrations");
 
-        let migrator = sqlx::migrate::Migrator::new(migration_dir)
-            .await
-            .unwrap();
+        let migrator = sqlx::migrate::Migrator::new(migration_dir).await.unwrap();
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool: pool.clone() });
@@ -1013,7 +1003,7 @@ mod orchestrator_tests {
         // First, we need to insert a project (required by workflow)
         let project_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
         )
         .bind(project_id)
         .bind("test-project")
@@ -1031,7 +1021,7 @@ mod orchestrator_tests {
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "
+            ",
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -1066,7 +1056,8 @@ mod orchestrator_tests {
         .unwrap();
 
         // Execute instruction with failure
-        let instruction_json = r#"{"type":"fail_workflow","reason":"Critical error in task execution"}"#;
+        let instruction_json =
+            r#"{"type":"fail_workflow","reason":"Critical error in task execution"}"#;
 
         agent.execute_instruction(instruction_json).await.unwrap();
 
@@ -1087,17 +1078,20 @@ mod orchestrator_tests {
     async fn setup_workflow_with_terminals(
         terminal_count: usize,
         include_pty: bool,
-    ) -> (Arc<db::DBService>, String, String, Vec<(String, Option<String>)>) {
+    ) -> (
+        Arc<db::DBService>,
+        String,
+        String,
+        Vec<(String, Option<String>)>,
+    ) {
+        use std::path::PathBuf;
+
         use db::DBService;
         use sqlx::sqlite::SqlitePoolOptions;
-        use std::path::PathBuf;
         use uuid::Uuid;
 
         // Create in-memory database with migrations
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
-            .await
-            .unwrap();
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
 
         // Run migrations
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1108,9 +1102,7 @@ mod orchestrator_tests {
             .join("db")
             .join("migrations");
 
-        let migrator = sqlx::migrate::Migrator::new(migration_dir)
-            .await
-            .unwrap();
+        let migrator = sqlx::migrate::Migrator::new(migration_dir).await.unwrap();
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool: pool.clone() });
@@ -1121,7 +1113,7 @@ mod orchestrator_tests {
         // Insert project
         let project_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
         )
         .bind(project_id)
         .bind("test-project")
@@ -1139,7 +1131,7 @@ mod orchestrator_tests {
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "
+            ",
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -1160,7 +1152,7 @@ mod orchestrator_tests {
                 id, workflow_id, name, branch, order_index,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            "
+            ",
         )
         .bind(&task_id)
         .bind(&workflow_id)
@@ -1188,7 +1180,7 @@ mod orchestrator_tests {
                     id, workflow_task_id, cli_type_id, model_config_id,
                     order_index, status, pty_session_id, created_at, updated_at
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-                "
+                ",
             )
             .bind(&terminal_id)
             .bind(&task_id)
@@ -1213,8 +1205,7 @@ mod orchestrator_tests {
     async fn test_execute_instruction_start_task() {
         use db::models::{Terminal, WorkflowTask};
 
-        let (db, workflow_id, task_id, terminals) =
-            setup_workflow_with_terminals(1, true).await;
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(1, true).await;
         let (terminal_id, pty_session_id) = terminals.first().cloned().unwrap();
         let pty_session_id = pty_session_id.expect("PTY should be present");
 
@@ -1248,10 +1239,8 @@ mod orchestrator_tests {
         let result = agent.execute_instruction(&instruction_json).await;
         assert!(result.is_ok(), "StartTask should succeed");
 
-        let timeout = tokio::time::timeout(
-            tokio::time::Duration::from_millis(500),
-            terminal_rx.recv()
-        ).await;
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(500), terminal_rx.recv()).await;
 
         assert!(timeout.is_ok(), "Should receive terminal message");
         let msg = timeout.unwrap().unwrap();
@@ -1279,8 +1268,7 @@ mod orchestrator_tests {
     async fn test_execute_instruction_start_task_no_pty() {
         use db::models::{Terminal, WorkflowTask};
 
-        let (db, workflow_id, task_id, terminals) =
-            setup_workflow_with_terminals(1, false).await;
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(1, false).await;
         let (terminal_id, _) = terminals.first().cloned().unwrap();
 
         let config = OrchestratorConfig {
@@ -1329,18 +1317,19 @@ mod orchestrator_tests {
     // =========================================================================
 
     /// Helper function to set up test workflow with terminal
-    async fn setup_test_workflow() -> (Arc<db::DBService>, db::models::Workflow, db::models::Terminal) {
+    async fn setup_test_workflow() -> (
+        Arc<db::DBService>,
+        db::models::Workflow,
+        db::models::Terminal,
+    ) {
+        use std::{path::PathBuf, sync::Arc};
+
         use db::DBService;
         use sqlx::sqlite::SqlitePoolOptions;
-        use std::path::PathBuf;
-        use std::sync::Arc;
         use uuid::Uuid;
 
         // Create in-memory database with migrations
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
-            .await
-            .unwrap();
+        let pool = SqlitePoolOptions::new().connect(":memory:").await.unwrap();
 
         // Run migrations
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1351,9 +1340,7 @@ mod orchestrator_tests {
             .join("db")
             .join("migrations");
 
-        let migrator = sqlx::migrate::Migrator::new(migration_dir)
-            .await
-            .unwrap();
+        let migrator = sqlx::migrate::Migrator::new(migration_dir).await.unwrap();
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool: pool.clone() });
@@ -1367,7 +1354,7 @@ mod orchestrator_tests {
         // First, we need to insert a project (required by workflow)
         let project_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
+            "INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
         )
         .bind(project_id)
         .bind("test-project")
@@ -1385,7 +1372,7 @@ mod orchestrator_tests {
                 merge_terminal_cli_id, merge_terminal_model_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "
+            ",
         )
         .bind(&workflow_id)
         .bind(&project_id)
@@ -1406,7 +1393,7 @@ mod orchestrator_tests {
                 id, workflow_id, name, branch, order_index,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            "
+            ",
         )
         .bind(&task_id)
         .bind(&workflow_id)
@@ -1426,7 +1413,7 @@ mod orchestrator_tests {
                 id, workflow_task_id, cli_type_id, model_config_id,
                 order_index, status, pty_session_id, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-            "
+            ",
         )
         .bind(&terminal_id)
         .bind(&task_id)
@@ -1487,9 +1474,9 @@ mod orchestrator_tests {
         .unwrap();
 
         // Subscribe to workflow topic
-        let mut workflow_rx = message_bus.subscribe(
-            &format!("workflow:{}", workflow.id)
-        ).await;
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{}", workflow.id))
+            .await;
 
         // Create valid commit message (KV format, not JSON)
         let commit_message = format!(
@@ -1505,28 +1492,96 @@ next_action: continue"#,
         );
 
         // Handle git event
-        agent.handle_git_event(
-            &workflow.id,
-            "abc123",
-            "main",
-            commit_message.as_str()
-        ).await.unwrap();
+        agent
+            .handle_git_event(&workflow.id, "abc123", "main", commit_message.as_str())
+            .await
+            .unwrap();
 
         // Verify terminal status updated
-        let updated_terminal = db::models::Terminal::find_by_id(
-            &db.pool,
-            &terminal.id
-        ).await.unwrap().unwrap();
+        let updated_terminal = db::models::Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(updated_terminal.status, "completed");
 
         // Verify event published
-        let timeout = tokio::time::timeout(
-            tokio::time::Duration::from_millis(500),
-            workflow_rx.recv()
-        ).await;
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(500), workflow_rx.recv()).await;
 
         assert!(timeout.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_review_pass_publishes_terminal_status_update() {
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{}", workflow.id))
+            .await;
+
+        let commit_message = format!(
+            r#"Review passed
+
+---METADATA---
+workflow_id: {}
+task_id: {}
+terminal_id: reviewer-1
+status: review_pass
+reviewed_terminal: {}"#,
+            workflow.id, terminal.workflow_task_id, terminal.id
+        );
+
+        agent
+            .handle_git_event(&workflow.id, "abc123", "main", commit_message.as_str())
+            .await
+            .unwrap();
+
+        let msg = tokio::time::timeout(tokio::time::Duration::from_millis(500), workflow_rx.recv())
+            .await
+            .expect("Should receive workflow message")
+            .expect("Message should not be None");
+
+        match msg {
+            BusMessage::TerminalStatusUpdate {
+                workflow_id,
+                terminal_id,
+                status,
+            } => {
+                assert_eq!(workflow_id, workflow.id);
+                assert_eq!(terminal_id, terminal.id);
+                assert_eq!(status, "review_passed");
+            }
+            _ => panic!("Expected TerminalStatusUpdate, got {msg:?}"),
+        }
     }
 
     #[tokio::test]
@@ -1572,12 +1627,9 @@ status: completed
 next_action: continue"#;
 
         // Should succeed but do nothing (workflow mismatch)
-        let result = agent.handle_git_event(
-            &workflow.id,
-            "abc123",
-            "main",
-            commit_message
-        ).await;
+        let result = agent
+            .handle_git_event(&workflow.id, "abc123", "main", commit_message)
+            .await;
 
         assert!(result.is_ok());
     }
@@ -1673,19 +1725,22 @@ next_action: continue"#;
             "abc123def456",
             "feature/test",
             "feat: add new feature",
-        ).await;
+        )
+        .await;
 
         // Verify message received on topic
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub.recv()
-        ).await;
+        let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub.recv()).await;
 
         assert!(msg.is_ok(), "Should receive git event within timeout");
         let msg = msg.unwrap().unwrap();
 
         match msg {
-            BusMessage::GitEvent { workflow_id, commit_hash, branch, message } => {
+            BusMessage::GitEvent {
+                workflow_id,
+                commit_hash,
+                branch,
+                message,
+            } => {
                 assert_eq!(workflow_id, "wf-1");
                 assert_eq!(commit_hash, "abc123def456");
                 assert_eq!(branch, "feature/test");
@@ -1701,18 +1756,12 @@ next_action: continue"#;
         let mut broadcast_sub = bus.subscribe_broadcast();
 
         // Publish git event
-        bus.publish_git_event(
-            "wf-1",
-            "abc123",
-            "main",
-            "fix: bug fix",
-        ).await;
+        bus.publish_git_event("wf-1", "abc123", "main", "fix: bug fix")
+            .await;
 
         // Verify broadcast received
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            broadcast_sub.recv()
-        ).await;
+        let msg =
+            tokio::time::timeout(std::time::Duration::from_millis(100), broadcast_sub.recv()).await;
 
         assert!(msg.is_ok(), "Should receive broadcast within timeout");
         let msg = msg.unwrap().unwrap();
@@ -1773,28 +1822,22 @@ next_action: continue"#,
         let commit_hash = "unique_commit_hash_123";
 
         // First call should process the commit
-        let result1 = agent.handle_git_event(
-            &workflow.id,
-            commit_hash,
-            "main",
-            &commit_message
-        ).await;
+        let result1 = agent
+            .handle_git_event(&workflow.id, commit_hash, "main", &commit_message)
+            .await;
         assert!(result1.is_ok(), "First call should succeed");
 
         // Second call with same commit hash should be idempotent (no error, but no processing)
-        let result2 = agent.handle_git_event(
-            &workflow.id,
-            commit_hash,
-            "main",
-            &commit_message
-        ).await;
+        let result2 = agent
+            .handle_git_event(&workflow.id, commit_hash, "main", &commit_message)
+            .await;
         assert!(result2.is_ok(), "Second call should succeed (idempotent)");
 
         // Verify terminal status is still completed (not double-processed)
-        let updated_terminal = db::models::Terminal::find_by_id(
-            &db.pool,
-            &terminal.id
-        ).await.unwrap().unwrap();
+        let updated_terminal = db::models::Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(updated_terminal.status, "completed");
     }
 
@@ -1834,12 +1877,14 @@ next_action: continue"#,
         let commit_message = "feat: add new feature without metadata";
 
         // Should succeed and trigger awakening logic
-        let result = agent.handle_git_event(
-            &workflow.id,
-            "no_metadata_commit_456",
-            "feature/branch",
-            commit_message
-        ).await;
+        let result = agent
+            .handle_git_event(
+                &workflow.id,
+                "no_metadata_commit_456",
+                "feature/branch",
+                commit_message,
+            )
+            .await;
 
         assert!(result.is_ok(), "Should handle commit without metadata");
     }
@@ -1873,25 +1918,15 @@ next_action: continue"#,
         let mut sub_wf2 = bus.subscribe("workflow:wf-2").await;
 
         // Publish to wf-1 only
-        bus.publish_git_event(
-            "wf-1",
-            "abc123",
-            "main",
-            "commit message",
-        ).await;
+        bus.publish_git_event("wf-1", "abc123", "main", "commit message")
+            .await;
 
         // wf-1 should receive
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub_wf1.recv()
-        ).await;
+        let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub_wf1.recv()).await;
         assert!(msg.is_ok(), "wf-1 should receive git event");
 
         // wf-2 should NOT receive (timeout)
-        let msg = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            sub_wf2.recv()
-        ).await;
+        let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub_wf2.recv()).await;
         assert!(msg.is_err(), "wf-2 should not receive wf-1's git event");
     }
 }

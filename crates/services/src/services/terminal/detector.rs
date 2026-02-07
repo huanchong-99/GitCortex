@@ -267,7 +267,6 @@ mod tests {
             assert!(sh_path.is_some(), "Should find 'sh' executable");
             assert!(sh_path.unwrap().ends_with("sh"));
         }
-
     }
 
     #[tokio::test]

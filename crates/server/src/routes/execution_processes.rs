@@ -42,14 +42,17 @@ pub async fn stream_raw_logs_ws(
     State(deployment): State<DeploymentImpl>,
     Path(exec_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // Check if the stream exists before upgrading the WebSocket
-    let _stream = deployment
-        .container()
-        .stream_raw_logs(&exec_id)
-        .await
-        .ok_or_else(|| {
-            ApiError::ExecutionProcess(ExecutionProcessError::ExecutionProcessNotFound)
-        })?;
+    // Verify process existence before upgrading WebSocket.
+    // Avoid creating raw log stream twice (precheck + handler).
+    let exists = ExecutionProcess::find_by_id(&deployment.db().pool, exec_id)
+        .await?
+        .is_some();
+
+    if !exists {
+        return Err(ApiError::ExecutionProcess(
+            ExecutionProcessError::ExecutionProcessNotFound,
+        ));
+    }
 
     Ok(ws.on_upgrade(move |socket| async move {
         if let Err(e) = handle_raw_logs_ws(socket, deployment, exec_id).await {

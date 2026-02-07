@@ -6,14 +6,13 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
     task::JoinHandle,
     time::MissedTickBehavior,
 };
 
-use crate::services::orchestrator::message_bus::{BusMessage, SharedMessageBus};
-
 use super::process::ProcessManager;
+use crate::services::orchestrator::message_bus::{BusMessage, SharedMessageBus};
 
 // ============================================================================
 // Constants
@@ -222,7 +221,10 @@ impl TerminalBridge {
 
     /// Returns whether a PTY session currently has an active bridge task.
     pub async fn is_registered(&self, pty_session_id: &str) -> bool {
-        self.active_sessions.read().await.contains_key(pty_session_id)
+        self.active_sessions
+            .read()
+            .await
+            .contains_key(pty_session_id)
     }
 
     /// Helper method to forward a bus message to PTY stdin.
@@ -310,9 +312,9 @@ impl TerminalBridge {
             .await
             .ok_or_else(|| anyhow::anyhow!("Terminal not running: {}", terminal_id))?;
 
-        let writer = handle
-            .writer
-            .ok_or_else(|| anyhow::anyhow!("PTY writer unavailable for terminal {}", terminal_id))?;
+        let writer = handle.writer.ok_or_else(|| {
+            anyhow::anyhow!("PTY writer unavailable for terminal {}", terminal_id)
+        })?;
 
         // Create channel for writer task
         let (tx, mut writer_rx) = mpsc::channel::<Vec<u8>>(BRIDGE_CHANNEL_CAPACITY);
@@ -474,6 +476,9 @@ mod tests {
     #[test]
     fn test_normalize_message_unix_lf() {
         let result = TerminalBridge::normalize_message("hello");
-        assert!(result.ends_with('\n') && !result.ends_with("\r\n"), "Unix should use LF only");
+        assert!(
+            result.ends_with('\n') && !result.ends_with("\r\n"),
+            "Unix should use LF only"
+        );
     }
 }

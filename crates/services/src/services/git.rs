@@ -180,9 +180,7 @@ impl GitService {
     }
 
     /// Get a signature for libgit2 commits with a safe fallback identity.
-    fn signature_with_fallback(
-        repo: &Repository,
-    ) -> Result<git2::Signature<'_>, GitServiceError> {
+    fn signature_with_fallback(repo: &Repository) -> Result<git2::Signature<'_>, GitServiceError> {
         match repo.signature() {
             Ok(sig) => Ok(sig),
             Err(_) => git2::Signature::now("GitCortex", "noreply@gitcortex.com")
@@ -318,9 +316,8 @@ impl GitService {
 
                 let git = GitCli::new();
                 let cli_opts = StatusDiffOptions {
-                    path_filter: path_filter.map(|fs| {
-                        fs.iter().copied().map(ToString::to_string).collect()
-                    }),
+                    path_filter: path_filter
+                        .map(|fs| fs.iter().copied().map(ToString::to_string).collect()),
                 };
                 let entries = git
                     .diff_status(worktree_path, base_commit, &cli_opts)
@@ -613,11 +610,7 @@ impl GitService {
     }
 
     /// Create FileDiffDetails from path and blob with filesystem fallback
-    fn create_file_details(
-        path: &Path,
-        blob_id: &git2::Oid,
-        repo: &Repository,
-    ) -> FileDiffDetails {
+    fn create_file_details(path: &Path, blob_id: &git2::Oid, repo: &Repository) -> FileDiffDetails {
         let file_name = path.to_string_lossy().to_string();
 
         // Try to get content from blob first (for non-zero OIDs)
@@ -814,76 +807,76 @@ impl GitService {
         if let Some(base_checkout_path) =
             Self::find_checkout_path_for_branch(base_worktree_path, base_branch_name)?
         {
-                // base branch is checked out somewhere - use CLI merge
-                let git_cli = GitCli::new();
+            // base branch is checked out somewhere - use CLI merge
+            let git_cli = GitCli::new();
 
-                // Safety check: base branch has no staged changes
-                if git_cli
-                    .has_staged_changes(&base_checkout_path)
-                    .map_err(|e| {
-                        GitServiceError::InvalidRepository(format!("git diff --cached failed: {e}"))
-                    })?
-                {
-                    return Err(GitServiceError::WorktreeDirty(
-                        base_branch_name.to_string(),
-                        "staged changes present".to_string(),
-                    ));
-                }
-
-                // Use CLI merge in base context
-                self.ensure_cli_commit_identity(&base_checkout_path)?;
-                let sha = git_cli
-                    .merge_squash_commit(
-                        &base_checkout_path,
-                        base_branch_name,
-                        task_branch_name,
-                        commit_message,
-                    )
-                    .map_err(|e| {
-                        GitServiceError::InvalidRepository(format!("CLI merge failed: {e}"))
-                    })?;
-
-                // Update task branch ref for continuity
-                let task_refname = format!("refs/heads/{task_branch_name}");
-                git_cli
-                    .update_ref(base_worktree_path, &task_refname, &sha)
-                    .map_err(|e| {
-                        GitServiceError::InvalidRepository(format!("git update-ref failed: {e}"))
-                    })?;
-
-                Ok(sha)
-            } else {
-                // base branch not checked out anywhere - use libgit2 pure ref operations
-                let task_branch = Self::find_branch(&task_repo, task_branch_name)?;
-                let base_branch = Self::find_branch(&task_repo, base_branch_name)?;
-
-                // Resolve commits
-                let base_commit = base_branch.get().peel_to_commit()?;
-                let task_commit = task_branch.get().peel_to_commit()?;
-
-                // Create the squash commit in-memory (no checkout) and update the base branch ref
-                let signature = Self::signature_with_fallback(&task_repo)?;
-                let squash_commit_id = Self::perform_squash_merge(
-                    &task_repo,
-                    &base_commit,
-                    &task_commit,
-                    &signature,
-                    commit_message,
-                    base_branch_name,
-                )?;
-
-                // Update the task branch to the new squash commit so follow-up
-                // work can continue from the merged state without conflicts.
-                let task_refname = format!("refs/heads/{task_branch_name}");
-                base_repo.reference(
-                    &task_refname,
-                    squash_commit_id,
-                    true,
-                    "Reset task branch after squash merge",
-                )?;
-
-                Ok(squash_commit_id.to_string())
+            // Safety check: base branch has no staged changes
+            if git_cli
+                .has_staged_changes(&base_checkout_path)
+                .map_err(|e| {
+                    GitServiceError::InvalidRepository(format!("git diff --cached failed: {e}"))
+                })?
+            {
+                return Err(GitServiceError::WorktreeDirty(
+                    base_branch_name.to_string(),
+                    "staged changes present".to_string(),
+                ));
             }
+
+            // Use CLI merge in base context
+            self.ensure_cli_commit_identity(&base_checkout_path)?;
+            let sha = git_cli
+                .merge_squash_commit(
+                    &base_checkout_path,
+                    base_branch_name,
+                    task_branch_name,
+                    commit_message,
+                )
+                .map_err(|e| {
+                    GitServiceError::InvalidRepository(format!("CLI merge failed: {e}"))
+                })?;
+
+            // Update task branch ref for continuity
+            let task_refname = format!("refs/heads/{task_branch_name}");
+            git_cli
+                .update_ref(base_worktree_path, &task_refname, &sha)
+                .map_err(|e| {
+                    GitServiceError::InvalidRepository(format!("git update-ref failed: {e}"))
+                })?;
+
+            Ok(sha)
+        } else {
+            // base branch not checked out anywhere - use libgit2 pure ref operations
+            let task_branch = Self::find_branch(&task_repo, task_branch_name)?;
+            let base_branch = Self::find_branch(&task_repo, base_branch_name)?;
+
+            // Resolve commits
+            let base_commit = base_branch.get().peel_to_commit()?;
+            let task_commit = task_branch.get().peel_to_commit()?;
+
+            // Create the squash commit in-memory (no checkout) and update the base branch ref
+            let signature = Self::signature_with_fallback(&task_repo)?;
+            let squash_commit_id = Self::perform_squash_merge(
+                &task_repo,
+                &base_commit,
+                &task_commit,
+                &signature,
+                commit_message,
+                base_branch_name,
+            )?;
+
+            // Update the task branch to the new squash commit so follow-up
+            // work can continue from the merged state without conflicts.
+            let task_refname = format!("refs/heads/{task_branch_name}");
+            base_repo.reference(
+                &task_refname,
+                squash_commit_id,
+                true,
+                "Reset task branch after squash merge",
+            )?;
+
+            Ok(squash_commit_id.to_string())
+        }
     }
     fn get_branch_status_inner(
         repo: &Repository,
@@ -1621,11 +1614,10 @@ impl GitService {
         repo_path: &Path,
         branch_name: &str,
     ) -> Result<String, GitServiceError> {
-        Self::get_remote_name_from_branch_name(repo_path, branch_name)
-            .or_else(|_| {
-                let repo = self.open_repo(repo_path)?;
-                Ok(Self::default_remote_name(&repo))
-            })
+        Self::get_remote_name_from_branch_name(repo_path, branch_name).or_else(|_| {
+            let repo = self.open_repo(repo_path)?;
+            Ok(Self::default_remote_name(&repo))
+        })
     }
 
     fn get_remote_from_branch_ref<'a>(
@@ -1728,10 +1720,7 @@ impl GitService {
     }
 
     /// Fetch from remote repository using native git authentication
-    fn fetch_all_from_remote(
-        repo: &Repository,
-        remote: &Remote,
-    ) -> Result<(), GitServiceError> {
+    fn fetch_all_from_remote(repo: &Repository, remote: &Remote) -> Result<(), GitServiceError> {
         let default_remote_name = Self::default_remote_name(repo);
         let remote_name = remote.name().unwrap_or(&default_remote_name);
         let refspec = format!("+refs/heads/*:refs/remotes/{remote_name}/*");

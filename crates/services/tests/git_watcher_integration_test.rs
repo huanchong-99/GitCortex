@@ -2,13 +2,13 @@
 //!
 //! Tests for monitoring git repositories and parsing commit metadata.
 
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::timeout;
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
-use services::services::git_watcher::{GitWatcher, GitWatcherConfig, CommitMetadata};
-use services::services::orchestrator::{MessageBus, BusMessage};
+use services::services::{
+    git_watcher::{CommitMetadata, GitWatcher, GitWatcherConfig},
+    orchestrator::{BusMessage, MessageBus},
+};
+use tokio::time::timeout;
 
 /// Helper to create a test commit message with metadata
 fn create_test_commit_message(
@@ -88,7 +88,10 @@ mod commit_metadata_tests {
         let message = "Normal commit without metadata";
 
         let result = CommitMetadata::parse(message);
-        assert!(result.is_none(), "Should return None for commits without metadata");
+        assert!(
+            result.is_none(),
+            "Should return None for commits without metadata"
+        );
     }
 
     #[test]
@@ -116,9 +119,11 @@ mod commit_metadata_tests {
 
 #[cfg(test)]
 mod git_watcher_tests {
-    use super::*;
     use std::fs;
+
     use tempfile::TempDir;
+
+    use super::*;
 
     /// Helper to create a test git repository
     fn create_test_repo() -> (TempDir, PathBuf) {
@@ -217,7 +222,8 @@ mod git_watcher_tests {
         // Subscribe to messages before creating watcher (which consumes message_bus)
         let mut receiver = message_bus.subscribe_broadcast();
 
-        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
+        let mut watcher =
+            GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching in background
         let watcher_handle = tokio::spawn(async move {
@@ -228,7 +234,8 @@ mod git_watcher_tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Create a commit with metadata
-        let commit_msg = create_test_commit_message("wf-test", "task-test", "terminal-test", "completed");
+        let commit_msg =
+            create_test_commit_message("wf-test", "task-test", "terminal-test", "completed");
         create_commit(&repo_path, &commit_msg);
 
         // Wait for the event to be published
@@ -243,7 +250,7 @@ mod git_watcher_tests {
                 assert_eq!(event.terminal_id, "terminal-test");
                 assert_eq!(event.task_id, "task-test");
                 assert_eq!(event.workflow_id, "wf-test");
-            },
+            }
             _ => panic!("Expected TerminalCompleted message, got {:?}", bus_message),
         }
 
@@ -264,7 +271,8 @@ mod git_watcher_tests {
         // Subscribe to messages before creating watcher
         let mut receiver = message_bus.subscribe_broadcast();
 
-        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
+        let mut watcher =
+            GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching in background
         let watcher_handle = tokio::spawn(async move {
@@ -281,7 +289,10 @@ mod git_watcher_tests {
         let result = timeout(Duration::from_millis(200), receiver.recv()).await;
 
         // Verify we didn't get a message
-        assert!(result.is_err(), "Should not receive a message for commits without metadata");
+        assert!(
+            result.is_err(),
+            "Should not receive a message for commits without metadata"
+        );
 
         // Cleanup
         watcher_handle.abort();
@@ -300,7 +311,8 @@ mod git_watcher_tests {
         // Subscribe to messages before creating watcher
         let mut receiver = message_bus.subscribe_broadcast();
 
-        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
+        let mut watcher =
+            GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching in background
         let watcher_handle = tokio::spawn(async move {
@@ -334,7 +346,11 @@ mod git_watcher_tests {
         }
 
         // Verify we got all 3 events
-        assert_eq!(events.len(), 3, "Should receive 3 terminal completion events");
+        assert_eq!(
+            events.len(),
+            3,
+            "Should receive 3 terminal completion events"
+        );
 
         // Cleanup
         watcher_handle.abort();
@@ -351,18 +367,21 @@ mod git_watcher_tests {
             poll_interval_ms: 50,
         };
 
-        let mut watcher = GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
+        let mut watcher =
+            GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
 
         // Start watching
-        let handle = tokio::spawn(async move {
-            timeout(Duration::from_millis(200), watcher.watch()).await
-        });
+        let handle =
+            tokio::spawn(async move { timeout(Duration::from_millis(200), watcher.watch()).await });
 
         // Wait a bit then let it complete naturally
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // The watcher should be running
-        let result: Result<Result<Result<(), anyhow::Error>, tokio::time::error::Elapsed>, tokio::task::JoinError> = handle.await;
+        let result: Result<
+            Result<Result<(), anyhow::Error>, tokio::time::error::Elapsed>,
+            tokio::task::JoinError,
+        > = handle.await;
         assert!(result.is_ok(), "Task should complete without panic");
 
         // Create a new watcher instance

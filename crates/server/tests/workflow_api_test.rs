@@ -5,15 +5,15 @@
 //! - Starting workflows
 //! - Status transitions
 
-use server::DeploymentImpl;
-use server::routes::subscription_hub::SubscriptionHub;
-use db::models::{
-    CreateWorkflowRequest, CreateTaskRequest, CreateTerminalRequest,
-    MergeTerminalConfig, OrchestratorConfig, Workflow, CliType, ModelConfig,
-};
-use uuid::Uuid;
-use serde_json::json;
 use std::sync::Arc;
+
+use db::models::{
+    CliType, CreateTaskRequest, CreateTerminalRequest, CreateWorkflowRequest, MergeTerminalConfig,
+    ModelConfig, OrchestratorConfig, Workflow,
+};
+use serde_json::json;
+use server::{DeploymentImpl, routes::subscription_hub::SubscriptionHub};
+use uuid::Uuid;
 
 /// Helper: Create a test subscription hub
 fn create_test_hub() -> server::routes::SharedSubscriptionHub {
@@ -22,7 +22,8 @@ fn create_test_hub() -> server::routes::SharedSubscriptionHub {
 
 /// Helper: Setup test environment
 async fn setup_test() -> (DeploymentImpl, String) {
-    let deployment = DeploymentImpl::new().await
+    let deployment = DeploymentImpl::new()
+        .await
         .expect("Failed to create deployment");
 
     // Create a test project
@@ -35,7 +36,9 @@ async fn setup_test() -> (DeploymentImpl, String) {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         },
-    ).await.expect("Failed to create project");
+    )
+    .await
+    .expect("Failed to create project");
 
     // Create CLI type
     let cli_type = CliType {
@@ -46,7 +49,8 @@ async fn setup_test() -> (DeploymentImpl, String) {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     };
-    CliType::create(&deployment.db().pool, &cli_type).await
+    CliType::create(&deployment.db().pool, &cli_type)
+        .await
         .expect("Failed to create CLI type");
 
     // Create model config
@@ -60,7 +64,8 @@ async fn setup_test() -> (DeploymentImpl, String) {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     };
-    ModelConfig::create(&deployment.db().pool, &model_config).await
+    ModelConfig::create(&deployment.db().pool, &model_config)
+        .await
         .expect("Failed to create model config");
 
     (deployment, project_id)
@@ -110,13 +115,31 @@ async fn create_minimal_workflow(
         status: "created".to_string(),
         use_slash_commands: request.use_slash_commands,
         orchestrator_enabled: request.orchestrator_config.is_some(),
-        orchestrator_api_type: request.orchestrator_config.as_ref().map(|c| c.api_type.clone()),
-        orchestrator_base_url: request.orchestrator_config.as_ref().map(|c| c.base_url.clone()),
-        orchestrator_api_key: request.orchestrator_config.as_ref().map(|c| c.api_key.clone()),
-        orchestrator_model: request.orchestrator_config.as_ref().map(|c| c.model.clone()),
+        orchestrator_api_type: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.api_type.clone()),
+        orchestrator_base_url: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.base_url.clone()),
+        orchestrator_api_key: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.api_key.clone()),
+        orchestrator_model: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.model.clone()),
         error_terminal_enabled: request.error_terminal_config.is_some(),
-        error_terminal_cli_id: request.error_terminal_config.as_ref().map(|c| c.cli_type_id.clone()),
-        error_terminal_model_id: request.error_terminal_config.as_ref().map(|c| c.model_config_id.clone()),
+        error_terminal_cli_id: request
+            .error_terminal_config
+            .as_ref()
+            .map(|c| c.cli_type_id.clone()),
+        error_terminal_model_id: request
+            .error_terminal_config
+            .as_ref()
+            .map(|c| c.model_config_id.clone()),
         merge_terminal_cli_id: request.merge_terminal_config.cli_type_id,
         merge_terminal_model_id: request.merge_terminal_config.model_config_id,
         target_branch: "main".to_string(),
@@ -127,7 +150,8 @@ async fn create_minimal_workflow(
         updated_at: chrono::Utc::now(),
     };
 
-    Workflow::create(&deployment.db().pool, &workflow).await
+    Workflow::create(&deployment.db().pool, &workflow)
+        .await
         .expect("Failed to create workflow");
 
     workflow_id
@@ -150,7 +174,7 @@ async fn test_start_workflow_requires_ready_status() {
     // (status validation now happens in runtime, which returns internal error)
     use axum::{
         body::Body,
-        http::{StatusCode, Request},
+        http::{Request, StatusCode},
     };
     use tower::ServiceExt;
 
@@ -162,8 +186,7 @@ async fn test_start_workflow_requires_ready_status() {
         .body(Body::empty())
         .expect("Failed to build request");
 
-    let response = app.oneshot(request).await
-        .expect("Failed to get response");
+    let response = app.oneshot(request).await.expect("Failed to get response");
 
     // Should return 500 Internal Server Error (runtime validation failure)
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -198,7 +221,7 @@ async fn test_start_workflow_transitions_to_running() {
     // Start workflow via API
     use axum::{
         body::Body,
-        http::{StatusCode, Request},
+        http::{Request, StatusCode},
     };
     use tower::ServiceExt;
 
@@ -210,8 +233,7 @@ async fn test_start_workflow_transitions_to_running() {
         .body(Body::empty())
         .expect("Failed to build request");
 
-    let response = app.oneshot(request).await
-        .expect("Failed to get response");
+    let response = app.oneshot(request).await.expect("Failed to get response");
 
     // Should return 200 OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -222,8 +244,10 @@ async fn test_start_workflow_transitions_to_running() {
         .expect("Failed to query workflow")
         .expect("Workflow not found");
     assert_eq!(workflow.status, "running");
-    assert!(workflow.started_at.is_some(),
-             "started_at should be set after starting workflow");
+    assert!(
+        workflow.started_at.is_some(),
+        "started_at should be set after starting workflow"
+    );
 }
 
 #[tokio::test]
@@ -248,7 +272,7 @@ async fn test_start_workflow_requires_orchestrator_enabled() {
     // Attempt to start workflow - should return 400 BadRequest
     use axum::{
         body::Body,
-        http::{StatusCode, Request},
+        http::{Request, StatusCode},
     };
     use tower::ServiceExt;
 
@@ -260,8 +284,7 @@ async fn test_start_workflow_requires_orchestrator_enabled() {
         .body(Body::empty())
         .expect("Failed to build request");
 
-    let response = app.oneshot(request).await
-        .expect("Failed to get response");
+    let response = app.oneshot(request).await.expect("Failed to get response");
 
     // Should return 400 BadRequest
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);

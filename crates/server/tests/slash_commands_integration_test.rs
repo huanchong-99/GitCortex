@@ -6,18 +6,19 @@
 //! - Workflow integration with slash commands
 //! - End-to-end command execution flow
 
-use server::DeploymentImpl;
 use db::models::{
-    CreateWorkflowRequest, CreateWorkflowTaskRequest, CreateTerminalRequest,
-    MergeTerminalConfig, TerminalConfig, WorkflowCommandRequest, Workflow,
-    SlashCommandPreset, CliType, ModelConfig, WorkflowCommand,
+    CliType, CreateTerminalRequest, CreateWorkflowRequest, CreateWorkflowTaskRequest,
+    MergeTerminalConfig, ModelConfig, SlashCommandPreset, TerminalConfig, Workflow,
+    WorkflowCommand, WorkflowCommandRequest,
 };
-use uuid::Uuid;
 use serde_json::json;
+use server::DeploymentImpl;
+use uuid::Uuid;
 
 /// Helper: Setup test environment
 async fn setup_test() -> (DeploymentImpl, String) {
-    let deployment = DeploymentImpl::new().await
+    let deployment = DeploymentImpl::new()
+        .await
         .expect("Failed to create deployment");
 
     // Create a test project
@@ -30,7 +31,9 @@ async fn setup_test() -> (DeploymentImpl, String) {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         },
-    ).await.expect("Failed to create project");
+    )
+    .await
+    .expect("Failed to create project");
 
     // Create CLI type
     let cli_type = CliType {
@@ -41,7 +44,8 @@ async fn setup_test() -> (DeploymentImpl, String) {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     };
-    CliType::create(&deployment.db().pool, &cli_type).await
+    CliType::create(&deployment.db().pool, &cli_type)
+        .await
         .expect("Failed to create CLI type");
 
     // Create model config
@@ -55,7 +59,8 @@ async fn setup_test() -> (DeploymentImpl, String) {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     };
-    ModelConfig::create(&deployment.db().pool, &model_config).await
+    ModelConfig::create(&deployment.db().pool, &model_config)
+        .await
         .expect("Failed to create model config");
 
     (deployment, project_id)
@@ -112,14 +117,16 @@ async fn test_list_all_presets() {
         "/test1",
         "Test command 1",
         "Template 1 with {{var}}",
-    ).await;
+    )
+    .await;
 
     create_test_preset(
         &deployment.db().pool,
         "/test2",
         "Test command 2",
         "Template 2",
-    ).await;
+    )
+    .await;
 
     // List all presets
     let presets = SlashCommandPreset::find_all(&deployment.db().pool)
@@ -142,7 +149,8 @@ async fn test_create_preset() {
         "/custom",
         "Custom command",
         "Custom {{param}} template",
-    ).await;
+    )
+    .await;
 
     // Verify preset was created
     let all_presets = SlashCommandPreset::find_all(&deployment.db().pool)
@@ -155,7 +163,10 @@ async fn test_create_preset() {
 
     assert_eq!(found.command, "/custom");
     assert_eq!(found.description, "Custom command");
-    assert_eq!(found.prompt_template, Some("Custom {{param}} template".to_string()));
+    assert_eq!(
+        found.prompt_template,
+        Some("Custom {{param}} template".to_string())
+    );
     assert!(!found.is_system);
 }
 
@@ -169,14 +180,16 @@ async fn test_workflow_with_commands() {
         "/review",
         "Review code",
         "Please review the following code:\n{{code_path}}",
-    ).await;
+    )
+    .await;
 
     let preset2 = create_test_preset(
         &deployment.db().pool,
         "/test",
         "Run tests",
         "Run tests for {{module}} with coverage {{coverage}}",
-    ).await;
+    )
+    .await;
 
     // Create workflow with commands
     let workflow_id = Uuid::new_v4().to_string();
@@ -218,7 +231,9 @@ async fn test_workflow_with_commands() {
         &preset1.id,
         0,
         Some(r#"{"code_path": "src/main.rs"}"#),
-    ).await.expect("Failed to create command 1");
+    )
+    .await
+    .expect("Failed to create command 1");
 
     let cmd2 = WorkflowCommand::create(
         &deployment.db().pool,
@@ -226,7 +241,9 @@ async fn test_workflow_with_commands() {
         &preset2.id,
         1,
         Some(r#"{"module": "auth", "coverage": "80%"}"#),
-    ).await.expect("Failed to create command 2");
+    )
+    .await
+    .expect("Failed to create command 2");
 
     // Retrieve commands for workflow
     let commands = WorkflowCommand::find_by_workflow(&deployment.db().pool, &workflow_id)
@@ -261,7 +278,8 @@ async fn test_template_rendering() {
     // Test 1: Simple template with custom params
     let template = "Review the code at {{path}}";
     let custom_params = r#"{"path": "src/lib.rs"}"#;
-    let result = renderer.render(template, Some(custom_params), None)
+    let result = renderer
+        .render(template, Some(custom_params), None)
         .expect("Failed to render template");
     assert_eq!(result, "Review the code at src/lib.rs");
 
@@ -272,19 +290,17 @@ async fn test_template_rendering() {
         Some("Test workflow".to_string()),
         "main".to_string(),
     );
-    let result = renderer.render(template, None, Some(&workflow_ctx))
+    let result = renderer
+        .render(template, None, Some(&workflow_ctx))
         .expect("Failed to render template");
     assert_eq!(result, "Working on My Workflow targeting main");
 
     // Test 3: Combined custom params and workflow context
     let template = "{{greeting}} {{workflow.name}}: {{instruction}}";
     let custom_params = r#"{"greeting": "Please", "instruction": "do the work"}"#;
-    let workflow_ctx = WorkflowContext::new(
-        "Test WF".to_string(),
-        None,
-        "dev".to_string(),
-    );
-    let result = renderer.render(template, Some(custom_params), Some(&workflow_ctx))
+    let workflow_ctx = WorkflowContext::new("Test WF".to_string(), None, "dev".to_string());
+    let result = renderer
+        .render(template, Some(custom_params), Some(&workflow_ctx))
         .expect("Failed to render template");
     assert_eq!(result, "Please Test WF: do the work");
 
@@ -296,7 +312,10 @@ async fn test_template_rendering() {
     // Test 5: Missing variable should fail (strict mode)
     let template = "Hello {{name}}";
     let result = renderer.render(template, None, None);
-    assert!(result.is_err(), "Should fail with missing variable in strict mode");
+    assert!(
+        result.is_err(),
+        "Should fail with missing variable in strict mode"
+    );
 }
 
 #[tokio::test]
@@ -309,7 +328,8 @@ async fn test_full_workflow_with_commands_api() {
         "/deploy",
         "Deploy to production",
         "Deploy {{service}} to {{env}} with {{strategy}} strategy",
-    ).await;
+    )
+    .await;
 
     // Create workflow request with commands
     let workflow_id = Uuid::new_v4().to_string();
@@ -318,12 +338,12 @@ async fn test_full_workflow_with_commands_api() {
         name: "Deploy Workflow".to_string(),
         description: Some("Deployment workflow".to_string()),
         use_slash_commands: true,
-        commands: Some(vec![
-            WorkflowCommandRequest {
-                preset_id: preset.id.clone(),
-                custom_params: Some(r#"{"service": "api", "env": "prod", "strategy": "blue-green"}"#.to_string()),
-            }
-        ]),
+        commands: Some(vec![WorkflowCommandRequest {
+            preset_id: preset.id.clone(),
+            custom_params: Some(
+                r#"{"service": "api", "env": "prod", "strategy": "blue-green"}"#.to_string(),
+            ),
+        }]),
         orchestrator_config: None,
         error_terminal_config: None,
         merge_terminal_config: TerminalConfig {
@@ -346,13 +366,28 @@ async fn test_full_workflow_with_commands_api() {
         status: "created".to_string(),
         use_slash_commands: request.use_slash_commands,
         orchestrator_enabled: request.orchestrator_config.is_some(),
-        orchestrator_api_type: request.orchestrator_config.as_ref().map(|c| c.api_type.clone()),
-        orchestrator_base_url: request.orchestrator_config.as_ref().map(|c| c.base_url.clone()),
+        orchestrator_api_type: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.api_type.clone()),
+        orchestrator_base_url: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.base_url.clone()),
         orchestrator_api_key: None,
-        orchestrator_model: request.orchestrator_config.as_ref().map(|c| c.model.clone()),
+        orchestrator_model: request
+            .orchestrator_config
+            .as_ref()
+            .map(|c| c.model.clone()),
         error_terminal_enabled: request.error_terminal_config.is_some(),
-        error_terminal_cli_id: request.error_terminal_config.as_ref().map(|c| c.cli_type_id.clone()),
-        error_terminal_model_id: request.error_terminal_config.as_ref().map(|c| c.model_config_id.clone()),
+        error_terminal_cli_id: request
+            .error_terminal_config
+            .as_ref()
+            .map(|c| c.cli_type_id.clone()),
+        error_terminal_model_id: request
+            .error_terminal_config
+            .as_ref()
+            .map(|c| c.model_config_id.clone()),
         merge_terminal_cli_id: request.merge_terminal_config.cli_type_id.clone(),
         merge_terminal_model_id: request.merge_terminal_config.model_config_id.clone(),
         target_branch: request.target_branch.unwrap_or_else(|| "main".to_string()),
@@ -376,7 +411,9 @@ async fn test_full_workflow_with_commands_api() {
                 &cmd_req.preset_id,
                 index as i32,
                 cmd_req.custom_params.as_deref(),
-            ).await.expect("Failed to create workflow command");
+            )
+            .await
+            .expect("Failed to create workflow command");
         }
     }
 
@@ -489,21 +526,24 @@ async fn test_complex_template_rendering() {
     // Test nested JSON in custom params
     let template = "User: {{user.name}}, Email: {{user.email}}";
     let custom_params = r#"{"user": {"name": "Alice", "email": "alice@example.com"}}"#;
-    let result = renderer.render(template, Some(custom_params), None)
+    let result = renderer
+        .render(template, Some(custom_params), None)
         .expect("Failed to render template");
     assert_eq!(result, "User: Alice, Email: alice@example.com");
 
     // Test array access
     let template = "First item: {{items.0}}, Second item: {{items.1}}";
     let custom_params = r#"{"items": ["apple", "banana"]}"#;
-    let result = renderer.render(template, Some(custom_params), None)
+    let result = renderer
+        .render(template, Some(custom_params), None)
         .expect("Failed to render template");
     assert_eq!(result, "First item: apple, Second item: banana");
 
     // Test template with newlines and special characters
     let template = "Instructions:\n1. {{step1}}\n2. {{step2}}\n\nResult: {{result}}";
     let custom_params = r#"{"step1": "Prepare", "step2": "Execute", "result": "Success!"}"#;
-    let result = renderer.render(template, Some(custom_params), None)
+    let result = renderer
+        .render(template, Some(custom_params), None)
         .expect("Failed to render template");
     assert!(result.contains("Prepare"));
     assert!(result.contains("Execute"));

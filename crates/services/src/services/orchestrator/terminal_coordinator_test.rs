@@ -5,18 +5,19 @@
 //! not by the coordinator.
 
 use std::sync::Arc;
-use uuid::Uuid;
-use chrono::Utc;
-use sqlx::sqlite::SqlitePoolOptions;
 
-use crate::services::orchestrator::TerminalCoordinator;
+use chrono::Utc;
 use db::{
     DBService,
     models::{
-        terminal::Terminal,
         cli_type::{CliType, ModelConfig},
+        terminal::Terminal,
     },
 };
+use sqlx::sqlite::SqlitePoolOptions;
+use uuid::Uuid;
+
+use crate::services::orchestrator::TerminalCoordinator;
 
 // Helper function to create test database with real migrations
 async fn setup_test_db() -> DBService {
@@ -28,16 +29,14 @@ async fn setup_test_db() -> DBService {
         .expect("Failed to create in-memory pool");
 
     // Run real migrations from db crate
-    let migrations_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../db/migrations");
+    let migrations_path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../db/migrations");
 
     let migrator = sqlx::migrate::Migrator::new(migrations_path)
         .await
         .expect("Failed to load migrations");
 
-    migrator.run(&pool)
-        .await
-        .expect("Failed to run migrations");
+    migrator.run(&pool).await.expect("Failed to run migrations");
 
     DBService { pool }
 }
@@ -128,16 +127,14 @@ async fn create_workflow_with_terminals(
     let now = Utc::now();
 
     // First create a project (required by workflow foreign key)
-    sqlx::query(
-        r"INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
-    )
-    .bind(project_id)
-    .bind("Test Project")
-    .bind(now)
-    .bind(now)
-    .execute(&db.pool)
-    .await
-    .expect("Failed to create project");
+    sqlx::query(r"INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)")
+        .bind(project_id)
+        .bind("Test Project")
+        .bind(now)
+        .bind(now)
+        .execute(&db.pool)
+        .await
+        .expect("Failed to create project");
 
     // Use pre-seeded cli_type and model_config from migrations
     let merge_cli_id = "cli-claude-code";
@@ -193,7 +190,7 @@ async fn create_workflow_with_terminals(
                 id, workflow_id, vk_task_id, name, description,
                 branch, status, order_index, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-            "
+            ",
         )
         .bind(&task_id)
         .bind(&workflow_id)
@@ -223,7 +220,7 @@ async fn create_workflow_with_terminals(
                     custom_base_url, custom_api_key, role, role_description,
                     order_index, status, created_at, updated_at
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-                "
+                ",
             )
             .bind(&terminal_id)
             .bind(&task_id)
@@ -259,18 +256,22 @@ async fn test_terminal_startup_sequence_succeeds() {
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 2, 2).await;
 
     // Start terminals for workflow
-    let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
+    let result: Result<(), anyhow::Error> =
+        coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
     assert!(result.is_ok(), "Terminal startup should succeed");
 
-    // Verify terminals are in "waiting" status
+    // Verify terminals are in "starting" status
     for terminal_id in terminal_ids {
         let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
             .await
             .expect("Failed to query terminal")
             .expect("Terminal not found");
-        assert_eq!(terminal.status, "waiting", "Terminal should be in waiting status");
+        assert_eq!(
+            terminal.status, "starting",
+            "Terminal should be in starting status"
+        );
     }
 }
 
@@ -284,18 +285,22 @@ async fn test_terminal_startup_updates_all_terminals() {
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 2, 2).await;
 
     // Start terminals for workflow
-    let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
+    let result: Result<(), anyhow::Error> =
+        coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
     assert!(result.is_ok(), "Terminal startup should succeed");
 
-    // Verify all terminals are in "waiting" status
+    // Verify all terminals are in "starting" status
     for terminal_id in terminal_ids {
         let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
             .await
             .expect("Failed to query terminal")
             .expect("Terminal not found");
-        assert_eq!(terminal.status, "waiting", "Terminal should be in waiting status");
+        assert_eq!(
+            terminal.status, "starting",
+            "Terminal should be in starting status"
+        );
     }
 }
 
@@ -310,16 +315,14 @@ async fn test_empty_workflow_no_terminals() {
     let now = Utc::now();
 
     // First create a project (required by workflow foreign key)
-    sqlx::query(
-        r"INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)"
-    )
-    .bind(project_id)
-    .bind("Test Project")
-    .bind(now)
-    .bind(now)
-    .execute(&db.pool)
-    .await
-    .expect("Failed to create project");
+    sqlx::query(r"INSERT INTO projects (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)")
+        .bind(project_id)
+        .bind("Test Project")
+        .bind(now)
+        .bind(now)
+        .execute(&db.pool)
+        .await
+        .expect("Failed to create project");
 
     // Use pre-seeded cli_type and model_config from migrations
     let merge_cli_id = "cli-claude-code";
@@ -376,15 +379,19 @@ async fn test_single_terminal_startup() {
     let (workflow_id, terminal_ids) = create_workflow_with_terminals(&db, 1, 1).await;
 
     // Start terminals for workflow
-    let result: Result<(), anyhow::Error> = coordinator.start_terminals_for_workflow(&workflow_id).await;
+    let result: Result<(), anyhow::Error> =
+        coordinator.start_terminals_for_workflow(&workflow_id).await;
 
     // Should succeed
     assert!(result.is_ok(), "Single terminal startup should succeed");
 
-    // Verify terminal is in "waiting" status
+    // Verify terminal is in "starting" status
     let terminal = Terminal::find_by_id(&db.pool, &terminal_ids[0])
         .await
         .expect("Failed to query terminal")
         .expect("Terminal not found");
-    assert_eq!(terminal.status, "waiting", "Terminal should be in waiting status");
+    assert_eq!(
+        terminal.status, "starting",
+        "Terminal should be in starting status"
+    );
 }

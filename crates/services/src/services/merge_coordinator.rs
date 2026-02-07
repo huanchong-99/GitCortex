@@ -2,15 +2,17 @@
 //!
 //! Coordinates merging of task branches into the base branch with conflict detection.
 
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
+
 use anyhow::Result;
 use tokio::sync::RwLock;
-use std::path::Path;
 
-use crate::services::git::GitService;
-use crate::services::orchestrator::{
-    constants::WORKFLOW_TOPIC_PREFIX,
-    message_bus::{BusMessage, SharedMessageBus},
+use crate::services::{
+    git::GitService,
+    orchestrator::{
+        constants::WORKFLOW_TOPIC_PREFIX,
+        message_bus::{BusMessage, SharedMessageBus},
+    },
 };
 
 /// Coordinates merging of completed task branches into the base branch.
@@ -95,16 +97,15 @@ impl MergeCoordinator {
                 );
 
                 // Broadcast merge success event
-                self.broadcast_merge_success(workflow_id, task_id, &sha).await?;
+                self.broadcast_merge_success(workflow_id, task_id, &sha)
+                    .await?;
 
                 Ok(sha)
             }
             Err(e) => {
                 // Check if error is due to merge conflicts
-                let is_conflict = matches!(
-                    e,
-                    crate::services::git::GitServiceError::MergeConflicts(_)
-                );
+                let is_conflict =
+                    matches!(e, crate::services::git::GitServiceError::MergeConflicts(_));
 
                 if is_conflict {
                     tracing::warn!(
@@ -121,11 +122,7 @@ impl MergeCoordinator {
                 }
 
                 // Other error - broadcast failure
-                tracing::error!(
-                    "Merge failed for task branch {}: {}",
-                    task_branch,
-                    e
-                );
+                tracing::error!("Merge failed for task branch {}: {}", task_branch, e);
 
                 self.broadcast_merge_failure(workflow_id, task_id, &e.to_string())
                     .await?;
@@ -202,10 +199,7 @@ impl MergeCoordinator {
         self.broadcast_merge_success(workflow_id, task_id, commit_sha)
             .await?;
 
-        tracing::info!(
-            "Successfully completed resolved merge for task {}",
-            task_id
-        );
+        tracing::info!("Successfully completed resolved merge for task {}", task_id);
 
         Ok(())
     }

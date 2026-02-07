@@ -2,8 +2,9 @@
 //!
 //! Run with: cargo bench --package server
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
 use std::time::Duration;
+
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 /// Benchmark database query performance
 fn bench_db_queries(c: &mut Criterion) {
@@ -83,11 +84,13 @@ fn bench_json_serde(c: &mut Criterion) {
     });
 
     // Batch serialization
-    let batch: Vec<_> = (0..100).map(|i| {
-        let mut w = sample.clone();
-        w.id = format!("id-{}", i);
-        w
-    }).collect();
+    let batch: Vec<_> = (0..100)
+        .map(|i| {
+            let mut w = sample.clone();
+            w.id = format!("id-{}", i);
+            w
+        })
+        .collect();
 
     group.bench_function("serialize_batch_100", |b| {
         b.iter(|| {
@@ -140,7 +143,13 @@ fn bench_string_ops(c: &mut Criterion) {
             let name = "Test Workflow Name";
             let slug: String = name
                 .chars()
-                .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+                .map(|c| {
+                    if c.is_alphanumeric() {
+                        c.to_ascii_lowercase()
+                    } else {
+                        '-'
+                    }
+                })
                 .collect();
             let branch = format!("workflow/{}/{}", workflow_id, slug);
             black_box(branch)
@@ -163,7 +172,7 @@ fn bench_string_ops(c: &mut Criterion) {
 
 /// Benchmark encryption operations (if applicable)
 fn bench_encryption(c: &mut Criterion) {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
 
     let mut group = c.benchmark_group("encryption");
 
@@ -201,9 +210,7 @@ fn bench_async_tasks(c: &mut Criterion) {
 
     group.bench_function("spawn_task", |b| {
         b.to_async(&rt).iter(|| async {
-            let handle = tokio::spawn(async {
-                42
-            });
+            let handle = tokio::spawn(async { 42 });
             let result = handle.await.unwrap();
             black_box(result)
         })

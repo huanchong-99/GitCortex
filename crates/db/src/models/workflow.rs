@@ -870,12 +870,10 @@ impl SlashCommandPreset {
 
     /// Find a preset by ID
     pub async fn find_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Self>> {
-        sqlx::query_as::<_, SlashCommandPreset>(
-            r"SELECT * FROM slash_command_preset WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
+        sqlx::query_as::<_, SlashCommandPreset>(r"SELECT * FROM slash_command_preset WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Create a new slash command preset
@@ -934,12 +932,10 @@ impl SlashCommandPreset {
 
     /// Delete a slash command preset (only non-system presets)
     pub async fn delete(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
-        sqlx::query(
-            r"DELETE FROM slash_command_preset WHERE id = ? AND is_system = 0",
-        )
-        .bind(id)
-        .execute(pool)
-        .await?;
+        sqlx::query(r"DELETE FROM slash_command_preset WHERE id = ? AND is_system = 0")
+            .bind(id)
+            .execute(pool)
+            .await?;
         Ok(())
     }
 }
@@ -1003,7 +999,10 @@ mod encryption_tests {
         }))
         .expect("deserialization should succeed");
 
-        assert!(request.auto_confirm, "auto_confirm should default to true when not specified");
+        assert!(
+            request.auto_confirm,
+            "auto_confirm should default to true when not specified"
+        );
     }
 
     #[test]
@@ -1016,7 +1015,10 @@ mod encryption_tests {
         }))
         .expect("deserialization should succeed");
 
-        assert!(!request.auto_confirm, "auto_confirm should respect explicit false value");
+        assert!(
+            !request.auto_confirm,
+            "auto_confirm should respect explicit false value"
+        );
     }
 
     #[test]
@@ -1029,7 +1031,10 @@ mod encryption_tests {
         }))
         .expect("deserialization should succeed");
 
-        assert!(request.auto_confirm, "auto_confirm should respect explicit true value");
+        assert!(
+            request.auto_confirm,
+            "auto_confirm should respect explicit true value"
+        );
     }
 
     #[test]

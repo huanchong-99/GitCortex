@@ -37,6 +37,7 @@ import {
   McpServerQuery,
   UpdateMcpServersBody,
   GetMcpServerResponse,
+  McpConfigError,
   ImageResponse,
   GitOperationError,
   ApprovalResponse,
@@ -94,6 +95,10 @@ import {
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
+
+type OpenEditorApiRequest = OpenEditorRequest & {
+  git_repo_path?: string | null;
+};
 
 export class ApiError<E = unknown> extends Error {
   public status?: number;
@@ -279,7 +284,7 @@ export const projectsApi = {
 
   openEditor: async (
     id: string,
-    data: OpenEditorRequest
+    data: OpenEditorApiRequest
   ): Promise<OpenEditorResponse> => {
     const response = await makeRequest(`/api/projects/${id}/open-editor`, {
       method: 'POST',
@@ -600,7 +605,7 @@ export const attemptsApi = {
 
   openEditor: async (
     attemptId: string,
-    data: OpenEditorRequest
+    data: OpenEditorApiRequest
   ): Promise<OpenEditorResponse> => {
     const response = await makeRequest(
       `/api/task-attempts/${attemptId}/open-editor`,
@@ -913,7 +918,7 @@ export const repoApi = {
 
   openEditor: async (
     repoId: string,
-    data: OpenEditorRequest
+    data: OpenEditorApiRequest
   ): Promise<OpenEditorResponse> => {
     const response = await makeRequest(`/api/repos/${repoId}/open-editor`, {
       method: 'POST',
@@ -1007,32 +1012,18 @@ export const mcpServersApi = {
   load: async (query: McpServerQuery): Promise<GetMcpServerResponse> => {
     const params = new URLSearchParams(query);
     const response = await makeRequest(`/api/mcp-config?${params.toString()}`);
-    return handleApiResponse<GetMcpServerResponse>(response);
+    return handleApiResponse<GetMcpServerResponse, McpConfigError>(response);
   },
   save: async (
     query: McpServerQuery,
     data: UpdateMcpServersBody
   ): Promise<void> => {
     const params = new URLSearchParams(query);
-    // params.set('profile', profile);
     const response = await makeRequest(`/api/mcp-config?${params.toString()}`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      const errorData = await response.json();
-      logApiError('[API Error] Failed to save MCP servers', {
-        message: errorData.message,
-        status: response.status,
-        response,
-        timestamp: new Date().toISOString(),
-      });
-      throw new ApiError(
-        errorData.message || 'Failed to save MCP servers',
-        response.status,
-        response
-      );
-    }
+    await handleApiResponse<string, McpConfigError>(response);
   },
 };
 

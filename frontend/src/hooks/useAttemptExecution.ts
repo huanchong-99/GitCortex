@@ -7,7 +7,8 @@ import type { AttemptData } from '@/lib/types';
 import type { ExecutionProcess } from 'shared/types';
 
 export function useAttemptExecution(attemptId?: string, taskId?: string) {
-  const { isStopping, setIsStopping } = useTaskStopping(taskId || '');
+  const stopStateKey = taskId ?? attemptId;
+  const { isStopping, setIsStopping } = useTaskStopping(stopStateKey);
 
   const {
     executionProcessesVisible: executionProcesses,

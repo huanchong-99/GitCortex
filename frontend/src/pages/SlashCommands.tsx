@@ -197,27 +197,35 @@ function SlashCommandFormDialog({
   const [promptTemplate, setPromptTemplate] = useState(command?.promptTemplate || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const normalizedCommand = cmd.trim();
+  const normalizedDescription = description.trim();
+  const normalizedTemplate = promptTemplate.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!cmd.trim() || !promptTemplate.trim()) {
+    if (!normalizedCommand || !normalizedTemplate) {
       setError(t('errors.validation.commandRequired'));
       return;
     }
 
-    if (!cmd.startsWith('/')) {
+    if (!normalizedCommand.startsWith('/')) {
       setError(t('errors.validation.commandMustStartWithSlash'));
+      return;
+    }
+
+    if (!normalizedDescription) {
+      setError('Description is required');
       return;
     }
 
     try {
       setIsSubmitting(true);
       await onSubmit({
-        command: cmd.trim(),
-        description: description.trim(),
-        promptTemplate: promptTemplate.trim(),
+        command: normalizedCommand,
+        description: normalizedDescription,
+        promptTemplate: normalizedTemplate,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.createFailed'));

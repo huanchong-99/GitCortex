@@ -29,6 +29,61 @@ pub enum EditorOpenError {
     },
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{EditorConfig, EditorType};
+    use std::path::Path;
+
+    #[test]
+    fn remote_url_encodes_special_characters_and_adds_line_col_for_file_hint() {
+        let config = EditorConfig::new(
+            EditorType::VsCode,
+            None,
+            Some("example.com".to_string()),
+            Some("alice".to_string()),
+        );
+
+        let url = config
+            .remote_url_with_hint(Path::new("/tmp/hello world/#1.ts"), Some(true))
+            .expect("remote url");
+
+        assert_eq!(
+            url,
+            "vscode://vscode-remote/ssh-remote+alice@example.com/tmp/hello+world/%231.ts:1:1"
+        );
+    }
+
+    #[test]
+    fn remote_url_uses_hint_over_local_is_file_result() {
+        let config = EditorConfig::new(
+            EditorType::Cursor,
+            None,
+            Some("example.com".to_string()),
+            None,
+        );
+
+        let url = config
+            .remote_url_with_hint(Path::new("/tmp/not-existing.ts"), Some(true))
+            .expect("remote url");
+        assert!(url.ends_with(":1:1"), "file hint should append line/col");
+    }
+
+    #[test]
+    fn remote_url_directory_hint_does_not_append_line_col() {
+        let config = EditorConfig::new(
+            EditorType::Windsurf,
+            None,
+            Some("example.com".to_string()),
+            None,
+        );
+
+        let url = config
+            .remote_url_with_hint(Path::new("/tmp/project dir"), Some(false))
+            .expect("remote url");
+        assert!(!url.ends_with(":1:1"), "directory hint should not append line/col");
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct EditorConfig {
     editor_type: EditorType,
@@ -131,21 +186,38 @@ impl EditorConfig {
     }
 
     pub async fn open_file(&self, path: &Path) -> Result<Option<String>, EditorOpenError> {
-        if let Some(url) = self.remote_url(path) {
+        self.open_file_with_hint(path, None).await
+    }
+
+    pub async fn open_file_with_hint(
+        &self,
+        path: &Path,
+        is_file_hint: Option<bool>,
+    ) -> Result<Option<String>, EditorOpenError> {
+        if let Some(url) = self.remote_url_with_hint(path, is_file_hint) {
             return Ok(Some(url));
         }
         self.spawn_local(path).await?;
         Ok(None)
     }
 
-    fn remote_url(&self, path: &Path) -> Option<String> {
+    fn remote_url_with_hint(&self, path: &Path, is_file_hint: Option<bool>) -> Option<String> {
         let remote_host = self.remote_ssh_host.as_ref()?;
         let user_part = self
             .remote_ssh_user
             .as_ref()
             .map(|u| format!("{u}@"))
             .unwrap_or_default();
-        let path_str = path.to_string_lossy();
+        let normalized_path = path.to_string_lossy().replace('\\', "/");
+
+        let encoded_segments = normalized_path
+            .split('/')
+            .map(|segment| {
+                url::form_urlencoded::byte_serialize(segment.as_bytes())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>();
+        let encoded_path = encoded_segments.join("/");
 
         let scheme = match self.editor_type {
             EditorType::VsCode => "vscode",
@@ -153,16 +225,21 @@ impl EditorConfig {
             EditorType::Windsurf => "windsurf",
             EditorType::GoogleAntigravity => "antigravity",
             EditorType::Zed => {
-                return Some(format!("zed://ssh/{user_part}{remote_host}{path_str}"));
+                return Some(format!("zed://ssh/{user_part}{remote_host}{encoded_path}"));
             }
             _ => return None,
         };
 
         // files must contain a line and column number
-        let line_col = if path.is_file() { ":1:1" } else { "" };
+        let treat_as_file = is_file_hint.unwrap_or_else(|| path.is_file());
+        let line_col = if treat_as_file { ":1:1" } else { "" };
         Some(format!(
-            "{scheme}://vscode-remote/ssh-remote+{user_part}{remote_host}{path_str}{line_col}"
+            "{scheme}://vscode-remote/ssh-remote+{user_part}{remote_host}{encoded_path}{line_col}"
         ))
+    }
+
+    fn remote_url(&self, path: &Path) -> Option<String> {
+        self.remote_url_with_hint(path, None)
     }
 
     pub async fn spawn_local(&self, path: &Path) -> Result<(), EditorOpenError> {

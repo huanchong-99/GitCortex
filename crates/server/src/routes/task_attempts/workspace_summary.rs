@@ -138,8 +138,8 @@ pub async fn get_workspace_summaries(
         .map(|ws| {
             let id = ws.id;
             let latest = latest_processes.get(&id);
-            let has_pending = latest
-                .is_some_and(|p| pending_approval_eps.contains(&p.execution_process_id));
+            let has_pending =
+                latest.is_some_and(|p| pending_approval_eps.contains(&p.execution_process_id));
             let stats = diff_stats.get(&id);
 
             WorkspaceSummary {

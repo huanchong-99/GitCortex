@@ -15,6 +15,7 @@ export function useOpenProjectInEditor(
         const response = await projectsApi.openEditor(project.id, {
           editor_type: editorType ?? null,
           file_path: null,
+          git_repo_path: undefined,
         });
 
         // If a URL is returned, open it in a new window/tab

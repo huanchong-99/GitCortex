@@ -8,18 +8,18 @@
 //! - Requests are rejected when the token doesn't match
 //! - Requests are allowed when the token matches
 
+use std::sync::{Arc, Mutex, MutexGuard};
+
 use axum::{
     body::Body,
-    http::{header, Request, StatusCode},
+    http::{Request, StatusCode, header},
 };
 use once_cell::sync::Lazy;
-use std::sync::{Arc, Mutex, MutexGuard};
+use server::{
+    Deployment, DeploymentImpl,
+    routes::{router, subscription_hub::SubscriptionHub},
+};
 use tower::ServiceExt;
-
-use server::Deployment;
-use server::routes::router;
-use server::routes::subscription_hub::SubscriptionHub;
-use server::DeploymentImpl;
 
 /// Mutex to serialize environment variable access across tests.
 /// This ensures tests that modify environment variables run sequentially.
@@ -49,7 +49,11 @@ impl EnvVarGuard {
         let lock = ENV_LOCK.lock().unwrap();
         let prev = std::env::var(key).ok();
         unsafe { std::env::set_var(key, value) };
-        Self { key, prev, _lock: lock }
+        Self {
+            key,
+            prev,
+            _lock: lock,
+        }
     }
 
     /// Unset an environment variable.
@@ -58,7 +62,11 @@ impl EnvVarGuard {
         let lock = ENV_LOCK.lock().unwrap();
         let prev = std::env::var(key).ok();
         unsafe { std::env::remove_var(key) };
-        Self { key, prev, _lock: lock }
+        Self {
+            key,
+            prev,
+            _lock: lock,
+        }
     }
 }
 

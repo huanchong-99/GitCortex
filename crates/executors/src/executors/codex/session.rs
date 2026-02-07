@@ -206,8 +206,7 @@ impl SessionHandler {
                     .file_name()
                     .and_then(|name| name.to_str())
                     .is_some_and(|filename| {
-                        filename.contains(session_id)
-                            && filename.starts_with("rollout-")
+                        filename.contains(session_id) && filename.starts_with("rollout-")
                     })
                 && path
                     .extension()

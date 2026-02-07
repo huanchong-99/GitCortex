@@ -1,7 +1,6 @@
-use std::{collections::HashSet, env, io::ErrorKind, path::Path};
+use std::{collections::HashSet, env, fmt::Write, io::ErrorKind, path::Path};
 
 use sha2::{Digest, Sha256};
-use std::fmt::Write;
 use tokio::fs;
 use tracing::warn;
 

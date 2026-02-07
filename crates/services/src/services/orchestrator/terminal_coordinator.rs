@@ -4,10 +4,18 @@
 //! Configuration is now handled at spawn time via environment variable injection.
 
 use std::sync::Arc;
-use anyhow::Result;
-use tracing::{info, error, instrument};
 
-use db::{DBService, models::{workflow::WorkflowTask, terminal::Terminal}};
+use anyhow::Result;
+use db::{
+    DBService,
+    models::{terminal::Terminal, workflow::WorkflowTask},
+};
+use tracing::{error, info, instrument};
+
+use super::{
+    constants::WORKFLOW_TOPIC_PREFIX,
+    message_bus::{BusMessage, SharedMessageBus},
+};
 
 /// Terminal Coordinator
 ///
@@ -16,19 +24,31 @@ use db::{DBService, models::{workflow::WorkflowTask, terminal::Terminal}};
 /// and environment variable injection, not by this coordinator.
 pub struct TerminalCoordinator {
     db: Arc<DBService>,
+    message_bus: Option<SharedMessageBus>,
 }
 
 impl TerminalCoordinator {
     /// Create a new terminal coordinator
     pub fn new(db: Arc<DBService>) -> Self {
-        Self { db }
+        Self {
+            db,
+            message_bus: None,
+        }
+    }
+
+    /// Create a new terminal coordinator with message bus for status broadcasting.
+    pub fn with_message_bus(db: Arc<DBService>, message_bus: SharedMessageBus) -> Self {
+        Self {
+            db,
+            message_bus: Some(message_bus),
+        }
     }
 
     /// Prepare all terminals for a workflow
     ///
     /// Process:
     /// 1. Load all terminals for all tasks in the workflow
-    /// 2. Transition all terminals to "waiting" status
+    /// 2. Transition all terminals to "starting" status
     ///
     /// Note: Model configuration switching is no longer done here.
     /// It's handled at spawn time via `build_launch_config` for process-level isolation.
@@ -38,7 +58,7 @@ impl TerminalCoordinator {
     ///
     /// # Returns
     /// * `Ok(())` if all terminals were successfully prepared
-    /// * `Err(anyhow::Error)` if status update fails
+    /// * `Err(anyhow::Error)` if status update or event publish fails
     #[instrument(skip(self), fields(workflow_id))]
     pub async fn start_terminals_for_workflow(&self, workflow_id: &str) -> Result<()> {
         info!("Starting terminal preparation sequence for workflow");
@@ -65,9 +85,10 @@ impl TerminalCoordinator {
 
         info!(count = all_terminals.len(), "Found terminals to prepare");
 
-        // Step 3: Transition terminals to "waiting" status
+        // Step 3: Transition terminals to "starting" status
         // Note: Model switching is now done at spawn time via environment variables
         let mut prepared_terminals = Vec::new();
+        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
         for terminal in &all_terminals {
             info!(
                 terminal_id = %terminal.id,
@@ -76,21 +97,57 @@ impl TerminalCoordinator {
                 "Preparing terminal (config will be applied at spawn time)"
             );
 
-            if let Err(e) = Terminal::set_started(&self.db.pool, &terminal.id).await {
+            if let Err(e) = Terminal::set_starting(&self.db.pool, &terminal.id).await {
                 error!(
                     terminal_id = %terminal.id,
                     error = %e,
-                    "Failed to mark terminal as waiting"
+                    "Failed to mark terminal as starting"
                 );
                 return Err(anyhow::anyhow!(
-                    "Failed to mark terminal as waiting {}: {}",
+                    "Failed to mark terminal as starting {}: {}",
                     terminal.id,
                     e
                 ));
             }
 
+            if let Some(message_bus) = &self.message_bus {
+                let message = BusMessage::TerminalStatusUpdate {
+                    workflow_id: workflow_id.to_string(),
+                    terminal_id: terminal.id.clone(),
+                    status: "starting".to_string(),
+                };
+
+                if let Err(e) = message_bus.publish(&topic, message.clone()).await {
+                    error!(
+                        terminal_id = %terminal.id,
+                        workflow_id = %workflow_id,
+                        error = %e,
+                        "Failed to publish terminal starting status"
+                    );
+                    return Err(anyhow::anyhow!(
+                        "Failed to publish terminal starting status {}: {}",
+                        terminal.id,
+                        e
+                    ));
+                }
+
+                if let Err(e) = message_bus.broadcast(message) {
+                    error!(
+                        terminal_id = %terminal.id,
+                        workflow_id = %workflow_id,
+                        error = %e,
+                        "Failed to broadcast terminal starting status"
+                    );
+                    return Err(anyhow::anyhow!(
+                        "Failed to broadcast terminal starting status {}: {}",
+                        terminal.id,
+                        e
+                    ));
+                }
+            }
+
             prepared_terminals.push(terminal.id.clone());
-            info!(terminal_id = %terminal.id, "Terminal transitioned to waiting status");
+            info!(terminal_id = %terminal.id, "Terminal transitioned to starting status");
         }
 
         info!(

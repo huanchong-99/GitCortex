@@ -232,12 +232,10 @@ impl StandardCodingAgentExecutor for Opencode {
     }
 
     fn get_availability_info(&self) -> AvailabilityInfo {
-        let mcp_config_found = self
-            .default_mcp_config_path()
-            .is_some_and(|p| p.exists());
+        let mcp_config_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
 
-        let installation_indicator_found = dirs::config_dir()
-            .is_some_and(|config| config.join("opencode").exists());
+        let installation_indicator_found =
+            dirs::config_dir().is_some_and(|config| config.join("opencode").exists());
 
         if mcp_config_found || installation_indicator_found {
             AvailabilityInfo::InstallationFound

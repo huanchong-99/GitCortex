@@ -75,14 +75,14 @@ pub async fn run_gh_cli_setup(
 async fn get_gh_cli_setup_helper_action() -> Result<ExecutorAction, ApiError> {
     use utils::shell::resolve_executable_path;
 
-        if resolve_executable_path("brew").await.is_none() {
-            return Err(ApiError::Executor(ExecutorError::ExecutableNotFound {
-                program: "brew".to_string(),
-            }));
-        }
+    if resolve_executable_path("brew").await.is_none() {
+        return Err(ApiError::Executor(ExecutorError::ExecutableNotFound {
+            program: "brew".to_string(),
+        }));
+    }
 
-        // Install script
-        let install_script = r#"#!/bin/bash
+    // Install script
+    let install_script = r#"#!/bin/bash
 set -e
 if ! command -v gh &> /dev/null; then
     echo "Installing GitHub CLI..."
@@ -91,38 +91,38 @@ if ! command -v gh &> /dev/null; then
 else
     echo "GitHub CLI already installed"
 fi"#
-        .to_string();
+    .to_string();
 
-        let install_request = ScriptRequest {
-            script: install_script,
-            language: ScriptRequestLanguage::Bash,
-            context: ScriptContext::ToolInstallScript,
-            working_dir: None,
-        };
+    let install_request = ScriptRequest {
+        script: install_script,
+        language: ScriptRequestLanguage::Bash,
+        context: ScriptContext::ToolInstallScript,
+        working_dir: None,
+    };
 
-        // Auth script
-        let auth_script = r#"#!/bin/bash
+    // Auth script
+    let auth_script = r#"#!/bin/bash
 set -e
 export GH_PROMPT_DISABLED=1
 gh auth login --web --git-protocol https --skip-ssh-key
 "#
-        .to_string();
+    .to_string();
 
-        let auth_request = ScriptRequest {
-            script: auth_script,
-            language: ScriptRequestLanguage::Bash,
-            context: ScriptContext::ToolInstallScript,
-            working_dir: None,
-        };
+    let auth_request = ScriptRequest {
+        script: auth_script,
+        language: ScriptRequestLanguage::Bash,
+        context: ScriptContext::ToolInstallScript,
+        working_dir: None,
+    };
 
-        // Chain them: install → auth
-        Ok(ExecutorAction::new(
-            ExecutorActionType::ScriptRequest(install_request),
-            Some(Box::new(ExecutorAction::new(
-                ExecutorActionType::ScriptRequest(auth_request),
-                None,
-            ))),
-        ))
+    // Chain them: install → auth
+    Ok(ExecutorAction::new(
+        ExecutorActionType::ScriptRequest(install_request),
+        Some(Box::new(ExecutorAction::new(
+            ExecutorActionType::ScriptRequest(auth_request),
+            None,
+        ))),
+    ))
 }
 
 #[cfg(not(unix))]

@@ -150,10 +150,7 @@ impl Repo {
         .await
     }
 
-    pub async fn find_by_path(
-        pool: &SqlitePool,
-        path: &str,
-    ) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_path(pool: &SqlitePool, path: &str) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Repo,
             r#"SELECT id as "id!: Uuid",

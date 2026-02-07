@@ -55,6 +55,37 @@ const parseJson = async (response: Response): Promise<unknown> => {
   }
 };
 
+const buildTerminalErrorKey = (
+  terminalId: string,
+  field: 'cli' | 'model'
+): string => `terminal-${terminalId}-${field}`;
+
+const terminalConfigEquals = (
+  left: TerminalConfig,
+  right: TerminalConfig
+): boolean => {
+  return (
+    left.id === right.id &&
+    left.taskId === right.taskId &&
+    left.orderIndex === right.orderIndex &&
+    left.cliTypeId === right.cliTypeId &&
+    left.modelConfigId === right.modelConfigId &&
+    (left.role ?? '') === (right.role ?? '') &&
+    (left.autoConfirm ?? true) === (right.autoConfirm ?? true)
+  );
+};
+
+const terminalConfigListEquals = (
+  left: TerminalConfig[],
+  right: TerminalConfig[]
+): boolean => {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => terminalConfigEquals(item, right[index]));
+};
+
 /**
  * Step 4: Assigns terminals and CLI/model settings for each task.
  */
@@ -78,31 +109,57 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   const hasTasks = config.tasks.length > 0;
   const currentTask = hasTasks ? config.tasks[currentTaskIndex] : null;
 
-  // Initialize terminals when config length mismatches task count
+  // Keep current task index in bounds when task list changes
   useEffect(() => {
-    if (!currentTask) return;
+    if (config.tasks.length === 0) {
+      return;
+    }
 
-    const existingTerminals = config.terminals.filter((t) => t.taskId === currentTask.id);
-    if (existingTerminals.length !== currentTask.terminalCount) {
-      const newTerminals: TerminalConfig[] = Array.from(
-        { length: currentTask.terminalCount },
-        (_, i) => ({
-          id: `terminal-${currentTask.id}-${i}`,
-          taskId: currentTask.id,
-          orderIndex: i,
+    if (currentTaskIndex >= config.tasks.length) {
+      setCurrentTaskIndex(config.tasks.length - 1);
+    }
+  }, [currentTaskIndex, config.tasks.length]);
+
+  // Initialize/normalize terminals for all tasks
+  useEffect(() => {
+    if (!hasTasks) {
+      return;
+    }
+
+    const normalizedTerminals: TerminalConfig[] = config.tasks.flatMap((task) => {
+      const existingTerminals = config.terminals
+        .filter((terminal) => terminal.taskId === task.id)
+        .sort((a, b) => a.orderIndex - b.orderIndex);
+
+      return Array.from({ length: task.terminalCount }, (_, orderIndex) => {
+        const byOrderIndex = existingTerminals.find((terminal) => terminal.orderIndex === orderIndex);
+        const fallbackByPosition = existingTerminals[orderIndex];
+        const existingTerminal = byOrderIndex ?? fallbackByPosition;
+
+        if (existingTerminal) {
+          return {
+            ...existingTerminal,
+            id: existingTerminal.id || `terminal-${task.id}-${orderIndex}`,
+            taskId: task.id,
+            orderIndex,
+          };
+        }
+
+        return {
+          id: `terminal-${task.id}-${orderIndex}`,
+          taskId: task.id,
+          orderIndex,
           cliTypeId: '',
           modelConfigId: '',
           role: '',
-        })
-      );
-
-      // Remove old terminals for this task and add new ones
-      const otherTerminals = config.terminals.filter((t) => t.taskId !== currentTask.id);
-      onUpdate({
-        terminals: [...otherTerminals, ...newTerminals],
+        };
       });
+    });
+
+    if (!terminalConfigListEquals(config.terminals, normalizedTerminals)) {
+      onUpdate({ terminals: normalizedTerminals });
     }
-  }, [currentTask, config.terminals, onUpdate]);
+  }, [hasTasks, config.tasks, config.terminals, onUpdate]);
 
   // Detect CLI installation status from API
   const detectCliTypes = useCallback(async (isRefresh = false) => {
@@ -346,8 +403,8 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                     </button>
                   ))}
                 </div>
-                {errors[`terminal-${terminal.id}-cli`] && (
-                  <FieldError>{t(errors[`terminal-${terminal.id}-cli`])}</FieldError>
+                {errors[buildTerminalErrorKey(terminal.id, 'cli')] && (
+                  <FieldError>{t(errors[buildTerminalErrorKey(terminal.id, 'cli')])}</FieldError>
                 )}
               </Field>
 
@@ -362,7 +419,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                   className={cn(
                     'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                     'focus:outline-none focus:ring-1 focus:ring-brand',
-                    errors[`terminal-${terminal.id}-model`] && 'border-error'
+                    errors[buildTerminalErrorKey(terminal.id, 'model')] && 'border-error'
                   )}
                 >
                   <option value="">{t('step4.modelPlaceholder')}</option>
@@ -372,8 +429,8 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
                     </option>
                   ))}
                 </select>
-                {errors[`terminal-${terminal.id}-model`] && (
-                  <FieldError>{t(errors[`terminal-${terminal.id}-model`])}</FieldError>
+                {errors[buildTerminalErrorKey(terminal.id, 'model')] && (
+                  <FieldError>{t(errors[buildTerminalErrorKey(terminal.id, 'model')])}</FieldError>
                 )}
               </Field>
 

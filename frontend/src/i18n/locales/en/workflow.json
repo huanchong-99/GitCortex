@@ -13,6 +13,7 @@
     "ready": "Ready",
     "starting": "Starting",
     "running": "Running",
+    "merging": "Merging",
     "paused": "Paused",
     "completed": "Completed",
     "failed": "Failed",

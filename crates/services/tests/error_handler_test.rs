@@ -2,11 +2,12 @@
 
 use std::sync::Arc;
 
-use tokio::sync::broadcast;
-
-use services::services::error_handler::ErrorHandler;
-use services::orchestrator::message_bus::{BusMessage, MessageBus};
 use db::DBService;
+use services::{
+    orchestrator::message_bus::{BusMessage, MessageBus},
+    services::error_handler::ErrorHandler,
+};
+use tokio::sync::broadcast;
 
 #[cfg(test)]
 mod tests {

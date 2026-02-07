@@ -33,8 +33,7 @@ pub async fn run_cursor_setup(
         let latest_action = latest_process
             .executor_action()
             .map_err(|e| ApiError::Workspace(WorkspaceError::ValidationError(e.to_string())))?;
-        get_setup_helper_action()?
-            .append_action(latest_action.to_owned())
+        get_setup_helper_action()?.append_action(latest_action.to_owned())
     } else {
         get_setup_helper_action()?
     };

@@ -23,9 +23,7 @@ use deployment::Deployment;
 use executors::profile::ExecutorProfileId;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use services::services::{
-    container::ContainerService, workspace_manager::WorkspaceManager,
-};
+use services::services::{container::ContainerService, workspace_manager::WorkspaceManager};
 use sqlx::Error as SqlxError;
 use ts_rs::TS;
 use utils::{api::oauth::LoginStatus, response::ApiResponse};
@@ -290,7 +288,10 @@ pub async fn update_task(
 
     // Note: Remote sharing features have been removed
     if task.shared_task_id.is_some() {
-        tracing::debug!("Task {} has shared_task_id but sharing is not supported", task.id);
+        tracing::debug!(
+            "Task {} has shared_task_id but sharing is not supported",
+            task.id
+        );
     }
 
     Ok(ResponseJson(ApiResponse::success(task)))
@@ -335,7 +336,10 @@ pub async fn delete_task(
 
     // Note: Remote sharing features have been removed
     if task.shared_task_id.is_some() {
-        tracing::debug!("Task {} has shared_task_id but deletion will proceed locally", task.id);
+        tracing::debug!(
+            "Task {} has shared_task_id but deletion will proceed locally",
+            task.id
+        );
     }
 
     // Use a transaction to ensure atomicity: either all operations succeed or all are rolled back

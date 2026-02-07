@@ -6,27 +6,36 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 // Re-export types
 pub use db::models::Terminal;
-use db::{DBService, models::{
-    cli_type,
-    workspace::Workspace,
-    session::Session,
-    execution_process::{ExecutionProcess, ExecutionProcessRunReason, CreateExecutionProcess},
-    task::Task,
-    project::Project,
-    execution_process_repo_state::CreateExecutionProcessRepoState,
-}};
-use uuid::Uuid;
-use executors::{
-    actions::{ExecutorAction, ExecutorActionType, coding_agent_initial::CodingAgentInitialRequest},
-    profile::ExecutorProfileId,
-    executors::BaseCodingAgent,
+use db::{
+    DBService,
+    models::{
+        cli_type,
+        execution_process::{CreateExecutionProcess, ExecutionProcess, ExecutionProcessRunReason},
+        execution_process_repo_state::CreateExecutionProcessRepoState,
+        project::Project,
+        session::Session,
+        task::Task,
+        workspace::Workspace,
+    },
 };
+use executors::{
+    actions::{
+        ExecutorAction, ExecutorActionType, coding_agent_initial::CodingAgentInitialRequest,
+    },
+    executors::BaseCodingAgent,
+    profile::ExecutorProfileId,
+};
+use uuid::Uuid;
 
-use super::bridge::TerminalBridge;
-use super::process::{ProcessHandle, ProcessManager, DEFAULT_COLS, DEFAULT_ROWS};
-use super::prompt_watcher::PromptWatcher;
-use crate::services::cc_switch::{CCSwitchService, CCSwitch};
-use crate::services::orchestrator::SharedMessageBus;
+use super::{
+    bridge::TerminalBridge,
+    process::{DEFAULT_COLS, DEFAULT_ROWS, ProcessHandle, ProcessManager},
+    prompt_watcher::PromptWatcher,
+};
+use crate::services::{
+    cc_switch::{CCSwitch, CCSwitchService},
+    orchestrator::{BusMessage, SharedMessageBus, constants::WORKFLOW_TOPIC_PREFIX},
+};
 
 /// Terminal launcher for serial terminal startup
 pub struct TerminalLauncher {
@@ -34,6 +43,7 @@ pub struct TerminalLauncher {
     cc_switch: Arc<CCSwitchService>,
     process_manager: Arc<ProcessManager>,
     working_dir: PathBuf,
+    message_bus: Option<SharedMessageBus>,
     /// Optional terminal bridge for MessageBus -> PTY stdin forwarding
     terminal_bridge: Option<TerminalBridge>,
     /// Optional prompt watcher for PTY output prompt detection
@@ -68,6 +78,7 @@ impl TerminalLauncher {
             cc_switch,
             process_manager,
             working_dir,
+            message_bus: None,
             terminal_bridge: None,
             prompt_watcher: None,
         }
@@ -92,12 +103,14 @@ impl TerminalLauncher {
         message_bus: SharedMessageBus,
         prompt_watcher: PromptWatcher,
     ) -> Self {
-        let terminal_bridge = TerminalBridge::new(message_bus.clone(), Arc::clone(&process_manager));
+        let terminal_bridge =
+            TerminalBridge::new(message_bus.clone(), Arc::clone(&process_manager));
         Self {
             db,
             cc_switch,
             process_manager,
             working_dir,
+            message_bus: Some(message_bus.clone()),
             terminal_bridge: Some(terminal_bridge),
             prompt_watcher: Some(prompt_watcher),
         }
@@ -139,6 +152,11 @@ impl TerminalLauncher {
     /// A launch result indicating success or failure
     pub async fn launch_terminal(&self, terminal: &Terminal) -> LaunchResult {
         let terminal_id = terminal.id.clone();
+        let workflow_id = self
+            .get_workflow_id_for_terminal(&terminal.workflow_task_id)
+            .await
+            .ok()
+            .flatten();
 
         // 1. Get CLI type information
         let cli_type =
@@ -164,29 +182,52 @@ impl TerminalLauncher {
 
         // 2. Create Session for execution context tracking
         // Get workflow task to find associated workspace
-        let workspace_id = match self.get_workspace_for_terminal(&terminal.workflow_task_id).await {
+        let workspace_id = match self
+            .get_workspace_for_terminal(&terminal.workflow_task_id)
+            .await
+        {
             Ok(Some(id)) => Some(id),
             Ok(None) => {
                 tracing::warn!("No workspace found for terminal {}", terminal_id);
                 None
             }
             Err(e) => {
-                tracing::error!("Failed to get workspace for terminal {}: {}", terminal_id, e);
+                tracing::error!(
+                    "Failed to get workspace for terminal {}: {}",
+                    terminal_id,
+                    e
+                );
                 None
             }
         };
 
         let (session_id, execution_process_id) = if let Some(ws_id) = workspace_id {
-            match Session::create_for_terminal(&self.db.pool, ws_id, Some(cli_type.name.clone()), Some(terminal_id.clone())).await {
+            match Session::create_for_terminal(
+                &self.db.pool,
+                ws_id,
+                Some(cli_type.name.clone()),
+                Some(terminal_id.clone()),
+            )
+            .await
+            {
                 Ok(session) => {
-                    tracing::info!("Created session {} for terminal {}", session.id, terminal_id);
+                    tracing::info!(
+                        "Created session {} for terminal {}",
+                        session.id,
+                        terminal_id
+                    );
 
                     // Create ExecutionProcess for tracking this terminal launch
                     // Create a simple coding agent action
                     let executor_action = ExecutorAction::new(
                         ExecutorActionType::CodingAgentInitialRequest(CodingAgentInitialRequest {
-                            prompt: format!("Terminal launched for workflow task: {}", terminal.workflow_task_id),
-                            executor_profile_id: ExecutorProfileId::new(BaseCodingAgent::ClaudeCode),
+                            prompt: format!(
+                                "Terminal launched for workflow task: {}",
+                                terminal.workflow_task_id
+                            ),
+                            executor_profile_id: ExecutorProfileId::new(
+                                BaseCodingAgent::ClaudeCode,
+                            ),
                             working_dir: None,
                         }),
                         None,
@@ -203,15 +244,27 @@ impl TerminalLauncher {
                         &create_exec_process,
                         Uuid::new_v4(),
                         &[], // Empty repo states for terminal launch
-                    ).await;
+                    )
+                    .await;
 
                     let (sess_id, exec_id) = match exec_process_result {
                         Ok(exec_process) => {
-                            tracing::info!("Created execution process {} for terminal {}", exec_process.id, terminal_id);
-                            (Some(session.id.to_string()), Some(exec_process.id.to_string()))
+                            tracing::info!(
+                                "Created execution process {} for terminal {}",
+                                exec_process.id,
+                                terminal_id
+                            );
+                            (
+                                Some(session.id.to_string()),
+                                Some(exec_process.id.to_string()),
+                            )
                         }
                         Err(e) => {
-                            tracing::error!("Failed to create execution process for terminal {}: {}", terminal_id, e);
+                            tracing::error!(
+                                "Failed to create execution process for terminal {}: {}",
+                                terminal_id,
+                                e
+                            );
                             (Some(session.id.to_string()), None)
                         }
                     };
@@ -223,14 +276,20 @@ impl TerminalLauncher {
                         &terminal_id,
                         sess_id.as_deref(),
                         exec_id.as_deref(),
-                    ).await {
+                    )
+                    .await
+                    {
                         tracing::error!("Failed to update terminal session binding: {}", e);
                     }
 
                     (sess_id, exec_id)
                 }
                 Err(e) => {
-                    tracing::error!("Failed to create session for terminal {}: {}", terminal_id, e);
+                    tracing::error!(
+                        "Failed to create session for terminal {}: {}",
+                        terminal_id,
+                        e
+                    );
                     (None, None)
                 }
             }
@@ -244,7 +303,12 @@ impl TerminalLauncher {
         // 4. Build spawn configuration (process-level isolation, no global config changes)
         let spawn_config = match self
             .cc_switch
-            .build_launch_config(terminal, &cli_command, &self.working_dir, terminal.auto_confirm)
+            .build_launch_config(
+                terminal,
+                &cli_command,
+                &self.working_dir,
+                terminal.auto_confirm,
+            )
             .await
         {
             Ok(config) => config,
@@ -271,12 +335,16 @@ impl TerminalLauncher {
         {
             Ok(handle) => {
                 // Update terminal status in database
-                if let Err(e) = Terminal::set_started(&self.db.pool, &terminal_id).await {
-                    return self.rollback_launch_after_spawn(
-                        &terminal_id,
-                        format!("Failed to set terminal started status: {e}")
-                    ).await;
+                if let Err(e) = Terminal::set_waiting(&self.db.pool, &terminal_id).await {
+                    return self
+                        .rollback_launch_after_spawn(
+                            &terminal_id,
+                            format!("Failed to set terminal started status: {e}"),
+                        )
+                        .await;
                 }
+                self.broadcast_terminal_status(workflow_id.as_deref(), &terminal_id, "waiting")
+                    .await;
                 let pid = i32::try_from(handle.pid).ok();
                 if let Err(e) = Terminal::update_process(
                     &self.db.pool,
@@ -284,11 +352,14 @@ impl TerminalLauncher {
                     pid,
                     Some(&handle.session_id),
                 )
-                .await {
-                    return self.rollback_launch_after_spawn(
-                        &terminal_id,
-                        format!("Failed to update terminal process binding: {e}")
-                    ).await;
+                .await
+                {
+                    return self
+                        .rollback_launch_after_spawn(
+                            &terminal_id,
+                            format!("Failed to update terminal process binding: {e}"),
+                        )
+                        .await;
                 }
 
                 // Update terminal with session and execution process binding
@@ -299,41 +370,49 @@ impl TerminalLauncher {
                         session_id.as_deref(),
                         execution_process_id.as_deref(),
                     )
-                    .await {
-                        return self.rollback_launch_after_spawn(
-                            &terminal_id,
-                            format!("Failed to update terminal session binding: {e}")
-                        ).await;
+                    .await
+                    {
+                        return self
+                            .rollback_launch_after_spawn(
+                                &terminal_id,
+                                format!("Failed to update terminal session binding: {e}"),
+                            )
+                            .await;
                     }
                 }
 
                 // Attach terminal logger for output persistence
-                if let Err(e) = self.process_manager.attach_terminal_logger(
-                    Arc::clone(&self.db),
-                    &terminal_id,
-                    "stdout",
-                    1,
-                ).await {
-                    return self.rollback_launch_after_spawn(
-                        &terminal_id,
-                        format!("Failed to attach terminal logger: {e}")
-                    ).await;
+                if let Err(e) = self
+                    .process_manager
+                    .attach_terminal_logger(Arc::clone(&self.db), &terminal_id, "stdout", 1)
+                    .await
+                {
+                    return self
+                        .rollback_launch_after_spawn(
+                            &terminal_id,
+                            format!("Failed to attach terminal logger: {e}"),
+                        )
+                        .await;
                 }
 
                 // Register terminal bridge for MessageBus -> PTY stdin forwarding
                 if let Some(ref bridge) = self.terminal_bridge {
                     if let Err(e) = bridge.register(&terminal_id, &handle.session_id).await {
-                        return self.rollback_launch_after_spawn(
-                            &terminal_id,
-                            format!("Failed to register terminal bridge: {e}")
-                        ).await;
+                        return self
+                            .rollback_launch_after_spawn(
+                                &terminal_id,
+                                format!("Failed to register terminal bridge: {e}"),
+                            )
+                            .await;
                     }
                     tokio::time::sleep(Duration::from_millis(50)).await;
                     if !bridge.is_registered(&handle.session_id).await {
-                        return self.rollback_launch_after_spawn(
-                            &terminal_id,
-                            "Terminal bridge registration verification failed".to_string()
-                        ).await;
+                        return self
+                            .rollback_launch_after_spawn(
+                                &terminal_id,
+                                "Terminal bridge registration verification failed".to_string(),
+                            )
+                            .await;
                     }
                     tracing::debug!(
                         terminal_id = %terminal_id,
@@ -344,49 +423,64 @@ impl TerminalLauncher {
 
                 // Register prompt watcher for PTY output prompt detection
                 if let Some(ref watcher) = self.prompt_watcher {
-                    match self.get_workflow_id_for_terminal(&terminal.workflow_task_id).await {
-                        Ok(Some(workflow_id)) => {
-                            if let Err(e) = watcher.register(
-                                &terminal_id,
-                                &workflow_id,
-                                &terminal.workflow_task_id,
-                                &handle.session_id,
-                            ).await {
+                    if !terminal.auto_confirm {
+                        watcher.unregister(&terminal_id).await;
+                        tracing::debug!(
+                            terminal_id = %terminal_id,
+                            "Skipped prompt watcher registration because auto_confirm is disabled"
+                        );
+                    } else {
+                        match self
+                            .get_workflow_id_for_terminal(&terminal.workflow_task_id)
+                            .await
+                        {
+                            Ok(Some(workflow_id)) => {
+                                if let Err(e) = watcher
+                                    .register(
+                                        &terminal_id,
+                                        &workflow_id,
+                                        &terminal.workflow_task_id,
+                                        &handle.session_id,
+                                        terminal.auto_confirm,
+                                    )
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        terminal_id = %terminal_id,
+                                        workflow_id = %workflow_id,
+                                        error = %e,
+                                        "Failed to register prompt watcher"
+                                    );
+                                } else if !watcher.is_registered(&terminal_id).await {
+                                    tracing::warn!(
+                                        terminal_id = %terminal_id,
+                                        workflow_id = %workflow_id,
+                                        "Prompt watcher registration verification failed"
+                                    );
+                                } else {
+                                    tracing::debug!(
+                                        terminal_id = %terminal_id,
+                                        workflow_id = %workflow_id,
+                                        pty_session_id = %handle.session_id,
+                                        "Prompt watcher registered successfully"
+                                    );
+                                }
+                            }
+                            Ok(None) => {
                                 tracing::warn!(
                                     terminal_id = %terminal_id,
-                                    workflow_id = %workflow_id,
-                                    error = %e,
-                                    "Failed to register prompt watcher"
-                                );
-                            } else if !watcher.is_registered(&terminal_id).await {
-                                tracing::warn!(
-                                    terminal_id = %terminal_id,
-                                    workflow_id = %workflow_id,
-                                    "Prompt watcher registration verification failed"
-                                );
-                            } else {
-                                tracing::debug!(
-                                    terminal_id = %terminal_id,
-                                    workflow_id = %workflow_id,
-                                    pty_session_id = %handle.session_id,
-                                    "Prompt watcher registered successfully"
+                                    workflow_task_id = %terminal.workflow_task_id,
+                                    "Could not resolve workflow_id for prompt watcher registration"
                                 );
                             }
-                        }
-                        Ok(None) => {
-                            tracing::warn!(
-                                terminal_id = %terminal_id,
-                                workflow_task_id = %terminal.workflow_task_id,
-                                "Could not resolve workflow_id for prompt watcher registration"
-                            );
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                terminal_id = %terminal_id,
-                                workflow_task_id = %terminal.workflow_task_id,
-                                error = %e,
-                                "Failed to resolve prompt watcher workflow binding"
-                            );
+                            Err(e) => {
+                                tracing::warn!(
+                                    terminal_id = %terminal_id,
+                                    workflow_task_id = %terminal.workflow_task_id,
+                                    error = %e,
+                                    "Failed to resolve prompt watcher workflow binding"
+                                );
+                            }
                         }
                     }
                 }
@@ -412,11 +506,12 @@ impl TerminalLauncher {
         }
     }
 
-    async fn rollback_launch_after_spawn(
-        &self,
-        terminal_id: &str,
-        reason: String,
-    ) -> LaunchResult {
+    async fn rollback_launch_after_spawn(&self, terminal_id: &str, reason: String) -> LaunchResult {
+        let workflow_id = self
+            .get_workflow_id_for_terminal_by_terminal_id(terminal_id)
+            .await
+            .ok()
+            .flatten();
         tracing::error!(
             terminal_id = %terminal_id,
             error = %reason,
@@ -434,6 +529,9 @@ impl TerminalLauncher {
         }
         if let Err(e) = Terminal::update_status(&self.db.pool, terminal_id, "failed").await {
             tracing::warn!(terminal_id = %terminal_id, error = %e, "Failed to mark terminal failed during rollback");
+        } else {
+            self.broadcast_terminal_status(workflow_id.as_deref(), terminal_id, "failed")
+                .await;
         }
 
         LaunchResult {
@@ -441,6 +539,47 @@ impl TerminalLauncher {
             process_handle: None,
             success: false,
             error: Some(reason),
+        }
+    }
+
+    async fn broadcast_terminal_status(
+        &self,
+        workflow_id: Option<&str>,
+        terminal_id: &str,
+        status: &str,
+    ) {
+        let Some(message_bus) = &self.message_bus else {
+            return;
+        };
+        let Some(workflow_id) = workflow_id else {
+            return;
+        };
+
+        let message = BusMessage::TerminalStatusUpdate {
+            workflow_id: workflow_id.to_string(),
+            terminal_id: terminal_id.to_string(),
+            status: status.to_string(),
+        };
+        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
+
+        if let Err(e) = message_bus.publish(&topic, message.clone()).await {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                terminal_id = %terminal_id,
+                status = %status,
+                error = %e,
+                "Failed to publish terminal status update"
+            );
+        }
+
+        if let Err(e) = message_bus.broadcast(message) {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                terminal_id = %terminal_id,
+                status = %status,
+                error = %e,
+                "Failed to broadcast terminal status update"
+            );
         }
     }
 
@@ -467,10 +606,30 @@ impl TerminalLauncher {
         &self,
         workflow_task_id: &str,
     ) -> anyhow::Result<Option<String>> {
+        let workflow_id: Option<String> =
+            sqlx::query_scalar("SELECT workflow_id FROM workflow_task WHERE id = ?")
+                .bind(workflow_task_id)
+                .fetch_optional(&self.db.pool)
+                .await?
+                .flatten();
+
+        Ok(workflow_id)
+    }
+
+    async fn get_workflow_id_for_terminal_by_terminal_id(
+        &self,
+        terminal_id: &str,
+    ) -> anyhow::Result<Option<String>> {
         let workflow_id: Option<String> = sqlx::query_scalar(
-            "SELECT workflow_id FROM workflow_task WHERE id = ?"
+            r#"
+            SELECT wt.workflow_id
+            FROM workflow_task wt
+            INNER JOIN terminal t ON t.workflow_task_id = wt.id
+            WHERE t.id = ?
+            LIMIT 1
+            "#,
         )
-        .bind(workflow_task_id)
+        .bind(terminal_id)
         .fetch_optional(&self.db.pool)
         .await?
         .flatten();
@@ -484,26 +643,24 @@ impl TerminalLauncher {
         workflow_task_id: &str,
     ) -> anyhow::Result<Option<uuid::Uuid>> {
         // Get vk_task_id from workflow_task - stored as BLOB (UUID bytes)
-        let task_id: Option<uuid::Uuid> = sqlx::query_scalar(
-            "SELECT vk_task_id FROM workflow_task WHERE id = ?"
-        )
-        .bind(workflow_task_id)
-        .fetch_optional(&self.db.pool)
-        .await?
-        .flatten();
+        let task_id: Option<uuid::Uuid> =
+            sqlx::query_scalar("SELECT vk_task_id FROM workflow_task WHERE id = ?")
+                .bind(workflow_task_id)
+                .fetch_optional(&self.db.pool)
+                .await?
+                .flatten();
 
         let Some(task_uuid) = task_id else {
             return Ok(None);
         };
 
         // Get workspace_id from workspace table - id is also BLOB (UUID bytes)
-        let workspace_id: Option<uuid::Uuid> = sqlx::query_scalar(
-            "SELECT id FROM workspaces WHERE task_id = ? LIMIT 1"
-        )
-        .bind(task_uuid)
-        .fetch_optional(&self.db.pool)
-        .await?
-        .flatten();
+        let workspace_id: Option<uuid::Uuid> =
+            sqlx::query_scalar("SELECT id FROM workspaces WHERE task_id = ? LIMIT 1")
+                .bind(task_uuid)
+                .fetch_optional(&self.db.pool)
+                .await?
+                .flatten();
 
         Ok(workspace_id)
     }
@@ -520,10 +677,15 @@ impl TerminalLauncher {
                 if let Ok(pid_u32) = u32::try_from(pid) {
                     self.process_manager.kill(pid_u32)?;
                 } else {
-                    tracing::warn!("Skipping invalid process id {pid} for terminal {}", terminal.id);
+                    tracing::warn!(
+                        "Skipping invalid process id {pid} for terminal {}",
+                        terminal.id
+                    );
                 }
             }
             Terminal::update_status(&self.db.pool, &terminal.id, "cancelled").await?;
+            self.broadcast_terminal_status(Some(workflow_id), &terminal.id, "cancelled")
+                .await;
         }
 
         Ok(())

@@ -88,10 +88,17 @@ pub fn parse_pr_url(url: &str) -> Result<(String, String, i64), ReviewError> {
 
 /// Check if the GitHub CLI is installed
 fn ensure_gh_available() -> Result<(), ReviewError> {
-    let output = Command::new("which")
-        .arg("gh")
-        .output()
-        .map_err(|_| ReviewError::GhNotInstalled)?;
+    let mut probe = if cfg!(windows) {
+        let mut cmd = Command::new("where");
+        cmd.arg("gh");
+        cmd
+    } else {
+        let mut cmd = Command::new("which");
+        cmd.arg("gh");
+        cmd
+    };
+
+    let output = probe.output().map_err(|_| ReviewError::GhNotInstalled)?;
 
     if !output.status.success() {
         return Err(ReviewError::GhNotInstalled);
