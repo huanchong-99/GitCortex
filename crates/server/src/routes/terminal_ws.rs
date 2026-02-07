@@ -150,16 +150,25 @@ async fn handle_terminal_socket(
                     Ok(Some(task)) => match pty_session_id {
                         Some(session_id) if !session_id.trim().is_empty() => {
                             let workflow_id = task.workflow_id;
-                            prompt_watcher
+                            if let Err(e) = prompt_watcher
                                 .register(&terminal_id, &workflow_id, &task_id, &session_id)
-                                .await;
-                            tracing::info!(
-                                terminal_id = %terminal_id,
-                                workflow_id = %workflow_id,
-                                task_id = %task_id,
-                                pty_session_id = %session_id,
-                                "Auto-registered terminal for prompt watching"
-                            );
+                                .await {
+                                tracing::warn!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    task_id = %task_id,
+                                    error = %e,
+                                    "Failed to auto-register terminal for prompt watching"
+                                );
+                            } else {
+                                tracing::info!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    task_id = %task_id,
+                                    pty_session_id = %session_id,
+                                    "Auto-registered terminal for prompt watching"
+                                );
+                            }
                         }
                         _ => {
                             tracing::warn!(
