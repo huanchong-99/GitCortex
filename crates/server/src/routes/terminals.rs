@@ -241,14 +241,37 @@ pub async fn start_terminal(
     };
 
     // Update terminal status in database
-    Terminal::set_started(&deployment.db().pool, &id)
-        .await
-        .map_err(|e| ApiError::Internal(format!("Failed to update terminal status: {e}")))?;
+    if let Err(e) = Terminal::set_started(&deployment.db().pool, &id).await {
+        let _ = deployment.process_manager().kill_terminal(&id).await;
+        let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
+        let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
+        return Err(ApiError::Internal(format!("Failed to update terminal status: {e}")));
+    }
 
     let pid = i32::try_from(handle.pid).ok();
-    Terminal::update_process(&deployment.db().pool, &id, pid, Some(&handle.session_id))
+    if let Err(e) =
+        Terminal::update_process(&deployment.db().pool, &id, pid, Some(&handle.session_id)).await
+    {
+        let _ = deployment.process_manager().kill_terminal(&id).await;
+        let _ = Terminal::update_process(&deployment.db().pool, &id, None, None).await;
+        let _ = Terminal::update_status(&deployment.db().pool, &id, "failed").await;
+        return Err(ApiError::Internal(format!("Failed to update terminal process info: {e}")));
+    }
+
+    // Attach terminal logger for output persistence (Phase 26)
+    if let Err(e) = deployment
+        .process_manager()
+        .attach_terminal_logger(Arc::new(deployment.db().clone()), &id, "stdout", 1)
         .await
-        .map_err(|e| ApiError::Internal(format!("Failed to update terminal process info: {e}")))?;
+    {
+        tracing::warn!(
+            terminal_id = %id,
+            error = %e,
+            "Failed to attach terminal logger (non-fatal, logs won't persist)"
+        );
+    } else {
+        tracing::debug!(terminal_id = %id, "Terminal logger attached for output persistence");
+    }
 
     // Register terminal bridge for MessageBus -> PTY stdin forwarding
     let terminal_bridge = TerminalBridge::new(
@@ -272,48 +295,45 @@ pub async fn start_terminal(
 
     // Register PromptWatcher for background prompt detection
     // This enables auto-confirm to work even without WebSocket connection
-    if let Some(pty_session_id) = terminal.pty_session_id.as_ref() {
-        if !pty_session_id.trim().is_empty() {
-            // Get workflow_id from workflow_task
-            match db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id).await {
-                Ok(Some(task)) => {
-                    if let Err(e) = deployment.prompt_watcher().register(
-                        &id,
-                        &task.workflow_id,
-                        &terminal.workflow_task_id,
-                        pty_session_id,
-                    ).await {
-                        tracing::warn!(
-                            terminal_id = %id,
-                            workflow_id = %task.workflow_id,
-                            error = %e,
-                            "Failed to register PromptWatcher for background prompt detection"
-                        );
-                    } else {
-                        tracing::info!(
-                            terminal_id = %id,
-                            workflow_id = %task.workflow_id,
-                            pty_session_id = %pty_session_id,
-                            "PromptWatcher registered for background prompt detection"
-                        );
-                    }
-                }
-                Ok(None) => {
-                    tracing::warn!(
-                        terminal_id = %id,
-                        workflow_task_id = %terminal.workflow_task_id,
-                        "Skipped PromptWatcher registration: workflow task not found"
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        terminal_id = %id,
-                        workflow_task_id = %terminal.workflow_task_id,
-                        error = %e,
-                        "Failed to query workflow task for PromptWatcher registration (non-fatal)"
-                    );
-                }
+    // Use handle.session_id (the actual PTY session) not terminal.pty_session_id (stale DB value)
+    match db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id).await {
+        Ok(Some(task)) => {
+            if let Err(e) = deployment.prompt_watcher().register(
+                &id,
+                &task.workflow_id,
+                &terminal.workflow_task_id,
+                &handle.session_id,
+            ).await {
+                tracing::warn!(
+                    terminal_id = %id,
+                    workflow_id = %task.workflow_id,
+                    pty_session_id = %handle.session_id,
+                    error = %e,
+                    "Failed to register PromptWatcher for background prompt detection"
+                );
+            } else {
+                tracing::info!(
+                    terminal_id = %id,
+                    workflow_id = %task.workflow_id,
+                    pty_session_id = %handle.session_id,
+                    "PromptWatcher registered for background prompt detection"
+                );
             }
+        }
+        Ok(None) => {
+            tracing::warn!(
+                terminal_id = %id,
+                workflow_task_id = %terminal.workflow_task_id,
+                "Skipped PromptWatcher registration: workflow task not found"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                terminal_id = %id,
+                workflow_task_id = %terminal.workflow_task_id,
+                error = %e,
+                "Failed to query workflow task for PromptWatcher registration (non-fatal)"
+            );
         }
     }
 
