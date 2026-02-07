@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use cc_switch::{CliType as CcCliType, ModelSwitcher, SwitchConfig, read_claude_config};
 use db::{
     DBService,
-    models::{CliType, ModelConfig, Terminal},
+    models::{CliType, ModelConfig, Terminal, Workflow},
 };
 
 use crate::services::terminal::process::{SpawnCommand, SpawnEnv};
@@ -279,6 +279,49 @@ impl CCSwitchService {
             db,
             switcher: ModelSwitcher::new(),
         }
+    }
+
+    async fn resolve_workflow_orchestrator_fallback(
+        &self,
+        workflow_task_id: &str,
+    ) -> anyhow::Result<(Option<String>, Option<String>)> {
+        let workflow_id: Option<String> = sqlx::query_scalar(
+            "SELECT workflow_id FROM workflow_task WHERE id = ? LIMIT 1",
+        )
+        .bind(workflow_task_id)
+        .fetch_optional(&self.db.pool)
+        .await?
+        .flatten();
+
+        let Some(workflow_id) = workflow_id else {
+            return Ok((None, None));
+        };
+
+        let workflow = match Workflow::find_by_id(&self.db.pool, &workflow_id).await? {
+            Some(workflow) => workflow,
+            None => {
+                tracing::warn!(
+                    workflow_id = %workflow_id,
+                    workflow_task_id = %workflow_task_id,
+                    "Workflow not found while resolving Codex API fallback"
+                );
+                return Ok((None, None));
+            }
+        };
+
+        let api_key = match workflow.get_api_key() {
+            Ok(api_key) => api_key,
+            Err(e) => {
+                tracing::warn!(
+                    workflow_id = %workflow_id,
+                    error = %e,
+                    "Failed to decrypt workflow orchestrator API key for Codex fallback"
+                );
+                None
+            }
+        };
+
+        Ok((workflow.orchestrator_base_url.clone(), api_key))
     }
 }
 
@@ -542,11 +585,37 @@ impl CCSwitchService {
                 );
             }
             CcCliType::Codex => {
-                // Codex requires API key
-                let api_key = terminal
-                    .get_custom_api_key()?
-                    .ok_or_else(|| anyhow::anyhow!("Codex requires API key"))?;
+                // Codex requires API key.
+                // Prefer terminal-level key, then fallback to workflow orchestrator config.
+                let custom_api_key = terminal.get_custom_api_key()?;
+                let mut fallback_base_url = None;
+                let mut fallback_api_key = None;
+
+                if custom_api_key.is_none() || terminal.custom_base_url.is_none() {
+                    let (base_url, api_key) = self
+                        .resolve_workflow_orchestrator_fallback(&terminal.workflow_task_id)
+                        .await?;
+                    fallback_base_url = base_url;
+                    fallback_api_key = api_key;
+                }
+
+                let used_workflow_fallback = custom_api_key.is_none() && fallback_api_key.is_some();
+                let api_key = custom_api_key.or(fallback_api_key).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Codex requires API key (set terminal.custom_api_key or workflow.orchestrator_config.api_key)"
+                    )
+                })?;
                 env.set.insert("OPENAI_API_KEY".to_string(), api_key.clone());
+
+                if used_workflow_fallback {
+                    tracing::info!(
+                        terminal_id = %terminal.id,
+                        workflow_task_id = %terminal.workflow_task_id,
+                        "Using workflow orchestrator API key as Codex terminal fallback"
+                    );
+                }
+
+                let effective_base_url = terminal.custom_base_url.clone().or(fallback_base_url);
 
                 // Avoid inherited OPENAI_BASE_URL overriding generated provider config.
                 // Endpoint selection should come from CODEX_HOME/config.toml only.
@@ -605,7 +674,7 @@ impl CCSwitchService {
                 // Create config.toml with explicit provider/api_key
                 create_codex_config(
                     &codex_home,
-                    terminal.custom_base_url.as_deref(),
+                    effective_base_url.as_deref(),
                     &model,
                     &api_key,
                 )

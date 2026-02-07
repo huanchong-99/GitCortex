@@ -380,6 +380,11 @@ pub struct InlineModelConfig {
     pub model_id: String,
 }
 
+/// Default function for auto_confirm field - defaults to true for safety
+fn default_auto_confirm_true() -> bool {
+    true
+}
+
 /// Create Terminal Request
 #[derive(Debug, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -403,8 +408,8 @@ pub struct CreateTerminalRequest {
     pub role_description: Option<String>,
     /// Terminal order index within task
     pub order_index: i32,
-    /// Auto-confirm mode: skip CLI permission prompts
-    #[serde(default)]
+    /// Auto-confirm mode: skip CLI permission prompts (defaults to true)
+    #[serde(default = "default_auto_confirm_true")]
     pub auto_confirm: bool,
 }
 
@@ -988,6 +993,44 @@ mod encryption_tests {
     use temp_env::with_var;
 
     use super::*;
+
+    #[test]
+    fn test_create_terminal_request_auto_confirm_defaults_to_true() {
+        let request: CreateTerminalRequest = serde_json::from_value(serde_json::json!({
+            "cliTypeId": "claude-code",
+            "modelConfigId": "model-1",
+            "orderIndex": 0
+        }))
+        .expect("deserialization should succeed");
+
+        assert!(request.auto_confirm, "auto_confirm should default to true when not specified");
+    }
+
+    #[test]
+    fn test_create_terminal_request_auto_confirm_respects_explicit_false() {
+        let request: CreateTerminalRequest = serde_json::from_value(serde_json::json!({
+            "cliTypeId": "claude-code",
+            "modelConfigId": "model-1",
+            "orderIndex": 0,
+            "autoConfirm": false
+        }))
+        .expect("deserialization should succeed");
+
+        assert!(!request.auto_confirm, "auto_confirm should respect explicit false value");
+    }
+
+    #[test]
+    fn test_create_terminal_request_auto_confirm_respects_explicit_true() {
+        let request: CreateTerminalRequest = serde_json::from_value(serde_json::json!({
+            "cliTypeId": "claude-code",
+            "modelConfigId": "model-1",
+            "orderIndex": 0,
+            "autoConfirm": true
+        }))
+        .expect("deserialization should succeed");
+
+        assert!(request.auto_confirm, "auto_confirm should respect explicit true value");
+    }
 
     #[test]
     #[serial]
