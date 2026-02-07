@@ -17,6 +17,9 @@ logs/
 dev_assets/
 *.sqlite
 *.db
+*.db-shm
+*.db-wal
+tmp_phase*.db*
 
 # Rust
 target/
