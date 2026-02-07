@@ -7,12 +7,12 @@
 
 | 指标 | 值 |
 |------|-----|
-| 总任务数 | 295 |
-| 已完成 | 241 |
+| 总任务数 | 296 |
+| 已完成 | 228 |
 | 进行中 | 0 |
-| 未开始 | 54 (Phase 18.5: 3个可选, Phase 21: 2个可选, Phase 24: 43个, Phase 25: 6个, Phase 26: 6个) |
+| 未开始 | 68 (Phase 21: 2个, Phase 26: 60个, Phase 27: 6个) |
 | 可选优化 | 5 |
-| **完成率** | **81.7%** |
+| **完成率** | **77.0%** |
 
 > **当前审计分数:** 100/100 (S级)
 > **目标分数:** 100/100 (S级 - 完美代码)
@@ -25,11 +25,11 @@
 > - ✅ 136 个单元测试全部通过
 > - ✅ GitHub Actions CI 通过
 >
-> **下一步:** Phase 24 - 终端自动确认与消息桥接（核心功能缺陷修复）
-> - 与 Codex 完成 3 轮讨论，确定最终方案
-> - 6 种提示类型分类：EnterConfirm, YesNo, Choice, ArrowSelect, Input, Password
-> - 双路径架构：Claude Hooks + PTY PromptDetector
-> - ArrowSelect 支持箭头键导航选择（ANSI 转义序列）
+> **下一步:** Phase 26 - 联合审计问题全量修复（阻断级 + 逻辑级 + 兼容级）
+> - 基于 `codex和Claudecode联合分析_三文件增量合并.md` 全量拆解 60 个修复任务（A/B/C 50 + 补充高优先 10）
+> - 前后端/服务层/数据层并行修复，确保跨模块链路一致
+> - 强化回归矩阵：单测 + 集成 + E2E + 稳定性验证
+> - Phase 26 完成后再执行 Docker 容器化（顺延至 Phase 27）
 >
 > **核心功能已完成:**
 > - ✅ Phase 20-23: 自动化协调核心 + Git 事件驱动 + WebSocket 事件广播 + 终端进程隔离
@@ -989,7 +989,106 @@
 
 ---
 
-## Phase 26: Docker 容器化部署（开源发布优化）
+## Phase 26: 联合审计问题全量修复（Codex + Claude）
+
+**计划文件:** `2026-02-08-phase-26-unified-audit-fix-plan.md`
+
+> **状态:** 📋 待实施
+> **优先级:** 🔴 最高（阻断级/核心链路修复）
+> **目标:** 修复 `codex和Claudecode联合分析_三文件增量合并.md` 发现的全部 60 个高优先问题
+> **前置条件:** Phase 25 自动确认可靠性修复完成
+> **修复范围:** 阻断级 19 + 逻辑级 21 + 兼容级 10 + 合并报告补充高优先 10
+
+### P0 - 阻断级问题（A1-A19）
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 26.1 | 修复 Step4 终端校验键不一致，恢复错误提示与阻断一致性 | ⬜ |  |
+| 26.2 | 修复多任务 Workflow 终端初始化缺失导致提交失败 | ⬜ |  |
+| 26.3 | 移除 DiffsPanel 渲染期 setState，消除渲染抖动/循环风险 | ⬜ |  |
+| 26.4 | stop_workflow 同步停止终端进程，修复“状态已停进程仍跑” | ⬜ |  |
+| 26.5 | Workflow merge 执行真实合并链路，禁止“仅改状态假完成” | ⬜ |  |
+| 26.6 | 统一终端状态枚举与映射，覆盖 cancelled/review_* 状态 | ⬜ |  |
+| 26.7 | 修复 Review 事件误发为 workflow.status_changed 的语义错位 | ⬜ |  |
+| 26.8 | 创建 WorkflowTask 时正确绑定 vk_task_id，恢复终端会话关联 | ⬜ |  |
+| 26.9 | task attempt 启动失败向调用方显式返回错误 | ⬜ |  |
+| 26.10 | 放开无 process 的 Follow-up 输入，避免失败态无法自救 | ⬜ |  |
+| 26.11 | 修复 createTask 后错误跳转 attempts/latest | ⬜ |  |
+| 26.12 | 统一 Slash Command description 校验规则（前后端一致） | ⬜ |  |
+| 26.13 | 修复 Slash Command 重命名命令名无效 | ⬜ |  |
+| 26.14 | 统一 Open Editor 请求字段（file_path / git_repo_path）契约 | ⬜ |  |
+| 26.15 | containers/attempt-context 支持子目录 ref 解析 | ⬜ |  |
+| 26.16 | 容器查询 not found 正确映射为 404（非 500） | ⬜ |  |
+| 26.17 | 修复 Terminal WS 接收超时导致只读会话误断连 | ⬜ |  |
+| 26.18 | stop terminal 对不存在 id 返回 not_found，禁止假成功 | ⬜ |  |
+| 26.19 | 任务列表 executor 可空解码修复，消除潜在 500 | ⬜ |  |
+
+### P1 - 逻辑级问题（B1-B21）
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 26.20 | useWorkflowEvents 引用计数化，避免多订阅互断 | ⬜ |  |
+| 26.21 | WS Store 支持多 workflow 并行订阅，避免串线覆盖 | ⬜ |  |
+| 26.22 | 前端补齐 terminal.prompt_* 事件类型与消费链路 | ⬜ |  |
+| 26.23 | EventBridge 无订阅场景引入事件补偿/缓存策略 | ⬜ |  |
+| 26.24 | lagged 事件恢复机制，禁止静默丢弃 | ⬜ |  |
+| 26.25 | prepare 部分失败时统一回滚已启动终端 | ⬜ |  |
+| 26.26 | workflow task 状态接口移除/拒绝 in_progress 非法值 | ⬜ |  |
+| 26.27 | 修复单仓 open-editor + file_path 基目录拼接错误 | ⬜ |  |
+| 26.28 | 多仓 merge 不再提前置 Done/归档 workspace | ⬜ |  |
+| 26.29 | 修复删除任务缓存 key 错误导致的详情闪回 | ⬜ |  |
+| 26.30 | 修复 useAttemptExecution 空 key 停止态串扰 | ⬜ |  |
+| 26.31 | Follow-up 脚本入口可用性与 Result 错误处理一致 | ⬜ |  |
+| 26.32 | ExecutionProcessesProvider 纳入 attemptId 维度 | ⬜ |  |
+| 26.33 | subscription_hub 无订阅不创建 channel，抑制增长 | ⬜ |  |
+| 26.34 | workspace 清理 SQL 修复 NULL completed_at 处理 | ⬜ |  |
+| 26.35 | execution_process 完成更新同步刷新 updated_at | ⬜ |  |
+| 26.36 | execution_processes raw logs WS 避免重复拉流 | ⬜ |  |
+| 26.37 | Project Open Editor 路径范围约束（项目内白名单） | ⬜ |  |
+| 26.38 | 远程编辑器 URL 路径编码，支持特殊字符 | ⬜ |  |
+| 26.39 | 远程文件 :1:1 追加规则去本地 is_file 依赖 | ⬜ |  |
+| 26.40 | 组织/远程项目入口与后端能力对齐（支持或禁用） | ⬜ |  |
+
+### P2 - 兼容/实现级问题（C1-C10）
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 26.41 | 修复 ProjectSettings 更新类型不完整导致前端检查失败 | ⬜ |  |
+| 26.42 | executors command build 空 base 防 panic 处理 | ⬜ |  |
+| 26.43 | plain_text_processor time_gap 分支丢 chunk 修复 | ⬜ |  |
+| 26.44 | review session selector 双 Skip 索引偏移修复 | ⬜ |  |
+| 26.45 | review 的 gh 检测兼容 Windows（which -> where） | ⬜ |  |
+| 26.46 | cc-switch 原子写入兼容 Windows 已存在目标文件 | ⬜ |  |
+| 26.47 | MCP 不支持错误文案/错误码统一，前端可稳定识别 | ⬜ |  |
+| 26.48 | MCP 保存逻辑使用稳定 profile key（非对象引用） | ⬜ |  |
+| 26.49 | 前端 Workflow 状态枚举补齐 merging 并对齐映射 | ⬜ |  |
+| 26.50 | TerminalDto.customApiKey 序列化与 shared 类型一致化 | ⬜ |  |
+
+### P0/P1 - 合并报告补充高优先问题（S1-S10）
+
+| Task | 目标描述 | 状态 | 完成时间 |
+|------|----------|------|----------|
+| 26.51 | 修复 `Terminal::set_started()` 状态语义错误（waiting/started 对齐） | ⬜ |  |
+| 26.52 | 补齐终端状态变化 WebSocket 事件发布链路（状态变更可观测） | ⬜ |  |
+| 26.53 | 修复 prepare 流程状态转换混乱，避免终端长期卡在 waiting | ⬜ |  |
+| 26.54 | auto_confirm 与 PromptWatcher 注册逻辑打通（配置生效） | ⬜ |  |
+| 26.55 | PromptHandler 决策逻辑接入 auto_confirm（避免策略脱节） | ⬜ |  |
+| 26.56 | 补齐历史数据迁移：旧 terminal 的 auto_confirm 缺省值回填 | ⬜ |  |
+| 26.57 | 修复 Phase 24/25 自动确认集成断点（事件到决策链路一致） | ⬜ |  |
+| 26.58 | 修复手动启动路径 logger 失败处理不一致（失败语义统一） | ⬜ |  |
+| 26.59 | 修复 TerminalLogger flush 恢复机制竞态（避免重复恢复/丢日志） | ⬜ |  |
+| 26.60 | 补强 lagged 场景输出补偿链路（与 26.24 联合验收） | ⬜ |  |
+
+**完成标准:**
+- ✅ 报告中 60 个高优先问题全部有对应修复任务与验收条目
+- ✅ 阻断级问题全部关闭（A1-A19）
+- ✅ 补充高优先问题全部关闭（S1-S10）
+- ✅ 关键链路回归通过：workflow 创建→prepare→start→terminal/ws→task attempt→merge
+- ✅ 前端 `pnpm -C frontend run check`、后端核心测试与回归通过
+
+---
+
+## Phase 27: Docker 容器化部署（开源发布优化）
 
 **计划文件:** `2026-01-27-phase-19-docker-deployment.md`
 
@@ -1000,12 +1099,18 @@
 
 | Task | 目标描述 | 状态 | 完成时间 |
 |------|----------|------|----------|
-| 26.1 | 创建生产部署 Dockerfile（多阶段构建） | ⬜ |  |
-| 26.2 | 创建生产部署 Docker Compose | ⬜ |  |
-| 26.3 | 创建开发调试 Docker Compose（可选） | ⬜ |  |
-| 26.4 | 优化 Docker 镜像构建（缓存/体积） | ⬜ |  |
-| 26.5 | 创建 Docker 部署文档 | ⬜ |  |
-| 26.6 | CI/CD 集成（GitHub Actions） | ⬜ |  |
+| 27.1 | 创建生产部署 Dockerfile（多阶段构建） | ⬜ |  |
+| 27.2 | 创建生产部署 Docker Compose | ⬜ |  |
+| 27.3 | 创建开发调试 Docker Compose（可选） | ⬜ |  |
+| 27.4 | 优化 Docker 镜像构建（缓存/体积） | ⬜ |  |
+| 27.5 | 创建 Docker 部署文档 | ⬜ |  |
+| 27.6 | CI/CD 集成（GitHub Actions） | ⬜ |  |
+
+**完成标准:**
+- ✅ 生产镜像可稳定构建并通过基础健康检查
+- ✅ `docker compose up` 可一键拉起前后端与依赖服务
+- ✅ 开发/生产部署文档可复现（新机器按文档可运行）
+- ✅ CI 在主分支上完成镜像构建与基础集成验证
 
 **预期收益:**
 - ✅ 使用者无需安装 Rust/Node.js 环境
