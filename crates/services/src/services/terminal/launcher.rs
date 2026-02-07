@@ -2,7 +2,7 @@
 //!
 //! Serial terminal launcher with model switching integration.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 // Re-export types
 pub use db::models::Terminal;
@@ -271,61 +271,107 @@ impl TerminalLauncher {
         {
             Ok(handle) => {
                 // Update terminal status in database
-                let _ = Terminal::set_started(&self.db.pool, &terminal_id).await;
+                if let Err(e) = Terminal::set_started(&self.db.pool, &terminal_id).await {
+                    return self.rollback_launch_after_spawn(
+                        &terminal_id,
+                        format!("Failed to set terminal started status: {e}")
+                    ).await;
+                }
                 let pid = i32::try_from(handle.pid).ok();
-                let _ = Terminal::update_process(
+                if let Err(e) = Terminal::update_process(
                     &self.db.pool,
                     &terminal_id,
                     pid,
                     Some(&handle.session_id),
                 )
-                .await;
+                .await {
+                    return self.rollback_launch_after_spawn(
+                        &terminal_id,
+                        format!("Failed to update terminal process binding: {e}")
+                    ).await;
+                }
 
                 // Update terminal with session and execution process binding
                 if session_id.is_some() || execution_process_id.is_some() {
-                    let _ = Terminal::update_session(
+                    if let Err(e) = Terminal::update_session(
                         &self.db.pool,
                         &terminal_id,
                         session_id.as_deref(),
                         execution_process_id.as_deref(),
                     )
-                    .await;
+                    .await {
+                        return self.rollback_launch_after_spawn(
+                            &terminal_id,
+                            format!("Failed to update terminal session binding: {e}")
+                        ).await;
+                    }
+                }
+
+                // Attach terminal logger for output persistence
+                if let Err(e) = self.process_manager.attach_terminal_logger(
+                    Arc::clone(&self.db),
+                    &terminal_id,
+                    "stdout",
+                    1,
+                ).await {
+                    return self.rollback_launch_after_spawn(
+                        &terminal_id,
+                        format!("Failed to attach terminal logger: {e}")
+                    ).await;
                 }
 
                 // Register terminal bridge for MessageBus -> PTY stdin forwarding
                 if let Some(ref bridge) = self.terminal_bridge {
                     if let Err(e) = bridge.register(&terminal_id, &handle.session_id).await {
-                        tracing::warn!(
-                            terminal_id = %terminal_id,
-                            pty_session_id = %handle.session_id,
-                            error = %e,
-                            "Failed to register terminal bridge (non-fatal)"
-                        );
-                    } else {
-                        tracing::debug!(
-                            terminal_id = %terminal_id,
-                            pty_session_id = %handle.session_id,
-                            "Terminal bridge registered successfully"
-                        );
+                        return self.rollback_launch_after_spawn(
+                            &terminal_id,
+                            format!("Failed to register terminal bridge: {e}")
+                        ).await;
                     }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    if !bridge.is_registered(&handle.session_id).await {
+                        return self.rollback_launch_after_spawn(
+                            &terminal_id,
+                            "Terminal bridge registration verification failed".to_string()
+                        ).await;
+                    }
+                    tracing::debug!(
+                        terminal_id = %terminal_id,
+                        pty_session_id = %handle.session_id,
+                        "Terminal bridge registered and verified"
+                    );
                 }
 
                 // Register prompt watcher for PTY output prompt detection
                 if let Some(ref watcher) = self.prompt_watcher {
                     match self.get_workflow_id_for_terminal(&terminal.workflow_task_id).await {
                         Ok(Some(workflow_id)) => {
-                            watcher.register(
+                            if let Err(e) = watcher.register(
                                 &terminal_id,
                                 &workflow_id,
                                 &terminal.workflow_task_id,
                                 &handle.session_id,
-                            ).await;
-                            tracing::debug!(
-                                terminal_id = %terminal_id,
-                                workflow_id = %workflow_id,
-                                pty_session_id = %handle.session_id,
-                                "Prompt watcher registered successfully"
-                            );
+                            ).await {
+                                tracing::warn!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    error = %e,
+                                    "Failed to register prompt watcher"
+                                );
+                            } else if !watcher.is_registered(&terminal_id).await {
+                                tracing::warn!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    "Prompt watcher registration verification failed"
+                                );
+                            } else {
+                                tracing::debug!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    pty_session_id = %handle.session_id,
+                                    "Prompt watcher registered successfully"
+                                );
+                            }
                         }
                         Ok(None) => {
                             tracing::warn!(
@@ -339,7 +385,7 @@ impl TerminalLauncher {
                                 terminal_id = %terminal_id,
                                 workflow_task_id = %terminal.workflow_task_id,
                                 error = %e,
-                                "Failed to register prompt watcher (non-fatal)"
+                                "Failed to resolve prompt watcher workflow binding"
                             );
                         }
                     }
@@ -363,6 +409,38 @@ impl TerminalLauncher {
                     error: Some(format!("Process spawn failed: {e}")),
                 }
             }
+        }
+    }
+
+    async fn rollback_launch_after_spawn(
+        &self,
+        terminal_id: &str,
+        reason: String,
+    ) -> LaunchResult {
+        tracing::error!(
+            terminal_id = %terminal_id,
+            error = %reason,
+            "Terminal launch failed after spawn, performing rollback"
+        );
+
+        if let Err(e) = self.process_manager.kill_terminal(terminal_id).await {
+            tracing::warn!(terminal_id = %terminal_id, error = %e, "Failed to kill terminal during rollback");
+        }
+        if let Err(e) = Terminal::update_process(&self.db.pool, terminal_id, None, None).await {
+            tracing::warn!(terminal_id = %terminal_id, error = %e, "Failed to clear process binding during rollback");
+        }
+        if let Err(e) = Terminal::update_session(&self.db.pool, terminal_id, None, None).await {
+            tracing::warn!(terminal_id = %terminal_id, error = %e, "Failed to clear session binding during rollback");
+        }
+        if let Err(e) = Terminal::update_status(&self.db.pool, terminal_id, "failed").await {
+            tracing::warn!(terminal_id = %terminal_id, error = %e, "Failed to mark terminal failed during rollback");
+        }
+
+        LaunchResult {
+            terminal_id: terminal_id.to_string(),
+            process_handle: None,
+            success: false,
+            error: Some(reason),
         }
     }
 

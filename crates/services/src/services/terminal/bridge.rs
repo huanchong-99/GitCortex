@@ -220,6 +220,11 @@ impl TerminalBridge {
         self.active_sessions.read().await.len()
     }
 
+    /// Returns whether a PTY session currently has an active bridge task.
+    pub async fn is_registered(&self, pty_session_id: &str) -> bool {
+        self.active_sessions.read().await.contains_key(pty_session_id)
+    }
+
     /// Helper method to forward a bus message to PTY stdin.
     async fn forward_bus_message(
         tx: &mpsc::Sender<Vec<u8>>,

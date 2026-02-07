@@ -159,6 +159,7 @@ async fn create_terminal(
         completed_at: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        auto_confirm: true,
     };
 
     Terminal::create(&db.pool, &terminal).await.unwrap();

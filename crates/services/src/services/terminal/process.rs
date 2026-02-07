@@ -203,6 +203,8 @@ struct TrackedProcess {
     output_fanout: Arc<OutputFanout>,
     /// Background PTY reader task
     reader_task: Option<JoinHandle<()>>,
+    /// Background terminal log persistence task
+    logger_task: Option<JoinHandle<()>>,
 }
 
 // ============================================================================
@@ -551,6 +553,7 @@ impl ProcessManager {
                 codex_home,
                 output_fanout,
                 reader_task,
+                logger_task: None,
             },
         );
 
@@ -698,6 +701,7 @@ impl ProcessManager {
                 codex_home: None, // Legacy spawn_pty doesn't support CODEX_HOME
                 output_fanout,
                 reader_task,
+                logger_task: None,
             },
         );
 
@@ -806,6 +810,11 @@ impl ProcessManager {
                 task.abort();
             }
 
+            // Abort terminal logger task
+            if let Some(task) = tracked.logger_task.take() {
+                task.abort();
+            }
+
             // Try to kill the child process
             if let Err(e) = tracked.child.kill() {
                 tracing::warn!(
@@ -859,7 +868,12 @@ impl ProcessManager {
             let mut targets = Vec::new();
             for id in dead_ids {
                 if let Some(mut tracked) = processes.remove(&id) {
-                    targets.push((id, tracked.codex_home, tracked.reader_task.take()));
+                    targets.push((
+                        id,
+                        tracked.codex_home,
+                        tracked.reader_task.take(),
+                        tracked.logger_task.take(),
+                    ));
                 }
             }
 
@@ -867,9 +881,13 @@ impl ProcessManager {
         };
 
         // Clean up resources outside the lock
-        for (id, codex_home, reader_task) in cleanup_targets {
+        for (id, codex_home, reader_task, logger_task) in cleanup_targets {
             // Abort background reader task
             if let Some(task) = reader_task {
+                task.abort();
+            }
+            // Abort terminal logger task
+            if let Some(task) = logger_task {
                 task.abort();
             }
             // Clean up CODEX_HOME directory
@@ -970,6 +988,83 @@ impl ProcessManager {
         processes
             .get(terminal_id)
             .map(|tracked| tracked.output_fanout.latest_seq())
+    }
+
+    /// Attach a persistent logger to terminal output fanout.
+    ///
+    /// This wires PTY output to `terminal_log` table persistence.
+    pub async fn attach_terminal_logger(
+        &self,
+        db: Arc<DBService>,
+        terminal_id: &str,
+        log_type: &str,
+        flush_interval_secs: u64,
+    ) -> anyhow::Result<()> {
+        {
+            let processes = self.processes.read().await;
+            if !processes.contains_key(terminal_id) {
+                return Err(anyhow::anyhow!("Terminal not found: {terminal_id}"));
+            }
+        }
+
+        let mut subscription = self.subscribe_output(terminal_id, None).await?;
+        let logger = TerminalLogger::new(
+            db,
+            terminal_id.to_string(),
+            log_type.to_string(),
+            flush_interval_secs,
+        );
+        let terminal_id_owned = terminal_id.to_string();
+        let log_type_owned = log_type.to_string();
+
+        let logger_task = tokio::spawn(async move {
+            loop {
+                match subscription.recv().await {
+                    Ok(chunk) => {
+                        if !chunk.text.is_empty() {
+                            logger.append(&chunk.text).await;
+                        }
+                        if chunk.dropped_invalid_bytes > 0 {
+                            logger
+                                .append(&format!(
+                                    "[{}] dropped {} invalid UTF-8 bytes at seq={}",
+                                    log_type_owned, chunk.dropped_invalid_bytes, chunk.seq
+                                ))
+                                .await;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id_owned,
+                            skipped = %skipped,
+                            "Terminal logger output subscription lagged"
+                        );
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::debug!(
+                            terminal_id = %terminal_id_owned,
+                            "Terminal logger output subscription closed"
+                        );
+                        break;
+                    }
+                }
+            }
+        });
+
+        let mut processes = self.processes.write().await;
+        let tracked = match processes.get_mut(terminal_id) {
+            Some(tracked) => tracked,
+            None => {
+                logger_task.abort();
+                return Err(anyhow::anyhow!("Terminal not found: {terminal_id}"));
+            }
+        };
+        if let Some(existing_task) = tracked.logger_task.take() {
+            existing_task.abort();
+        }
+        tracked.logger_task = Some(logger_task);
+        tracing::debug!(terminal_id = %terminal_id, log_type = %log_type, "Attached terminal logger to output fanout");
+        Ok(())
     }
 }
 

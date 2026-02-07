@@ -102,20 +102,59 @@ impl MessageBus {
         rx
     }
 
+    /// Returns current subscriber count for a topic.
+    pub async fn subscriber_count(&self, topic: &str) -> usize {
+        let subscribers = self.subscribers.read().await;
+        subscribers.get(topic).map_or(0, Vec::len)
+    }
+
+    /// Publish a message and require at least one subscriber.
+    ///
+    /// Returns the number of subscribers that received the message.
+    pub async fn publish_required(
+        &self,
+        topic: &str,
+        message: BusMessage,
+    ) -> anyhow::Result<usize> {
+        self.publish_inner(topic, message, true).await
+    }
+
     /// Publish a message to all subscribers of a topic.
     pub async fn publish(&self, topic: &str, message: BusMessage) -> anyhow::Result<()> {
-        let subscribers: tokio::sync::RwLockReadGuard<
-            '_,
-            HashMap<String, Vec<mpsc::Sender<BusMessage>>>,
-        > = self.subscribers.read().await;
-        if let Some(subs) = subscribers.get(topic) {
-            for tx in subs {
-                tx.send(message.clone())
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to send message to subscriber: {e}"))?;
+        self.publish_inner(topic, message, false).await.map(|_| ())
+    }
+
+    async fn publish_inner(
+        &self,
+        topic: &str,
+        message: BusMessage,
+        require_subscribers: bool,
+    ) -> anyhow::Result<usize> {
+        let subscribers = {
+            let subscribers = self.subscribers.read().await;
+            subscribers.get(topic).cloned().unwrap_or_default()
+        };
+
+        if subscribers.is_empty() {
+            if require_subscribers {
+                return Err(anyhow::anyhow!("No subscribers for topic: {topic}"));
             }
+            tracing::warn!(topic = %topic, "Dropping message: no subscribers");
+            return Ok(0);
         }
-        Ok(())
+
+        for tx in &subscribers {
+            tx.send(message.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to send message to subscriber: {e}"))?;
+        }
+
+        tracing::trace!(
+            topic = %topic,
+            subscriber_count = subscribers.len(),
+            "Published message to topic subscribers"
+        );
+        Ok(subscribers.len())
     }
 
     /// Publishes a terminal completion event to workflow topic and broadcast channel.

@@ -277,18 +277,26 @@ pub async fn start_terminal(
             // Get workflow_id from workflow_task
             match db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id).await {
                 Ok(Some(task)) => {
-                    deployment.prompt_watcher().register(
+                    if let Err(e) = deployment.prompt_watcher().register(
                         &id,
                         &task.workflow_id,
                         &terminal.workflow_task_id,
                         pty_session_id,
-                    ).await;
-                    tracing::info!(
-                        terminal_id = %id,
-                        workflow_id = %task.workflow_id,
-                        pty_session_id = %pty_session_id,
-                        "PromptWatcher registered for background prompt detection"
-                    );
+                    ).await {
+                        tracing::warn!(
+                            terminal_id = %id,
+                            workflow_id = %task.workflow_id,
+                            error = %e,
+                            "Failed to register PromptWatcher for background prompt detection"
+                        );
+                    } else {
+                        tracing::info!(
+                            terminal_id = %id,
+                            workflow_id = %task.workflow_id,
+                            pty_session_id = %pty_session_id,
+                            "PromptWatcher registered for background prompt detection"
+                        );
+                    }
                 }
                 Ok(None) => {
                     tracing::warn!(
