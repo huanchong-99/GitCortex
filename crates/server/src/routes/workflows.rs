@@ -1806,11 +1806,13 @@ mod prompt_response_route_tests {
     };
     use deployment::Deployment;
     use serde_json::json;
+    use serial_test::serial;
     use tower::ServiceExt;
 
     use super::*;
 
     #[tokio::test]
+    #[serial]
     async fn submit_prompt_response_requires_terminal_id() {
         let deployment = DeploymentImpl::new()
             .await
@@ -1849,6 +1851,7 @@ mod prompt_response_route_tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn submit_prompt_response_allows_empty_response() {
         let deployment = DeploymentImpl::new()
             .await
@@ -1887,6 +1890,7 @@ mod prompt_response_route_tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn submit_prompt_response_requires_response_field() {
         let deployment = DeploymentImpl::new()
             .await
