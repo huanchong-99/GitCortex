@@ -425,6 +425,10 @@ impl TerminalBridge {
 
         // Already has newline
         if payload.ends_with('\n') {
+            if cfg!(windows) && !payload.ends_with("\r\n") {
+                payload.pop();
+                payload.push_str("\r\n");
+            }
             return payload;
         }
 
@@ -456,7 +460,21 @@ mod tests {
     #[test]
     fn test_normalize_message_preserves_existing_newline() {
         let result = TerminalBridge::normalize_message("hello\n");
-        assert_eq!(result, "hello\n", "Should preserve existing newline");
+        if cfg!(windows) {
+            assert_eq!(
+                result, "hello\r\n",
+                "Windows should normalize LF newline to CRLF"
+            );
+        } else {
+            assert_eq!(result, "hello\n", "Should preserve existing newline");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_normalize_message_preserves_existing_crlf_on_windows() {
+        let result = TerminalBridge::normalize_message("hello\r\n");
+        assert_eq!(result, "hello\r\n", "Windows should preserve existing CRLF");
     }
 
     #[test]
