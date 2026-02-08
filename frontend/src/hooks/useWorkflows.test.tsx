@@ -6,7 +6,9 @@ import {
   useWorkflow,
   useCreateWorkflow,
   useStartWorkflow,
+  useMergeWorkflow,
   useDeleteWorkflow,
+  getWorkflowActions,
   workflowKeys,
   type Workflow,
   type CreateWorkflowRequest,
@@ -35,18 +37,20 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Helper to create successful API response
-const createSuccessResponse = (data: unknown) => ({
-  ok: true,
-  json: async () => ({ success: true, data }),
-} as Response);
+const createSuccessResponse = (data: unknown) =>
+  ({
+    ok: true,
+    json: async () => ({ success: true, data }),
+  }) as Response;
 
 // Helper to create error API response
-const createErrorResponse = (message: string, status: number = 500) => ({
-  ok: false,
-  status,
-  statusText: message,
-  json: async () => ({ success: false, message }),
-} as Response);
+const createErrorResponse = (message: string, status: number = 500) =>
+  ({
+    ok: false,
+    status,
+    statusText: message,
+    json: async () => ({ success: false, message }),
+  }) as Response;
 
 // Mock workflows data
 const mockWorkflows: Workflow[] = [
@@ -138,7 +142,10 @@ describe('useWorkflows', () => {
   });
 
   it('should fetch workflows for a project', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflows)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createSuccessResponse(mockWorkflows))
+    );
 
     const { result } = renderHook(() => useWorkflows('proj-1'), {
       wrapper,
@@ -149,7 +156,10 @@ describe('useWorkflows', () => {
   });
 
   it('should handle fetch errors', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => createErrorResponse('Network error')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createErrorResponse('Network error'))
+    );
 
     const { result } = renderHook(() => useWorkflows('proj-1'), {
       wrapper,
@@ -160,7 +170,10 @@ describe('useWorkflows', () => {
   });
 
   it('should be disabled when projectId is empty', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflows)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createSuccessResponse(mockWorkflows))
+    );
 
     const { result } = renderHook(() => useWorkflows(''), {
       wrapper,
@@ -176,7 +189,10 @@ describe('useWorkflow', () => {
   });
 
   it('should fetch a single workflow by ID', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflow)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createSuccessResponse(mockWorkflow))
+    );
 
     const { result } = renderHook(() => useWorkflow('workflow-1'), {
       wrapper,
@@ -187,7 +203,10 @@ describe('useWorkflow', () => {
   });
 
   it('should be disabled when workflowId is empty', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(mockWorkflow)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createSuccessResponse(mockWorkflow))
+    );
 
     const { result } = renderHook(() => useWorkflow(''), {
       wrapper,
@@ -254,7 +273,10 @@ describe('useCreateWorkflow', () => {
       config: mockWorkflow.config,
     };
 
-    vi.stubGlobal('fetch', vi.fn(() => createErrorResponse('Creation failed')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createErrorResponse('Creation failed'))
+    );
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { result } = renderHook(() => useCreateWorkflow(), {
@@ -282,7 +304,10 @@ describe('useStartWorkflow', () => {
       started_at: '2024-01-01T00:00:00Z',
     };
 
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(executionResponse)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createSuccessResponse(executionResponse))
+    );
 
     const { result } = renderHook(() => useStartWorkflow(), {
       wrapper,
@@ -301,7 +326,10 @@ describe('useDeleteWorkflow', () => {
   });
 
   it('should delete a workflow', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(undefined)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => createSuccessResponse(undefined))
+    );
 
     const { result } = renderHook(() => useDeleteWorkflow(), {
       wrapper,
@@ -310,5 +338,67 @@ describe('useDeleteWorkflow', () => {
     result.current.mutate('workflow-1');
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+describe('useMergeWorkflow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should call merge API and invalidate workflow caches', async () => {
+    const mergeResponse = {
+      success: true,
+      message: 'Merge completed successfully',
+      workflowId: 'workflow-1',
+      targetBranch: 'main',
+      mergedTasks: [],
+    };
+
+    const queryClient = createMockQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const fetchMock = vi.fn(() => createSuccessResponse(mergeResponse));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useMergeWorkflow(), {
+      wrapper: scopedWrapper,
+    });
+
+    result.current.mutate({ workflow_id: 'workflow-1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/workflows/workflow-1/merge',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merge_strategy: 'squash' }),
+      })
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.byId('workflow-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.all,
+    });
+  });
+});
+
+describe('getWorkflowActions', () => {
+  it('should allow merge for merging and completed workflows', () => {
+    expect(getWorkflowActions('merging').canMerge).toBe(true);
+    expect(getWorkflowActions('completed').canMerge).toBe(true);
+  });
+
+  it('should disallow merge for running and draft workflows', () => {
+    expect(getWorkflowActions('running').canMerge).toBe(false);
+    expect(getWorkflowActions('cancelled').canMerge).toBe(false);
+    expect(getWorkflowActions('draft').canMerge).toBe(false);
   });
 });

@@ -39,6 +39,19 @@ interface McpUiError {
   message: string;
 }
 
+export const buildMcpServersPayload = (
+  editorValue: string,
+  mcpConfig: McpConfig
+): McpConfig['servers'] => {
+  if (!editorValue.trim()) {
+    return {};
+  }
+
+  const fullConfig = JSON.parse(editorValue);
+  McpConfigStrategyGeneral.validateFullConfig(mcpConfig, fullConfig);
+  return McpConfigStrategyGeneral.extractServersForApi(mcpConfig, fullConfig);
+};
+
 export function McpSettings() {
   const { t } = useTranslation('settings');
   const { config, profiles } = useUserSystem();
@@ -46,9 +59,8 @@ export function McpSettings() {
   const [mcpConfig, setMcpConfig] = useState<McpConfig | null>(null);
   const [mcpError, setMcpError] = useState<McpUiError | null>(null);
   const [mcpLoading, setMcpLoading] = useState(true);
-  const [selectedProfileKey, setSelectedProfileKey] = useState<BaseCodingAgent | null>(
-    null
-  );
+  const [selectedProfileKey, setSelectedProfileKey] =
+    useState<BaseCodingAgent | null>(null);
   const [mcpApplying, setMcpApplying] = useState(false);
   const [mcpConfigPath, setMcpConfigPath] = useState<string>('');
   const [success, setSuccess] = useState(false);
@@ -112,9 +124,7 @@ export function McpSettings() {
         setMcpServers(configJson);
         setMcpConfigPath(result.config_path);
       } catch (err: unknown) {
-        setMcpError(
-          toMcpUiError(err, t('settings.mcp.errors.loadFailed'))
-        );
+        setMcpError(toMcpUiError(err, t('settings.mcp.errors.loadFailed')));
         console.error('Error loading MCP servers:', err);
       } finally {
         setMcpLoading(false);
@@ -164,37 +174,29 @@ export function McpSettings() {
 
     try {
       // Validate and save MCP configuration
-      if (mcpServers.trim()) {
-        try {
-          const fullConfig = JSON.parse(mcpServers);
-          McpConfigStrategyGeneral.validateFullConfig(mcpConfig, fullConfig);
-          const mcpServersConfig =
-            McpConfigStrategyGeneral.extractServersForApi(
-              mcpConfig,
-              fullConfig
-            );
+      try {
+        const mcpServersConfig = buildMcpServersPayload(mcpServers, mcpConfig);
 
-          await mcpServersApi.save(
-            {
-              executor: selectedProfileKey,
-            },
-            { servers: mcpServersConfig }
+        await mcpServersApi.save(
+          {
+            executor: selectedProfileKey,
+          },
+          { servers: mcpServersConfig }
+        );
+
+        // Show success feedback
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      } catch (mcpErr) {
+        if (mcpErr instanceof SyntaxError) {
+          setMcpError({
+            code: null,
+            message: t('settings.mcp.errors.invalidJson'),
+          });
+        } else {
+          setMcpError(
+            toMcpUiError(mcpErr, t('settings.mcp.errors.saveFailed'))
           );
-
-          // Show success feedback
-          setSuccess(true);
-          setTimeout(() => setSuccess(false), 3000);
-        } catch (mcpErr) {
-          if (mcpErr instanceof SyntaxError) {
-            setMcpError({
-              code: null,
-              message: t('settings.mcp.errors.invalidJson'),
-            });
-          } else {
-            setMcpError(
-              toMcpUiError(mcpErr, t('settings.mcp.errors.saveFailed'))
-            );
-          }
         }
       }
     } catch (err) {

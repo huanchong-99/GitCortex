@@ -118,22 +118,15 @@ impl CommandBuilder {
     }
 
     fn build(&self, additional_args: &[String]) -> Result<CommandParts, CommandBuildError> {
-        let mut parts = split_command_line(&self.simple_join(additional_args))?;
-        if parts.is_empty() {
-            return Err(CommandBuildError::EmptyCommand);
-        }
-
+        let mut parts = split_command_line(&self.base)?;
         let program = parts.remove(0);
-        Ok(CommandParts::new(program, parts))
-    }
 
-    fn simple_join(&self, additional_args: &[String]) -> String {
-        let mut parts = vec![self.base.clone()];
         if let Some(ref params) = self.params {
-            parts.extend(params.clone());
+            parts.extend(params.iter().cloned());
         }
         parts.extend(additional_args.iter().cloned());
-        parts.join(" ")
+
+        Ok(CommandParts::new(program, parts))
     }
 }
 
@@ -177,6 +170,71 @@ mod tests {
     fn split_empty_input_returns_empty_command_error() {
         let err = split_command_line("").expect_err("empty command line should fail");
         assert!(matches!(err, CommandBuildError::EmptyCommand));
+    }
+
+    #[test]
+    fn build_initial_keeps_base_string_parsing_compatible() {
+        let builder = CommandBuilder::new("npx -y tool@latest").params(["--json"]);
+
+        let command = builder
+            .build_initial()
+            .expect("base command string should still be parsed into program + args");
+
+        assert_eq!(command.program, "npx");
+        assert_eq!(command.args, vec!["-y", "tool@latest", "--json"]);
+    }
+
+    #[test]
+    fn build_initial_preserves_param_boundaries() {
+        let builder = CommandBuilder::new("agent").params([
+            "--prompt",
+            "hello world",
+            "contains\"quote",
+            "trailing-space ",
+        ]);
+
+        let command = builder
+            .build_initial()
+            .expect("params should keep original argument boundaries");
+
+        assert_eq!(command.program, "agent");
+        assert_eq!(
+            command.args,
+            vec![
+                "--prompt",
+                "hello world",
+                "contains\"quote",
+                "trailing-space ",
+            ]
+        );
+    }
+
+    #[test]
+    fn build_follow_up_preserves_additional_arg_boundaries() {
+        let builder = CommandBuilder::new("agent --mode run").params(["--prompt", "line one"]);
+        let additional = vec![
+            "--resume".to_string(),
+            "session with spaces".to_string(),
+            "unterminated\"quote".to_string(),
+        ];
+
+        let command = builder
+            .build_follow_up(&additional)
+            .expect("follow-up args should not be reparsed");
+
+        assert_eq!(command.program, "agent");
+        assert_eq!(
+            command.args,
+            vec![
+                "--mode",
+                "run",
+                "--prompt",
+                "line one",
+                "--resume",
+                "session with spaces",
+                "unterminated\"quote",
+            ]
+        );
     }
 }
 

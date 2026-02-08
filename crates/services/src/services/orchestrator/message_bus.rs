@@ -128,6 +128,28 @@ impl MessageBus {
         self.publish_inner(topic, message, false).await.map(|_| ())
     }
 
+    /// Publish a workflow-scoped event to both workflow topic and broadcast channel.
+    ///
+    /// Returns the number of workflow topic subscribers that received the event.
+    pub async fn publish_workflow_event(
+        &self,
+        workflow_id: &str,
+        message: BusMessage,
+    ) -> anyhow::Result<usize> {
+        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+        let delivered = self.publish_inner(&topic, message.clone(), false).await?;
+
+        if let Err(err) = self.broadcast(message) {
+            tracing::debug!(
+                ?err,
+                workflow_id = %workflow_id,
+                "Workflow broadcast skipped because no broadcast subscribers are active"
+            );
+        }
+
+        Ok(delivered)
+    }
+
     async fn publish_inner(
         &self,
         topic: &str,
@@ -163,11 +185,10 @@ impl MessageBus {
 
     /// Publishes a terminal completion event to workflow topic and broadcast channel.
     pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
-        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, event.workflow_id);
+        let workflow_id = event.workflow_id.clone();
         let _ = self
-            .publish(&topic, BusMessage::TerminalCompleted(event.clone()))
+            .publish_workflow_event(&workflow_id, BusMessage::TerminalCompleted(event))
             .await;
-        let _ = self.broadcast(BusMessage::TerminalCompleted(event));
     }
 
     /// Publishes a git event to workflow topic and broadcast channel.
@@ -182,26 +203,23 @@ impl MessageBus {
         branch: &str,
         message: &str,
     ) {
-        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
         let event = BusMessage::GitEvent {
             workflow_id: workflow_id.to_string(),
             commit_hash: commit_hash.to_string(),
             branch: branch.to_string(),
             message: message.to_string(),
         };
-        let _ = self.publish(&topic, event.clone()).await;
-        let _ = self.broadcast(event);
+        let _ = self.publish_workflow_event(workflow_id, event).await;
     }
 
     /// Publishes a terminal prompt detected event.
     ///
     /// Called by PromptWatcher when an interactive prompt is detected in PTY output.
     pub async fn publish_terminal_prompt_detected(&self, event: TerminalPromptEvent) {
-        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, event.workflow_id);
+        let workflow_id = event.workflow_id.clone();
         let _ = self
-            .publish(&topic, BusMessage::TerminalPromptDetected(event.clone()))
+            .publish_workflow_event(&workflow_id, BusMessage::TerminalPromptDetected(event))
             .await;
-        let _ = self.broadcast(BusMessage::TerminalPromptDetected(event));
     }
 
     /// Publishes a terminal input message to be sent to PTY stdin.
@@ -236,14 +254,12 @@ impl MessageBus {
         workflow_id: &str,
         decision: PromptDecision,
     ) {
-        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
         let message = BusMessage::TerminalPromptDecision {
             terminal_id: terminal_id.to_string(),
             workflow_id: workflow_id.to_string(),
-            decision: decision.clone(),
+            decision,
         };
-        let _ = self.publish(&topic, message.clone()).await;
-        let _ = self.broadcast(message);
+        let _ = self.publish_workflow_event(workflow_id, message).await;
     }
 }
 

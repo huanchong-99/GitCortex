@@ -28,7 +28,11 @@ export type WsEventType =
   | 'terminal.prompt_detected'
   | 'terminal.prompt_decision';
 
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+type ConnectionStatus =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting';
 
 type MessageHandler = (payload: unknown) => void;
 
@@ -88,6 +92,440 @@ function generateMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
+type JsonRecord = Record<string, unknown>;
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getStringField(
+  payload: JsonRecord,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function getNumberField(
+  payload: JsonRecord,
+  ...keys: string[]
+): number | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsedNumber = Number(value);
+      if (Number.isFinite(parsedNumber)) {
+        return parsedNumber;
+      }
+    }
+  }
+  return undefined;
+}
+
+function getBooleanField(
+  payload: JsonRecord,
+  ...keys: string[]
+): boolean | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      if (value === 'true') {
+        return true;
+      }
+      if (value === 'false') {
+        return false;
+      }
+    }
+  }
+  return undefined;
+}
+
+function normalizeKeyToken(value: string): string {
+  return value
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_')
+    .toLowerCase();
+}
+
+function normalizePromptKindValue(value: unknown): TerminalPromptKind {
+  if (typeof value !== 'string') {
+    return 'unknown';
+  }
+
+  const normalizedValue = normalizeKeyToken(value);
+  switch (normalizedValue) {
+    case 'enter_confirm':
+    case 'confirmation':
+      return 'enter_confirm';
+    case 'yes_no':
+    case 'yesno':
+      return 'yes_no';
+    case 'choice':
+      return 'choice';
+    case 'arrow_select':
+    case 'arrowselect':
+      return 'arrow_select';
+    case 'input':
+      return 'input';
+    case 'password':
+      return 'password';
+    default:
+      return 'unknown';
+  }
+}
+
+function normalizePromptDecisionAction(value: unknown): PromptDecisionAction {
+  if (typeof value !== 'string') {
+    return 'unknown';
+  }
+
+  const normalizedValue = normalizeKeyToken(value);
+  switch (normalizedValue) {
+    case 'auto_confirm':
+      return 'auto_confirm';
+    case 'llm_decision':
+      return 'llm_decision';
+    case 'ask_user':
+      return 'ask_user';
+    case 'skip':
+      return 'skip';
+    default:
+      return 'unknown';
+  }
+}
+
+function normalizeTerminalCompletedStatus(
+  value: unknown
+): TerminalCompletedStatus {
+  if (typeof value !== 'string') {
+    return 'unknown';
+  }
+
+  const normalizedValue = normalizeKeyToken(value);
+  switch (normalizedValue) {
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'cancelled':
+    case 'canceled':
+      return 'cancelled';
+    case 'review_pass':
+    case 'review_passed':
+      return 'review_pass';
+    case 'review_reject':
+    case 'review_rejected':
+      return 'review_reject';
+    default:
+      return 'unknown';
+  }
+}
+
+function normalizePromptOptions(payload: JsonRecord): {
+  options: string[];
+  optionDetails?: TerminalPromptOption[];
+} {
+  const parseOptionEntries = (rawEntries: unknown): TerminalPromptOption[] => {
+    if (!Array.isArray(rawEntries)) {
+      return [];
+    }
+
+    const parsedOptions: TerminalPromptOption[] = [];
+
+    rawEntries.forEach((option, fallbackIndex) => {
+      if (typeof option === 'string') {
+        parsedOptions.push({
+          index: fallbackIndex,
+          label: option,
+          selected: false,
+        });
+        return;
+      }
+
+      if (!isJsonRecord(option)) {
+        return;
+      }
+
+      const label = getStringField(option, 'label', 'value', 'text');
+      if (!label) {
+        return;
+      }
+
+      const parsedIndex = getNumberField(option, 'index');
+      const selected = getBooleanField(option, 'selected') ?? false;
+
+      parsedOptions.push({
+        index: parsedIndex ?? fallbackIndex,
+        label,
+        selected,
+      });
+    });
+
+    return parsedOptions;
+  };
+
+  const optionDetailsFromField = parseOptionEntries(
+    payload.optionDetails ?? payload.option_details
+  );
+  const optionDetailsFromOptions = parseOptionEntries(payload.options);
+  const optionDetails =
+    optionDetailsFromField.length > 0 ? optionDetailsFromField : optionDetailsFromOptions;
+
+  const optionsFromField = Array.isArray(payload.options)
+    ? payload.options.filter((value): value is string => typeof value === 'string')
+    : [];
+  const options =
+    optionsFromField.length > 0 ? optionsFromField : optionDetails.map((option) => option.label);
+
+  if (optionDetails.length === 0) {
+    return { options };
+  }
+
+  return {
+    options,
+    optionDetails,
+  };
+}
+
+function normalizeTerminalCompletedPayload(payload: unknown): unknown {
+  if (!isJsonRecord(payload)) {
+    return payload;
+  }
+
+  const workflowId = getStringField(payload, 'workflowId', 'workflow_id');
+  const taskId = getStringField(payload, 'taskId', 'task_id');
+  const terminalId = getStringField(payload, 'terminalId', 'terminal_id');
+
+  if (!workflowId || !taskId || !terminalId) {
+    return payload;
+  }
+
+  const status = normalizeTerminalCompletedStatus(payload.status);
+  const rawStatus =
+    typeof payload.status === 'string' ? payload.status : undefined;
+  const normalizedPayload: TerminalCompletedPayload = {
+    workflowId,
+    taskId,
+    terminalId,
+    status,
+    commitHash: getStringField(payload, 'commitHash', 'commit_hash'),
+    commitMessage: getStringField(payload, 'commitMessage', 'commit_message'),
+    metadata: payload.metadata,
+  };
+
+  if (status === 'unknown' && rawStatus) {
+    normalizedPayload.statusRaw = rawStatus;
+  }
+
+  return normalizedPayload;
+}
+
+function normalizeTerminalPromptDetectedPayload(payload: unknown): unknown {
+  if (!isJsonRecord(payload)) {
+    return payload;
+  }
+
+  const workflowId = getStringField(payload, 'workflowId', 'workflow_id');
+  const terminalId = getStringField(payload, 'terminalId', 'terminal_id');
+
+  if (!workflowId || !terminalId) {
+    return payload;
+  }
+
+  const rawPromptKind = getStringField(payload, 'promptKind', 'prompt_kind');
+  const normalizedPromptKind = normalizePromptKindValue(rawPromptKind);
+  const { options, optionDetails } = normalizePromptOptions(payload);
+
+  let selectedIndex = getNumberField(
+    payload,
+    'selectedIndex',
+    'selected_index'
+  );
+  if (selectedIndex === undefined && optionDetails) {
+    selectedIndex = optionDetails.find((option) => option.selected)?.index;
+  }
+
+  const normalizedPayload: TerminalPromptDetectedPayload = {
+    workflowId,
+    terminalId,
+    promptKind: normalizedPromptKind,
+    promptText:
+      getStringField(
+        payload,
+        'promptText',
+        'prompt_text',
+        'rawText',
+        'raw_text'
+      ) ?? '',
+    confidence: getNumberField(payload, 'confidence') ?? 0,
+    hasDangerousKeywords:
+      getBooleanField(
+        payload,
+        'hasDangerousKeywords',
+        'has_dangerous_keywords'
+      ) ?? false,
+    options,
+    selectedIndex: selectedIndex ?? null,
+  };
+
+  if (rawPromptKind && rawPromptKind !== normalizedPromptKind) {
+    normalizedPayload.promptKindRaw = rawPromptKind;
+  }
+
+  if (optionDetails) {
+    normalizedPayload.optionDetails = optionDetails;
+  }
+
+  return normalizedPayload;
+}
+
+function normalizeDecisionDetail(decision: JsonRecord): PromptDecisionDetail {
+  const detail: PromptDecisionDetail = { ...decision };
+
+  if (!('targetIndex' in detail)) {
+    const targetIndex = getNumberField(decision, 'targetIndex', 'target_index');
+    if (targetIndex !== undefined) {
+      detail.targetIndex = targetIndex;
+    } else if (
+      decision.targetIndex === null ||
+      decision.target_index === null
+    ) {
+      detail.targetIndex = null;
+    }
+  }
+
+  const suggestions = decision.suggestions;
+  if (Array.isArray(suggestions)) {
+    detail.suggestions = suggestions.filter(
+      (value): value is string => typeof value === 'string'
+    );
+  } else if (suggestions === null) {
+    detail.suggestions = null;
+  }
+
+  return detail;
+}
+
+function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
+  if (!isJsonRecord(payload)) {
+    return payload;
+  }
+
+  const workflowId = getStringField(payload, 'workflowId', 'workflow_id');
+  const terminalId = getStringField(payload, 'terminalId', 'terminal_id');
+
+  if (!workflowId || !terminalId) {
+    return payload;
+  }
+
+  const decisionSource = payload.decision;
+
+  if (typeof decisionSource === 'string') {
+    const normalizedDecision = normalizePromptDecisionAction(decisionSource);
+    const decisionDetailSource = isJsonRecord(payload.decisionDetail)
+      ? payload.decisionDetail
+      : isJsonRecord(payload.decision_detail)
+        ? payload.decision_detail
+        : undefined;
+    const decisionRawSource = payload.decisionRaw ?? payload.decision_raw;
+
+    const normalizedPayload: TerminalPromptDecisionPayload = {
+      workflowId,
+      terminalId,
+      decision: normalizedDecision,
+    };
+
+    if (decisionDetailSource) {
+      normalizedPayload.decisionDetail = normalizeDecisionDetail(decisionDetailSource);
+    }
+
+    if (decisionRawSource !== undefined) {
+      normalizedPayload.decisionRaw = decisionRawSource;
+    }
+
+    if (normalizedDecision === 'unknown' && decisionRawSource === undefined) {
+      normalizedPayload.decisionRaw = decisionSource;
+    }
+
+    return normalizedPayload;
+  }
+
+  if (isJsonRecord(decisionSource)) {
+    const decisionAction = normalizePromptDecisionAction(
+      getStringField(decisionSource, 'action')
+    );
+    const normalizedPayload: TerminalPromptDecisionPayload = {
+      workflowId,
+      terminalId,
+      decision: decisionAction,
+      decisionDetail: normalizeDecisionDetail(decisionSource),
+      decisionRaw: decisionSource,
+    };
+    return normalizedPayload;
+  }
+
+  const topLevelDecisionAction = normalizePromptDecisionAction(
+    getStringField(payload, 'action')
+  );
+  const normalizedPayload: TerminalPromptDecisionPayload = {
+    workflowId,
+    terminalId,
+    decision: topLevelDecisionAction,
+  };
+
+  if (topLevelDecisionAction === 'unknown' && decisionSource !== undefined) {
+    normalizedPayload.decisionRaw = decisionSource;
+  }
+
+  return normalizedPayload;
+}
+
+function normalizeWorkflowEventPayload(
+  eventType: string,
+  payload: unknown
+): unknown {
+  switch (eventType) {
+    case 'terminal.completed':
+      return normalizeTerminalCompletedPayload(payload);
+    case 'terminal.prompt_detected':
+      return normalizeTerminalPromptDetectedPayload(payload);
+    case 'terminal.prompt_decision':
+      return normalizeTerminalPromptDecisionPayload(payload);
+    default:
+      return payload;
+  }
+}
+
+function extractWorkflowIdFromMessage(message: WsMessage): string | null {
+  const messageWithWorkflow = message as WsMessage & { workflowId?: unknown };
+  if (typeof messageWithWorkflow.workflowId === 'string') {
+    return messageWithWorkflow.workflowId;
+  }
+
+  if (!isJsonRecord(message.payload)) {
+    return null;
+  }
+
+  return (
+    getStringField(message.payload, 'workflowId', 'workflow_id') ??
+    getStringField(message.payload, 'workflow') ??
+    null
+  );
+}
+
 const LEGACY_CONNECTION_ID = '__legacy__';
 
 function buildWorkflowEventsUrl(workflowId: string): string {
@@ -99,7 +537,9 @@ function buildWorkflowEventsUrl(workflowId: string): string {
 function aggregateConnectionStatus(
   workflowConnections: Map<string, WorkflowScopedConnection>
 ): ConnectionStatus {
-  const statuses = Array.from(workflowConnections.values()).map((connection) => connection.status);
+  const statuses = Array.from(workflowConnections.values()).map(
+    (connection) => connection.status
+  );
 
   if (statuses.includes('connected')) {
     return 'connected';
@@ -120,7 +560,10 @@ function aggregateLastHeartbeat(
   let lastHeartbeat: Date | null = null;
 
   for (const connection of workflowConnections.values()) {
-    if (!lastHeartbeat || (connection.lastHeartbeat && connection.lastHeartbeat > lastHeartbeat)) {
+    if (
+      !lastHeartbeat ||
+      (connection.lastHeartbeat && connection.lastHeartbeat > lastHeartbeat)
+    ) {
       lastHeartbeat = connection.lastHeartbeat;
     }
   }
@@ -152,7 +595,10 @@ function toWorkflowConnectionStatusRecord(
   return record;
 }
 
-function createWorkflowConnection(url: string, refCount: number): WorkflowScopedConnection {
+function createWorkflowConnection(
+  url: string,
+  refCount: number
+): WorkflowScopedConnection {
   return {
     ws: null,
     status: 'disconnected',
@@ -202,7 +648,11 @@ export const useWsStore = create<WsState>((set, get) => ({
     return get()._workflowConnections.get(workflowId)?.status ?? 'disconnected';
   },
 
-  subscribeToWorkflow: (workflowId: string, eventType: string, handler: MessageHandler) => {
+  subscribeToWorkflow: (
+    workflowId: string,
+    eventType: string,
+    handler: MessageHandler
+  ) => {
     const workflowHandlers = get()._workflowHandlers;
 
     if (!workflowHandlers.has(workflowId)) {
@@ -271,9 +721,9 @@ export const useWsStore = create<WsState>((set, get) => ({
     const currentWorkflowId =
       state.currentWorkflowId && nextConnections.has(state.currentWorkflowId)
         ? state.currentWorkflowId
-        : nextConnections.keys().next().value ?? null;
+        : (nextConnections.keys().next().value ?? null);
     const activeConnection = currentWorkflowId
-      ? nextConnections.get(currentWorkflowId) ?? null
+      ? (nextConnections.get(currentWorkflowId) ?? null)
       : null;
 
     set({
@@ -284,7 +734,8 @@ export const useWsStore = create<WsState>((set, get) => ({
       _reconnectTimeout: activeConnection?.reconnectTimeout ?? null,
       _url: activeConnection?.url ?? null,
       _manualDisconnect: activeConnection?.manualDisconnect ?? false,
-      workflowConnectionStatus: toWorkflowConnectionStatusRecord(nextConnections),
+      workflowConnectionStatus:
+        toWorkflowConnectionStatusRecord(nextConnections),
       connectionStatus: aggregateConnectionStatus(nextConnections),
       lastHeartbeat: aggregateLastHeartbeat(nextConnections),
       reconnectAttempts: aggregateReconnectAttempts(nextConnections),
@@ -294,7 +745,8 @@ export const useWsStore = create<WsState>((set, get) => ({
   connectToWorkflow: (workflowId: string) => {
     const openConnection = (targetWorkflowId: string) => {
       const currentState = get();
-      const currentConnection = currentState._workflowConnections.get(targetWorkflowId);
+      const currentConnection =
+        currentState._workflowConnections.get(targetWorkflowId);
 
       if (!currentConnection) {
         return;
@@ -316,7 +768,10 @@ export const useWsStore = create<WsState>((set, get) => ({
       connectingConnections.set(targetWorkflowId, {
         ...currentConnection,
         ws,
-        status: currentConnection.reconnectAttempts > 0 ? 'reconnecting' : 'connecting',
+        status:
+          currentConnection.reconnectAttempts > 0
+            ? 'reconnecting'
+            : 'connecting',
         manualDisconnect: false,
         heartbeatInterval: null,
         reconnectTimeout: null,
@@ -331,13 +786,16 @@ export const useWsStore = create<WsState>((set, get) => ({
         _reconnectTimeout: connectingConnection.reconnectTimeout,
         _url: connectingConnection.url,
         _manualDisconnect: connectingConnection.manualDisconnect,
-        workflowConnectionStatus: toWorkflowConnectionStatusRecord(connectingConnections),
+        workflowConnectionStatus: toWorkflowConnectionStatusRecord(
+          connectingConnections
+        ),
         connectionStatus: aggregateConnectionStatus(connectingConnections),
         lastHeartbeat: aggregateLastHeartbeat(connectingConnections),
         reconnectAttempts: aggregateReconnectAttempts(connectingConnections),
       });
 
-      const isStale = () => get()._workflowConnections.get(targetWorkflowId)?.ws !== ws;
+      const isStale = () =>
+        get()._workflowConnections.get(targetWorkflowId)?.ws !== ws;
 
       ws.onopen = () => {
         if (isStale()) return;
@@ -365,7 +823,8 @@ export const useWsStore = create<WsState>((set, get) => ({
               lastHeartbeat: new Date(),
             });
 
-            const activeConnection = heartbeatConnections.get(targetWorkflowId)!;
+            const activeConnection =
+              heartbeatConnections.get(targetWorkflowId)!;
             set({
               _workflowConnections: heartbeatConnections,
               _ws: activeConnection.ws,
@@ -373,10 +832,12 @@ export const useWsStore = create<WsState>((set, get) => ({
               _reconnectTimeout: activeConnection.reconnectTimeout,
               _url: activeConnection.url,
               _manualDisconnect: activeConnection.manualDisconnect,
-              workflowConnectionStatus: toWorkflowConnectionStatusRecord(heartbeatConnections),
+              workflowConnectionStatus:
+                toWorkflowConnectionStatusRecord(heartbeatConnections),
               connectionStatus: aggregateConnectionStatus(heartbeatConnections),
               lastHeartbeat: aggregateLastHeartbeat(heartbeatConnections),
-              reconnectAttempts: aggregateReconnectAttempts(heartbeatConnections),
+              reconnectAttempts:
+                aggregateReconnectAttempts(heartbeatConnections),
             });
           }
         }, HEARTBEAT_INTERVAL);
@@ -405,7 +866,8 @@ export const useWsStore = create<WsState>((set, get) => ({
           _reconnectTimeout: activeConnection.reconnectTimeout,
           _url: activeConnection.url,
           _manualDisconnect: activeConnection.manualDisconnect,
-          workflowConnectionStatus: toWorkflowConnectionStatusRecord(connectedConnections),
+          workflowConnectionStatus:
+            toWorkflowConnectionStatusRecord(connectedConnections),
           connectionStatus: aggregateConnectionStatus(connectedConnections),
           lastHeartbeat: aggregateLastHeartbeat(connectedConnections),
           reconnectAttempts: aggregateReconnectAttempts(connectedConnections),
@@ -417,8 +879,14 @@ export const useWsStore = create<WsState>((set, get) => ({
 
         try {
           const message = JSON.parse(event.data as string) as WsMessage;
+          const normalizedPayload = normalizeWorkflowEventPayload(
+            message.type,
+            message.payload
+          );
           const currentStateForMessage = get();
-          const globalHandlers = currentStateForMessage._handlers.get(message.type);
+          const globalHandlers = currentStateForMessage._handlers.get(
+            message.type
+          );
           const scopedHandlers = currentStateForMessage._workflowHandlers
             .get(targetWorkflowId)
             ?.get(message.type);
@@ -426,7 +894,7 @@ export const useWsStore = create<WsState>((set, get) => ({
           if (globalHandlers) {
             globalHandlers.forEach((handler) => {
               try {
-                handler(message.payload);
+                handler(normalizedPayload);
               } catch (error) {
                 console.error('Error in message handler:', error);
               }
@@ -436,7 +904,7 @@ export const useWsStore = create<WsState>((set, get) => ({
           if (scopedHandlers) {
             scopedHandlers.forEach((handler) => {
               try {
-                handler(message.payload);
+                handler(normalizedPayload);
               } catch (error) {
                 console.error('Error in message handler:', error);
               }
@@ -451,7 +919,8 @@ export const useWsStore = create<WsState>((set, get) => ({
         if (isStale()) return;
 
         const currentStateForClose = get();
-        const connection = currentStateForClose._workflowConnections.get(targetWorkflowId);
+        const connection =
+          currentStateForClose._workflowConnections.get(targetWorkflowId);
 
         if (!connection) {
           return;
@@ -462,7 +931,9 @@ export const useWsStore = create<WsState>((set, get) => ({
         }
 
         if (connection.manualDisconnect || connection.refCount <= 0) {
-          const closedConnections = new Map(currentStateForClose._workflowConnections);
+          const closedConnections = new Map(
+            currentStateForClose._workflowConnections
+          );
           const active = closedConnections.get(targetWorkflowId);
 
           if (!active || active.ws !== ws) {
@@ -485,7 +956,8 @@ export const useWsStore = create<WsState>((set, get) => ({
             _reconnectTimeout: activeConnection.reconnectTimeout,
             _url: activeConnection.url,
             _manualDisconnect: activeConnection.manualDisconnect,
-            workflowConnectionStatus: toWorkflowConnectionStatusRecord(closedConnections),
+            workflowConnectionStatus:
+              toWorkflowConnectionStatusRecord(closedConnections),
             connectionStatus: aggregateConnectionStatus(closedConnections),
             lastHeartbeat: aggregateLastHeartbeat(closedConnections),
             reconnectAttempts: aggregateReconnectAttempts(closedConnections),
@@ -505,7 +977,9 @@ export const useWsStore = create<WsState>((set, get) => ({
             openConnection(targetWorkflowId);
           }, delay);
 
-          const reconnectingConnections = new Map(currentStateForClose._workflowConnections);
+          const reconnectingConnections = new Map(
+            currentStateForClose._workflowConnections
+          );
           const active = reconnectingConnections.get(targetWorkflowId);
 
           if (!active || active.ws !== ws) {
@@ -522,7 +996,8 @@ export const useWsStore = create<WsState>((set, get) => ({
             reconnectTimeout,
           });
 
-          const activeConnection = reconnectingConnections.get(targetWorkflowId)!;
+          const activeConnection =
+            reconnectingConnections.get(targetWorkflowId)!;
           set({
             _workflowConnections: reconnectingConnections,
             _ws: activeConnection.ws,
@@ -530,13 +1005,21 @@ export const useWsStore = create<WsState>((set, get) => ({
             _reconnectTimeout: activeConnection.reconnectTimeout,
             _url: activeConnection.url,
             _manualDisconnect: activeConnection.manualDisconnect,
-            workflowConnectionStatus: toWorkflowConnectionStatusRecord(reconnectingConnections),
-            connectionStatus: aggregateConnectionStatus(reconnectingConnections),
+            workflowConnectionStatus: toWorkflowConnectionStatusRecord(
+              reconnectingConnections
+            ),
+            connectionStatus: aggregateConnectionStatus(
+              reconnectingConnections
+            ),
             lastHeartbeat: aggregateLastHeartbeat(reconnectingConnections),
-            reconnectAttempts: aggregateReconnectAttempts(reconnectingConnections),
+            reconnectAttempts: aggregateReconnectAttempts(
+              reconnectingConnections
+            ),
           });
         } else {
-          const disconnectedConnections = new Map(currentStateForClose._workflowConnections);
+          const disconnectedConnections = new Map(
+            currentStateForClose._workflowConnections
+          );
           const active = disconnectedConnections.get(targetWorkflowId);
           if (!active || active.ws !== ws) {
             return;
@@ -550,7 +1033,8 @@ export const useWsStore = create<WsState>((set, get) => ({
             reconnectTimeout: null,
           });
 
-          const activeConnection = disconnectedConnections.get(targetWorkflowId)!;
+          const activeConnection =
+            disconnectedConnections.get(targetWorkflowId)!;
           set({
             _workflowConnections: disconnectedConnections,
             _ws: activeConnection.ws,
@@ -558,10 +1042,16 @@ export const useWsStore = create<WsState>((set, get) => ({
             _reconnectTimeout: activeConnection.reconnectTimeout,
             _url: activeConnection.url,
             _manualDisconnect: activeConnection.manualDisconnect,
-            workflowConnectionStatus: toWorkflowConnectionStatusRecord(disconnectedConnections),
-            connectionStatus: aggregateConnectionStatus(disconnectedConnections),
+            workflowConnectionStatus: toWorkflowConnectionStatusRecord(
+              disconnectedConnections
+            ),
+            connectionStatus: aggregateConnectionStatus(
+              disconnectedConnections
+            ),
             lastHeartbeat: aggregateLastHeartbeat(disconnectedConnections),
-            reconnectAttempts: aggregateReconnectAttempts(disconnectedConnections),
+            reconnectAttempts: aggregateReconnectAttempts(
+              disconnectedConnections
+            ),
           });
         }
       };
@@ -597,7 +1087,8 @@ export const useWsStore = create<WsState>((set, get) => ({
       _reconnectTimeout: currentConnection.reconnectTimeout,
       _url: currentConnection.url,
       _manualDisconnect: currentConnection.manualDisconnect,
-      workflowConnectionStatus: toWorkflowConnectionStatusRecord(nextConnections),
+      workflowConnectionStatus:
+        toWorkflowConnectionStatusRecord(nextConnections),
       connectionStatus: aggregateConnectionStatus(nextConnections),
       lastHeartbeat: aggregateLastHeartbeat(nextConnections),
       reconnectAttempts: aggregateReconnectAttempts(nextConnections),
@@ -609,10 +1100,14 @@ export const useWsStore = create<WsState>((set, get) => ({
   connect: (url: string) => {
     const state = get();
 
-    const legacyConnection = state._workflowConnections.get(LEGACY_CONNECTION_ID);
+    const legacyConnection =
+      state._workflowConnections.get(LEGACY_CONNECTION_ID);
     if (legacyConnection) {
       clearConnectionTimers(legacyConnection);
-      if (legacyConnection.ws && legacyConnection.ws.readyState < WebSocket.CLOSING) {
+      if (
+        legacyConnection.ws &&
+        legacyConnection.ws.readyState < WebSocket.CLOSING
+      ) {
         legacyConnection.ws.close();
       }
     }
@@ -629,7 +1124,8 @@ export const useWsStore = create<WsState>((set, get) => ({
       _reconnectTimeout: activeConnection.reconnectTimeout,
       _url: activeConnection.url,
       _manualDisconnect: activeConnection.manualDisconnect,
-      workflowConnectionStatus: toWorkflowConnectionStatusRecord(nextConnections),
+      workflowConnectionStatus:
+        toWorkflowConnectionStatusRecord(nextConnections),
       connectionStatus: aggregateConnectionStatus(nextConnections),
       lastHeartbeat: aggregateLastHeartbeat(nextConnections),
       reconnectAttempts: aggregateReconnectAttempts(nextConnections),
@@ -666,22 +1162,30 @@ export const useWsStore = create<WsState>((set, get) => ({
 
   send: (message: WsMessage) => {
     const state = get();
-    const activeWs = state._ws;
+    const targetWorkflowId =
+      extractWorkflowIdFromMessage(message) ?? state.currentWorkflowId;
 
-    if (activeWs?.readyState === WebSocket.OPEN) {
-      activeWs.send(JSON.stringify(message));
+    if (targetWorkflowId) {
+      const targetConnection = state._workflowConnections.get(targetWorkflowId);
+      if (targetConnection?.ws?.readyState === WebSocket.OPEN) {
+        targetConnection.ws.send(JSON.stringify(message));
+        return;
+      }
+
+      console.warn(
+        `WebSocket for workflow ${targetWorkflowId} is not connected, cannot send message`
+      );
       return;
     }
 
-    const fallbackConnection = Array.from(state._workflowConnections.values()).find(
-      (connection) => connection.ws?.readyState === WebSocket.OPEN
-    );
-
-    if (fallbackConnection?.ws?.readyState === WebSocket.OPEN) {
-      fallbackConnection.ws.send(JSON.stringify(message));
-    } else {
-      console.warn('WebSocket is not connected, cannot send message');
+    const legacyConnection =
+      state._workflowConnections.get(LEGACY_CONNECTION_ID);
+    if (legacyConnection?.ws?.readyState === WebSocket.OPEN) {
+      legacyConnection.ws.send(JSON.stringify(message));
+      return;
     }
+
+    console.warn('WebSocket is not connected, cannot send message');
   },
 
   subscribe: (eventType: string, handler: MessageHandler) => {
@@ -751,13 +1255,23 @@ export interface GitCommitPayload {
   message: string;
 }
 
+export type TerminalCompletedStatus =
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'review_pass'
+  | 'review_reject'
+  | 'unknown';
+
 export interface TerminalCompletedPayload {
   workflowId: string;
   taskId: string;
   terminalId: string;
-  status: 'completed' | 'failed' | 'cancelled';
+  status: TerminalCompletedStatus;
   commitHash?: string;
   commitMessage?: string;
+  statusRaw?: string;
+  metadata?: unknown;
 }
 
 export interface SystemLaggedPayload {
@@ -770,21 +1284,57 @@ export interface SystemErrorPayload {
   message?: string;
 }
 
+export type TerminalPromptKind =
+  | 'enter_confirm'
+  | 'yes_no'
+  | 'choice'
+  | 'arrow_select'
+  | 'input'
+  | 'password'
+  | 'unknown';
+
+export interface TerminalPromptOption {
+  index: number;
+  label: string;
+  selected: boolean;
+}
+
 export interface TerminalPromptDetectedPayload {
   workflowId: string;
   terminalId: string;
-  promptKind: string;
+  promptKind: TerminalPromptKind;
   promptText: string;
   confidence: number;
   hasDangerousKeywords: boolean;
   options: string[];
   selectedIndex: number | null;
+  optionDetails?: TerminalPromptOption[];
+  promptKindRaw?: string;
+}
+
+export type PromptDecisionAction =
+  | 'auto_confirm'
+  | 'llm_decision'
+  | 'ask_user'
+  | 'skip'
+  | 'unknown';
+
+export interface PromptDecisionDetail {
+  action?: string;
+  response?: string;
+  reason?: string;
+  reasoning?: string;
+  suggestions?: string[] | null;
+  targetIndex?: number | null;
+  [key: string]: unknown;
 }
 
 export interface TerminalPromptDecisionPayload {
   workflowId: string;
   terminalId: string;
-  decision: string;
+  decision: PromptDecisionAction;
+  decisionDetail?: PromptDecisionDetail;
+  decisionRaw?: unknown;
 }
 
 /**
@@ -808,7 +1358,9 @@ export function useWorkflowEvents(
   const disconnectWorkflow = useWsStore((s) => s.disconnectWorkflow);
   const subscribeToWorkflow = useWsStore((s) => s.subscribeToWorkflow);
   const connectionStatus = useWsStore((s) =>
-    workflowId ? s.workflowConnectionStatus[workflowId] ?? 'disconnected' : s.connectionStatus
+    workflowId
+      ? (s.workflowConnectionStatus[workflowId] ?? 'disconnected')
+      : s.connectionStatus
   );
 
   // Connect to workflow on mount, disconnect on unmount
@@ -902,7 +1454,11 @@ export function useWorkflowEvents(
 
     if (handlers?.onSystemError) {
       unsubscribers.push(
-        subscribeToWorkflow(workflowId, 'system.error', handlers.onSystemError as MessageHandler)
+        subscribeToWorkflow(
+          workflowId,
+          'system.error',
+          handlers.onSystemError as MessageHandler
+        )
       );
     }
 

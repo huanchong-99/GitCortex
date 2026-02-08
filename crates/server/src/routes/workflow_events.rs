@@ -5,7 +5,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use services::services::orchestrator::BusMessage;
+use services::services::orchestrator::{
+    BusMessage,
+    types::{PromptDecision, PromptKind, TerminalCompletionStatus},
+};
 use ts_rs::TS;
 use uuid::Uuid;
 
@@ -92,6 +95,76 @@ pub struct WsEvent {
     pub id: String,
 }
 
+fn terminal_completion_status_to_wire(status: TerminalCompletionStatus) -> &'static str {
+    match status {
+        TerminalCompletionStatus::Completed => "completed",
+        TerminalCompletionStatus::ReviewPass => "review_pass",
+        TerminalCompletionStatus::ReviewReject => "review_reject",
+        TerminalCompletionStatus::Failed => "failed",
+    }
+}
+
+fn prompt_kind_to_wire(prompt_kind: PromptKind) -> &'static str {
+    match prompt_kind {
+        PromptKind::EnterConfirm => "enter_confirm",
+        PromptKind::YesNo => "yes_no",
+        PromptKind::Choice => "choice",
+        PromptKind::ArrowSelect => "arrow_select",
+        PromptKind::Input => "input",
+        PromptKind::Password => "password",
+    }
+}
+
+fn prompt_decision_action(decision: &PromptDecision) -> &'static str {
+    match decision {
+        PromptDecision::AutoConfirm { .. } => "auto_confirm",
+        PromptDecision::LLMDecision { .. } => "llm_decision",
+        PromptDecision::AskUser { .. } => "ask_user",
+        PromptDecision::Skip { .. } => "skip",
+    }
+}
+
+fn prompt_decision_detail(decision: &PromptDecision) -> Value {
+    match decision {
+        PromptDecision::AutoConfirm { response, reason } => {
+            json!({
+                "action": "auto_confirm",
+                "response": response,
+                "reason": reason
+            })
+        }
+        PromptDecision::LLMDecision {
+            response,
+            reasoning,
+            target_index,
+        } => {
+            json!({
+                "action": "llm_decision",
+                "response": response,
+                "reasoning": reasoning,
+                "targetIndex": target_index,
+                "target_index": target_index
+            })
+        }
+        PromptDecision::AskUser {
+            reason,
+            suggestions,
+        } => {
+            json!({
+                "action": "ask_user",
+                "reason": reason,
+                "suggestions": suggestions
+            })
+        }
+        PromptDecision::Skip { reason } => {
+            json!({
+                "action": "skip",
+                "reason": reason
+            })
+        }
+    }
+}
+
 impl WsEvent {
     /// Create a new WebSocket event with auto-generated ID and timestamp.
     pub fn new(event_type: WsEventType, payload: Value) -> Self {
@@ -174,12 +247,27 @@ impl WsEvent {
             }
 
             BusMessage::TerminalCompleted(event) => {
-                let workflow_id = event.workflow_id.clone();
-                let payload = serde_json::to_value(&event).unwrap_or_else(|_| {
-                    json!({
-                        "workflowId": workflow_id,
-                        "error": "serialization_failed"
-                    })
+                let workflow_id = event.workflow_id;
+                let task_id = event.task_id;
+                let terminal_id = event.terminal_id;
+                let status = terminal_completion_status_to_wire(event.status);
+                let commit_hash = event.commit_hash;
+                let commit_message = event.commit_message;
+                let metadata = event.metadata;
+
+                let payload = json!({
+                    "workflowId": workflow_id,
+                    "taskId": task_id,
+                    "terminalId": terminal_id,
+                    "status": status,
+                    "commitHash": commit_hash,
+                    "commitMessage": commit_message,
+                    "metadata": metadata,
+                    "workflow_id": workflow_id,
+                    "task_id": task_id,
+                    "terminal_id": terminal_id,
+                    "commit_hash": commit_hash,
+                    "commit_message": commit_message
                 });
                 Some((
                     workflow_id,
@@ -215,16 +303,37 @@ impl WsEvent {
 
             // Terminal prompt events - forward to WebSocket for UI updates
             BusMessage::TerminalPromptDetected(event) => {
-                let workflow_id = event.workflow_id.clone();
+                let workflow_id = event.workflow_id;
+                let terminal_id = event.terminal_id;
+                let prompt_kind = prompt_kind_to_wire(event.prompt.kind);
+                let legacy_prompt_kind = format!("{:?}", event.prompt.kind);
+                let prompt_text = event.prompt.raw_text;
+                let confidence = event.prompt.confidence;
+                let has_dangerous_keywords = event.prompt.has_dangerous_keywords;
+                let selected_index = event.prompt.selected_index;
+                let option_details = event.prompt.options.unwrap_or_default();
+                let options: Vec<String> = option_details
+                    .iter()
+                    .map(|option| option.label.clone())
+                    .collect();
+
                 let payload = json!({
                     "workflowId": workflow_id,
-                    "terminalId": event.terminal_id,
-                    "promptKind": format!("{:?}", event.prompt.kind),
-                    "promptText": event.prompt.raw_text,
-                    "confidence": event.prompt.confidence,
-                    "hasDangerousKeywords": event.prompt.has_dangerous_keywords,
-                    "options": event.prompt.options,
-                    "selectedIndex": event.prompt.selected_index
+                    "terminalId": terminal_id,
+                    "promptKind": prompt_kind,
+                    "promptText": prompt_text,
+                    "confidence": confidence,
+                    "hasDangerousKeywords": has_dangerous_keywords,
+                    "options": options,
+                    "optionDetails": option_details,
+                    "selectedIndex": selected_index,
+                    "workflow_id": workflow_id,
+                    "terminal_id": terminal_id,
+                    "prompt_kind": prompt_kind,
+                    "prompt_text": prompt_text,
+                    "has_dangerous_keywords": has_dangerous_keywords,
+                    "selected_index": selected_index,
+                    "legacyPromptKind": legacy_prompt_kind
                 });
                 Some((
                     workflow_id,
@@ -237,10 +346,27 @@ impl WsEvent {
                 workflow_id,
                 decision,
             } => {
+                let decision_action = prompt_decision_action(&decision);
+                let decision_detail = prompt_decision_detail(&decision);
+                let mut decision_raw = serde_json::to_value(&decision).unwrap_or_else(|_| {
+                    json!({
+                        "action": decision_action,
+                        "error": "serialization_failed"
+                    })
+                });
+
+                if decision_raw["action"] == "l_l_m_decision" {
+                    decision_raw["action"] = json!("llm_decision");
+                }
+
                 let payload = json!({
                     "workflowId": workflow_id,
                     "terminalId": terminal_id,
-                    "decision": decision
+                    "decision": decision_action,
+                    "decisionDetail": decision_detail,
+                    "decisionRaw": decision_raw,
+                    "workflow_id": workflow_id,
+                    "terminal_id": terminal_id
                 });
                 Some((
                     workflow_id,
@@ -264,7 +390,8 @@ impl WsEvent {
 #[cfg(test)]
 mod tests {
     use services::services::orchestrator::types::{
-        TerminalCompletionEvent, TerminalCompletionStatus,
+        ArrowSelectOption, DetectedPrompt, PromptDecision, PromptKind, TerminalCompletionEvent,
+        TerminalCompletionStatus, TerminalPromptEvent,
     };
 
     use super::*;
@@ -392,6 +519,245 @@ mod tests {
         let (workflow_id, event) = result.unwrap();
         assert_eq!(workflow_id, "wf-123");
         assert_eq!(event.event_type, WsEventType::TerminalCompleted);
+        assert_eq!(event.payload["workflowId"], "wf-123");
+        assert_eq!(event.payload["taskId"], "task-456");
+        assert_eq!(event.payload["terminalId"], "term-789");
+        assert_eq!(event.payload["status"], "completed");
+        assert_eq!(event.payload["commitHash"], "abc123");
+        assert_eq!(event.payload["commitMessage"], "feat: done");
+        assert_eq!(event.payload["workflow_id"], "wf-123");
+        assert_eq!(event.payload["task_id"], "task-456");
+        assert_eq!(event.payload["terminal_id"], "term-789");
+        assert_eq!(event.payload["commit_hash"], "abc123");
+        assert_eq!(event.payload["commit_message"], "feat: done");
+    }
+
+    #[test]
+    fn test_bus_message_terminal_prompt_detected_conversion_contract() {
+        let bus_msg = BusMessage::TerminalPromptDetected(TerminalPromptEvent {
+            terminal_id: "term-789".to_string(),
+            workflow_id: "wf-123".to_string(),
+            task_id: "task-456".to_string(),
+            session_id: "session-111".to_string(),
+            auto_confirm: true,
+            prompt: DetectedPrompt {
+                kind: PromptKind::ArrowSelect,
+                raw_text: "Select option".to_string(),
+                confidence: 0.92,
+                options: Some(vec![
+                    ArrowSelectOption {
+                        index: 0,
+                        label: "Option A".to_string(),
+                        selected: false,
+                    },
+                    ArrowSelectOption {
+                        index: 1,
+                        label: "Option B".to_string(),
+                        selected: true,
+                    },
+                ]),
+                selected_index: Some(1),
+                has_dangerous_keywords: false,
+            },
+            detected_at: Utc::now(),
+        });
+
+        let result = WsEvent::try_from_bus_message(bus_msg);
+
+        assert!(result.is_some());
+        let (workflow_id, event) = result.unwrap();
+        assert_eq!(workflow_id, "wf-123");
+        assert_eq!(event.event_type, WsEventType::TerminalPromptDetected);
+        assert_eq!(event.payload["workflowId"], "wf-123");
+        assert_eq!(event.payload["terminalId"], "term-789");
+        assert_eq!(event.payload["promptKind"], "arrow_select");
+        assert_eq!(event.payload["promptText"], "Select option");
+        assert_eq!(event.payload["hasDangerousKeywords"], false);
+        assert_eq!(event.payload["selectedIndex"], 1);
+        assert_eq!(event.payload["options"], json!(["Option A", "Option B"]));
+        assert_eq!(event.payload["optionDetails"][1]["label"], "Option B");
+        assert_eq!(event.payload["optionDetails"][1]["selected"], true);
+        assert_eq!(event.payload["workflow_id"], "wf-123");
+        assert_eq!(event.payload["terminal_id"], "term-789");
+        assert_eq!(event.payload["prompt_kind"], "arrow_select");
+        assert_eq!(event.payload["prompt_text"], "Select option");
+        assert_eq!(event.payload["selected_index"], 1);
+        assert_eq!(event.payload["legacyPromptKind"], "ArrowSelect");
+    }
+
+    #[test]
+    fn test_bus_message_terminal_prompt_decision_conversion_contract() {
+        let decision = PromptDecision::LLMDecision {
+            response: "y\n".to_string(),
+            reasoning: "safe to proceed".to_string(),
+            target_index: Some(2),
+        };
+        let bus_msg = BusMessage::TerminalPromptDecision {
+            terminal_id: "term-789".to_string(),
+            workflow_id: "wf-123".to_string(),
+            decision,
+        };
+
+        let result = WsEvent::try_from_bus_message(bus_msg);
+
+        assert!(result.is_some());
+        let (workflow_id, event) = result.unwrap();
+        assert_eq!(workflow_id, "wf-123");
+        assert_eq!(event.event_type, WsEventType::TerminalPromptDecision);
+        assert_eq!(event.payload["workflowId"], "wf-123");
+        assert_eq!(event.payload["terminalId"], "term-789");
+        assert_eq!(event.payload["decision"], "llm_decision");
+        assert_eq!(event.payload["decisionDetail"]["action"], "llm_decision");
+        assert_eq!(event.payload["decisionDetail"]["response"], "y\n");
+        assert_eq!(
+            event.payload["decisionDetail"]["reasoning"],
+            "safe to proceed"
+        );
+        assert_eq!(event.payload["decisionDetail"]["targetIndex"], 2);
+        assert_eq!(event.payload["decisionDetail"]["target_index"], 2);
+        assert_eq!(event.payload["decisionRaw"]["action"], "llm_decision");
+        assert_eq!(event.payload["decisionRaw"]["target_index"], 2);
+        assert_eq!(event.payload["workflow_id"], "wf-123");
+        assert_eq!(event.payload["terminal_id"], "term-789");
+    }
+
+    #[test]
+    fn test_terminal_ws_contract_dual_case_regression_for_p0_events() {
+        let (_, terminal_completed) =
+            WsEvent::try_from_bus_message(BusMessage::TerminalCompleted(TerminalCompletionEvent {
+                workflow_id: "wf-contract".to_string(),
+                task_id: "task-contract".to_string(),
+                terminal_id: "term-contract".to_string(),
+                status: TerminalCompletionStatus::ReviewPass,
+                commit_hash: Some("abc123".to_string()),
+                commit_message: Some("feat: contract".to_string()),
+                metadata: None,
+            }))
+            .expect("terminal.completed should be converted");
+
+        assert_eq!(
+            terminal_completed.event_type,
+            WsEventType::TerminalCompleted
+        );
+        assert_eq!(
+            terminal_completed.payload["workflowId"],
+            terminal_completed.payload["workflow_id"]
+        );
+        assert_eq!(
+            terminal_completed.payload["taskId"],
+            terminal_completed.payload["task_id"]
+        );
+        assert_eq!(
+            terminal_completed.payload["terminalId"],
+            terminal_completed.payload["terminal_id"]
+        );
+        assert_eq!(
+            terminal_completed.payload["commitHash"],
+            terminal_completed.payload["commit_hash"]
+        );
+        assert_eq!(
+            terminal_completed.payload["commitMessage"],
+            terminal_completed.payload["commit_message"]
+        );
+        assert_eq!(terminal_completed.payload["status"], "review_pass");
+
+        let (_, prompt_detected) = WsEvent::try_from_bus_message(
+            BusMessage::TerminalPromptDetected(TerminalPromptEvent {
+                terminal_id: "term-contract".to_string(),
+                workflow_id: "wf-contract".to_string(),
+                task_id: "task-contract".to_string(),
+                session_id: "session-contract".to_string(),
+                auto_confirm: true,
+                prompt: DetectedPrompt {
+                    kind: PromptKind::ArrowSelect,
+                    raw_text: "Select contract option".to_string(),
+                    confidence: 0.95,
+                    options: Some(vec![
+                        ArrowSelectOption {
+                            index: 0,
+                            label: "Option A".to_string(),
+                            selected: false,
+                        },
+                        ArrowSelectOption {
+                            index: 1,
+                            label: "Option B".to_string(),
+                            selected: true,
+                        },
+                    ]),
+                    selected_index: Some(1),
+                    has_dangerous_keywords: false,
+                },
+                detected_at: Utc::now(),
+            }),
+        )
+        .expect("terminal.prompt_detected should be converted");
+
+        assert_eq!(
+            prompt_detected.event_type,
+            WsEventType::TerminalPromptDetected
+        );
+        assert_eq!(
+            prompt_detected.payload["workflowId"],
+            prompt_detected.payload["workflow_id"]
+        );
+        assert_eq!(
+            prompt_detected.payload["terminalId"],
+            prompt_detected.payload["terminal_id"]
+        );
+        assert_eq!(
+            prompt_detected.payload["promptKind"],
+            prompt_detected.payload["prompt_kind"]
+        );
+        assert_eq!(
+            prompt_detected.payload["promptText"],
+            prompt_detected.payload["prompt_text"]
+        );
+        assert_eq!(
+            prompt_detected.payload["selectedIndex"],
+            prompt_detected.payload["selected_index"]
+        );
+        assert_eq!(
+            prompt_detected.payload["options"],
+            json!(["Option A", "Option B"])
+        );
+        assert_eq!(
+            prompt_detected.payload["optionDetails"][1]["selected"],
+            true
+        );
+
+        let (_, prompt_decision) =
+            WsEvent::try_from_bus_message(BusMessage::TerminalPromptDecision {
+                terminal_id: "term-contract".to_string(),
+                workflow_id: "wf-contract".to_string(),
+                decision: PromptDecision::LLMDecision {
+                    response: "y\n".to_string(),
+                    reasoning: "contract decision".to_string(),
+                    target_index: Some(1),
+                },
+            })
+            .expect("terminal.prompt_decision should be converted");
+
+        assert_eq!(
+            prompt_decision.event_type,
+            WsEventType::TerminalPromptDecision
+        );
+        assert_eq!(
+            prompt_decision.payload["workflowId"],
+            prompt_decision.payload["workflow_id"]
+        );
+        assert_eq!(
+            prompt_decision.payload["terminalId"],
+            prompt_decision.payload["terminal_id"]
+        );
+        assert_eq!(prompt_decision.payload["decision"], "llm_decision");
+        assert_eq!(
+            prompt_decision.payload["decisionDetail"]["targetIndex"],
+            prompt_decision.payload["decisionDetail"]["target_index"]
+        );
+        assert_eq!(
+            prompt_decision.payload["decisionRaw"]["action"],
+            "llm_decision"
+        );
     }
 
     #[test]

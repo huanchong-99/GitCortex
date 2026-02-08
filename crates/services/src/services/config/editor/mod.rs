@@ -31,8 +31,11 @@ pub enum EditorOpenError {
 
 #[cfg(test)]
 mod tests {
-    use super::{EditorConfig, EditorType};
     use std::path::Path;
+
+    use tempfile::NamedTempFile;
+
+    use super::{EditorConfig, EditorType};
 
     #[test]
     fn remote_url_encodes_special_characters_and_adds_line_col_for_file_hint() {
@@ -80,7 +83,30 @@ mod tests {
         let url = config
             .remote_url_with_hint(Path::new("/tmp/project dir"), Some(false))
             .expect("remote url");
-        assert!(!url.ends_with(":1:1"), "directory hint should not append line/col");
+        assert!(
+            !url.ends_with(":1:1"),
+            "directory hint should not append line/col"
+        );
+    }
+
+    #[test]
+    fn remote_url_directory_hint_overrides_existing_file_probe() {
+        let config = EditorConfig::new(
+            EditorType::VsCode,
+            None,
+            Some("example.com".to_string()),
+            None,
+        );
+        let temp_file = NamedTempFile::new().expect("temp file");
+
+        let url = config
+            .remote_url_with_hint(temp_file.path(), Some(false))
+            .expect("remote url");
+
+        assert!(
+            !url.ends_with(":1:1"),
+            "explicit directory hint must override local file probe"
+        );
     }
 }
 
@@ -213,8 +239,7 @@ impl EditorConfig {
         let encoded_segments = normalized_path
             .split('/')
             .map(|segment| {
-                url::form_urlencoded::byte_serialize(segment.as_bytes())
-                    .collect::<String>()
+                url::form_urlencoded::byte_serialize(segment.as_bytes()).collect::<String>()
             })
             .collect::<Vec<_>>();
         let encoded_path = encoded_segments.join("/");

@@ -255,6 +255,7 @@ pub struct GetTaskResponse {
 pub struct TaskServer {
     client: reqwest::Client,
     base_url: String,
+    api_token: Option<String>,
     tool_router: ToolRouter<TaskServer>,
     context: Option<McpContext>,
 }
@@ -287,8 +288,16 @@ impl TaskServer {
         Self {
             client: reqwest::Client::new(),
             base_url: base_url.to_string(),
+            api_token: std::env::var("GITCORTEX_API_TOKEN").ok(),
             tool_router: Self::tool_router(),
             context: None,
+        }
+    }
+
+    fn apply_api_token(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match &self.api_token {
+            Some(token) => request.bearer_auth(token),
+            None => request,
         }
     }
 
@@ -318,7 +327,9 @@ impl TaskServer {
 
         let response = tokio::time::timeout(
             std::time::Duration::from_millis(500),
-            self.client.get(&url).query(&query).send(),
+            self.apply_api_token(self.client.get(&url))
+                .query(&query)
+                .send(),
         )
         .await
         .ok()?
@@ -392,7 +403,8 @@ impl TaskServer {
         &self,
         rb: reqwest::RequestBuilder,
     ) -> Result<T, CallToolResult> {
-        let resp = rb
+        let resp = self
+            .apply_api_token(rb)
             .send()
             .await
             .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())))?;
@@ -427,7 +439,8 @@ impl TaskServer {
             message: Option<String>,
         }
 
-        let resp = rb
+        let resp = self
+            .apply_api_token(rb)
             .send()
             .await
             .map_err(|e| Self::err("Failed to connect to VK API", Some(&e.to_string())))?;
@@ -484,7 +497,7 @@ impl TaskServer {
 
         // Fetch all tags from the API
         let url = self.url("/api/tags");
-        let tags: Vec<Tag> = match self.client.get(&url).send().await {
+        let tags: Vec<Tag> = match self.apply_api_token(self.client.get(&url)).send().await {
             Ok(resp) if resp.status().is_success() => {
                 match resp.json::<ApiResponseEnvelope<Vec<Tag>>>().await {
                     Ok(envelope) if envelope.success => envelope.data.unwrap_or_default(),
@@ -860,5 +873,101 @@ impl ServerHandler for TaskServer {
             },
             instructions: Some(instruction),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Once;
+
+    use serde_json::json;
+    use serial_test::serial;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{header, method, path},
+    };
+
+    use super::*;
+
+    fn install_rustls_provider_for_tests() {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        });
+    }
+
+    struct ApiTokenEnvGuard {
+        previous: Option<String>,
+    }
+
+    impl ApiTokenEnvGuard {
+        fn set(token: Option<&str>) -> Self {
+            let previous = std::env::var("GITCORTEX_API_TOKEN").ok();
+            unsafe {
+                match token {
+                    Some(value) => std::env::set_var("GITCORTEX_API_TOKEN", value),
+                    None => std::env::remove_var("GITCORTEX_API_TOKEN"),
+                }
+            }
+
+            Self { previous }
+        }
+    }
+
+    impl Drop for ApiTokenEnvGuard {
+        fn drop(&mut self) {
+            unsafe {
+                match &self.previous {
+                    Some(previous) => std::env::set_var("GITCORTEX_API_TOKEN", previous),
+                    None => std::env::remove_var("GITCORTEX_API_TOKEN"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn apply_api_token_omits_authorization_header_when_unset() {
+        install_rustls_provider_for_tests();
+        let _guard = ApiTokenEnvGuard::set(None);
+
+        let server = TaskServer::new("http://127.0.0.1:3000");
+        let request = server
+            .apply_api_token(server.client.get("http://example.com/health"))
+            .build()
+            .expect("request should build");
+
+        assert!(
+            !request
+                .headers()
+                .contains_key(reqwest::header::AUTHORIZATION)
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn send_json_attaches_authorization_header_when_token_set() {
+        install_rustls_provider_for_tests();
+        let _guard = ApiTokenEnvGuard::set(Some("mcp-secret-token"));
+
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/protected"))
+            .and(header("authorization", "Bearer mcp-secret-token"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"success": true, "data": {"ok": true}})),
+            )
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let server = TaskServer::new(&mock_server.uri());
+        let value: serde_json::Value = server
+            .send_json(server.client.get(server.url("/protected")))
+            .await
+            .expect("request should succeed with valid token");
+
+        assert_eq!(value, json!({"ok": true}));
     }
 }

@@ -561,7 +561,7 @@ pub async fn push_task_attempt_branch(
     Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Json(request): Json<PushTaskAttemptRequest>,
-) -> Result<ResponseJson<ApiResponse<(), PushError>>, ApiError> {
+) -> Result<(StatusCode, ResponseJson<ApiResponse<(), PushError>>), ApiError> {
     let pool = &deployment.db().pool;
 
     let workspace_repo =
@@ -584,12 +584,17 @@ pub async fn push_task_attempt_branch(
         .git()
         .push_to_remote(&worktree_path, &workspace.branch, false)
     {
-        Ok(()) => Ok(ResponseJson(ApiResponse::success(()))),
-        Err(GitServiceError::GitCLI(GitCliError::PushRejected(_))) => Ok(ResponseJson(
-            ApiResponse::error_with_data(PushError::ForcePushRequired),
-        )),
+        Ok(()) => Ok((StatusCode::OK, ResponseJson(ApiResponse::success(())))),
+        Err(GitServiceError::GitCLI(GitCliError::PushRejected(_))) => Ok(push_rejected_response()),
         Err(e) => Err(ApiError::GitService(e)),
     }
+}
+
+fn push_rejected_response() -> (StatusCode, ResponseJson<ApiResponse<(), PushError>>) {
+    (
+        StatusCode::CONFLICT,
+        ResponseJson(ApiResponse::error_with_data(PushError::ForcePushRequired)),
+    )
 }
 
 pub async fn force_push_task_attempt_branch(
@@ -702,10 +707,12 @@ fn resolve_workspace_file_path_for_editor(
         ));
     }
 
-    if relative_path
-        .components()
-        .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_) | Component::RootDir))
-    {
+    if relative_path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir
+        )
+    }) {
         return Err(ApiError::BadRequest(
             "file_path must stay within the selected root".to_string(),
         ));
@@ -725,10 +732,9 @@ fn resolve_workspace_file_path_for_editor(
 
 #[cfg(test)]
 mod open_editor_path_tests {
-    use super::{
-        normalize_editor_repo_path, resolve_workspace_file_path_for_editor,
-    };
     use std::path::{Path, PathBuf};
+
+    use super::{normalize_editor_repo_path, resolve_workspace_file_path_for_editor};
 
     #[test]
     fn strips_repo_prefix_for_single_repo_workspace_file_path() {
@@ -741,19 +747,14 @@ mod open_editor_path_tests {
 
         assert_eq!(
             resolved,
-            Path::new("/workspace/repo-a")
-                .join("src")
-                .join("main.rs")
+            Path::new("/workspace/repo-a").join("src").join("main.rs")
         );
     }
 
     #[test]
     fn rejects_parent_dir_traversal_in_file_path() {
-        let result = resolve_workspace_file_path_for_editor(
-            Path::new("/workspace"),
-            "../outside.txt",
-            None,
-        );
+        let result =
+            resolve_workspace_file_path_for_editor(Path::new("/workspace"), "../outside.txt", None);
 
         assert!(result.is_err(), "path traversal must be rejected");
     }
@@ -780,12 +781,27 @@ mod open_editor_path_tests {
             updated_at: chrono::Utc::now(),
         };
 
-        let root = super::resolve_workspace_file_open_root(
-            Path::new("/workspace"),
-            Some(&selected_repo),
-        );
+        let root =
+            super::resolve_workspace_file_open_root(Path::new("/workspace"), Some(&selected_repo));
 
         assert_eq!(root, PathBuf::from("/workspace").join("repo-a"));
+    }
+}
+
+#[cfg(test)]
+mod status_semantics_tests {
+    use super::*;
+
+    #[test]
+    fn push_rejected_response_uses_conflict_status() {
+        let (status, _payload) = push_rejected_response();
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn rebase_conflict_response_uses_conflict_status() {
+        let (status, _payload) = rebase_conflict_response(GitOperationError::RebaseInProgress);
+        assert_eq!(status, StatusCode::CONFLICT);
     }
 }
 
@@ -814,10 +830,7 @@ pub async fn open_task_attempt_in_editor(
         .as_deref()
         .filter(|value| !value.trim().is_empty());
 
-    let base_path = resolve_workspace_file_open_root(
-        workspace_path,
-        selected_repo,
-    );
+    let base_path = resolve_workspace_file_open_root(workspace_path, selected_repo);
 
     let path = if let Some(file_path) = file_path {
         resolve_workspace_file_path_for_editor(
@@ -1099,12 +1112,9 @@ pub async fn change_target_branch(
         .git()
         .check_branch_exists(&repo.path, &new_target_branch)?
     {
-        return Ok(ResponseJson(ApiResponse::error(
-            format!(
-                "Branch '{new_target_branch}' does not exist in repository '{}'",
-                repo.name
-            )
-            .as_str(),
+        return Err(ApiError::NotFound(format!(
+            "Branch '{new_target_branch}' does not exist in repository '{}'",
+            repo.name
         )));
     }
 
@@ -1279,7 +1289,7 @@ pub async fn rebase_task_attempt(
     Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<RebaseTaskAttemptRequest>,
-) -> Result<ResponseJson<ApiResponse<(), GitOperationError>>, ApiError> {
+) -> Result<(StatusCode, ResponseJson<ApiResponse<(), GitOperationError>>), ApiError> {
     let pool = &deployment.db().pool;
 
     let workspace_repo =
@@ -1305,8 +1315,8 @@ pub async fn rebase_task_attempt(
         WorkspaceRepo::update_target_branch(pool, workspace.id, payload.repo_id, &new_base_branch)
             .await?;
     } else {
-        return Ok(ResponseJson(ApiResponse::error(
-            format!("Branch '{new_base_branch}' does not exist in the repository").as_str(),
+        return Err(ApiError::NotFound(format!(
+            "Branch '{new_base_branch}' does not exist in the repository"
         )));
     }
 
@@ -1327,21 +1337,15 @@ pub async fn rebase_task_attempt(
     if let Err(e) = result {
         use services::services::git::GitServiceError;
         return match e {
-            GitServiceError::MergeConflicts(msg) => Ok(ResponseJson(ApiResponse::<
-                (),
-                GitOperationError,
-            >::error_with_data(
+            GitServiceError::MergeConflicts(msg) => Ok(rebase_conflict_response(
                 GitOperationError::MergeConflicts {
                     message: msg,
                     op: ConflictOp::Rebase,
                 },
-            ))),
-            GitServiceError::RebaseInProgress => Ok(ResponseJson(ApiResponse::<
-                (),
-                GitOperationError,
-            >::error_with_data(
+            )),
+            GitServiceError::RebaseInProgress => Ok(rebase_conflict_response(
                 GitOperationError::RebaseInProgress,
-            ))),
+            )),
             other => Err(ApiError::GitService(other)),
         };
     }
@@ -1356,7 +1360,16 @@ pub async fn rebase_task_attempt(
         )
         .await;
 
-    Ok(ResponseJson(ApiResponse::success(())))
+    Ok((StatusCode::OK, ResponseJson(ApiResponse::success(()))))
+}
+
+fn rebase_conflict_response(
+    error: GitOperationError,
+) -> (StatusCode, ResponseJson<ApiResponse<(), GitOperationError>>) {
+    (
+        StatusCode::CONFLICT,
+        ResponseJson(ApiResponse::<(), GitOperationError>::error_with_data(error)),
+    )
 }
 
 #[axum::debug_handler]
@@ -1441,9 +1454,9 @@ pub async fn start_dev_server(
         .collect();
 
     if repos_with_dev_script.is_empty() {
-        return Ok(ResponseJson(ApiResponse::error(
-            "No dev server script configured for any repository in this workspace",
-        )));
+        return Err(ApiError::BadRequest(
+            "No dev server script configured for any repository in this workspace".to_string(),
+        ));
     }
 
     let session = match Session::find_latest_by_workspace_id(pool, workspace.id).await? {
@@ -1500,31 +1513,22 @@ pub async fn start_dev_server(
 pub async fn get_task_attempt_children(
     Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
-) -> Result<ResponseJson<ApiResponse<TaskRelationships>>, StatusCode> {
-    match Task::find_relationships_for_workspace(&deployment.db().pool, &workspace).await {
-        Ok(relationships) => {
-            deployment
-                .track_if_analytics_allowed(
-                    "task_attempt_children_viewed",
-                    serde_json::json!({
-                        "workspace_id": workspace.id.to_string(),
-                        "children_count": relationships.children.len(),
-                        "parent_count": i32::from(relationships.parent_task.is_some()),
-                    }),
-                )
-                .await;
+) -> Result<ResponseJson<ApiResponse<TaskRelationships>>, ApiError> {
+    let relationships =
+        Task::find_relationships_for_workspace(&deployment.db().pool, &workspace).await?;
 
-            Ok(ResponseJson(ApiResponse::success(relationships)))
-        }
-        Err(e) => {
-            tracing::error!(
-                "Failed to fetch relationships for task attempt {}: {}",
-                workspace.id,
-                e
-            );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
+    deployment
+        .track_if_analytics_allowed(
+            "task_attempt_children_viewed",
+            serde_json::json!({
+                "workspace_id": workspace.id.to_string(),
+                "children_count": relationships.children.len(),
+                "parent_count": i32::from(relationships.parent_task.is_some()),
+            }),
+        )
+        .await;
+
+    Ok(ResponseJson(ApiResponse::success(relationships)))
 }
 
 pub async fn stop_task_attempt_execution(
@@ -1762,37 +1766,26 @@ pub async fn search_workspace_files(
     Extension(workspace): Extension<Workspace>,
     State(deployment): State<DeploymentImpl>,
     Query(search_query): Query<SearchQuery>,
-) -> Result<ResponseJson<ApiResponse<Vec<SearchResult>>>, StatusCode> {
+) -> Result<ResponseJson<ApiResponse<Vec<SearchResult>>>, ApiError> {
     if search_query.q.trim().is_empty() {
-        return Ok(ResponseJson(ApiResponse::error(
-            "Query parameter 'q' is required and cannot be empty",
-        )));
+        return Err(ApiError::BadRequest(
+            "Query parameter 'q' is required and cannot be empty".to_string(),
+        ));
     }
 
     let repos =
-        match WorkspaceRepo::find_repos_for_workspace(&deployment.db().pool, workspace.id).await {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::error!("Failed to get workspace repos: {}", e);
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
-            }
-        };
+        WorkspaceRepo::find_repos_for_workspace(&deployment.db().pool, workspace.id).await?;
 
-    match deployment
+    let results = deployment
         .project()
         .search_files(
             deployment.file_search_cache().as_ref(),
             &repos,
             &search_query,
         )
-        .await
-    {
-        Ok(results) => Ok(ResponseJson(ApiResponse::success(results))),
-        Err(e) => {
-            tracing::error!("Failed to search files: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
+        .await?;
+
+    Ok(ResponseJson(ApiResponse::success(results)))
 }
 
 pub async fn get_first_user_message(

@@ -2,7 +2,11 @@
 //!
 //! Manages multiple OrchestratorAgent instances, one per active workflow.
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use anyhow::{Result, anyhow};
 use db::DBService;
@@ -63,6 +67,8 @@ pub struct OrchestratorRuntime {
     message_bus: SharedMessageBus,
     config: RuntimeConfig,
     running_workflows: Arc<Mutex<HashMap<String, RunningWorkflow>>>,
+    /// Workflows currently in start pipeline, keyed by workflow_id
+    starting_workflows: Arc<Mutex<HashSet<String>>>,
     /// Git watchers for each workflow, keyed by workflow_id
     git_watchers: Arc<Mutex<HashMap<String, GitWatcherHandle>>>,
     persistence: StatePersistence,
@@ -78,6 +84,7 @@ impl OrchestratorRuntime {
             message_bus,
             config: RuntimeConfig::default(),
             running_workflows: Arc::new(Mutex::new(HashMap::new())),
+            starting_workflows: Arc::new(Mutex::new(HashSet::new())),
             git_watchers: Arc::new(Mutex::new(HashMap::new())),
             persistence,
         }
@@ -96,6 +103,7 @@ impl OrchestratorRuntime {
             message_bus,
             config,
             running_workflows: Arc::new(Mutex::new(HashMap::new())),
+            starting_workflows: Arc::new(Mutex::new(HashSet::new())),
             git_watchers: Arc::new(Mutex::new(HashMap::new())),
             persistence,
         }
@@ -223,27 +231,34 @@ impl OrchestratorRuntime {
         }
     }
 
-    /// Start orchestrating a workflow
-    ///
-    /// Creates and starts an OrchestratorAgent for the given workflow.
-    /// Returns an error if the workflow is already running or if the
-    /// max_concurrent_workflows limit is reached.
-    pub async fn start_workflow(&self, workflow_id: &str) -> Result<()> {
-        // Check concurrent workflow limit and if already running
-        {
-            let running = self.running_workflows.lock().await;
-            if running.len() >= self.config.max_concurrent_workflows {
-                return Err(anyhow!(
-                    "Maximum concurrent workflows limit reached: {}",
-                    self.config.max_concurrent_workflows
-                ));
-            }
+    /// Reserve a start slot for a workflow to avoid concurrent duplicate starts.
+    async fn reserve_start_slot(&self, workflow_id: &str) -> Result<()> {
+        let running = self.running_workflows.lock().await;
+        let mut starting = self.starting_workflows.lock().await;
 
-            if running.contains_key(workflow_id) {
-                return Err(anyhow!("Workflow {} is already running", workflow_id));
-            }
+        if running.len() + starting.len() >= self.config.max_concurrent_workflows {
+            return Err(anyhow!(
+                "Maximum concurrent workflows limit reached: {}",
+                self.config.max_concurrent_workflows
+            ));
         }
 
+        if running.contains_key(workflow_id) || starting.contains(workflow_id) {
+            return Err(anyhow!("Workflow {} is already running", workflow_id));
+        }
+
+        starting.insert(workflow_id.to_string());
+        Ok(())
+    }
+
+    /// Release start slot after start attempt finishes.
+    async fn release_start_slot(&self, workflow_id: &str) {
+        let mut starting = self.starting_workflows.lock().await;
+        starting.remove(workflow_id);
+    }
+
+    /// Start workflow after start slot has been reserved.
+    async fn start_workflow_reserved(&self, workflow_id: &str) -> Result<()> {
         // Load workflow from database
         let workflow = db::models::Workflow::find_by_id(&self.db.pool, workflow_id)
             .await?
@@ -347,6 +362,18 @@ impl OrchestratorRuntime {
         debug!("Total running workflows: {}", running.len());
 
         Ok(())
+    }
+
+    /// Start orchestrating a workflow
+    ///
+    /// Creates and starts an OrchestratorAgent for the given workflow.
+    /// Returns an error if the workflow is already running or if the
+    /// max_concurrent_workflows limit is reached.
+    pub async fn start_workflow(&self, workflow_id: &str) -> Result<()> {
+        self.reserve_start_slot(workflow_id).await?;
+        let start_result = self.start_workflow_reserved(workflow_id).await;
+        self.release_start_slot(workflow_id).await;
+        start_result
     }
 
     /// Stop orchestrating a workflow
@@ -547,7 +574,135 @@ impl OrchestratorRuntime {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use chrono::Utc;
+    use db::{DBService, models::Workflow};
+    use tokio::sync::Barrier;
+    use uuid::Uuid;
 
-    // Note: Tests are in runtime_test.rs
+    use super::*;
+    use crate::services::orchestrator::MessageBus;
+
+    async fn setup_runtime_with_ready_workflow() -> (Arc<OrchestratorRuntime>, String) {
+        let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        sqlx::query(
+            r#"
+            CREATE TABLE workflow (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                status TEXT NOT NULL,
+                use_slash_commands INTEGER NOT NULL DEFAULT 0,
+                orchestrator_enabled INTEGER NOT NULL DEFAULT 0,
+                orchestrator_api_type TEXT,
+                orchestrator_base_url TEXT,
+                orchestrator_api_key TEXT,
+                orchestrator_model TEXT,
+                error_terminal_enabled INTEGER NOT NULL DEFAULT 0,
+                error_terminal_cli_id TEXT,
+                error_terminal_model_id TEXT,
+                merge_terminal_cli_id TEXT NOT NULL,
+                merge_terminal_model_id TEXT NOT NULL,
+                target_branch TEXT NOT NULL,
+                ready_at TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+        let message_bus = Arc::new(MessageBus::new(1000));
+        let runtime = Arc::new(OrchestratorRuntime::new(db, message_bus));
+
+        let workflow_id = Uuid::new_v4().to_string();
+        let workflow = Workflow {
+            id: workflow_id.clone(),
+            project_id: Uuid::new_v4(),
+            name: "Concurrent Start Workflow".to_string(),
+            description: None,
+            status: WORKFLOW_STATUS_READY.to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: Some(Utc::now()),
+            started_at: None,
+            completed_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        Workflow::create(&pool, &workflow).await.unwrap();
+
+        (runtime, workflow_id)
+    }
+
+    #[tokio::test]
+    async fn test_start_workflow_blocks_concurrent_duplicate_start() {
+        let (runtime, workflow_id) = setup_runtime_with_ready_workflow().await;
+
+        let barrier = Arc::new(Barrier::new(3));
+
+        let runtime_a = runtime.clone();
+        let workflow_id_a = workflow_id.clone();
+        let barrier_a = barrier.clone();
+        let start_a = tokio::spawn(async move {
+            barrier_a.wait().await;
+            runtime_a.start_workflow(&workflow_id_a).await
+        });
+
+        let runtime_b = runtime.clone();
+        let workflow_id_b = workflow_id.clone();
+        let barrier_b = barrier.clone();
+        let start_b = tokio::spawn(async move {
+            barrier_b.wait().await;
+            runtime_b.start_workflow(&workflow_id_b).await
+        });
+
+        barrier.wait().await;
+
+        let result_a = start_a.await.unwrap();
+        let result_b = start_b.await.unwrap();
+        let results = [result_a, result_b];
+
+        let success_count = results.iter().filter(|result| result.is_ok()).count();
+        let already_running_error_count = results
+            .iter()
+            .filter(|result| {
+                result
+                    .as_ref()
+                    .err()
+                    .is_some_and(|error| error.to_string().contains("already running"))
+            })
+            .count();
+
+        assert_eq!(
+            success_count, 1,
+            "Exactly one concurrent start should succeed"
+        );
+        assert_eq!(
+            already_running_error_count, 1,
+            "Competing start should fail with already running"
+        );
+        assert_eq!(
+            runtime.running_count().await,
+            1,
+            "Only one workflow instance should be registered as running"
+        );
+
+        runtime.stop_workflow(&workflow_id).await.unwrap();
+    }
 }

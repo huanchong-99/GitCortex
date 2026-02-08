@@ -142,27 +142,62 @@ export type Err<E> = { success: false; error: E | undefined; message?: string };
 // Result type for endpoints that need typed errors
 export type Result<T, E> = Ok<T> | Err<E>;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const pickErrorMessage = (
+  payload: unknown,
+  fallback: string,
+  statusText: string
+): string => {
+  if (isRecord(payload) && typeof payload.message === 'string') {
+    return payload.message;
+  }
+  return statusText || fallback;
+};
+
+const pickStructuredError = <E>(payload: unknown): E | undefined => {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  if ('error_data' in payload && payload.error_data != null) {
+    return payload.error_data as E;
+  }
+
+  if ('error' in payload && payload.error != null) {
+    return payload.error as E;
+  }
+
+  return undefined;
+};
+
 // Special handler for Result-returning endpoints
 const handleApiResponseAsResult = async <T, E>(
   response: Response
 ): Promise<Result<T, E>> => {
+  if (response.status === 204) {
+    return { success: true, data: undefined as T };
+  }
+
   if (!response.ok) {
-    // HTTP error - no structured error data
-    let errorMessage = `Request failed with status ${response.status}`;
+    const fallbackMessage = `Request failed with status ${response.status}`;
+    let responsePayload: unknown;
 
     try {
-      const errorData = await response.json();
-      if (errorData.message) {
-        errorMessage = errorData.message;
-      }
+      responsePayload = await response.json();
     } catch {
-      errorMessage = response.statusText || errorMessage;
+      responsePayload = undefined;
     }
 
     return {
       success: false,
-      error: undefined,
-      message: errorMessage,
+      error: pickStructuredError<E>(responsePayload),
+      message: pickErrorMessage(
+        responsePayload,
+        fallbackMessage,
+        response.statusText
+      ),
     };
   }
 
@@ -171,8 +206,8 @@ const handleApiResponseAsResult = async <T, E>(
   if (!result.success) {
     return {
       success: false,
-      error: result.error_data || undefined,
-      message: result.message || undefined,
+      error: result.error_data ?? undefined,
+      message: result.message ?? undefined,
     };
   }
 

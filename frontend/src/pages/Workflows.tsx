@@ -9,7 +9,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Play, Pause, Square, Trash2, Rocket } from 'lucide-react';
+import {
+  Plus,
+  Play,
+  Pause,
+  Square,
+  Trash2,
+  Rocket,
+  GitMerge,
+} from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import {
   useWorkflows,
@@ -18,6 +26,7 @@ import {
   useStartWorkflow,
   usePauseWorkflow,
   useStopWorkflow,
+  useMergeWorkflow,
   useDeleteWorkflow,
   useWorkflow,
   getWorkflowActions,
@@ -25,7 +34,11 @@ import {
 import { useProjects } from '@/hooks/useProjects';
 import type { WorkflowTaskDto } from 'shared/types';
 import { WorkflowWizard } from '@/components/workflow/WorkflowWizard';
-import { PipelineView, type WorkflowStatus, type WorkflowTask } from '@/components/workflow/PipelineView';
+import {
+  PipelineView,
+  type WorkflowStatus,
+  type WorkflowTask,
+} from '@/components/workflow/PipelineView';
 import { WizardConfig } from '@/components/workflow/types';
 import { wizardConfigToCreateRequest } from '@/components/workflow/types';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
@@ -38,18 +51,27 @@ export function Workflows() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [showWizard, setShowWizard] = useState(false);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
+    null
+  );
 
   // Get projectId from URL query params
   const projectIdFromUrl = searchParams.get('projectId');
 
   // Load projects list for project selector
-  const { projects, isLoading: projectsLoading, error: projectsError } = useProjects();
+  const {
+    projects,
+    isLoading: projectsLoading,
+    error: projectsError,
+  } = useProjects();
 
   // Validate projectId exists in projects list, fallback to first project if invalid
-  const validProjectId = projectIdFromUrl && projects.some(p => p.id === projectIdFromUrl)
-    ? projectIdFromUrl
-    : (projects.length > 0 ? projects[0].id : null);
+  const validProjectId =
+    projectIdFromUrl && projects.some((p) => p.id === projectIdFromUrl)
+      ? projectIdFromUrl
+      : projects.length > 0
+        ? projects[0].id
+        : null;
 
   // Update URL when projectId is invalid or missing
   useEffect(() => {
@@ -58,42 +80,87 @@ export function Workflows() {
       newParams.set('projectId', validProjectId!);
       setSearchParams(newParams, { replace: true });
     }
-  }, [projectIdFromUrl, validProjectId, projects.length, searchParams, setSearchParams]);
+  }, [
+    projectIdFromUrl,
+    validProjectId,
+    projects.length,
+    searchParams,
+    setSearchParams,
+  ]);
 
-  const { data: workflows, isLoading, error } = useWorkflows(validProjectId || '');
+  const {
+    data: workflows,
+    isLoading,
+    error,
+  } = useWorkflows(validProjectId || '');
   const createMutation = useCreateWorkflow();
   const prepareMutation = usePrepareWorkflow();
   const startMutation = useStartWorkflow();
   const pauseMutation = usePauseWorkflow();
   const stopMutation = useStopWorkflow();
+  const mergeMutation = useMergeWorkflow();
   const deleteMutation = useDeleteWorkflow();
 
   // Fetch workflow detail when selected
-  const { data: selectedWorkflowDetail } = useWorkflow(selectedWorkflowId || '');
+  const { data: selectedWorkflowDetail } = useWorkflow(
+    selectedWorkflowId || ''
+  );
 
   // Helper to map DTO status to PipelineView status
   const mapWorkflowStatus = (status: string): WorkflowStatus => {
     const statusMap: Record<string, WorkflowStatus> = {
-      'created': 'idle',
-      'starting': 'running',
-      'ready': 'idle',
-      'running': 'running',
-      'paused': 'paused',
-      'merging': 'running',
-      'completed': 'completed',
-      'failed': 'failed',
-      'cancelled': 'failed',
+      created: 'idle',
+      starting: 'running',
+      ready: 'idle',
+      running: 'running',
+      paused: 'paused',
+      merging: 'running',
+      completed: 'completed',
+      failed: 'failed',
+      cancelled: 'idle',
+      draft: 'idle',
     };
     return statusMap[status] || 'idle';
   };
 
+  const getWorkflowStatusBadgeClass = (status: string): string => {
+    const statusClasses: Record<string, string> = {
+      created: 'bg-gray-100 text-gray-800',
+      ready: 'bg-gray-100 text-gray-800',
+      draft: 'bg-gray-100 text-gray-800',
+      starting: 'bg-blue-100 text-blue-800',
+      running: 'bg-blue-100 text-blue-800',
+      merging: 'bg-blue-100 text-blue-800',
+      paused: 'bg-yellow-100 text-yellow-800',
+      completed: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+      cancelled: 'bg-zinc-100 text-zinc-800',
+    };
+    return statusClasses[status] ?? 'bg-gray-100 text-gray-800';
+  };
+
+  const mapMergeTerminalStatus = (status: string): TerminalStatus => {
+    switch (status) {
+      case 'merging':
+        return 'working';
+      case 'completed':
+        return 'completed';
+      case 'failed':
+        return 'failed';
+      case 'cancelled':
+        return 'cancelled';
+      default:
+        return 'not_started';
+    }
+  };
+
   // Helper to map DTO tasks to PipelineView tasks
   const mapWorkflowTasks = (dtoTasks: WorkflowTaskDto[]): WorkflowTask[] => {
-    return dtoTasks.map(task => ({
+    return dtoTasks.map((task) => ({
       id: task.id,
       name: task.name,
       branch: task.branch,
-      terminals: task.terminals.map(terminal => ({
+      terminals: task.terminals.map((terminal) => ({
         id: terminal.id,
         workflowTaskId: task.id,
         cliTypeId: terminal.cliTypeId,
@@ -114,7 +181,7 @@ export function Workflows() {
   };
 
   // Get current project name for display
-  const currentProject = projects.find(p => p.id === validProjectId);
+  const currentProject = projects.find((p) => p.id === validProjectId);
 
   if (projectsLoading) {
     return (
@@ -144,7 +211,8 @@ export function Workflows() {
           <CardContent className="pt-6">
             <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
             <p className="text-sm text-low">
-              Please create a project first in Settings → Projects before creating workflows.
+              Please create a project first in Settings → Projects before
+              creating workflows.
             </p>
           </CardContent>
         </Card>
@@ -232,7 +300,9 @@ export function Workflows() {
   const handleStopWorkflow = async (workflowId: string) => {
     const result = await ConfirmDialog.show({
       title: 'Stop Workflow',
-      message: t('errors.deleteConfirm'),
+      message: t('workflowDebug.confirmStop', {
+        defaultValue: 'Are you sure you want to stop this workflow?',
+      }),
       confirmText: 'Stop',
       cancelText: 'Cancel',
       variant: 'destructive',
@@ -241,6 +311,13 @@ export function Workflows() {
     if (result === 'confirmed') {
       await stopMutation.mutateAsync({ workflow_id: workflowId });
     }
+  };
+
+  const handleMergeWorkflow = async (workflowId: string) => {
+    await mergeMutation.mutateAsync({
+      workflow_id: workflowId,
+      merge_strategy: 'squash',
+    });
   };
 
   const handleDeleteWorkflow = async (workflowId: string) => {
@@ -259,6 +336,11 @@ export function Workflows() {
 
   if (selectedWorkflowDetail && selectedWorkflowId) {
     const actions = getWorkflowActions(selectedWorkflowDetail.status as any);
+    const hasCompletedAllTasks = selectedWorkflowDetail.tasks.every(
+      (task) => task.status === 'completed'
+    );
+    const canTriggerMerge =
+      actions.canMerge && hasCompletedAllTasks && !mergeMutation.isPending;
 
     return (
       <div className="h-full min-h-0 overflow-auto space-y-6">
@@ -273,7 +355,9 @@ export function Workflows() {
                 disabled={prepareMutation.isPending}
               >
                 <Rocket className="w-4 h-4 mr-2" />
-                {prepareMutation.isPending ? 'Preparing...' : 'Prepare Workflow'}
+                {prepareMutation.isPending
+                  ? 'Preparing...'
+                  : 'Prepare Workflow'}
               </Button>
             )}
             {actions.canStart && (
@@ -305,6 +389,15 @@ export function Workflows() {
                 Stop
               </Button>
             )}
+            {actions.canMerge && (
+              <Button
+                onClick={() => handleMergeWorkflow(selectedWorkflowDetail.id)}
+                disabled={!hasCompletedAllTasks || mergeMutation.isPending}
+              >
+                <GitMerge className="w-4 h-4 mr-2" />
+                {mergeMutation.isPending ? 'Merging...' : 'Merge Workflow'}
+              </Button>
+            )}
             {actions.canDelete && (
               <Button
                 variant="outline"
@@ -324,9 +417,14 @@ export function Workflows() {
           mergeTerminal={{
             cliTypeId: selectedWorkflowDetail.mergeTerminalCliId ?? '',
             modelConfigId: selectedWorkflowDetail.mergeTerminalModelId ?? '',
-            status: 'not_started' as TerminalStatus,
+            status: mapMergeTerminalStatus(selectedWorkflowDetail.status),
           }}
           onTerminalClick={undefined}
+          onMergeTerminalClick={
+            canTriggerMerge
+              ? () => void handleMergeWorkflow(selectedWorkflowDetail.id)
+              : undefined
+          }
         />
       </div>
     );
@@ -343,7 +441,10 @@ export function Workflows() {
             </p>
           </div>
           {projects.length > 1 && (
-            <Select value={validProjectId || ''} onValueChange={handleProjectChange}>
+            <Select
+              value={validProjectId || ''}
+              onValueChange={handleProjectChange}
+            >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Select project">
                   {currentProject?.name || 'Select project'}
@@ -372,57 +473,55 @@ export function Workflows() {
         />
       )}
 
-      {!showWizard && (
-        !workflows || workflows.length === 0 ? (
-        <Card className="p-12 text-center">
-          <h3 className="text-lg font-semibold mb-2">{t('empty.title')}</h3>
-          <p className="text-low mb-6">{t('empty.description')}</p>
-          <Button onClick={() => setShowWizard(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t('empty.button')}
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {workflows.map((workflow) => (
-            <Card
-              key={workflow.id}
-              className={cn(
-                "cursor-pointer transition-all hover:shadow-lg",
-                "border-2 hover:border-brand"
-              )}
-              onClick={() => setSelectedWorkflowId(workflow.id)}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="font-semibold text-lg">{workflow.name}</h3>
-                  <span
-                    className={cn(
-                      "px-2 py-1 rounded text-xs font-medium",
-                      (workflow.status === 'running' ||
-                        workflow.status === 'merging') &&
-                        "bg-blue-100 text-blue-800",
-                      workflow.status === 'completed' && "bg-green-100 text-green-800",
-                      workflow.status === 'failed' && "bg-red-100 text-red-800",
-                      workflow.status === 'draft' && "bg-gray-100 text-gray-800"
-                    )}
-                  >
-                    {workflow.status}
-                  </span>
-                </div>
-                {workflow.description && (
-                  <p className="text-sm text-low mb-4">{workflow.description}</p>
+      {!showWizard &&
+        (!workflows || workflows.length === 0 ? (
+          <Card className="p-12 text-center">
+            <h3 className="text-lg font-semibold mb-2">{t('empty.title')}</h3>
+            <p className="text-low mb-6">{t('empty.description')}</p>
+            <Button onClick={() => setShowWizard(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              {t('empty.button')}
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {workflows.map((workflow) => (
+              <Card
+                key={workflow.id}
+                className={cn(
+                  'cursor-pointer transition-all hover:shadow-lg',
+                  'border-2 hover:border-brand'
                 )}
-                <div className="flex items-center justify-between text-xs text-low">
-                  <span>{workflow.tasksCount} tasks</span>
-                  <span>{workflow.terminalsCount} terminals</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        )
-      )}
+                onClick={() => setSelectedWorkflowId(workflow.id)}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <h3 className="font-semibold text-lg">{workflow.name}</h3>
+                    <span
+                      className={cn(
+                        'px-2 py-1 rounded text-xs font-medium',
+                        getWorkflowStatusBadgeClass(workflow.status)
+                      )}
+                    >
+                      {t(`status.${workflow.status}`, {
+                        defaultValue: workflow.status,
+                      })}
+                    </span>
+                  </div>
+                  {workflow.description && (
+                    <p className="text-sm text-low mb-4">
+                      {workflow.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between text-xs text-low">
+                    <span>{workflow.tasksCount} tasks</span>
+                    <span>{workflow.terminalsCount} terminals</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ))}
     </div>
   );
 }

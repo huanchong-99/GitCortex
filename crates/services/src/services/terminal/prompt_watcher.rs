@@ -178,16 +178,6 @@ impl PromptWatcher {
         session_id: &str,
         auto_confirm: bool,
     ) -> anyhow::Result<()> {
-        if !auto_confirm {
-            self.unregister(terminal_id).await;
-            tracing::debug!(
-                terminal_id = %terminal_id,
-                workflow_id = %workflow_id,
-                "Skipped prompt watcher registration because auto_confirm is disabled"
-            );
-            return Ok(());
-        }
-
         let state = TerminalWatchState::new(
             terminal_id.to_string(),
             workflow_id.to_string(),
@@ -471,7 +461,7 @@ impl PromptWatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::orchestrator::message_bus::MessageBus;
+    use crate::services::orchestrator::message_bus::{BusMessage, MessageBus};
 
     fn create_test_watcher() -> PromptWatcher {
         let message_bus = Arc::new(MessageBus::new(100));
@@ -503,15 +493,63 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_register_skips_when_auto_confirm_disabled() {
+    async fn test_register_attempts_subscription_when_auto_confirm_disabled() {
         let watcher = create_test_watcher();
 
         let result = watcher
             .register("term-1", "workflow-1", "task-1", "session-1", false)
             .await;
 
-        assert!(result.is_ok());
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Terminal not found")
+        );
         assert!(!watcher.is_registered("term-1").await);
+    }
+
+    #[tokio::test]
+    async fn test_process_output_publishes_prompt_when_auto_confirm_disabled() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    false,
+                ),
+            );
+        }
+
+        watcher
+            .process_output("term-1", "Press Enter to continue")
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected prompt event broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalPromptDetected(prompt_event) => {
+                assert_eq!(prompt_event.terminal_id, "term-1");
+                assert_eq!(prompt_event.workflow_id, "workflow-1");
+                assert_eq!(prompt_event.task_id, "task-1");
+                assert_eq!(prompt_event.session_id, "session-1");
+                assert!(!prompt_event.auto_confirm);
+            }
+            other => panic!("expected TerminalPromptDetected event, got: {other:?}"),
+        }
     }
 
     #[tokio::test]

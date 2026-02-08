@@ -11,11 +11,7 @@ use db::{
     models::{
         cli_type,
         execution_process::{CreateExecutionProcess, ExecutionProcess, ExecutionProcessRunReason},
-        execution_process_repo_state::CreateExecutionProcessRepoState,
-        project::Project,
         session::Session,
-        task::Task,
-        workspace::Workspace,
     },
 };
 use executors::{
@@ -33,7 +29,7 @@ use super::{
     prompt_watcher::PromptWatcher,
 };
 use crate::services::{
-    cc_switch::{CCSwitch, CCSwitchService},
+    cc_switch::CCSwitchService,
     orchestrator::{BusMessage, SharedMessageBus, constants::WORKFLOW_TOPIC_PREFIX},
 };
 
@@ -423,64 +419,61 @@ impl TerminalLauncher {
 
                 // Register prompt watcher for PTY output prompt detection
                 if let Some(ref watcher) = self.prompt_watcher {
-                    if !terminal.auto_confirm {
-                        watcher.unregister(&terminal_id).await;
-                        tracing::debug!(
-                            terminal_id = %terminal_id,
-                            "Skipped prompt watcher registration because auto_confirm is disabled"
-                        );
-                    } else {
-                        match self
-                            .get_workflow_id_for_terminal(&terminal.workflow_task_id)
-                            .await
-                        {
-                            Ok(Some(workflow_id)) => {
-                                if let Err(e) = watcher
-                                    .register(
-                                        &terminal_id,
-                                        &workflow_id,
-                                        &terminal.workflow_task_id,
-                                        &handle.session_id,
-                                        terminal.auto_confirm,
-                                    )
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        terminal_id = %terminal_id,
-                                        workflow_id = %workflow_id,
-                                        error = %e,
-                                        "Failed to register prompt watcher"
-                                    );
-                                } else if !watcher.is_registered(&terminal_id).await {
-                                    tracing::warn!(
-                                        terminal_id = %terminal_id,
-                                        workflow_id = %workflow_id,
-                                        "Prompt watcher registration verification failed"
-                                    );
-                                } else {
-                                    tracing::debug!(
-                                        terminal_id = %terminal_id,
-                                        workflow_id = %workflow_id,
-                                        pty_session_id = %handle.session_id,
-                                        "Prompt watcher registered successfully"
-                                    );
-                                }
-                            }
-                            Ok(None) => {
+                    match self
+                        .get_workflow_id_for_terminal(&terminal.workflow_task_id)
+                        .await
+                    {
+                        Ok(Some(workflow_id)) => {
+                            if let Err(e) = watcher
+                                .register(
+                                    &terminal_id,
+                                    &workflow_id,
+                                    &terminal.workflow_task_id,
+                                    &handle.session_id,
+                                    terminal.auto_confirm,
+                                )
+                                .await
+                            {
                                 tracing::warn!(
                                     terminal_id = %terminal_id,
-                                    workflow_task_id = %terminal.workflow_task_id,
-                                    "Could not resolve workflow_id for prompt watcher registration"
-                                );
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    terminal_id = %terminal_id,
-                                    workflow_task_id = %terminal.workflow_task_id,
+                                    workflow_id = %workflow_id,
+                                    auto_confirm = terminal.auto_confirm,
                                     error = %e,
-                                    "Failed to resolve prompt watcher workflow binding"
+                                    "Failed to register prompt watcher"
+                                );
+                            } else if !watcher.is_registered(&terminal_id).await {
+                                tracing::warn!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    auto_confirm = terminal.auto_confirm,
+                                    "Prompt watcher registration verification failed"
+                                );
+                            } else {
+                                tracing::debug!(
+                                    terminal_id = %terminal_id,
+                                    workflow_id = %workflow_id,
+                                    pty_session_id = %handle.session_id,
+                                    auto_confirm = terminal.auto_confirm,
+                                    "Prompt watcher registered successfully"
                                 );
                             }
+                        }
+                        Ok(None) => {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                workflow_task_id = %terminal.workflow_task_id,
+                                auto_confirm = terminal.auto_confirm,
+                                "Could not resolve workflow_id for prompt watcher registration"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                workflow_task_id = %terminal.workflow_task_id,
+                                auto_confirm = terminal.auto_confirm,
+                                error = %e,
+                                "Failed to resolve prompt watcher workflow binding"
+                            );
                         }
                     }
                 }
@@ -673,16 +666,46 @@ impl TerminalLauncher {
         let terminals = Terminal::find_by_workflow(&self.db.pool, workflow_id).await?;
 
         for terminal in terminals {
-            if let Some(pid) = terminal.process_id {
-                if let Ok(pid_u32) = u32::try_from(pid) {
-                    self.process_manager.kill(pid_u32)?;
-                } else {
+            let pty_session_id = terminal
+                .pty_session_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|session_id| !session_id.is_empty())
+                .map(str::to_string);
+
+            if self.process_manager.is_running(&terminal.id).await {
+                if let Err(e) = self.process_manager.kill_terminal(&terminal.id).await {
                     tracing::warn!(
-                        "Skipping invalid process id {pid} for terminal {}",
-                        terminal.id
+                        terminal_id = %terminal.id,
+                        workflow_id = %workflow_id,
+                        error = %e,
+                        "Failed to stop terminal via full cleanup chain"
                     );
+                    continue;
                 }
+            } else if terminal.process_id.is_some() {
+                tracing::debug!(
+                    terminal_id = %terminal.id,
+                    workflow_id = %workflow_id,
+                    "Terminal has persisted process_id but no active tracked process"
+                );
             }
+
+            if let (Some(bridge), Some(session_id)) =
+                (&self.terminal_bridge, pty_session_id.as_deref())
+            {
+                bridge.unregister(session_id).await;
+            }
+
+            if let Some(watcher) = &self.prompt_watcher {
+                watcher.unregister(&terminal.id).await;
+            }
+
+            if terminal.status != "completed" {
+                Terminal::update_process(&self.db.pool, &terminal.id, None, None).await?;
+                Terminal::update_session(&self.db.pool, &terminal.id, None, None).await?;
+            }
+
             Terminal::update_status(&self.db.pool, &terminal.id, "cancelled").await?;
             self.broadcast_terminal_status(Some(workflow_id), &terminal.id, "cancelled")
                 .await;
@@ -694,7 +717,91 @@ impl TerminalLauncher {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
+
+    async fn seed_workflow_terminal(
+        db: &Arc<DBService>,
+        terminal_id: &str,
+        status: &str,
+        with_process_binding: bool,
+    ) -> String {
+        let project_id = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
+            .bind(project_id)
+            .bind("test-project")
+            .bind(Utc::now())
+            .bind(Utc::now())
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let workflow_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO workflow (id, project_id, name, status, merge_terminal_cli_id, merge_terminal_model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(&workflow_id)
+        .bind(project_id)
+        .bind("test-workflow")
+        .bind("running")
+        .bind("cli-claude-code")
+        .bind("model-claude-sonnet")
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let workflow_task_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO workflow_task (id, workflow_id, name, branch, order_index, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(&workflow_task_id)
+        .bind(&workflow_id)
+        .bind("task-1")
+        .bind("main")
+        .bind(0)
+        .bind("running")
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let process_id = if with_process_binding {
+            Some(1234_i32)
+        } else {
+            None
+        };
+        let pty_session_id = if with_process_binding {
+            Some(uuid::Uuid::new_v4().to_string())
+        } else {
+            None
+        };
+
+        sqlx::query(
+            "INSERT INTO terminal (id, workflow_task_id, cli_type_id, model_config_id, order_index, status, auto_confirm, process_id, pty_session_id, session_id, execution_process_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(terminal_id)
+        .bind(&workflow_task_id)
+        .bind("cli-claude-code")
+        .bind("model-claude-sonnet")
+        .bind(0)
+        .bind(status)
+        .bind(true)
+        .bind(process_id)
+        .bind(pty_session_id)
+        .bind(Some(uuid::Uuid::new_v4().to_string()))
+        .bind(Some(uuid::Uuid::new_v4().to_string()))
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        workflow_id
+    }
 
     // Test helper - creates launcher with in-memory database
     async fn setup_launcher() -> (TerminalLauncher, Arc<DBService>) {
@@ -806,5 +913,91 @@ mod tests {
         assert!(result.success);
         assert!(result.process_handle.is_none());
         assert!(result.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_stop_all_clears_terminal_bindings_when_not_completed() {
+        let (launcher, db) = setup_launcher().await;
+        let workflow_id =
+            seed_workflow_terminal(&db, "stop-all-terminal-1", "waiting", false).await;
+
+        launcher.stop_all(&workflow_id).await.unwrap();
+
+        let terminal = Terminal::find_by_id(&db.pool, "stop-all-terminal-1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "cancelled");
+        assert!(terminal.process_id.is_none());
+        assert!(terminal.pty_session_id.is_none());
+        assert!(terminal.session_id.is_none());
+        assert!(terminal.execution_process_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_stop_all_keeps_completed_terminal_binding() {
+        let (launcher, db) = setup_launcher().await;
+        let workflow_id =
+            seed_workflow_terminal(&db, "stop-all-terminal-2", "completed", false).await;
+
+        let before = Terminal::find_by_id(&db.pool, "stop-all-terminal-2")
+            .await
+            .unwrap()
+            .unwrap();
+
+        launcher.stop_all(&workflow_id).await.unwrap();
+
+        let after = Terminal::find_by_id(&db.pool, "stop-all-terminal-2")
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(after.status, "cancelled");
+        assert_eq!(after.session_id, before.session_id);
+        assert_eq!(after.execution_process_id, before.execution_process_id);
+    }
+
+    #[tokio::test]
+    async fn test_stop_all_kills_running_terminal_and_clears_tracking() {
+        let (launcher, db) = setup_launcher().await;
+        let terminal_id = "stop-all-running-terminal-1";
+        let workflow_id = seed_workflow_terminal(&db, terminal_id, "waiting", false).await;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        #[cfg(windows)]
+        let shell = "cmd.exe";
+        #[cfg(unix)]
+        let shell = "sh";
+
+        launcher
+            .process_manager
+            .spawn_pty(
+                terminal_id,
+                shell,
+                temp_dir.path(),
+                DEFAULT_COLS,
+                DEFAULT_ROWS,
+            )
+            .await
+            .unwrap();
+
+        assert!(launcher.process_manager.is_running(terminal_id).await);
+
+        launcher.stop_all(&workflow_id).await.unwrap();
+
+        assert!(
+            !launcher.process_manager.is_running(terminal_id).await,
+            "stop_all should remove running process tracking via kill_terminal"
+        );
+
+        let terminal = Terminal::find_by_id(&db.pool, terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "cancelled");
+        assert!(terminal.process_id.is_none());
+        assert!(terminal.pty_session_id.is_none());
+        assert!(terminal.session_id.is_none());
+        assert!(terminal.execution_process_id.is_none());
     }
 }

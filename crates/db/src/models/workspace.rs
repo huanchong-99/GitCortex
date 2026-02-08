@@ -585,6 +585,7 @@ impl Workspace {
                     JOIN execution_processes ep ON ep.session_id = s.id
                     WHERE s.workspace_id = w.id
                       AND ep.status = 'running'
+                      AND ep.dropped = FALSE
                       AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
                     LIMIT 1
                 ) THEN 1 ELSE 0 END AS "is_running!: i64",
@@ -594,6 +595,7 @@ impl Workspace {
                     FROM sessions s
                     JOIN execution_processes ep ON ep.session_id = s.id
                     WHERE s.workspace_id = w.id
+                      AND ep.dropped = FALSE
                       AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
                     ORDER BY ep.created_at DESC
                     LIMIT 1
@@ -690,6 +692,7 @@ impl Workspace {
                     JOIN execution_processes ep ON ep.session_id = s.id
                     WHERE s.workspace_id = w.id
                       AND ep.status = 'running'
+                      AND ep.dropped = FALSE
                       AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
                     LIMIT 1
                 ) THEN 1 ELSE 0 END AS "is_running!: i64",
@@ -699,6 +702,7 @@ impl Workspace {
                     FROM sessions s
                     JOIN execution_processes ep ON ep.session_id = s.id
                     WHERE s.workspace_id = w.id
+                      AND ep.dropped = FALSE
                       AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
                     ORDER BY ep.created_at DESC
                     LIMIT 1
@@ -742,5 +746,177 @@ impl Workspace {
         }
 
         Ok(Some(ws))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+
+    use super::*;
+    use crate::{
+        models::{
+            project::{CreateProject, Project},
+            session::{CreateSession, Session},
+            task::{CreateTask, Task, TaskStatus},
+        },
+        run_migrations,
+    };
+
+    async fn setup_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn create_workspace_fixture(
+        pool: &SqlitePool,
+        project_id: Uuid,
+        title: &str,
+    ) -> (Uuid, Uuid, Uuid, Uuid) {
+        let task_id = Uuid::new_v4();
+        let workspace_id = Uuid::new_v4();
+        let session_id = Uuid::new_v4();
+
+        Task::create(
+            pool,
+            &CreateTask {
+                project_id,
+                title: title.to_string(),
+                description: None,
+                status: Some(TaskStatus::Todo),
+                parent_workspace_id: None,
+                image_ids: None,
+                shared_task_id: None,
+            },
+            task_id,
+        )
+        .await
+        .unwrap();
+
+        Workspace::create(
+            pool,
+            &CreateWorkspace {
+                branch: format!("branch-{title}"),
+                agent_working_dir: None,
+            },
+            workspace_id,
+            task_id,
+        )
+        .await
+        .unwrap();
+
+        Session::create(
+            pool,
+            &CreateSession {
+                executor: Some("test-executor".to_string()),
+            },
+            session_id,
+            workspace_id,
+        )
+        .await
+        .unwrap();
+
+        (task_id, workspace_id, session_id, project_id)
+    }
+
+    async fn insert_process(
+        pool: &SqlitePool,
+        session_id: Uuid,
+        status: &str,
+        dropped: bool,
+        created_at: &str,
+    ) {
+        sqlx::query(
+            "INSERT INTO execution_processes (id, session_id, run_reason, status, dropped, created_at) VALUES (?, ?, 'codingagent', ?, ?, ?)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(session_id)
+        .bind(status)
+        .bind(dropped)
+        .bind(created_at)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn workspace_status_queries_exclude_dropped_processes() {
+        let pool = setup_pool().await;
+
+        let project_id = Uuid::new_v4();
+        Project::create(
+            &pool,
+            &CreateProject {
+                name: "project-for-workspace-status".to_string(),
+                repositories: vec![],
+            },
+            project_id,
+        )
+        .await
+        .unwrap();
+
+        let (_, dropped_workspace_id, dropped_session_id, _) =
+            create_workspace_fixture(&pool, project_id, "dropped-only").await;
+        let (_, active_workspace_id, active_session_id, _) =
+            create_workspace_fixture(&pool, project_id, "active").await;
+
+        insert_process(
+            &pool,
+            dropped_session_id,
+            "completed",
+            false,
+            "2026-01-02 00:00:00.000",
+        )
+        .await;
+        insert_process(
+            &pool,
+            dropped_session_id,
+            "failed",
+            true,
+            "2026-01-02 00:00:01.000",
+        )
+        .await;
+        insert_process(
+            &pool,
+            dropped_session_id,
+            "running",
+            true,
+            "2026-01-02 00:00:02.000",
+        )
+        .await;
+
+        insert_process(
+            &pool,
+            active_session_id,
+            "running",
+            false,
+            "2026-01-02 00:00:03.000",
+        )
+        .await;
+
+        let all = Workspace::find_all_with_status(&pool, None, None)
+            .await
+            .unwrap();
+        let dropped_workspace = all
+            .iter()
+            .find(|entry| entry.workspace.id == dropped_workspace_id)
+            .unwrap();
+        assert!(!dropped_workspace.is_running);
+        assert!(!dropped_workspace.is_errored);
+
+        let active_workspace = all
+            .iter()
+            .find(|entry| entry.workspace.id == active_workspace_id)
+            .unwrap();
+        assert!(active_workspace.is_running);
+        assert!(!active_workspace.is_errored);
+
+        let single = Workspace::find_by_id_with_status(&pool, dropped_workspace_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!single.is_running);
+        assert!(!single.is_errored);
     }
 }

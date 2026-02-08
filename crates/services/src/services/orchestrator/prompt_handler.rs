@@ -435,9 +435,12 @@ Analyze the prompt and decide how to respond. Return a JSON object with:
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::services::{
-        orchestrator::message_bus::MessageBus, terminal::prompt_detector::DetectedPrompt,
+        orchestrator::message_bus::{BusMessage, MessageBus},
+        terminal::prompt_detector::DetectedPrompt,
     };
 
     fn create_test_handler() -> PromptHandler {
@@ -536,6 +539,259 @@ mod tests {
                 assert!(reason.contains("Auto-confirm disabled"));
             }
             _ => panic!("Expected AskUser decision when auto_confirm=false"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_prompt_event_auto_confirm_disabled_only_publishes_ask_user_decision() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let handler = PromptHandler::new(message_bus.clone());
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        let event = TerminalPromptEvent {
+            terminal_id: "term-1".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            session_id: "session-1".to_string(),
+            auto_confirm: false,
+            prompt: create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.95),
+            detected_at: chrono::Utc::now(),
+        };
+
+        let decision = handler
+            .handle_prompt_event(&event)
+            .await
+            .expect("prompt should produce decision");
+
+        match decision {
+            PromptDecision::AskUser { reason, .. } => {
+                assert!(reason.contains("Auto-confirm disabled"));
+            }
+            _ => panic!("Expected AskUser decision when auto_confirm=false"),
+        }
+
+        let first_message = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected prompt decision broadcast")
+            .expect("broadcast channel should be open");
+
+        match first_message {
+            BusMessage::TerminalPromptDecision {
+                terminal_id,
+                workflow_id,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(workflow_id, "workflow-1");
+                assert!(matches!(decision, PromptDecision::AskUser { .. }));
+            }
+            other => panic!("expected TerminalPromptDecision, got: {other:?}"),
+        }
+
+        let maybe_second =
+            tokio::time::timeout(Duration::from_millis(100), broadcast_rx.recv()).await;
+        assert!(
+            maybe_second.is_err(),
+            "AskUser should not publish terminal input"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_prompt_event_auto_confirm_enabled_publishes_decision_and_terminal_input() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let handler = PromptHandler::new(message_bus.clone());
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+        let mut input_topic_rx = message_bus.subscribe("terminal.input.term-1").await;
+
+        let event = TerminalPromptEvent {
+            terminal_id: "term-1".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            session_id: "session-1".to_string(),
+            auto_confirm: true,
+            prompt: create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.95),
+            detected_at: chrono::Utc::now(),
+        };
+
+        let decision = handler
+            .handle_prompt_event(&event)
+            .await
+            .expect("prompt should produce decision");
+
+        match decision {
+            PromptDecision::AutoConfirm { response, .. } => {
+                assert_eq!(response, "\n");
+            }
+            _ => panic!("Expected AutoConfirm decision when auto_confirm=true"),
+        }
+
+        let first_message = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected prompt decision broadcast")
+            .expect("broadcast channel should be open");
+
+        match first_message {
+            BusMessage::TerminalPromptDecision {
+                terminal_id,
+                workflow_id,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(workflow_id, "workflow-1");
+                assert!(matches!(decision, PromptDecision::AutoConfirm { .. }));
+            }
+            other => panic!("expected TerminalPromptDecision, got: {other:?}"),
+        }
+
+        let second_message = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match second_message {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "\n");
+                assert!(matches!(decision, Some(PromptDecision::AutoConfirm { .. })));
+            }
+            other => panic!("expected TerminalInput, got: {other:?}"),
+        }
+
+        let topic_message = tokio::time::timeout(Duration::from_millis(200), input_topic_rx.recv())
+            .await
+            .expect("expected topic terminal input")
+            .expect("topic channel should be open");
+
+        match topic_message {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "\n");
+                assert!(matches!(decision, Some(PromptDecision::AutoConfirm { .. })));
+            }
+            other => panic!("expected topic TerminalInput, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_user_approval_after_ask_user_event_publishes_manual_response() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let handler = PromptHandler::new(message_bus.clone());
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+        let mut input_topic_rx = message_bus.subscribe("terminal.input.term-1").await;
+
+        let event = TerminalPromptEvent {
+            terminal_id: "term-1".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            session_id: "session-1".to_string(),
+            auto_confirm: false,
+            prompt: create_test_prompt(PromptKind::YesNo, "Continue? [y/n]", 0.95),
+            detected_at: chrono::Utc::now(),
+        };
+
+        let ask_user_decision = handler
+            .handle_prompt_event(&event)
+            .await
+            .expect("prompt should produce AskUser decision");
+
+        match ask_user_decision {
+            PromptDecision::AskUser { suggestions, .. } => {
+                assert_eq!(suggestions, Some(vec!["y".to_string(), "n".to_string()]));
+            }
+            _ => panic!("Expected AskUser decision when auto_confirm=false"),
+        }
+
+        let ask_user_message =
+            tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+                .await
+                .expect("expected AskUser decision broadcast")
+                .expect("broadcast channel should be open");
+
+        match ask_user_message {
+            BusMessage::TerminalPromptDecision { decision, .. } => {
+                assert!(matches!(decision, PromptDecision::AskUser { .. }));
+            }
+            other => panic!("expected AskUser TerminalPromptDecision, got: {other:?}"),
+        }
+
+        handler
+            .handle_user_approval("term-1", "session-1", "workflow-1", "n")
+            .await;
+
+        let input_broadcast = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected manual input broadcast")
+            .expect("broadcast channel should be open");
+
+        match input_broadcast {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "n\n");
+                assert!(matches!(decision, Some(PromptDecision::LLMDecision { .. })));
+            }
+            other => panic!("expected TerminalInput, got: {other:?}"),
+        }
+
+        let topic_input = tokio::time::timeout(Duration::from_millis(200), input_topic_rx.recv())
+            .await
+            .expect("expected manual input topic message")
+            .expect("topic channel should be open");
+
+        match topic_input {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "n\n");
+                assert!(matches!(decision, Some(PromptDecision::LLMDecision { .. })));
+            }
+            other => panic!("expected topic TerminalInput, got: {other:?}"),
+        }
+
+        let decision_broadcast =
+            tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+                .await
+                .expect("expected manual decision broadcast")
+                .expect("broadcast channel should be open");
+
+        match decision_broadcast {
+            BusMessage::TerminalPromptDecision {
+                terminal_id,
+                workflow_id,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(workflow_id, "workflow-1");
+                match decision {
+                    PromptDecision::LLMDecision { response, .. } => {
+                        assert_eq!(response, "n\n");
+                    }
+                    _ => panic!("Expected LLMDecision broadcast after manual approval"),
+                }
+            }
+            other => panic!("expected TerminalPromptDecision, got: {other:?}"),
         }
     }
 

@@ -41,7 +41,8 @@ export function TaskCard({
   const { remoteFeaturesEnabled } = useUserSystem();
 
   const isRemoteShared =
-    remoteFeaturesEnabled && (Boolean(sharedTask) || Boolean(task.sharedTaskId));
+    remoteFeaturesEnabled &&
+    (Boolean(sharedTask) || Boolean(task.sharedTaskId));
 
   const handleClick = useCallback(() => {
     onViewDetails(task);
@@ -56,14 +57,11 @@ export function TaskCard({
       try {
         const parentAttempt = await attemptsApi.get(task.parentWorkspaceId);
         navigate(
-          paths.attempt(
-            projectId,
-            parentAttempt.taskId,
-            task.parentWorkspaceId
-          )
+          paths.attempt(projectId, parentAttempt.taskId, task.parentWorkspaceId)
         );
       } catch (error) {
         console.error('Failed to navigate to parent task attempt:', error);
+      } finally {
         setIsNavigatingToParent(false);
       }
     },

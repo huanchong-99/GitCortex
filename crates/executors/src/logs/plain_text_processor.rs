@@ -248,7 +248,14 @@ impl PlainTextLogProcessor {
             match message_boundary_predicate {
                 // Predicate decided to conclude the current entry at `line_idx`
                 Some(MessageBoundary::Split(line_idx)) => {
-                    let lines = self.buffer.drain_lines(line_idx);
+                    let split_at = line_idx.min(self.buffer.lines().len());
+                    if split_at == 0 {
+                        // No progress can be made by draining 0 lines. Stop split loop and
+                        // continue with normal partial update flow to avoid spinning forever.
+                        break;
+                    }
+
+                    let lines = self.buffer.drain_lines(split_at);
                     if !lines.is_empty() {
                         let content = lines.concat();
                         patches.push(self.create_patch(content));
@@ -492,6 +499,46 @@ mod tests {
         // Next, add actual content; should emit one patch with the content
         let patches = processor.process("real content\n".to_string());
         assert_eq!(patches.len(), 1);
+    }
+
+    #[test]
+    fn test_split_zero_boundary_does_not_spin_or_drop_logs() {
+        let producer = |content: String| -> NormalizedEntry {
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::SystemMessage,
+                content,
+                metadata: None,
+            }
+        };
+
+        let mut processor = PlainTextLogProcessor::builder()
+            .normalized_entry_producer(producer)
+            .message_boundary_predicate(Box::new(|lines: &[String]| {
+                if lines
+                    .first()
+                    .is_some_and(|line| line.starts_with("BOUNDARY"))
+                {
+                    return Some(MessageBoundary::Split(0));
+                }
+                None
+            }))
+            .index_provider(EntryIndexProvider::test_new())
+            .build();
+
+        let patches = processor.process("BOUNDARY line 1\n".to_string());
+        assert_eq!(patches.len(), 1);
+        let first_content = extract_normalized_entry_from_patch(&patches[0])
+            .map(|(_, entry)| entry.content)
+            .expect("first patch content should exist");
+        assert_eq!(first_content, "BOUNDARY line 1\n");
+
+        let patches = processor.process("BOUNDARY line 2\n".to_string());
+        assert_eq!(patches.len(), 1);
+        let second_content = extract_normalized_entry_from_patch(&patches[0])
+            .map(|(_, entry)| entry.content)
+            .expect("second patch content should exist");
+        assert_eq!(second_content, "BOUNDARY line 1\nBOUNDARY line 2\n");
     }
 
     #[test]

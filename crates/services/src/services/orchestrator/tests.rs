@@ -528,6 +528,58 @@ mod orchestrator_tests {
     }
 
     #[tokio::test]
+    async fn test_publish_workflow_event_fanout_to_topic_and_broadcast() {
+        let bus = MessageBus::new(100);
+        let mut topic_sub = bus.subscribe("workflow:wf-1").await;
+        let mut broadcast_sub = bus.subscribe_broadcast();
+
+        let delivered = bus
+            .publish_workflow_event(
+                "wf-1",
+                BusMessage::StatusUpdate {
+                    workflow_id: "wf-1".to_string(),
+                    status: "running".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(delivered, 1);
+
+        let topic_msg =
+            tokio::time::timeout(std::time::Duration::from_millis(100), topic_sub.recv())
+                .await
+                .unwrap()
+                .unwrap();
+        match topic_msg {
+            BusMessage::StatusUpdate {
+                workflow_id,
+                status,
+            } => {
+                assert_eq!(workflow_id, "wf-1");
+                assert_eq!(status, "running");
+            }
+            _ => panic!("Expected StatusUpdate on workflow topic"),
+        }
+
+        let broadcast_msg =
+            tokio::time::timeout(std::time::Duration::from_millis(100), broadcast_sub.recv())
+                .await
+                .unwrap()
+                .unwrap();
+        match broadcast_msg {
+            BusMessage::StatusUpdate {
+                workflow_id,
+                status,
+            } => {
+                assert_eq!(workflow_id, "wf-1");
+                assert_eq!(status, "running");
+            }
+            _ => panic!("Expected StatusUpdate on broadcast"),
+        }
+    }
+
+    #[tokio::test]
     async fn test_publish_terminal_completed() {
         let bus = MessageBus::new(100);
         let mut sub = bus.subscribe("workflow:wf-1").await;

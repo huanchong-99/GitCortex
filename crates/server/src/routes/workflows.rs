@@ -99,6 +99,20 @@ pub struct MergeWorkflowRequest {
     pub merge_strategy: Option<String>,
 }
 
+const WORKFLOW_STATUSES: [&str; 9] = [
+    "created",
+    "starting",
+    "ready",
+    "running",
+    "paused",
+    "merging",
+    "completed",
+    "failed",
+    "cancelled",
+];
+
+const MERGE_ALLOWED_WORKFLOW_STATUSES: [&str; 2] = ["completed", "merging"];
+
 // ============================================================================
 // Route Definition
 // ============================================================================
@@ -124,6 +138,84 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
             "/{workflow_id}/tasks/{task_id}/terminals",
             get(list_task_terminals),
         )
+}
+
+fn is_known_workflow_status(status: &str) -> bool {
+    WORKFLOW_STATUSES.contains(&status)
+}
+
+fn can_merge_from_workflow_status(status: &str) -> bool {
+    MERGE_ALLOWED_WORKFLOW_STATUSES.contains(&status)
+}
+
+fn is_valid_workflow_status_transition(current: &str, next: &str) -> bool {
+    if current == next {
+        return is_known_workflow_status(current);
+    }
+
+    matches!(
+        (current, next),
+        ("created", "starting")
+            | ("created", "failed")
+            | ("created", "cancelled")
+            | ("starting", "ready")
+            | ("starting", "failed")
+            | ("starting", "cancelled")
+            | ("ready", "running")
+            | ("ready", "failed")
+            | ("ready", "cancelled")
+            | ("running", "paused")
+            | ("running", "completed")
+            | ("running", "failed")
+            | ("running", "cancelled")
+            | ("paused", "ready")
+            | ("paused", "running")
+            | ("paused", "failed")
+            | ("paused", "cancelled")
+            | ("completed", "merging")
+            | ("completed", "created")
+            | ("merging", "completed")
+            | ("merging", "failed")
+            | ("failed", "starting")
+            | ("failed", "created")
+            | ("failed", "cancelled")
+            | ("cancelled", "created")
+    )
+}
+
+fn validate_workflow_status_transition(current: &str, next: &str) -> Result<(), ApiError> {
+    if !is_known_workflow_status(next) {
+        return Err(ApiError::BadRequest(format!(
+            "Invalid workflow status '{}', expected one of: {:?}",
+            next, WORKFLOW_STATUSES
+        )));
+    }
+
+    if !is_known_workflow_status(current) {
+        return Err(ApiError::Conflict(format!(
+            "Cannot transition workflow from unknown status '{}': expected one of: {:?}",
+            current, WORKFLOW_STATUSES
+        )));
+    }
+
+    if !is_valid_workflow_status_transition(current, next) {
+        return Err(ApiError::Conflict(format!(
+            "Invalid workflow status transition: '{}' -> '{}'",
+            current, next
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_task_workflow_scope(task: &WorkflowTask, workflow_id: &str) -> Result<(), ApiError> {
+    if task.workflow_id != workflow_id {
+        return Err(ApiError::BadRequest(
+            "Task does not belong to this workflow".to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 // ============================================================================
@@ -652,7 +744,14 @@ async fn update_workflow_status(
     Path(workflow_id): Path<String>,
     Json(req): Json<UpdateWorkflowStatusRequest>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    Workflow::update_status(&deployment.db().pool, &workflow_id, &req.status).await?;
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    let target_status = req.status.trim().to_string();
+    validate_workflow_status_transition(&workflow.status, &target_status)?;
+
+    Workflow::update_status(&deployment.db().pool, &workflow_id, &target_status).await?;
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
@@ -1246,11 +1345,7 @@ async fn update_task_status(
         .await?
         .ok_or_else(|| ApiError::NotFound("Task not found".to_string()))?;
 
-    if task.workflow_id != workflow_id {
-        return Err(ApiError::BadRequest(
-            "Task does not belong to this workflow".to_string(),
-        ));
-    }
+    validate_task_workflow_scope(&task, &workflow_id)?;
 
     // Validate status value - support both backend and frontend status names
     let valid_statuses = [
@@ -1290,8 +1385,18 @@ async fn update_task_status(
 /// List task terminals
 async fn list_task_terminals(
     State(deployment): State<DeploymentImpl>,
-    Path((_, task_id)): Path<(String, String)>,
+    Path((workflow_id, task_id)): Path<(String, String)>,
 ) -> Result<ResponseJson<ApiResponse<Vec<Terminal>>>, ApiError> {
+    let _workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    let task = WorkflowTask::find_by_id(&deployment.db().pool, &task_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Task not found".to_string()))?;
+
+    validate_task_workflow_scope(&task, &workflow_id)?;
+
     let terminals = Terminal::find_by_task(&deployment.db().pool, &task_id).await?;
     Ok(ResponseJson(ApiResponse::success(terminals)))
 }
@@ -1318,13 +1423,11 @@ async fn merge_workflow(
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
 
     // Validate workflow is in appropriate state for merging
-    // Allow merging from "running" or "completed" states
     let current_status = workflow.status.as_str();
-    if current_status != "running" && current_status != "completed" && current_status != "starting"
-    {
+    if !can_merge_from_workflow_status(current_status) {
         return Err(ApiError::BadRequest(format!(
-            "Cannot merge workflow with status '{}': expected 'running', 'completed', or 'starting'",
-            current_status
+            "Cannot merge workflow with status '{}': expected one of: {:?}",
+            current_status, MERGE_ALLOWED_WORKFLOW_STATUSES
         )));
     }
 
@@ -1513,5 +1616,119 @@ mod dto_tests {
         assert!(response_json.contains("\"projectId\""));
         assert!(response_json.contains("\"useSlashCommands\""));
         assert!(response_json.contains("\"orchestratorEnabled\""));
+    }
+}
+
+#[cfg(test)]
+mod workflow_guard_tests {
+    use chrono::Utc;
+
+    use super::*;
+
+    fn build_task_with_workflow(workflow_id: &str) -> WorkflowTask {
+        WorkflowTask {
+            id: "task-test".to_string(),
+            workflow_id: workflow_id.to_string(),
+            vk_task_id: None,
+            name: "Task".to_string(),
+            description: None,
+            branch: "workflow/test/task".to_string(),
+            status: "pending".to_string(),
+            order_index: 0,
+            started_at: None,
+            completed_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn merge_status_guard_allows_only_terminal_merge_states() {
+        assert!(can_merge_from_workflow_status("completed"));
+        assert!(can_merge_from_workflow_status("merging"));
+        assert!(!can_merge_from_workflow_status("starting"));
+        assert!(!can_merge_from_workflow_status("running"));
+    }
+
+    #[test]
+    fn merge_status_guard_rejects_all_non_merge_states() {
+        let non_merge_states = [
+            "created",
+            "starting",
+            "ready",
+            "running",
+            "paused",
+            "failed",
+            "cancelled",
+        ];
+
+        for status in non_merge_states {
+            assert!(
+                !can_merge_from_workflow_status(status),
+                "Expected status '{status}' to be rejected by merge guard"
+            );
+        }
+    }
+
+    #[test]
+    fn workflow_status_transition_accepts_valid_paths() {
+        let allowed_cases = [
+            ("created", "starting"),
+            ("starting", "ready"),
+            ("ready", "running"),
+            ("running", "paused"),
+            ("running", "completed"),
+            ("paused", "ready"),
+            ("completed", "merging"),
+            ("merging", "completed"),
+            ("failed", "starting"),
+            ("cancelled", "created"),
+            ("completed", "created"),
+        ];
+
+        for (current, next) in allowed_cases {
+            assert!(
+                validate_workflow_status_transition(current, next).is_ok(),
+                "Expected transition {current} -> {next} to be valid"
+            );
+        }
+    }
+
+    #[test]
+    fn workflow_status_transition_rejects_illegal_jumps() {
+        let rejected_cases = [
+            ("created", "running"),
+            ("starting", "completed"),
+            ("ready", "completed"),
+            ("completed", "running"),
+            ("merging", "running"),
+            ("cancelled", "running"),
+        ];
+
+        for (current, next) in rejected_cases {
+            assert!(
+                matches!(
+                    validate_workflow_status_transition(current, next),
+                    Err(ApiError::Conflict(_))
+                ),
+                "Expected transition {current} -> {next} to be rejected"
+            );
+        }
+
+        assert!(matches!(
+            validate_workflow_status_transition("created", "unknown_status"),
+            Err(ApiError::BadRequest(_))
+        ));
+    }
+
+    #[test]
+    fn task_scope_guard_rejects_cross_workflow_access() {
+        let task = build_task_with_workflow("wf-1");
+
+        assert!(validate_task_workflow_scope(&task, "wf-1").is_ok());
+        assert!(matches!(
+            validate_task_workflow_scope(&task, "wf-2"),
+            Err(ApiError::BadRequest(_))
+        ));
     }
 }

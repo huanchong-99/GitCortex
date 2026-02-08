@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -40,6 +40,10 @@ import { useTranslation } from 'react-i18next';
 import { useProjects } from '@/hooks/useProjects';
 import { useOrganizationProjects } from '@/hooks/useOrganizationProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
+import { ApiError } from '@/lib/api';
+import { isRemoteProjectCapabilityUnsupported } from './organizationRemoteCapability';
+
+const REMOTE_PROJECT_API_UNSUPPORTED_STATUS = 501;
 
 export function OrganizationSettings() {
   const { t } = useTranslation('organization');
@@ -145,8 +149,41 @@ export function OrganizationSettings() {
     useProjects();
 
   // Fetch remote projects for the selected organization
-  const { data: remoteProjects = [], isLoading: loadingRemoteProjects } =
-    useOrganizationProjects(selectedOrgId);
+  const {
+    data: remoteProjects = [],
+    isLoading: loadingRemoteProjects,
+    error: remoteProjectsError,
+  } = useOrganizationProjects(selectedOrgId);
+
+  const remoteProjectUnsupportedMessage = t(
+    'sharedProjects.remoteProjectUnsupported',
+    {
+      defaultValue:
+        'Remote project linking is unavailable because this backend version does not support remote project APIs.',
+    }
+  );
+
+  const loadRemoteProjectsErrorMessage = t('sharedProjects.loadError', {
+    defaultValue: 'Failed to load remote projects.',
+  });
+
+  const remoteProjectsApiUnsupported = useMemo(() => {
+    if (!remoteProjectsError) {
+      return false;
+    }
+
+    if (
+      remoteProjectsError instanceof ApiError &&
+      remoteProjectsError.status === REMOTE_PROJECT_API_UNSUPPORTED_STATUS
+    ) {
+      return true;
+    }
+
+    return isRemoteProjectCapabilityUnsupported(remoteProjectsError);
+  }, [remoteProjectsError]);
+
+  const isRemoteProjectUnsupported =
+    !remoteFeaturesEnabled || remoteProjectsApiUnsupported;
 
   // Calculate available local projects (not linked to any remote project)
   const availableLocalProjects = allProjects.filter(
@@ -160,6 +197,10 @@ export function OrganizationSettings() {
       setTimeout(() => setSuccess(null), 3000);
     },
     onLinkError: (err) => {
+      if (isRemoteProjectCapabilityUnsupported(err)) {
+        setError(remoteProjectUnsupportedMessage);
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to link project');
     },
     onUnlinkSuccess: () => {
@@ -167,6 +208,10 @@ export function OrganizationSettings() {
       setTimeout(() => setSuccess(null), 3000);
     },
     onUnlinkError: (err) => {
+      if (isRemoteProjectCapabilityUnsupported(err)) {
+        setError(remoteProjectUnsupportedMessage);
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to unlink project');
     },
   });
@@ -245,6 +290,11 @@ export function OrganizationSettings() {
     remoteProjectId: string,
     localProjectId: string
   ) => {
+    if (isRemoteProjectUnsupported) {
+      setError(remoteProjectUnsupportedMessage);
+      return;
+    }
+
     setError(null);
     linkToExisting.mutate({
       localProjectId,
@@ -253,6 +303,11 @@ export function OrganizationSettings() {
   };
 
   const handleUnlinkProject = (projectId: string) => {
+    if (isRemoteProjectUnsupported) {
+      setError(remoteProjectUnsupportedMessage);
+      return;
+    }
+
     setError(null);
     unlinkProject.mutate(projectId);
   };
@@ -463,6 +518,20 @@ export function OrganizationSettings() {
                 <Loader2 className="h-6 w-6 animate-spin" />
                 <span className="ml-2">{t('sharedProjects.loading')}</span>
               </div>
+            ) : isRemoteProjectUnsupported ? (
+              <Alert>
+                <AlertDescription>
+                  {remoteProjectUnsupportedMessage}
+                </AlertDescription>
+              </Alert>
+            ) : remoteProjectsError ? (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {remoteProjectsError instanceof Error
+                    ? remoteProjectsError.message
+                    : loadRemoteProjectsErrorMessage}
+                </AlertDescription>
+              </Alert>
             ) : remoteProjects.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {t('sharedProjects.noProjects')}
@@ -485,6 +554,8 @@ export function OrganizationSettings() {
                       onUnlink={handleUnlinkProject}
                       isLinking={linkToExisting.isPending}
                       isUnlinking={unlinkProject.isPending}
+                      disabled={isRemoteProjectUnsupported}
+                      disabledReason={remoteProjectUnsupportedMessage}
                     />
                   );
                 })}

@@ -4,7 +4,6 @@
 //! They prevent regressions where snake_case or old fields reappear.
 
 use serde_json::Value;
-use serde_json::json;
 
 #[tokio::test]
 async fn test_list_workflows_contract() {
@@ -26,16 +25,40 @@ async fn test_list_workflows_contract() {
     let workflow = &response_json[0];
 
     // Verify camelCase fields exist
-    assert!(workflow.get("projectId").is_some(), "Missing projectId field");
-    assert!(workflow.get("createdAt").is_some(), "Missing createdAt field");
-    assert!(workflow.get("updatedAt").is_some(), "Missing updatedAt field");
-    assert!(workflow.get("tasksCount").is_some(), "Missing tasksCount field");
-    assert!(workflow.get("terminalsCount").is_some(), "Missing terminalsCount field");
+    assert!(
+        workflow.get("projectId").is_some(),
+        "Missing projectId field"
+    );
+    assert!(
+        workflow.get("createdAt").is_some(),
+        "Missing createdAt field"
+    );
+    assert!(
+        workflow.get("updatedAt").is_some(),
+        "Missing updatedAt field"
+    );
+    assert!(
+        workflow.get("tasksCount").is_some(),
+        "Missing tasksCount field"
+    );
+    assert!(
+        workflow.get("terminalsCount").is_some(),
+        "Missing terminalsCount field"
+    );
 
     // Verify NO snake_case fields
-    assert!(workflow.get("project_id").is_none(), "Found snake_case project_id field");
-    assert!(workflow.get("created_at").is_none(), "Found snake_case created_at field");
-    assert!(workflow.get("updated_at").is_none(), "Found snake_case updated_at field");
+    assert!(
+        workflow.get("project_id").is_none(),
+        "Found snake_case project_id field"
+    );
+    assert!(
+        workflow.get("created_at").is_none(),
+        "Found snake_case created_at field"
+    );
+    assert!(
+        workflow.get("updated_at").is_none(),
+        "Found snake_case updated_at field"
+    );
 }
 
 #[tokio::test]
@@ -87,17 +110,27 @@ async fn test_workflow_detail_contract() {
 #[test]
 fn test_status_enum_valid_values() {
     let valid_workflow_statuses = vec![
-        "created", "starting", "ready", "running",
-        "paused", "merging", "completed", "failed", "cancelled"
+        "created",
+        "starting",
+        "ready",
+        "running",
+        "paused",
+        "merging",
+        "completed",
+        "failed",
+        "cancelled",
     ];
 
     let valid_task_statuses = vec![
-        "pending", "running", "review_pending", "completed", "failed", "cancelled"
+        "pending",
+        "running",
+        "review_pending",
+        "completed",
+        "failed",
+        "cancelled",
     ];
 
-    let valid_terminal_statuses = vec![
-        "not_started", "waiting", "working", "completed", "failed"
-    ];
+    let valid_terminal_statuses = vec!["not_started", "waiting", "working", "completed", "failed"];
 
     // Verify all workflow statuses are valid
     for status in valid_workflow_statuses {
@@ -132,5 +165,8 @@ fn test_no_legacy_config_field() {
     });
 
     // Verify NO legacy "config" field
-    assert!(response_json.get("config").is_none(), "Found legacy config field - should use tasks/commands directly");
+    assert!(
+        response_json.get("config").is_none(),
+        "Found legacy config field - should use tasks/commands directly"
+    );
 }

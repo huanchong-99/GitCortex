@@ -93,10 +93,32 @@ impl From<Git2Error> for ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status_code, error_type) = match &self {
-            ApiError::Project(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ProjectError"),
-            ApiError::Repo(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ProjectRepoError"),
-            ApiError::Workspace(_) => (StatusCode::INTERNAL_SERVER_ERROR, "WorkspaceError"),
-            ApiError::Session(_) => (StatusCode::INTERNAL_SERVER_ERROR, "SessionError"),
+            ApiError::Project(project_err) => match project_err {
+                ProjectError::ProjectNotFound => (StatusCode::NOT_FOUND, "ProjectError"),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "ProjectError"),
+            },
+            ApiError::Repo(repo_err) => match repo_err {
+                RepoError::NotFound => (StatusCode::NOT_FOUND, "ProjectRepoError"),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "ProjectRepoError"),
+            },
+            ApiError::Workspace(workspace_err) => match workspace_err {
+                WorkspaceError::TaskNotFound
+                | WorkspaceError::ProjectNotFound
+                | WorkspaceError::BranchNotFound(_)
+                | WorkspaceError::Database(sqlx::Error::RowNotFound) => {
+                    (StatusCode::NOT_FOUND, "WorkspaceError")
+                }
+                WorkspaceError::ValidationError(_) => (StatusCode::BAD_REQUEST, "WorkspaceError"),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "WorkspaceError"),
+            },
+            ApiError::Session(session_err) => match session_err {
+                SessionError::NotFound
+                | SessionError::WorkspaceNotFound
+                | SessionError::Database(sqlx::Error::RowNotFound) => {
+                    (StatusCode::NOT_FOUND, "SessionError")
+                }
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "SessionError"),
+            },
             ApiError::ScratchError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ScratchError"),
             ApiError::ExecutionProcess(err) => match err {
                 ExecutionProcessError::ExecutionProcessNotFound => {
@@ -121,9 +143,15 @@ impl IntoResponse for ApiError {
                 _ => (StatusCode::INTERNAL_SERVER_ERROR, "ContainerError"),
             },
             ApiError::Executor(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ExecutorError"),
-            ApiError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "DatabaseError"),
+            ApiError::Database(db_err) => match db_err {
+                sqlx::Error::RowNotFound => (StatusCode::NOT_FOUND, "DatabaseError"),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "DatabaseError"),
+            },
             ApiError::Worktree(_) => (StatusCode::INTERNAL_SERVER_ERROR, "WorktreeError"),
-            ApiError::Config(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ConfigError"),
+            ApiError::Config(config_err) => match config_err {
+                ConfigError::ValidationError(_) => (StatusCode::BAD_REQUEST, "ConfigError"),
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "ConfigError"),
+            },
             ApiError::Image(img_err) => match img_err {
                 ImageError::InvalidFormat => (StatusCode::BAD_REQUEST, "InvalidImageFormat"),
                 ImageError::TooLarge(_, _) => (StatusCode::PAYLOAD_TOO_LARGE, "ImageTooLarge"),
@@ -209,7 +237,7 @@ impl From<ProjectServiceError> for ApiError {
                 "A repository with this name already exists in the project".to_string(),
             ),
             ProjectServiceError::RepositoryNotFound => {
-                ApiError::BadRequest("Repository not found".to_string())
+                ApiError::NotFound("Repository not found".to_string())
             }
             ProjectServiceError::GitError(msg) => {
                 ApiError::BadRequest(format!("Git operation failed: {msg}"))
@@ -232,7 +260,7 @@ impl From<RepoServiceError> for ApiError {
             RepoServiceError::NotGitRepository(path) => {
                 ApiError::BadRequest(format!("Path is not a git repository: {}", path.display()))
             }
-            RepoServiceError::NotFound => ApiError::BadRequest("Repository not found".to_string()),
+            RepoServiceError::NotFound => ApiError::NotFound("Repository not found".to_string()),
             RepoServiceError::DirectoryAlreadyExists(path) => {
                 ApiError::BadRequest(format!("Directory already exists: {}", path.display()))
             }
@@ -249,11 +277,54 @@ impl From<ProjectRepoError> for ApiError {
         match err {
             ProjectRepoError::Database(db_err) => ApiError::Database(db_err),
             ProjectRepoError::NotFound => {
-                ApiError::BadRequest("Repository not found in project".to_string())
+                ApiError::NotFound("Repository not found in project".to_string())
             }
             ProjectRepoError::AlreadyExists => {
                 ApiError::Conflict("Repository already exists in project".to_string())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn status_of(error: ApiError) -> StatusCode {
+        error.into_response().status()
+    }
+
+    #[test]
+    fn repo_service_not_found_maps_to_404() {
+        let error = ApiError::from(RepoServiceError::NotFound);
+        assert!(matches!(error, ApiError::NotFound(_)));
+        assert_eq!(status_of(error), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn project_repo_not_found_maps_to_404() {
+        let error = ApiError::from(ProjectRepoError::NotFound);
+        assert!(matches!(error, ApiError::NotFound(_)));
+        assert_eq!(status_of(error), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn workspace_validation_maps_to_400() {
+        let error = ApiError::Workspace(WorkspaceError::ValidationError("invalid".to_string()));
+        assert_eq!(status_of(error), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn config_validation_maps_to_400() {
+        let error = ApiError::Config(ConfigError::ValidationError("invalid".to_string()));
+        assert_eq!(status_of(error), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn sqlx_row_not_found_maps_to_404() {
+        assert_eq!(
+            status_of(ApiError::Database(sqlx::Error::RowNotFound)),
+            StatusCode::NOT_FOUND
+        );
     }
 }

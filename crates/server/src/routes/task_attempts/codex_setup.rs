@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use db::models::{
     execution_process::{ExecutionProcess, ExecutionProcessRunReason},
     session::{CreateSession, Session},
@@ -9,13 +11,31 @@ use executors::{
         ExecutorAction, ExecutorActionType,
         script::{ScriptContext, ScriptRequest, ScriptRequestLanguage},
     },
-    command::{CommandBuilder, apply_overrides},
+    command::{CommandBuildError, CommandBuilder, apply_overrides},
     executors::{ExecutorError, codex::Codex},
 };
 use services::services::container::ContainerService;
 use uuid::Uuid;
 
 use crate::error::ApiError;
+
+fn build_bash_command(program_path: &Path, args: &[String]) -> Result<String, ExecutorError> {
+    let quote = |value: &str| {
+        shlex::try_quote(value)
+            .map(|quoted| quoted.into_owned())
+            .map_err(CommandBuildError::QuoteError)
+            .map_err(ExecutorError::from)
+    };
+
+    let mut escaped_parts = Vec::with_capacity(args.len() + 1);
+    escaped_parts.push(quote(program_path.to_string_lossy().as_ref())?);
+
+    for arg in args {
+        escaped_parts.push(quote(arg)?);
+    }
+
+    Ok(escaped_parts.join(" "))
+}
 
 pub async fn run_codex_setup(
     deployment: &crate::DeploymentImpl,
@@ -86,7 +106,8 @@ async fn get_setup_helper_action(codex: &Codex) -> Result<ExecutorAction, ApiErr
         .into_resolved()
         .await
         .map_err(ApiError::Executor)?;
-    let login_script = format!("{} {}", program_path.to_string_lossy(), args.join(" "));
+    let login_script =
+        build_bash_command(program_path.as_path(), &args).map_err(ApiError::Executor)?;
     let login_request = ScriptRequest {
         script: login_script,
         language: ScriptRequestLanguage::Bash,
@@ -98,4 +119,58 @@ async fn get_setup_helper_action(codex: &Codex) -> Result<ExecutorAction, ApiErr
         ExecutorActionType::ScriptRequest(login_request),
         None,
     ))
+}
+
+#[cfg(test)]
+mod command_escape_tests {
+    use std::path::Path;
+
+    use executors::{command::CommandBuildError, executors::ExecutorError};
+
+    use super::build_bash_command;
+
+    #[test]
+    fn keeps_command_arguments_as_individual_tokens() {
+        let program = Path::new("/usr/local/bin/codex");
+        let args = vec![
+            "login".to_string(),
+            "--profile".to_string(),
+            "dev;rm -rf /".to_string(),
+            "$(touch /tmp/pwned)".to_string(),
+        ];
+
+        let script = build_bash_command(program, &args).expect("command should be escaped");
+        let tokens = shlex::split(&script).expect("escaped command should be parseable");
+
+        assert_eq!(tokens.len(), args.len() + 1);
+        assert_eq!(tokens[0], "/usr/local/bin/codex");
+        assert_eq!(tokens[1], "login");
+        assert_eq!(tokens[2], "--profile");
+        assert_eq!(tokens[3], "dev;rm -rf /");
+        assert_eq!(tokens[4], "$(touch /tmp/pwned)");
+    }
+
+    #[test]
+    fn supports_executable_path_with_spaces() {
+        let program = Path::new("/opt/codex cli/bin/codex");
+        let args = vec!["login".to_string()];
+
+        let script = build_bash_command(program, &args).expect("command should be escaped");
+        let tokens = shlex::split(&script).expect("escaped command should be parseable");
+
+        assert_eq!(tokens[0], "/opt/codex cli/bin/codex");
+        assert_eq!(tokens[1], "login");
+    }
+
+    #[test]
+    fn rejects_null_byte_arguments() {
+        let program = Path::new("/usr/local/bin/codex");
+        let args = vec!["bad\0arg".to_string()];
+
+        let error = build_bash_command(program, &args).expect_err("null bytes must be rejected");
+        assert!(matches!(
+            error,
+            ExecutorError::CommandBuild(CommandBuildError::QuoteError(_))
+        ));
+    }
 }

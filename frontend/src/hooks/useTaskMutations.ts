@@ -25,6 +25,11 @@ export function useTaskMutations(projectId?: string) {
     }
   };
 
+  const invalidateTaskAndWorkspaceQueries = (taskId?: string) => {
+    invalidateQueries(taskId);
+    queryClient.invalidateQueries({ queryKey: workspaceSummaryKeys.all });
+  };
+
   const createTask = useMutation({
     mutationFn: (data: CreateTask) => tasksApi.create(data),
     onSuccess: (createdTask: Task) => {
@@ -50,7 +55,7 @@ export function useTaskMutations(projectId?: string) {
     mutationFn: (data: CreateAndStartTaskRequest) =>
       tasksApi.createAndStart(data),
     onSuccess: (createdTask: TaskWithAttemptStatus) => {
-      invalidateQueries();
+      invalidateTaskAndWorkspaceQueries(createdTask.id);
       // Invalidate parent's relationships cache if this is a subtask
       if (createdTask.parentWorkspaceId) {
         queryClient.invalidateQueries({
@@ -100,6 +105,9 @@ export function useTaskMutations(projectId?: string) {
 
   const shareTask = useMutation({
     mutationFn: (taskId: string) => tasksApi.share(taskId),
+    onSuccess: (_: unknown, taskId: string) => {
+      invalidateTaskAndWorkspaceQueries(taskId);
+    },
     onError: (err) => {
       console.error('Failed to share task:', err);
     },

@@ -162,6 +162,7 @@ impl Task {
       JOIN execution_processes ep ON ep.session_id = s.id
      WHERE w.task_id       = t.id
        AND ep.status        = 'running'
+       AND ep.dropped       = FALSE
        AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
      LIMIT 1
   ) THEN 1 ELSE 0 END            AS "has_in_progress_attempt!: i64",
@@ -172,7 +173,8 @@ impl Task {
       JOIN sessions s ON s.workspace_id = w.id
       JOIN execution_processes ep ON ep.session_id = s.id
      WHERE w.task_id       = t.id
-     AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
+      AND ep.dropped       = FALSE
+      AND ep.run_reason IN ('setupscript','cleanupscript','codingagent')
      ORDER BY ep.created_at DESC
      LIMIT 1
   ) IN ('failed','killed') THEN 1 ELSE 0 END
@@ -493,5 +495,171 @@ ORDER BY t.created_at DESC"#,
             current_workspace: workspace.clone(),
             children,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+
+    use super::*;
+    use crate::{
+        models::{
+            project::{CreateProject, Project},
+            session::{CreateSession, Session},
+            workspace::{CreateWorkspace, Workspace},
+        },
+        run_migrations,
+    };
+
+    async fn setup_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn create_task_fixture(
+        pool: &SqlitePool,
+        project_id: Uuid,
+        title: &str,
+    ) -> (Uuid, Uuid, Uuid) {
+        let task_id = Uuid::new_v4();
+        let workspace_id = Uuid::new_v4();
+        let session_id = Uuid::new_v4();
+
+        Task::create(
+            pool,
+            &CreateTask {
+                project_id,
+                title: title.to_string(),
+                description: None,
+                status: Some(TaskStatus::Todo),
+                parent_workspace_id: None,
+                image_ids: None,
+                shared_task_id: None,
+            },
+            task_id,
+        )
+        .await
+        .unwrap();
+
+        Workspace::create(
+            pool,
+            &CreateWorkspace {
+                branch: format!("branch-{title}"),
+                agent_working_dir: None,
+            },
+            workspace_id,
+            task_id,
+        )
+        .await
+        .unwrap();
+
+        Session::create(
+            pool,
+            &CreateSession {
+                executor: Some("test-executor".to_string()),
+            },
+            session_id,
+            workspace_id,
+        )
+        .await
+        .unwrap();
+
+        (task_id, workspace_id, session_id)
+    }
+
+    async fn insert_process(
+        pool: &SqlitePool,
+        session_id: Uuid,
+        status: &str,
+        dropped: bool,
+        created_at: &str,
+    ) {
+        sqlx::query(
+            "INSERT INTO execution_processes (id, session_id, run_reason, status, dropped, created_at) VALUES (?, ?, 'codingagent', ?, ?, ?)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(session_id)
+        .bind(status)
+        .bind(dropped)
+        .bind(created_at)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn find_by_project_id_with_attempt_status_excludes_dropped_processes() {
+        let pool = setup_pool().await;
+
+        let project_id = Uuid::new_v4();
+        Project::create(
+            &pool,
+            &CreateProject {
+                name: "project-for-task-status".to_string(),
+                repositories: vec![],
+            },
+            project_id,
+        )
+        .await
+        .unwrap();
+
+        let (dropped_task_id, _, dropped_session_id) =
+            create_task_fixture(&pool, project_id, "dropped-only").await;
+        let (active_task_id, _, active_session_id) =
+            create_task_fixture(&pool, project_id, "active").await;
+
+        insert_process(
+            &pool,
+            dropped_session_id,
+            "completed",
+            false,
+            "2026-01-01 00:00:00.000",
+        )
+        .await;
+        insert_process(
+            &pool,
+            dropped_session_id,
+            "failed",
+            true,
+            "2026-01-01 00:00:01.000",
+        )
+        .await;
+        insert_process(
+            &pool,
+            dropped_session_id,
+            "running",
+            true,
+            "2026-01-01 00:00:02.000",
+        )
+        .await;
+
+        insert_process(
+            &pool,
+            active_session_id,
+            "running",
+            false,
+            "2026-01-01 00:00:03.000",
+        )
+        .await;
+
+        let tasks = Task::find_by_project_id_with_attempt_status(&pool, project_id)
+            .await
+            .unwrap();
+
+        let dropped_task = tasks
+            .iter()
+            .find(|entry| entry.task.id == dropped_task_id)
+            .unwrap();
+        assert!(!dropped_task.has_in_progress_attempt);
+        assert!(!dropped_task.last_attempt_failed);
+
+        let active_task = tasks
+            .iter()
+            .find(|entry| entry.task.id == active_task_id)
+            .unwrap();
+        assert!(active_task.has_in_progress_attempt);
+        assert!(!active_task.last_attempt_failed);
     }
 }

@@ -6,6 +6,15 @@ SET auto_confirm = 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE auto_confirm = 0;
 
+UPDATE terminal
+SET vk_session_id = NULL
+WHERE vk_session_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM sessions
+      WHERE sessions.id = terminal.vk_session_id
+  );
+
 DROP INDEX IF EXISTS idx_terminal_auto_confirm;
 
 ALTER TABLE terminal RENAME TO terminal_old;
@@ -35,7 +44,8 @@ CREATE TABLE terminal (
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (workflow_task_id) REFERENCES workflow_task(id) ON DELETE CASCADE,
     FOREIGN KEY (cli_type_id) REFERENCES cli_type(id),
-    FOREIGN KEY (model_config_id) REFERENCES model_config(id)
+    FOREIGN KEY (model_config_id) REFERENCES model_config(id),
+    FOREIGN KEY (vk_session_id) REFERENCES sessions(id)
 );
 
 INSERT INTO terminal (

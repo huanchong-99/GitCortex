@@ -1,17 +1,32 @@
 import { useParams } from 'react-router-dom';
-import { useWorkflow, useStartWorkflow, usePauseWorkflow, useStopWorkflow } from '@/hooks/useWorkflows';
+import {
+  useWorkflow,
+  useStartWorkflow,
+  usePauseWorkflow,
+  useStopWorkflow,
+} from '@/hooks/useWorkflows';
 import { TerminalDebugView } from '@/components/terminal/TerminalDebugView';
 import { PipelineView } from '@/components/workflow/PipelineView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Play, Pause, Square, Activity, GitBranch, Terminal as TerminalIcon } from 'lucide-react';
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  Square,
+  Activity,
+  GitBranch,
+  Terminal as TerminalIcon,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
-function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'completed' | 'failed' {
+function mapWorkflowStatus(
+  status: string
+): 'idle' | 'running' | 'paused' | 'completed' | 'failed' {
   switch (status) {
     case 'created':
     case 'starting':
@@ -31,6 +46,13 @@ function mapWorkflowStatus(status: string): 'idle' | 'running' | 'paused' | 'com
   }
 }
 
+export function buildWorkflowDebugWsUrl(
+  locationLike: Pick<Location, 'protocol' | 'host'>
+): string {
+  const wsProtocol = locationLike.protocol === 'https:' ? 'wss' : 'ws';
+  return `${wsProtocol}://${locationLike.host}/api`;
+}
+
 /**
  * Status indicator with color coding
  */
@@ -47,10 +69,13 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={cn(
-      'px-2 py-0.5 rounded-full text-xs font-medium border',
-      statusColors[status] ?? 'bg-gray-500/20 text-gray-600 border-gray-500/30'
-    )}>
+    <span
+      className={cn(
+        'px-2 py-0.5 rounded-full text-xs font-medium border',
+        statusColors[status] ??
+          'bg-gray-500/20 text-gray-600 border-gray-500/30'
+      )}
+    >
       {t(`status.${status}`, { defaultValue: status })}
     </span>
   );
@@ -89,10 +114,14 @@ export function WorkflowDebugPage() {
   }
 
   if (error !== null || !data) {
-    return <div className="p-8 text-center text-red-500">{t('workflowDebug.error')}</div>;
+    return (
+      <div className="p-8 text-center text-red-500">
+        {t('workflowDebug.error')}
+      </div>
+    );
   }
 
-  const wsUrl = `ws://${window.location.host}`;
+  const wsUrl = buildWorkflowDebugWsUrl(window.location);
   const defaultRoleLabel = t('terminalCard.defaultRole');
 
   // Map DTO tasks to internal WorkflowTask format
@@ -139,13 +168,18 @@ export function WorkflowDebugPage() {
 
   // Calculate statistics for status bar
   const totalTasks = tasks.length;
-  const totalTerminals = tasks.reduce((sum, task) => sum + task.terminals.length, 0);
+  const totalTerminals = tasks.reduce(
+    (sum, task) => sum + task.terminals.length,
+    0
+  );
   const runningTerminals = tasks.reduce(
-    (sum, task) => sum + task.terminals.filter((t) => t.status === 'working').length,
+    (sum, task) =>
+      sum + task.terminals.filter((t) => t.status === 'working').length,
     0
   );
   const completedTerminals = tasks.reduce(
-    (sum, task) => sum + task.terminals.filter((t) => t.status === 'completed').length,
+    (sum, task) =>
+      sum + task.terminals.filter((t) => t.status === 'completed').length,
     0
   );
 
@@ -210,14 +244,20 @@ export function WorkflowDebugPage() {
         <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm">
             <Activity className="w-4 h-4 text-blue-500" />
-            <span>{t('workflowDebug.readyToStart', { defaultValue: 'Workflow is ready to start. Click the button to begin execution.' })}</span>
+            <span>
+              {t('workflowDebug.readyToStart', {
+                defaultValue:
+                  'Workflow is ready to start. Click the button to begin execution.',
+              })}
+            </span>
           </div>
           <Button
             size="sm"
             onClick={handleStart}
             disabled={startMutation.isPending}
           >
-            <Play className="w-4 h-4 mr-2" /> {t('workflowDebug.startNow', { defaultValue: 'Start Now' })}
+            <Play className="w-4 h-4 mr-2" />{' '}
+            {t('workflowDebug.startNow', { defaultValue: 'Start Now' })}
           </Button>
         </div>
       )}
@@ -225,8 +265,12 @@ export function WorkflowDebugPage() {
       <div className="flex-1 overflow-hidden">
         <Tabs defaultValue="pipeline" className="h-full flex flex-col">
           <TabsList className="mx-4 mt-4">
-            <TabsTrigger value="pipeline">{t('workflowDebug.tabs.pipeline')}</TabsTrigger>
-            <TabsTrigger value="terminals">{t('workflowDebug.tabs.terminals')}</TabsTrigger>
+            <TabsTrigger value="pipeline">
+              {t('workflowDebug.tabs.pipeline')}
+            </TabsTrigger>
+            <TabsTrigger value="terminals">
+              {t('workflowDebug.tabs.terminals')}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pipeline" className="flex-1 p-4 overflow-auto">
@@ -253,28 +297,34 @@ export function WorkflowDebugPage() {
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1">
             <Activity className="w-3 h-3" />
-            {t('workflowDebug.statusBar.tasks', { count: totalTasks, defaultValue: '{{count}} tasks' })}
+            {t('workflowDebug.statusBar.tasks', {
+              count: totalTasks,
+              defaultValue: '{{count}} tasks',
+            })}
           </span>
           <span className="flex items-center gap-1">
             <TerminalIcon className="w-3 h-3" />
             {t('workflowDebug.statusBar.terminals', {
               running: runningTerminals,
               total: totalTerminals,
-              defaultValue: '{{running}}/{{total}} terminals running'
+              defaultValue: '{{running}}/{{total}} terminals running',
             })}
           </span>
           <span className="flex items-center gap-1 text-green-600">
             {t('workflowDebug.statusBar.completed', {
               count: completedTerminals,
-              defaultValue: '{{count}} completed'
+              defaultValue: '{{count}} completed',
             })}
           </span>
         </div>
         <div className="text-muted-foreground">
           {data.orchestratorEnabled
-            ? t('workflowDebug.statusBar.orchestratorActive', { defaultValue: 'Orchestrator: Active' })
-            : t('workflowDebug.statusBar.orchestratorInactive', { defaultValue: 'Orchestrator: Inactive' })
-          }
+            ? t('workflowDebug.statusBar.orchestratorActive', {
+                defaultValue: 'Orchestrator: Active',
+              })
+            : t('workflowDebug.statusBar.orchestratorInactive', {
+                defaultValue: 'Orchestrator: Inactive',
+              })}
         </div>
       </footer>
     </div>

@@ -16,6 +16,29 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+fn compile_regex(pattern: &'static str, regex_name: &'static str) -> Option<Regex> {
+    match Regex::new(pattern) {
+        Ok(regex) => Some(regex),
+        Err(error) => {
+            tracing::error!(
+                regex_name,
+                pattern,
+                error = %error,
+                "Failed to compile prompt detector regex; falling back to disabled matcher"
+            );
+            None
+        }
+    }
+}
+
+fn regex_is_match(regex: Option<&Regex>, text: &str) -> bool {
+    regex.is_some_and(|compiled| compiled.is_match(text))
+}
+
+fn regex_captures<'a>(regex: Option<&'a Regex>, text: &'a str) -> Option<regex::Captures<'a>> {
+    regex.and_then(|compiled| compiled.captures(text))
+}
+
 // ============================================================================
 // Prompt Types
 // ============================================================================
@@ -97,7 +120,7 @@ pub struct DetectedPrompt {
 impl DetectedPrompt {
     /// Create a new detected prompt
     pub fn new(kind: PromptKind, raw_text: String, confidence: f32) -> Self {
-        let has_dangerous_keywords = DANGEROUS_KEYWORDS_RE.is_match(&raw_text);
+        let has_dangerous_keywords = regex_is_match(DANGEROUS_KEYWORDS_RE.as_ref(), &raw_text);
         Self {
             kind,
             raw_text,
@@ -115,7 +138,7 @@ impl DetectedPrompt {
         options: Vec<ArrowSelectOption>,
         selected_index: usize,
     ) -> Self {
-        let has_dangerous_keywords = DANGEROUS_KEYWORDS_RE.is_match(&raw_text);
+        let has_dangerous_keywords = regex_is_match(DANGEROUS_KEYWORDS_RE.as_ref(), &raw_text);
         Self {
             kind: PromptKind::ArrowSelect,
             raw_text,
@@ -132,66 +155,79 @@ impl DetectedPrompt {
 // ============================================================================
 
 /// Password/sensitive input detection
-static PASSWORD_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
+static PASSWORD_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
         r"(?i)\b(password|passphrase|token|secret|api[_\s]?key|credential|private[_\s]?key)\b",
+        "PASSWORD_RE",
     )
-    .expect("Invalid PASSWORD_RE regex")
 });
 
 /// Input field detection (free-form text input)
-static INPUT_FIELD_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(enter|provide|input|type|specify)\s+.{0,30}(:|>\s*$)")
-        .expect("Invalid INPUT_FIELD_RE regex")
+static INPUT_FIELD_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"(?i)(enter|provide|input|type|specify)\s+.{0,30}(:|>\s*$)",
+        "INPUT_FIELD_RE",
+    )
 });
 
 /// Arrow key hint detection
-static ARROW_HINT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(use|press)\s+(arrow\s*keys?|↑|↓|up/down)")
-        .expect("Invalid ARROW_HINT_RE regex")
+static ARROW_HINT_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"(?i)(use|press)\s+(arrow\s*keys?|↑|↓|up/down)",
+        "ARROW_HINT_RE",
+    )
 });
 
 /// Arrow select marker detection (line-by-line)
-static SELECT_MARKER_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[\s]*(?P<mark>>|\*|❯|▸|→|\[x\]|\[\s\]|\(x\)|\(\s\)|●|○)\s+(?P<label>.+)$")
-        .expect("Invalid SELECT_MARKER_RE regex")
+static SELECT_MARKER_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"^[\s]*(?P<mark>>|\*|❯|▸|→|\[x\]|\[\s\]|\(x\)|\(\s\)|●|○)\s+(?P<label>.+)$",
+        "SELECT_MARKER_RE",
+    )
 });
 
 /// Selected marker patterns (indicates current selection)
-static SELECTED_MARKER_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[\s]*(>|\*|❯|▸|→|\[x\]|\(x\)|●)").expect("Invalid SELECTED_MARKER_RE regex")
-});
+static SELECTED_MARKER_RE: Lazy<Option<Regex>> =
+    Lazy::new(|| compile_regex(r"^[\s]*(>|\*|❯|▸|→|\[x\]|\(x\)|●)", "SELECTED_MARKER_RE"));
 
 /// Choice detection (single-line options with multiple choices)
-static CHOICE_RE: Lazy<Regex> = Lazy::new(|| {
+static CHOICE_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     // Matches: "Choose:", "Select [", or patterns like [a/b/c], (1/2/3)
     // Note: [y/n] patterns are handled by YES_NO_RE which has higher priority
-    Regex::new(r"(?i)(choose|select|option|pick)\s*[:\[]|\[[a-z0-9](/[a-z0-9])+\]|\([a-z0-9](/[a-z0-9])+\)")
-        .expect("Invalid CHOICE_RE regex")
+    compile_regex(
+        r"(?i)(choose|select|option|pick)\s*[:\[]|\[[a-z0-9](/[a-z0-9])+\]|\([a-z0-9](/[a-z0-9])+\)",
+        "CHOICE_RE",
+    )
 });
 
 /// Indented option line (for arrow select without explicit marker)
-static OPTION_INDENTED_RE: Lazy<Regex> = Lazy::new(|| {
+static OPTION_INDENTED_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     // Matches lines with 2+ leading spaces followed by non-whitespace content
-    Regex::new(r"^[\s]{2,}(\S.*)$").expect("Invalid OPTION_INDENTED_RE regex")
+    compile_regex(r"^[\s]{2,}(\S.*)$", "OPTION_INDENTED_RE")
 });
 
 /// Yes/No detection
-static YES_NO_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\[y/?n\]|\(y/?n\)|\byes/?no\b|\[yes/?no\]|\(yes/?no\)")
-        .expect("Invalid YES_NO_RE regex")
+static YES_NO_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"(?i)\[y/?n\]|\(y/?n\)|\byes/?no\b|\[yes/?no\]|\(yes/?no\)",
+        "YES_NO_RE",
+    )
 });
 
 /// Enter confirmation detection
-static ENTER_CONFIRM_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(press|hit|tap)\s+(the\s+)?(enter|return)\b|\[enter\]|\benter\s+to\s+(continue|proceed|resume|exit|confirm)\b|\bpress\s+any\s+key\b|\bcontinue\?\s*$")
-        .expect("Invalid ENTER_CONFIRM_RE regex")
+static ENTER_CONFIRM_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"(?i)(press|hit|tap)\s+(the\s+)?(enter|return)\b|\[enter\]|\benter\s+to\s+(continue|proceed|resume|exit|confirm)\b|\bpress\s+any\s+key\b|\bcontinue\?\s*$",
+        "ENTER_CONFIRM_RE",
+    )
 });
 
 /// Dangerous keywords that should trigger LLM decision or user confirmation
-static DANGEROUS_KEYWORDS_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(delete|remove|destroy|wipe|format|drop|overwrite|reset|publish|deploy|merge|push|force|permanent|irreversible)\b")
-        .expect("Invalid DANGEROUS_KEYWORDS_RE regex")
+static DANGEROUS_KEYWORDS_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"(?i)\b(delete|remove|destroy|wipe|format|drop|overwrite|reset|publish|deploy|merge|push|force|permanent|irreversible)\b",
+        "DANGEROUS_KEYWORDS_RE",
+    )
 });
 
 // ============================================================================
@@ -310,25 +346,25 @@ impl PromptDetector {
 
     /// Detect password/sensitive input prompt
     fn detect_password(&self, text: &str) -> bool {
-        PASSWORD_RE.is_match(text)
+        regex_is_match(PASSWORD_RE.as_ref(), text)
     }
 
     /// Detect free-form input prompt
     fn detect_input(&self, text: &str) -> bool {
         // Must match input pattern but NOT be a password prompt
-        INPUT_FIELD_RE.is_match(text) && !PASSWORD_RE.is_match(text)
+        regex_is_match(INPUT_FIELD_RE.as_ref(), text) && !regex_is_match(PASSWORD_RE.as_ref(), text)
     }
 
     /// Detect arrow select prompt from buffer
     fn detect_arrow_select(&self, current_line: &str) -> Option<DetectedPrompt> {
         // Check for arrow hint in current line or recent buffer
-        let has_arrow_hint = ARROW_HINT_RE.is_match(current_line)
+        let has_arrow_hint = regex_is_match(ARROW_HINT_RE.as_ref(), current_line)
             || self
                 .line_buffer
                 .iter()
                 .rev()
                 .take(5)
-                .any(|line| ARROW_HINT_RE.is_match(line));
+                .any(|line| regex_is_match(ARROW_HINT_RE.as_ref(), line));
 
         // Parse options from buffer
         let mut options: Vec<ArrowSelectOption> = Vec::new();
@@ -336,10 +372,10 @@ impl PromptDetector {
 
         for line in &self.line_buffer {
             // First try to match lines with explicit markers (>, *, etc.)
-            if let Some(caps) = SELECT_MARKER_RE.captures(line) {
+            if let Some(caps) = regex_captures(SELECT_MARKER_RE.as_ref(), line) {
                 let label = caps.name("label").map(|m| m.as_str().trim().to_string());
                 if let Some(label) = label {
-                    let is_selected = SELECTED_MARKER_RE.is_match(line);
+                    let is_selected = regex_is_match(SELECTED_MARKER_RE.as_ref(), line);
                     let index = options.len();
 
                     if is_selected {
@@ -355,7 +391,7 @@ impl PromptDetector {
             }
             // If we have an arrow hint, also consider indented lines as options
             else if has_arrow_hint {
-                if let Some(caps) = OPTION_INDENTED_RE.captures(line) {
+                if let Some(caps) = regex_captures(OPTION_INDENTED_RE.as_ref(), line) {
                     if let Some(label_match) = caps.get(1) {
                         let label = label_match.as_str().trim().to_string();
                         // Skip empty labels or lines that look like prompts/questions
@@ -389,22 +425,22 @@ impl PromptDetector {
 
     /// Detect single-line choice prompt
     fn detect_choice(&self, text: &str) -> bool {
-        CHOICE_RE.is_match(text)
+        regex_is_match(CHOICE_RE.as_ref(), text)
     }
 
     /// Detect yes/no prompt
     fn detect_yes_no(&self, text: &str) -> bool {
-        YES_NO_RE.is_match(text)
+        regex_is_match(YES_NO_RE.as_ref(), text)
     }
 
     /// Detect enter confirmation prompt
     fn detect_enter_confirm(&self, text: &str) -> bool {
-        ENTER_CONFIRM_RE.is_match(text)
+        regex_is_match(ENTER_CONFIRM_RE.as_ref(), text)
     }
 
     /// Check if text contains dangerous keywords
     pub fn has_dangerous_keywords(&self, text: &str) -> bool {
-        DANGEROUS_KEYWORDS_RE.is_match(text)
+        regex_is_match(DANGEROUS_KEYWORDS_RE.as_ref(), text)
     }
 }
 
@@ -587,5 +623,17 @@ mod tests {
         assert!(PromptKind::YesNo.requires_llm_decision());
         assert!(PromptKind::Choice.requires_llm_decision());
         assert!(!PromptKind::Password.requires_llm_decision());
+    }
+
+    #[test]
+    fn test_compile_regex_invalid_pattern_returns_none() {
+        assert!(compile_regex(r"(", "BROKEN_RE").is_none());
+    }
+
+    #[test]
+    fn test_regex_helpers_handle_missing_regex() {
+        let missing_regex: Option<&Regex> = None;
+        assert!(!regex_is_match(missing_regex, "anything"));
+        assert!(regex_captures(missing_regex, "anything").is_none());
     }
 }

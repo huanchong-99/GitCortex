@@ -4,7 +4,7 @@ use axum::{
     Json, Router,
     body::Body,
     extract::{Path, Query, State},
-    http,
+    http::{self, StatusCode},
     response::{Json as ResponseJson, Response},
     routing::{get, put},
 };
@@ -117,11 +117,11 @@ async fn get_user_system_info(
 async fn update_config(
     State(deployment): State<DeploymentImpl>,
     Json(new_config): Json<Config>,
-) -> ResponseJson<ApiResponse<Config>> {
+) -> Result<ResponseJson<ApiResponse<Config>>, ApiError> {
     let config_path = match config_path() {
         Ok(path) => path,
         Err(e) => {
-            return ResponseJson(ApiResponse::error(&format!(
+            return Err(ApiError::Internal(format!(
                 "Failed to resolve config path: {e}"
             )));
         }
@@ -129,8 +129,9 @@ async fn update_config(
 
     // Validate git branch prefix
     if !utils::git::is_valid_branch_prefix(&new_config.git_branch_prefix) {
-        return ResponseJson(ApiResponse::error(
-            "Invalid git branch prefix. Must be a valid git branch name component without slashes.",
+        return Err(ApiError::BadRequest(
+            "Invalid git branch prefix. Must be a valid git branch name component without slashes."
+                .to_string(),
         ));
     }
 
@@ -146,9 +147,9 @@ async fn update_config(
             // Track config events when fields transition from false → true and run side effects
             handle_config_events(&deployment, &old_config, &new_config).await;
 
-            ResponseJson(ApiResponse::success(new_config))
+            Ok(ResponseJson(ApiResponse::success(new_config)))
         }
-        Err(e) => ResponseJson(ApiResponse::error(&format!("Failed to save config: {e}"))),
+        Err(e) => Err(ApiError::Config(e)),
     }
 }
 
@@ -247,7 +248,13 @@ pub struct UpdateMcpServersBody {
 async fn get_mcp_servers(
     State(_deployment): State<DeploymentImpl>,
     Query(query): Query<McpServerQuery>,
-) -> Result<ResponseJson<ApiResponse<GetMcpServerResponse, McpConfigError>>, ApiError> {
+) -> Result<
+    (
+        StatusCode,
+        ResponseJson<ApiResponse<GetMcpServerResponse, McpConfigError>>,
+    ),
+    ApiError,
+> {
     let coding_agent = ExecutorConfigs::get_cached()
         .get_coding_agent(&ExecutorProfileId::new(query.executor))
         .ok_or(ConfigError::ValidationError(
@@ -255,33 +262,43 @@ async fn get_mcp_servers(
         ))?;
 
     if !coding_agent.supports_mcp() {
-        return Ok(ResponseJson(ApiResponse::error_with_data(
-            McpConfigError::not_supported(),
-        )));
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            ResponseJson(ApiResponse::error_with_data(McpConfigError::not_supported())),
+        ));
     }
 
     // Resolve supplied config path or agent default
     let Some(config_path) = coding_agent.default_mcp_config_path() else {
-        return Ok(ResponseJson(ApiResponse::error(
-            "Could not determine config file path",
-        )));
+        return Err(ApiError::BadRequest(
+            "Could not determine config file path".to_string(),
+        ));
     };
 
     let mut mcpc = coding_agent.get_mcp_config();
     let raw_config = read_agent_config(&config_path, &mcpc).await?;
     let servers = get_mcp_servers_from_config_path(&raw_config, &mcpc.servers_path);
     mcpc.set_servers(servers);
-    Ok(ResponseJson(ApiResponse::success(GetMcpServerResponse {
-        mcp_config: mcpc,
-        config_path: config_path.to_string_lossy().to_string(),
-    })))
+    Ok((
+        StatusCode::OK,
+        ResponseJson(ApiResponse::success(GetMcpServerResponse {
+            mcp_config: mcpc,
+            config_path: config_path.to_string_lossy().to_string(),
+        })),
+    ))
 }
 
 async fn update_mcp_servers(
     State(_deployment): State<DeploymentImpl>,
     Query(query): Query<McpServerQuery>,
     Json(payload): Json<UpdateMcpServersBody>,
-) -> Result<ResponseJson<ApiResponse<String, McpConfigError>>, ApiError> {
+) -> Result<
+    (
+        StatusCode,
+        ResponseJson<ApiResponse<String, McpConfigError>>,
+    ),
+    ApiError,
+> {
     let profiles = ExecutorConfigs::get_cached();
     let agent = profiles
         .get_coding_agent(&ExecutorProfileId::new(query.executor))
@@ -290,25 +307,26 @@ async fn update_mcp_servers(
         ))?;
 
     if !agent.supports_mcp() {
-        return Ok(ResponseJson(ApiResponse::error_with_data(
-            McpConfigError::not_supported(),
-        )));
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            ResponseJson(ApiResponse::error_with_data(McpConfigError::not_supported())),
+        ));
     }
 
     // Resolve supplied config path or agent default
     let Some(config_path) = agent.default_mcp_config_path() else {
-        return Ok(ResponseJson(ApiResponse::error(
-            "Could not determine config file path",
-        )));
+        return Err(ApiError::BadRequest(
+            "Could not determine config file path".to_string(),
+        ));
     };
     let config_path = config_path.clone();
 
     let mcpc = agent.get_mcp_config();
     match update_mcp_servers_in_config(&config_path, &mcpc, payload.servers).await {
-        Ok(message) => Ok(ResponseJson(ApiResponse::success(message))),
-        Err(e) => Ok(ResponseJson(ApiResponse::error(&format!(
+        Ok(message) => Ok((StatusCode::OK, ResponseJson(ApiResponse::success(message)))),
+        Err(e) => Err(ApiError::Internal(format!(
             "Failed to update MCP servers: {e}"
-        )))),
+        ))),
     }
 }
 
@@ -371,6 +389,14 @@ fn set_mcp_servers_in_config_path(
     path: &[String],
     servers: &HashMap<String, Value>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if path.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "MCP servers path cannot be empty",
+        )
+        .into());
+    }
+
     // Ensure config is an object
     if !raw_config.is_object() {
         *raw_config = serde_json::json!({});
@@ -399,6 +425,60 @@ fn set_mcp_servers_in_config_path(
         .insert(final_attr.clone(), serde_json::to_value(servers)?);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn sample_servers() -> HashMap<String, Value> {
+        let mut servers = HashMap::new();
+        servers.insert(
+            "demo".to_string(),
+            json!({"type": "stdio", "command": "npx", "args": ["-y", "mcp-demo"]}),
+        );
+        servers
+    }
+
+    #[test]
+    fn set_mcp_servers_in_config_path_rejects_empty_path() {
+        let mut raw_config = json!({"keep": true});
+        let before = raw_config.clone();
+        let servers = sample_servers();
+
+        let result = set_mcp_servers_in_config_path(&mut raw_config, &[], &servers);
+
+        assert!(result.is_err());
+        assert_eq!(raw_config, before);
+    }
+
+    #[test]
+    fn set_mcp_servers_in_config_path_sets_single_segment_path() {
+        let mut raw_config = json!({});
+        let servers = sample_servers();
+        let path = vec!["mcpServers".to_string()];
+
+        set_mcp_servers_in_config_path(&mut raw_config, &path, &servers)
+            .expect("setting mcp servers should succeed");
+
+        let extracted = get_mcp_servers_from_config_path(&raw_config, &path);
+        assert_eq!(extracted, servers);
+    }
+
+    #[test]
+    fn set_mcp_servers_in_config_path_creates_nested_structure() {
+        let mut raw_config = json!({"mcp": "invalid"});
+        let servers = sample_servers();
+        let path = vec!["mcp".to_string(), "servers".to_string()];
+
+        set_mcp_servers_in_config_path(&mut raw_config, &path, &servers)
+            .expect("setting nested mcp servers should succeed");
+
+        let extracted = get_mcp_servers_from_config_path(&raw_config, &path);
+        assert_eq!(extracted, servers);
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

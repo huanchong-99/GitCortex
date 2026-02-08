@@ -19,6 +19,8 @@ interface RemoteProjectItemProps {
   onUnlink: (localProjectId: string) => void;
   isLinking: boolean;
   isUnlinking: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export function RemoteProjectItem({
@@ -29,10 +31,12 @@ export function RemoteProjectItem({
   onUnlink,
   isLinking,
   isUnlinking,
+  disabled = false,
+  disabledReason,
 }: RemoteProjectItemProps) {
   const { t } = useTranslation('organization');
   const handleUnlinkClick = () => {
-    if (!linkedLocalProject) return;
+    if (!linkedLocalProject || disabled) return;
 
     const confirmed = window.confirm(
       `Are you sure you want to unlink "${linkedLocalProject.name}"? The local project will remain, but it will no longer be linked to this remote project.`
@@ -43,6 +47,7 @@ export function RemoteProjectItem({
   };
 
   const handleLinkSelect = (localProjectId: string) => {
+    if (disabled) return;
     onLink(remoteProject.id, localProjectId);
   };
 
@@ -66,6 +71,13 @@ export function RemoteProjectItem({
         {linkedLocalProject && (
           <Badge variant="default">{t('sharedProjects.linked')}</Badge>
         )}
+        {disabled && (
+          <Badge variant="outline">
+            {t('sharedProjects.actionsUnavailable', {
+              defaultValue: 'Actions unavailable',
+            })}
+          </Badge>
+        )}
       </div>
       <div className="flex items-center gap-2">
         {linkedLocalProject ? (
@@ -73,16 +85,22 @@ export function RemoteProjectItem({
             variant="ghost"
             size="sm"
             onClick={handleUnlinkClick}
-            disabled={isUnlinking}
+            disabled={isUnlinking || disabled}
+            title={disabled ? disabledReason : undefined}
           >
             <Unlink className="h-4 w-4 text-destructive" />
           </Button>
         ) : (
           <Select
             onValueChange={handleLinkSelect}
-            disabled={isLinking || availableLocalProjects.length === 0}
+            disabled={
+              isLinking || availableLocalProjects.length === 0 || disabled
+            }
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger
+              className="w-[180px]"
+              title={disabled ? disabledReason : undefined}
+            >
               <SelectValue placeholder={t('sharedProjects.linkProject')} />
             </SelectTrigger>
             <SelectContent>

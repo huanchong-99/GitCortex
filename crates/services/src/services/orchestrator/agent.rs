@@ -485,7 +485,7 @@ impl OrchestratorAgent {
         });
 
         self.message_bus
-            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .publish_workflow_event(&workflow_id, event)
             .await?;
 
         // 3. Awaken orchestrator to process the event
@@ -524,7 +524,7 @@ impl OrchestratorAgent {
         };
 
         self.message_bus
-            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .publish_workflow_event(&workflow_id, event)
             .await?;
 
         // 3. Awaken orchestrator to process the event
@@ -565,7 +565,7 @@ impl OrchestratorAgent {
         };
 
         self.message_bus
-            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .publish_workflow_event(&workflow_id, event)
             .await?;
 
         // 3. Awaken orchestrator to process the event
@@ -600,7 +600,7 @@ impl OrchestratorAgent {
         };
 
         self.message_bus
-            .publish(&format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"), event)
+            .publish_workflow_event(&workflow_id, event)
             .await?;
 
         // 3. Awaken orchestrator to process the event
@@ -704,8 +704,8 @@ impl OrchestratorAgent {
 
                     // Publish completion event
                     self.message_bus
-                        .publish(
-                            &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                        .publish_workflow_event(
+                            &workflow_id,
                             BusMessage::StatusUpdate {
                                 workflow_id: workflow_id.clone(),
                                 status: WORKFLOW_STATUS_COMPLETED.to_string(),
@@ -739,8 +739,8 @@ impl OrchestratorAgent {
 
                     // Publish failure event
                     self.message_bus
-                        .publish(
-                            &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                        .publish_workflow_event(
+                            &workflow_id,
                             BusMessage::Error {
                                 workflow_id: workflow_id.clone(),
                                 error: reason.clone(),
@@ -856,8 +856,8 @@ impl OrchestratorAgent {
                 // Broadcast terminal status update
                 let _ = self
                     .message_bus
-                    .publish(
-                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                    .publish_workflow_event(
+                        &workflow_id,
                         BusMessage::TerminalStatusUpdate {
                             workflow_id: workflow_id.clone(),
                             terminal_id: terminal.id.clone(),
@@ -873,8 +873,8 @@ impl OrchestratorAgent {
                 // Broadcast task status update
                 let _ = self
                     .message_bus
-                    .publish(
-                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                    .publish_workflow_event(
+                        &workflow_id,
                         BusMessage::TaskStatusUpdate {
                             workflow_id: workflow_id.clone(),
                             task_id: task_id.to_string(),
@@ -886,10 +886,10 @@ impl OrchestratorAgent {
                 // Broadcast error event for UI notification
                 let _ = self
                     .message_bus
-                    .publish(
-                        &format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}"),
+                    .publish_workflow_event(
+                        &workflow_id,
                         BusMessage::Error {
-                            workflow_id,
+                            workflow_id: workflow_id.clone(),
                             error: error_msg.clone(),
                         },
                     )
@@ -1080,8 +1080,9 @@ impl OrchestratorAgent {
             workflow_id: workflow_id.clone(),
             status: status.to_string(),
         };
-        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        self.message_bus.publish(&topic, message).await?;
+        self.message_bus
+            .publish_workflow_event(&workflow_id, message)
+            .await?;
 
         tracing::debug!("Broadcast workflow status: {} -> {}", workflow_id, status);
 
@@ -1112,8 +1113,9 @@ impl OrchestratorAgent {
             terminal_id: terminal_id.to_string(),
             status: status.to_string(),
         };
-        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        self.message_bus.publish(&topic, message).await?;
+        self.message_bus
+            .publish_workflow_event(&workflow_id, message)
+            .await?;
 
         tracing::debug!("Broadcast terminal status: {} -> {}", terminal_id, status);
 
@@ -1140,8 +1142,9 @@ impl OrchestratorAgent {
             task_id: task_id.to_string(),
             status: status.to_string(),
         };
-        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        self.message_bus.publish(&topic, message).await?;
+        self.message_bus
+            .publish_workflow_event(&workflow_id, message)
+            .await?;
 
         tracing::debug!("Broadcast task status: {} -> {}", task_id, status);
 
@@ -1209,8 +1212,9 @@ impl OrchestratorAgent {
                         workflow_id: workflow_id.clone(),
                         status: WORKFLOW_STATUS_COMPLETED.to_string(),
                     };
-                    let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-                    self.message_bus.publish(&topic, message).await?;
+                    self.message_bus
+                        .publish_workflow_event(&workflow_id, message)
+                        .await?;
                 }
                 Err(e) => {
                     // Check if this is a merge conflict
@@ -1237,8 +1241,9 @@ impl OrchestratorAgent {
                             workflow_id: workflow_id.clone(),
                             status: WORKFLOW_STATUS_MERGING.to_string(),
                         };
-                        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-                        self.message_bus.publish(&topic, message).await?;
+                        self.message_bus
+                            .publish_workflow_event(&workflow_id, message)
+                            .await?;
 
                         return Err(anyhow::anyhow!(
                             "Merge conflict detected for task branch {}: {}",
@@ -1261,8 +1266,9 @@ impl OrchestratorAgent {
                         workflow_id: workflow_id.clone(),
                         error: format!("Merge failed for task {}: {}", task_id, e),
                     };
-                    let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-                    self.message_bus.publish(&topic, message).await?;
+                    self.message_bus
+                        .publish_workflow_event(&workflow_id, message)
+                        .await?;
 
                     return Err(anyhow::anyhow!(
                         "Merge failed for task branch {}: {}",

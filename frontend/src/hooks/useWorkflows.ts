@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  UseQueryResult,
+} from '@tanstack/react-query';
 import { handleApiResponse, logApiError } from '@/lib/api';
 import type {
   WorkflowDetailDto as Workflow,
@@ -14,6 +19,7 @@ import type {
 // ============================================================================
 
 export type WorkflowStatusEnum =
+  | 'draft'
   | 'created'
   | 'ready'
   | 'starting'
@@ -25,27 +31,106 @@ export type WorkflowStatusEnum =
   | 'cancelled';
 
 export interface WorkflowActions {
-  canPrepare: boolean;  // created → starting → ready (启动终端)
-  canStart: boolean;    // ready → running (开始任务)
+  canPrepare: boolean; // created → starting → ready (启动终端)
+  canStart: boolean; // ready → running (开始任务)
   canPause: boolean;
   canStop: boolean;
+  canMerge: boolean;
   canDelete: boolean;
 }
 
-export const WORKFLOW_STATUS_TRANSITIONS: Record<WorkflowStatusEnum, WorkflowActions> = {
-  created: { canPrepare: true, canStart: false, canPause: false, canStop: false, canDelete: true },
-  ready: { canPrepare: false, canStart: true, canPause: false, canStop: false, canDelete: true },
-  starting: { canPrepare: false, canStart: false, canPause: false, canStop: true, canDelete: false },
-  running: { canPrepare: false, canStart: false, canPause: true, canStop: true, canDelete: false },
-  paused: { canPrepare: false, canStart: true, canPause: false, canStop: true, canDelete: true },
-  merging: { canPrepare: false, canStart: false, canPause: false, canStop: true, canDelete: false },
-  completed: { canPrepare: false, canStart: false, canPause: false, canStop: false, canDelete: true },
-  failed: { canPrepare: true, canStart: false, canPause: false, canStop: false, canDelete: true },
-  cancelled: { canPrepare: false, canStart: false, canPause: false, canStop: false, canDelete: true },
+export const WORKFLOW_STATUS_TRANSITIONS: Record<
+  WorkflowStatusEnum,
+  WorkflowActions
+> = {
+  draft: {
+    canPrepare: true,
+    canStart: false,
+    canPause: false,
+    canStop: false,
+    canMerge: false,
+    canDelete: true,
+  },
+  created: {
+    canPrepare: true,
+    canStart: false,
+    canPause: false,
+    canStop: false,
+    canMerge: false,
+    canDelete: true,
+  },
+  ready: {
+    canPrepare: false,
+    canStart: true,
+    canPause: false,
+    canStop: false,
+    canMerge: false,
+    canDelete: true,
+  },
+  starting: {
+    canPrepare: false,
+    canStart: false,
+    canPause: false,
+    canStop: true,
+    canMerge: false,
+    canDelete: false,
+  },
+  running: {
+    canPrepare: false,
+    canStart: false,
+    canPause: true,
+    canStop: true,
+    canMerge: false,
+    canDelete: false,
+  },
+  paused: {
+    canPrepare: false,
+    canStart: true,
+    canPause: false,
+    canStop: true,
+    canMerge: false,
+    canDelete: true,
+  },
+  merging: {
+    canPrepare: false,
+    canStart: false,
+    canPause: false,
+    canStop: true,
+    canMerge: true,
+    canDelete: false,
+  },
+  completed: {
+    canPrepare: false,
+    canStart: false,
+    canPause: false,
+    canStop: false,
+    canMerge: true,
+    canDelete: true,
+  },
+  failed: {
+    canPrepare: true,
+    canStart: false,
+    canPause: false,
+    canStop: false,
+    canMerge: false,
+    canDelete: true,
+  },
+  cancelled: {
+    canPrepare: false,
+    canStart: false,
+    canPause: false,
+    canStop: false,
+    canMerge: false,
+    canDelete: true,
+  },
 };
 
-export function getWorkflowActions(status: WorkflowStatusEnum): WorkflowActions {
-  return WORKFLOW_STATUS_TRANSITIONS[status] ?? WORKFLOW_STATUS_TRANSITIONS.created;
+export function getWorkflowActions(
+  status: WorkflowStatusEnum
+): WorkflowActions {
+  return (
+    WORKFLOW_STATUS_TRANSITIONS[status] ?? WORKFLOW_STATUS_TRANSITIONS.created
+  );
 }
 
 // ============================================================================
@@ -122,6 +207,11 @@ export interface StopWorkflowRequest {
   workflow_id: string;
 }
 
+export interface MergeWorkflowRequest {
+  workflow_id: string;
+  merge_strategy?: 'squash';
+}
+
 export interface WorkflowExecution {
   execution_id: string;
   workflow_id: string;
@@ -131,13 +221,27 @@ export interface WorkflowExecution {
   error?: string;
 }
 
+export interface WorkflowMergeResult {
+  success: boolean;
+  message: string;
+  workflow_id?: string;
+  workflowId: string;
+  targetBranch: string;
+  mergedTasks: Array<{
+    taskId: string;
+    branch: string;
+    commitSha: string;
+  }>;
+}
+
 // ============================================================================
 // Query Keys
 // ============================================================================
 
 export const workflowKeys = {
   all: ['workflows'] as const,
-  forProject: (projectId: string) => ['workflows', 'project', projectId] as const,
+  forProject: (projectId: string) =>
+    ['workflows', 'project', projectId] as const,
   byId: (workflowId: string) => ['workflows', 'detail', workflowId] as const,
 };
 
@@ -150,7 +254,9 @@ const workflowsApi = {
    * Get all workflows for a project
    */
   getForProject: async (projectId: string): Promise<WorkflowListItemDto[]> => {
-    const response = await fetch(`/api/workflows?project_id=${encodeURIComponent(projectId)}`);
+    const response = await fetch(
+      `/api/workflows?project_id=${encodeURIComponent(projectId)}`
+    );
     return handleApiResponse<WorkflowListItemDto[]>(response);
   },
 
@@ -158,7 +264,9 @@ const workflowsApi = {
    * Get a single workflow by ID
    */
   getById: async (workflowId: string): Promise<Workflow> => {
-    const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(workflowId)}`
+    );
     return handleApiResponse<Workflow>(response);
   },
 
@@ -178,10 +286,13 @@ const workflowsApi = {
    * Prepare a workflow (start terminals, created → starting → ready)
    */
   prepare: async (workflowId: string): Promise<void> => {
-    const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}/prepare`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(workflowId)}/prepare`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
     return handleApiResponse<void>(response);
   },
 
@@ -189,10 +300,13 @@ const workflowsApi = {
    * Start a workflow execution (ready → running)
    */
   start: async (data: StartWorkflowRequest): Promise<WorkflowExecution> => {
-    const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(data.workflow_id)}/start`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
     return handleApiResponse<WorkflowExecution>(response);
   },
 
@@ -200,10 +314,13 @@ const workflowsApi = {
    * Pause a running workflow
    */
   pause: async (data: PauseWorkflowRequest): Promise<WorkflowExecution> => {
-    const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/pause`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(data.workflow_id)}/pause`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
     return handleApiResponse<WorkflowExecution>(response);
   },
 
@@ -211,20 +328,43 @@ const workflowsApi = {
    * Stop a workflow
    */
   stop: async (data: StopWorkflowRequest): Promise<WorkflowExecution> => {
-    const response = await fetch(`/api/workflows/${encodeURIComponent(data.workflow_id)}/stop`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(data.workflow_id)}/stop`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
     return handleApiResponse<WorkflowExecution>(response);
+  },
+
+  /**
+   * Merge workflow task branches into target branch
+   */
+  merge: async (data: MergeWorkflowRequest): Promise<WorkflowMergeResult> => {
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(data.workflow_id)}/merge`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merge_strategy: data.merge_strategy ?? 'squash',
+        }),
+      }
+    );
+    return handleApiResponse<WorkflowMergeResult>(response);
   },
 
   /**
    * Delete a workflow
    */
   delete: async (workflowId: string): Promise<void> => {
-    const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(workflowId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
     return handleApiResponse<void>(response);
   },
 
@@ -257,7 +397,9 @@ const workflowsApi = {
  * @param projectId - The project ID to fetch workflows for
  * @returns Query result with workflows array
  */
-export function useWorkflows(projectId: string): UseQueryResult<WorkflowListItemDto[], Error> {
+export function useWorkflows(
+  projectId: string
+): UseQueryResult<WorkflowListItemDto[], Error> {
   return useQuery({
     queryKey: workflowKeys.forProject(projectId),
     queryFn: () => workflowsApi.getForProject(projectId),
@@ -271,7 +413,9 @@ export function useWorkflows(projectId: string): UseQueryResult<WorkflowListItem
  * @param workflowId - The workflow ID to fetch
  * @returns Query result with workflow details
  */
-export function useWorkflow(workflowId: string): UseQueryResult<Workflow, Error> {
+export function useWorkflow(
+  workflowId: string
+): UseQueryResult<Workflow, Error> {
   return useQuery({
     queryKey: workflowKeys.byId(workflowId),
     queryFn: () => workflowsApi.getById(workflowId),
@@ -295,10 +439,7 @@ export function useCreateWorkflow() {
         queryKey: workflowKeys.forProject(variables.projectId),
       });
       // Add the new workflow to the cache
-      queryClient.setQueryData(
-        workflowKeys.byId(newWorkflow.id),
-        newWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.byId(newWorkflow.id), newWorkflow);
     },
     onError: (error) => {
       logApiError('Failed to create workflow:', error);
@@ -389,6 +530,29 @@ export function useStopWorkflow() {
 }
 
 /**
+ * Hook to merge workflow task branches
+ * @returns Mutation object for merging workflow branches
+ */
+export function useMergeWorkflow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: MergeWorkflowRequest) => workflowsApi.merge(data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(variables.workflow_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.all,
+      });
+    },
+    onError: (error) => {
+      logApiError('Failed to merge workflow:', error);
+    },
+  });
+}
+
+/**
  * Hook to delete a workflow
  * @returns Mutation object for deleting workflows
  */
@@ -432,7 +596,9 @@ export function useUpdateTaskStatus() {
     }) => workflowsApi.updateTaskStatus(workflowId, taskId, status),
     onMutate: async ({ workflowId, taskId, status }) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: workflowKeys.byId(workflowId) });
+      await queryClient.cancelQueries({
+        queryKey: workflowKeys.byId(workflowId),
+      });
 
       // Snapshot the previous value
       const previousWorkflow = queryClient.getQueryData<Workflow>(
@@ -463,7 +629,9 @@ export function useUpdateTaskStatus() {
     },
     onSettled: (_, __, { workflowId }) => {
       // Refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: workflowKeys.byId(workflowId) });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(workflowId),
+      });
     },
   });
 }

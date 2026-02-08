@@ -415,10 +415,12 @@ fn resolve_repo_file_path_for_editor(
         ));
     }
 
-    if relative_path
-        .components()
-        .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_) | Component::RootDir))
-    {
+    if relative_path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir
+        )
+    }) {
         return Err(ApiError::BadRequest(
             "file_path must stay within the selected repository".to_string(),
         ));
@@ -427,15 +429,33 @@ fn resolve_repo_file_path_for_editor(
     Ok(repo_path.join(relative_path))
 }
 
+fn resolve_editor_target_file_hint(
+    path: &FsPath,
+    fallback_is_file: bool,
+) -> Result<bool, ApiError> {
+    match std::fs::metadata(path) {
+        Ok(metadata) if metadata.is_file() => Ok(true),
+        Ok(metadata) if metadata.is_dir() => Ok(false),
+        Ok(_) => Err(ApiError::BadRequest(
+            "open-editor target must be a file or directory".to_string(),
+        )),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(fallback_is_file),
+        Err(err) => Err(ApiError::Io(err)),
+    }
+}
+
 #[cfg(test)]
 mod open_editor_path_tests {
-    use super::{
-        normalize_editor_repo_path, resolve_project_repo_for_editor,
-        resolve_repo_file_path_for_editor,
-    };
-    use db::models::repo::Repo;
     use std::path::Path;
+
+    use db::models::repo::Repo;
+    use tempfile::tempdir;
     use uuid::Uuid;
+
+    use super::{
+        normalize_editor_repo_path, resolve_editor_target_file_hint,
+        resolve_project_repo_for_editor, resolve_repo_file_path_for_editor,
+    };
 
     fn repo(path: &str, name: &str) -> Repo {
         Repo {
@@ -474,6 +494,31 @@ mod open_editor_path_tests {
         let normalized = normalize_editor_repo_path(r"C:\work\repo-a\");
         assert_eq!(normalized, "C:/work/repo-a");
     }
+
+    #[test]
+    fn resolves_directory_hint_from_existing_directory_path() {
+        let temp = tempdir().expect("temp dir");
+
+        let is_file = resolve_editor_target_file_hint(temp.path(), true).expect("hint");
+
+        assert!(
+            !is_file,
+            "existing directories must not be treated as files"
+        );
+    }
+
+    #[test]
+    fn falls_back_to_file_hint_for_non_existing_path() {
+        let temp = tempdir().expect("temp dir");
+        let missing_path = temp.path().join("missing-file.ts");
+
+        let is_file = resolve_editor_target_file_hint(missing_path.as_path(), true).expect("hint");
+
+        assert!(
+            is_file,
+            "missing targets should keep fallback file hint for remote semantics"
+        );
+    }
 }
 
 pub async fn open_project_in_editor(
@@ -488,7 +533,9 @@ pub async fn open_project_in_editor(
 
     let selected_repo = resolve_project_repo_for_editor(
         &repositories,
-        payload.as_ref().and_then(|request| request.git_repo_path.as_deref()),
+        payload
+            .as_ref()
+            .and_then(|request| request.git_repo_path.as_deref()),
     )?;
 
     let file_path = payload
@@ -496,10 +543,14 @@ pub async fn open_project_in_editor(
         .and_then(|request| request.file_path.as_deref())
         .filter(|value| !value.trim().is_empty());
 
-    let path = if let Some(file_path) = file_path {
-        resolve_repo_file_path_for_editor(selected_repo.path.as_path(), file_path)?
+    let (path, is_file_hint) = if let Some(file_path) = file_path {
+        let path = resolve_repo_file_path_for_editor(selected_repo.path.as_path(), file_path)?;
+        let is_file_hint = resolve_editor_target_file_hint(path.as_path(), true)?;
+        (path, is_file_hint)
     } else {
-        selected_repo.path.clone()
+        let path = selected_repo.path.clone();
+        let is_file_hint = resolve_editor_target_file_hint(path.as_path(), false)?;
+        (path, is_file_hint)
     };
 
     let editor_config = {
@@ -509,7 +560,7 @@ pub async fn open_project_in_editor(
     };
 
     match editor_config
-        .open_file_with_hint(&path, Some(file_path.is_some()))
+        .open_file_with_hint(&path, Some(is_file_hint))
         .await
     {
         Ok(url) => {

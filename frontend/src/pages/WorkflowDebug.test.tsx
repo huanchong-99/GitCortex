@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { WorkflowDebugPage } from './WorkflowDebug';
+import { WorkflowDebugPage, buildWorkflowDebugWsUrl } from './WorkflowDebug';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as useWorkflowsModule from '@/hooks/useWorkflows';
 import { I18nextProvider } from 'react-i18next';
@@ -28,7 +28,7 @@ const createUseWorkflowResult = (
     isLoading: false,
     error: null,
     ...overrides,
-  } as UseWorkflowResult);
+  }) as UseWorkflowResult;
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <I18nextProvider i18n={i18n}>
@@ -119,13 +119,29 @@ describe('WorkflowDebugPage', () => {
     } as any);
   });
 
+  describe('WebSocket URL', () => {
+    it('should use wss protocol on HTTPS pages', () => {
+      expect(
+        buildWorkflowDebugWsUrl({ protocol: 'https:', host: 'example.com' })
+      ).toBe('wss://example.com/api');
+    });
+
+    it('should use ws protocol on HTTP pages', () => {
+      expect(
+        buildWorkflowDebugWsUrl({ protocol: 'http:', host: 'localhost:5173' })
+      ).toBe('ws://localhost:5173/api');
+    });
+  });
+
   describe('Loading State', () => {
     it('should show loading message when data is loading', () => {
       useWorkflow.mockReturnValue(createUseWorkflowResult({ isLoading: true }));
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       render(<WorkflowDebugPage />, { wrapper });
-      expect(screen.getByText(i18n.t('workflow:workflowDebug.loading'))).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:workflowDebug.loading'))
+      ).toBeInTheDocument();
       expect(warnSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
     });
@@ -138,70 +154,98 @@ describe('WorkflowDebugPage', () => {
       );
 
       render(<WorkflowDebugPage />, { wrapper });
-      expect(screen.getByText(i18n.t('workflow:workflowDebug.error'))).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t('workflow:workflowDebug.error'))
+      ).toBeInTheDocument();
     });
   });
 
   describe('Success State', () => {
     it('should render workflow header', async () => {
-      useWorkflow.mockReturnValue(createUseWorkflowResult({ data: baseWorkflow }));
+      useWorkflow.mockReturnValue(
+        createUseWorkflowResult({ data: baseWorkflow })
+      );
 
       render(<WorkflowDebugPage />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('Test Workflow', { selector: 'h1' })).toBeInTheDocument();
+        expect(
+          screen.getByText('Test Workflow', { selector: 'h1' })
+        ).toBeInTheDocument();
         // Status is now displayed as a badge - there may be multiple "Running" texts
-        expect(screen.getAllByText(i18n.t('workflow:status.running')).length).toBeGreaterThan(0);
+        expect(
+          screen.getAllByText(i18n.t('workflow:status.running')).length
+        ).toBeGreaterThan(0);
       });
     });
 
     it('should render back button', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'created' } })
+        createUseWorkflowResult({
+          data: { ...baseWorkflow, name: 'Test', status: 'created' },
+        })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(i18n.t('workflow:workflowDebug.back'))).toBeInTheDocument();
+        expect(
+          screen.getByText(i18n.t('workflow:workflowDebug.back'))
+        ).toBeInTheDocument();
       });
     });
 
     it('should show start button when workflow is ready', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'ready' } })
+        createUseWorkflowResult({
+          data: { ...baseWorkflow, name: 'Test', status: 'ready' },
+        })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(i18n.t('workflow:workflowDebug.start'))).toBeInTheDocument();
+        expect(
+          screen.getByText(i18n.t('workflow:workflowDebug.start'))
+        ).toBeInTheDocument();
       });
     });
 
     it('should show pause and stop buttons when workflow is running', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'running' } })
+        createUseWorkflowResult({
+          data: { ...baseWorkflow, name: 'Test', status: 'running' },
+        })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(i18n.t('workflow:workflowDebug.pause'))).toBeInTheDocument();
-        expect(screen.getByText(i18n.t('workflow:workflowDebug.stop'))).toBeInTheDocument();
+        expect(
+          screen.getByText(i18n.t('workflow:workflowDebug.pause'))
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(i18n.t('workflow:workflowDebug.stop'))
+        ).toBeInTheDocument();
       });
     });
 
     it('should render tabs for pipeline and terminals views', async () => {
       useWorkflow.mockReturnValue(
-        createUseWorkflowResult({ data: { ...baseWorkflow, name: 'Test', status: 'ready' } })
+        createUseWorkflowResult({
+          data: { ...baseWorkflow, name: 'Test', status: 'ready' },
+        })
       );
 
       render(<WorkflowDebugPage />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(i18n.t('workflow:workflowDebug.tabs.pipeline'))).toBeInTheDocument();
-        expect(screen.getByText(i18n.t('workflow:workflowDebug.tabs.terminals'))).toBeInTheDocument();
+        expect(
+          screen.getByText(i18n.t('workflow:workflowDebug.tabs.pipeline'))
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(i18n.t('workflow:workflowDebug.tabs.terminals'))
+        ).toBeInTheDocument();
       });
     });
   });

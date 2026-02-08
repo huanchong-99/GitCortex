@@ -211,4 +211,38 @@ mod tests {
         let result = timeout(Duration::from_millis(100), rx.recv()).await;
         assert!(result.is_err()); // Timeout
     }
+
+    #[tokio::test]
+    async fn test_event_bridge_routes_topic_published_status_when_fanout_used() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let hub = Arc::new(SubscriptionHub::new(100));
+
+        let bridge = EventBridge::new(message_bus.clone(), hub.clone());
+        let _handle = bridge.spawn();
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Simulate orchestrator workflow topic subscriber present
+        let _orchestrator_sub = message_bus.subscribe("workflow:wf-fanout").await;
+        let mut ws_rx = hub.subscribe("wf-fanout").await;
+
+        message_bus
+            .publish_workflow_event(
+                "wf-fanout",
+                BusMessage::StatusUpdate {
+                    workflow_id: "wf-fanout".to_string(),
+                    status: "running".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+
+        let result = timeout(Duration::from_millis(100), ws_rx.recv()).await;
+        assert!(result.is_ok());
+
+        let event = result.unwrap().unwrap();
+        assert_eq!(event.event_type, WsEventType::WorkflowStatusChanged);
+        assert_eq!(event.payload["workflowId"], json!("wf-fanout"));
+        assert_eq!(event.payload["status"], json!("running"));
+    }
 }
