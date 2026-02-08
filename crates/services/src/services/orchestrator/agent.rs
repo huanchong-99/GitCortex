@@ -938,25 +938,41 @@ impl OrchestratorAgent {
         task: &db::models::WorkflowTask,
         terminal: &db::models::Terminal,
     ) -> String {
-        let mut instruction = format!("Start task: {} ({})", task.name, task.id);
+        let mut parts = vec![format!("Start task: {} ({})", task.name, task.id)];
 
         if let Some(description) = &task.description {
-            instruction.push_str("\n\nTask description:\n");
-            instruction.push_str(description);
+            let normalized = description
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            if !normalized.is_empty() {
+                parts.push(format!("Task description: {}", normalized));
+            }
         }
 
         if let Some(role) = &terminal.role {
-            instruction.push_str("\n\nYour role: ");
-            instruction.push_str(role);
+            let role = role.trim();
+            if !role.is_empty() {
+                parts.push(format!("Your role: {role}"));
+            }
         }
 
         if let Some(role_description) = &terminal.role_description {
-            instruction.push_str("\nRole description: ");
-            instruction.push_str(role_description);
+            let normalized = role_description
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            if !normalized.is_empty() {
+                parts.push(format!("Role description: {}", normalized));
+            }
         }
 
-        instruction.push_str("\n\nPlease proceed with the task.");
-        instruction
+        parts.push(
+            "Please start implementing immediately and continue until the task is complete."
+                .to_string(),
+        );
+
+        parts.join(" | ")
     }
 
     /// Auto-dispatches the first terminal for each task when workflow starts.

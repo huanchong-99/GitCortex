@@ -39,6 +39,53 @@ fn regex_captures<'a>(regex: Option<&'a Regex>, text: &'a str) -> Option<regex::
     regex.and_then(|compiled| compiled.captures(text))
 }
 
+pub(crate) fn normalize_text_for_detection(text: &str) -> String {
+    let mut normalized = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' {
+            match chars.peek().copied() {
+                // CSI sequence: ESC [ ... <final-byte>
+                Some('[') => {
+                    let _ = chars.next();
+                    for seq_ch in chars.by_ref() {
+                        if ('@'..='~').contains(&seq_ch) {
+                            break;
+                        }
+                    }
+                }
+                // OSC sequence: ESC ] ... BEL or ST(ESC \)
+                Some(']') => {
+                    let _ = chars.next();
+                    let mut last_was_esc = false;
+                    for seq_ch in chars.by_ref() {
+                        if seq_ch == '\u{7}' {
+                            break;
+                        }
+                        if last_was_esc && seq_ch == '\\' {
+                            break;
+                        }
+                        last_was_esc = seq_ch == '\u{1b}';
+                    }
+                }
+                // Unknown escape sequence, skip ESC byte only
+                _ => {}
+            }
+            continue;
+        }
+
+        // Remove non-printable control chars that can break regex detection
+        if ch.is_control() && ch != '\t' {
+            continue;
+        }
+
+        normalized.push(ch);
+    }
+
+    normalized
+}
+
 // ============================================================================
 // Prompt Types
 // ============================================================================
@@ -214,10 +261,19 @@ static YES_NO_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     )
 });
 
+/// Codex interactive confirmation prompt (requires y/n)
+/// Example: "Confirming apply_patch approach (1m 32s • esc to interrupt)"
+static CODEX_CONFIRM_APPROACH_RE: Lazy<Option<Regex>> = Lazy::new(|| {
+    compile_regex(
+        r"(?i)\bconfirming\s+apply_patch\s+approach\b",
+        "CODEX_CONFIRM_APPROACH_RE",
+    )
+});
+
 /// Enter confirmation detection
 static ENTER_CONFIRM_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     compile_regex(
-        r"(?i)(press|hit|tap)\s+(the\s+)?(enter|return)\b|\[enter\]|\benter\s+to\s+(continue|proceed|resume|exit|confirm)\b|\bpress\s+any\s+key\b|\bcontinue\?\s*$",
+        r"(?i)(press|hit|tap)\s+(the\s+)?(enter|return)\b|\[enter\]|\benter\s+to\s+(continue|proceed|resume|exit|confirm)\b|\bpress\s+any\s+key\b|\bcontinue\?\s*$|\bbypass\s+permissions\s+(on|off)\b.*\(shift\+tab\s+to\s+cycle\)",
         "ENTER_CONFIRM_RE",
     )
 });
@@ -269,8 +325,13 @@ impl PromptDetector {
     ///
     /// Returns `Some(DetectedPrompt)` if a prompt is detected.
     pub fn process_line(&mut self, line: &str) -> Option<DetectedPrompt> {
+        let normalized_line = normalize_text_for_detection(line);
+        if normalized_line.trim().is_empty() {
+            return None;
+        }
+
         // Add line to buffer
-        self.line_buffer.push(line.to_string());
+        self.line_buffer.push(normalized_line.clone());
 
         // Trim buffer if too large
         while self.line_buffer.len() > self.max_buffer_lines {
@@ -278,7 +339,7 @@ impl PromptDetector {
         }
 
         // Detect prompt from current line and buffer context
-        self.detect(line)
+        self.detect(&normalized_line)
     }
 
     /// Detect prompt type from a single line of output
@@ -291,6 +352,12 @@ impl PromptDetector {
     /// 5. Choice - single-line options
     /// 6. EnterConfirm - simple confirmation
     pub fn detect(&self, text: &str) -> Option<DetectedPrompt> {
+        let normalized_text = normalize_text_for_detection(text);
+        let text = normalized_text.trim();
+        if text.is_empty() {
+            return None;
+        }
+
         // Priority 1: Password detection (highest priority)
         if self.detect_password(text) {
             return Some(DetectedPrompt::new(
@@ -431,6 +498,7 @@ impl PromptDetector {
     /// Detect yes/no prompt
     fn detect_yes_no(&self, text: &str) -> bool {
         regex_is_match(YES_NO_RE.as_ref(), text)
+            || regex_is_match(CODEX_CONFIRM_APPROACH_RE.as_ref(), text)
     }
 
     /// Detect enter confirmation prompt
@@ -513,6 +581,12 @@ mod tests {
         // Verify it's classified as YesNo
         let prompt = detector.detect("Continue? [y/n]").unwrap();
         assert_eq!(prompt.kind, PromptKind::YesNo);
+
+        // Codex interactive confirmation prompt should also be treated as yes/no
+        let codex_prompt = detector
+            .detect("Confirming apply_patch approach (1m 32s • esc to interrupt)")
+            .unwrap();
+        assert_eq!(codex_prompt.kind, PromptKind::YesNo);
     }
 
     #[test]
@@ -635,5 +709,32 @@ mod tests {
         let missing_regex: Option<&Regex> = None;
         assert!(!regex_is_match(missing_regex, "anything"));
         assert!(regex_captures(missing_regex, "anything").is_none());
+    }
+
+    #[test]
+    fn test_normalize_text_for_detection_strips_ansi_sequences() {
+        let input = "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions on (shift+tab to cycle)\u{1b}[0m";
+        let normalized = normalize_text_for_detection(input);
+        assert_eq!(normalized, "⏵⏵ bypass permissions on (shift+tab to cycle)");
+    }
+
+    #[test]
+    fn test_detect_bypass_permissions_prompt_with_ansi() {
+        let detector = PromptDetector::new();
+        let text = "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions on (shift+tab to cycle)";
+        let prompt = detector
+            .detect(text)
+            .expect("bypass permissions prompt should be detected");
+        assert_eq!(prompt.kind, PromptKind::EnterConfirm);
+    }
+
+    #[test]
+    fn test_process_line_detects_bypass_permissions_prompt_with_ansi() {
+        let mut detector = PromptDetector::new();
+        let text = "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions off (shift+tab to cycle)";
+        let prompt = detector
+            .process_line(text)
+            .expect("ANSI prompt should be detected in streaming line processing");
+        assert_eq!(prompt.kind, PromptKind::EnterConfirm);
     }
 }

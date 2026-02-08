@@ -12,6 +12,8 @@ use std::{
     time::Duration,
 };
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use tokio::{
     sync::{RwLock, broadcast::error::RecvError, oneshot},
     task::JoinHandle,
@@ -21,11 +23,13 @@ use tokio::{
 use crate::services::{
     orchestrator::{
         message_bus::SharedMessageBus,
-        types::{PromptState, TerminalPromptEvent, TerminalPromptStateMachine},
+        types::{PromptDecision, PromptState, TerminalPromptEvent, TerminalPromptStateMachine},
     },
     terminal::{
         process::ProcessManager,
-        prompt_detector::{DetectedPrompt, PromptDetector},
+        prompt_detector::{
+            DetectedPrompt, PromptDetector, PromptKind, normalize_text_for_detection,
+        },
     },
 };
 
@@ -41,6 +45,26 @@ const PROMPT_STATE_TIMEOUT_SECS: i64 = 30;
 
 /// Minimum confidence threshold for publishing prompt events
 const MIN_CONFIDENCE_THRESHOLD: f32 = 0.7;
+
+/// Claude/Codex TUI bypass 权限提示（需按 Enter 继续）
+static BYPASS_PERMISSIONS_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\bbypass\s+permissions\s+(on|off)\b.*\(shift\+tab\s+to\s+cycle\)")
+        .expect("BYPASS_PERMISSIONS_PROMPT_RE must compile")
+});
+
+/// Codex interactive confirmation prompt (requires y/n)
+static CODEX_CONFIRM_APPLY_PATCH_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\bconfirming\s+apply_patch\s+approach\b")
+        .expect("CODEX_CONFIRM_APPLY_PATCH_RE must compile")
+});
+
+fn is_bypass_permissions_prompt(line: &str) -> bool {
+    BYPASS_PERMISSIONS_PROMPT_RE.is_match(line)
+}
+
+fn is_codex_apply_patch_confirmation(text: &str) -> bool {
+    CODEX_CONFIRM_APPLY_PATCH_RE.is_match(text)
+}
 
 // ============================================================================
 // Terminal Watch State
@@ -374,8 +398,94 @@ impl PromptWatcher {
         // Check and reset stale state
         state.check_and_reset_stale();
 
+        // Chunk-level fallback: Codex confirmation prompt can appear inside
+        // heavily ANSI-rendered TUI frames without clean newline boundaries.
+        // Detect directly from normalized chunk and auto-reply with "y".
+        let normalized_output = normalize_text_for_detection(output);
+        if state.auto_confirm
+            && !state.should_debounce()
+            && is_codex_apply_patch_confirmation(&normalized_output)
+        {
+            let decision = PromptDecision::llm_yes_no(
+                true,
+                "Auto-approve Codex apply_patch confirmation".to_string(),
+            );
+            let detected_prompt = DetectedPrompt::new(
+                PromptKind::YesNo,
+                normalized_output,
+                0.95,
+            );
+
+            state.last_detection = Some(Instant::now());
+            state.state_machine.on_prompt_detected(detected_prompt);
+            state.state_machine.on_response_sent(decision.clone());
+            state.detector.clear_buffer();
+
+            let response_terminal_id = state.terminal_id.clone();
+            let response_session_id = state.session_id.clone();
+
+            tracing::info!(
+                terminal_id = %response_terminal_id,
+                session_id = %response_session_id,
+                "Detected Codex apply_patch confirmation; sending direct auto-yes fallback"
+            );
+
+            drop(terminals);
+            self.message_bus
+                .publish_terminal_input(
+                    &response_terminal_id,
+                    &response_session_id,
+                    "y",
+                    Some(decision),
+                )
+                .await;
+            return;
+        }
+
         // Process each line
         for line in output.lines() {
+            let normalized_line = normalize_text_for_detection(line);
+
+            // 兜底逻辑：对 bypass permissions 提示直接回车，避免 workflow 卡死。
+            // 该提示在真实终端里常带 ANSI/控制序列，需先清洗再匹配。
+            if state.auto_confirm
+                && !state.should_debounce()
+                && is_bypass_permissions_prompt(&normalized_line)
+            {
+                let decision = PromptDecision::auto_enter();
+                let detected_prompt = DetectedPrompt::new(
+                    PromptKind::EnterConfirm,
+                    normalized_line.clone(),
+                    0.95,
+                );
+
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected bypass permissions prompt; sending direct auto-enter fallback"
+                );
+
+                // Publish input (drop lock first to avoid deadlock)
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+
             if let Some(prompt) = state.process_line(line) {
                 let event = TerminalPromptEvent {
                     terminal_id: state.terminal_id.clone(),
@@ -560,6 +670,112 @@ mod tests {
         watcher
             .process_output("unknown-term", "Press Enter to continue")
             .await;
+    }
+
+    #[tokio::test]
+    async fn test_process_output_bypass_prompt_auto_confirms_with_terminal_input() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        let bypass_line =
+            "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions on (shift+tab to cycle)\u{1b}[0m";
+
+        watcher.process_output("term-1", bypass_line).await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "\n");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_codex_apply_patch_confirmation_auto_yes() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        watcher
+            .process_output(
+                "term-1",
+                "Confirming apply_patch approach (1m 32s • esc to interrupt)",
+            )
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "y");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
     }
 
     #[tokio::test]
