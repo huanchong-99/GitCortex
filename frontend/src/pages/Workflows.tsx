@@ -532,28 +532,45 @@ export function Workflows() {
   }
 
   const handleCreateWorkflow = async (wizardConfig: WizardConfig) => {
-    // Use working directory from wizard config
-    const workingDir = wizardConfig.project.workingDirectory;
-    if (!workingDir) return;
+    const workingDir = wizardConfig.project.workingDirectory?.trim();
+    const fallbackProjectId = validProjectId;
 
     try {
-      // First, resolve the project ID from the working directory path
-      const resolveResponse = await fetch('/api/projects/resolve-by-path', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: workingDir }),
-      });
+      let projectId = fallbackProjectId;
 
-      if (!resolveResponse.ok) {
-        throw new Error('Failed to resolve project from path');
+      if (workingDir) {
+        try {
+          const resolveResponse = await fetch('/api/projects/resolve-by-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: workingDir }),
+          });
+
+          if (!resolveResponse.ok) {
+            throw new Error('Failed to resolve project from path');
+          }
+
+          const resolveData = await resolveResponse.json();
+          if (!resolveData.success || !resolveData.data?.projectId) {
+            throw new Error(resolveData.message || 'Failed to resolve project');
+          }
+
+          projectId = resolveData.data.projectId;
+        } catch (resolveError) {
+          if (!projectId) {
+            throw resolveError;
+          }
+
+          console.warn(
+            'Failed to resolve project from path, using selected project fallback:',
+            resolveError
+          );
+        }
       }
 
-      const resolveData = await resolveResponse.json();
-      if (!resolveData.success || !resolveData.data?.projectId) {
-        throw new Error(resolveData.message || 'Failed to resolve project');
+      if (!projectId) {
+        throw new Error('No project selected to create workflow');
       }
-
-      const projectId = resolveData.data.projectId;
 
       // Transform WizardConfig to CreateWorkflowRequest using the resolved project ID
       const request = wizardConfigToCreateRequest(projectId, wizardConfig);
@@ -571,7 +588,9 @@ export function Workflows() {
       setShowWizard(false);
     } catch (error) {
       console.error('Failed to create workflow:', error);
-      // Error is already handled by the mutation's onError callback
+      throw error instanceof Error
+        ? error
+        : new Error('Failed to create workflow');
     }
   };
 

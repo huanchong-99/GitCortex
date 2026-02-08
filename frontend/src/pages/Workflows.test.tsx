@@ -20,6 +20,89 @@ import type {
   WorkflowEventHandlers,
 } from '@/stores/wsStore';
 
+const workflowWizardMock = vi.hoisted(() => ({
+  submitConfig: {
+    project: {
+      workingDirectory: 'E:\\test\\test',
+      gitStatus: { isGitRepo: true, isDirty: false },
+    },
+    basic: {
+      name: 'Wizard Created Workflow',
+      description: 'created by mocked wizard',
+      taskCount: 1,
+      importFromKanban: false,
+    },
+    tasks: [
+      {
+        id: 'task-0',
+        name: 'Task 1',
+        description: 'First task',
+        branch: 'feat/task-1',
+        terminalCount: 1,
+      },
+    ],
+    models: [
+      {
+        id: 'model-1',
+        displayName: 'Claude 3.5',
+        apiType: 'anthropic',
+        baseUrl: 'https://api.anthropic.com',
+        apiKey: 'sk-ant-xxx',
+        modelId: 'claude-3-5-sonnet-20241022',
+        isVerified: true,
+      },
+    ],
+    terminals: [
+      {
+        id: 'term-1',
+        taskId: 'task-0',
+        orderIndex: 0,
+        cliTypeId: 'claude-code',
+        modelConfigId: 'model-1',
+      },
+    ],
+    commands: {
+      enabled: false,
+      presetIds: [],
+    },
+    advanced: {
+      orchestrator: { modelConfigId: 'model-1' },
+      errorTerminal: { enabled: false },
+      mergeTerminal: {
+        cliTypeId: 'claude-code',
+        modelConfigId: 'model-1',
+        runTestsBeforeMerge: true,
+        pauseOnConflict: true,
+      },
+      targetBranch: 'main',
+    },
+  },
+}));
+
+vi.mock('@/components/workflow/WorkflowWizard', () => ({
+  WorkflowWizard: ({
+    onComplete,
+    onCancel,
+  }: {
+    onComplete: (config: typeof workflowWizardMock.submitConfig) =>
+      | void
+      | Promise<void>;
+    onCancel: () => void;
+  }) => (
+    <div data-testid="mock-workflow-wizard">
+      <button
+        data-testid="mock-workflow-wizard-submit"
+        onClick={() => void onComplete(workflowWizardMock.submitConfig)}
+      >
+        Submit Mock Wizard
+      </button>
+      <button data-testid="mock-workflow-wizard-cancel" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  ),
+}));
+
 const wsStoreMock = vi.hoisted(() => ({
   sendPromptResponse: vi.fn(),
   workflowId: null as string | null | undefined,
@@ -895,6 +978,100 @@ describe('Workflows Page', () => {
 
       await waitFor(() => {
         expect(screen.queryByTestId('workflow-prompt-dialog')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Workflow Creation', () => {
+    it('falls back to selected project when resolve-by-path fails', async () => {
+      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.startsWith('/api/workflows?project_id=')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: [] }),
+          } as Response);
+        }
+
+        if (url === '/api/projects/resolve-by-path') {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: async () => ({ success: false, message: 'resolve failed' }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows') {
+          const body = init?.body ? JSON.parse(String(init.body)) : null;
+          expect(body?.projectId).toBe('proj-1');
+
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: {
+                ...mockCompletedWorkflowDetail,
+                id: 'workflow-new',
+                projectId: 'proj-1',
+                name: 'Wizard Created Workflow',
+                status: 'draft',
+              },
+            }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-new') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: {
+                ...mockCompletedWorkflowDetail,
+                id: 'workflow-new',
+                projectId: 'proj-1',
+                name: 'Wizard Created Workflow',
+                status: 'draft',
+              },
+            }),
+          } as Response);
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<Workflows />, { wrapper });
+
+      const createButton = await screen.findByRole('button', {
+        name: 'Create Workflow',
+      });
+      fireEvent.click(createButton);
+
+      const submitButton = await screen.findByTestId(
+        'mock-workflow-wizard-submit'
+      );
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/projects/resolve-by-path',
+          expect.objectContaining({ method: 'POST' })
+        );
+      });
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows',
+          expect.objectContaining({ method: 'POST' })
+        );
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId('mock-workflow-wizard')
+        ).not.toBeInTheDocument();
       });
     });
   });
