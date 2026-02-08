@@ -1420,8 +1420,9 @@ mod tests {
 
         let options = SqliteConnectOptions::from_str(":memory:")
             .unwrap()
-            .pragma("foreign_keys", "0");
+            .pragma("foreign_keys", "ON");
         let pool = SqlitePoolOptions::new()
+            .max_connections(1)
             .connect_with(options)
             .await
             .unwrap();
@@ -1430,6 +1431,36 @@ mod tests {
         migrator.run(&pool).await.unwrap();
 
         let db = Arc::new(DBService { pool });
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS terminal_log (
+                id TEXT PRIMARY KEY,
+                terminal_id TEXT NOT NULL,
+                log_type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS terminal (
+                id TEXT PRIMARY KEY NOT NULL,
+                workflow_task_id TEXT NOT NULL,
+                cli_type_id TEXT NOT NULL,
+                model_config_id TEXT NOT NULL,
+                order_index INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'not_started',
+                auto_confirm INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
 
         let project_id = Uuid::new_v4();
         sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
@@ -1474,7 +1505,7 @@ mod tests {
         .unwrap();
 
         sqlx::query(
-            "INSERT INTO terminal (id, workflow_task_id, cli_type_id, model_config_id, order_index, status, auto_confirm, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT OR IGNORE INTO terminal (id, workflow_task_id, cli_type_id, model_config_id, order_index, status, auto_confirm, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(terminal_id)
         .bind(&workflow_task_id)
