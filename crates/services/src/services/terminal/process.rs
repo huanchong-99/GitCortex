@@ -1413,7 +1413,7 @@ impl TerminalLogger {
 mod tests {
     use super::*;
 
-    async fn setup_logger_test_db_with_terminal(terminal_id: &str) -> Arc<DBService> {
+    async fn setup_logger_test_db_with_terminal(_terminal_id: &str) -> Arc<DBService> {
         use std::str::FromStr;
 
         use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -1427,13 +1427,10 @@ mod tests {
             .await
             .unwrap();
 
-        let migrator = sqlx::migrate!("../db/migrations");
-        migrator.run(&pool).await.unwrap();
-
         let db = Arc::new(DBService { pool });
 
         sqlx::query(
-            "CREATE TABLE IF NOT EXISTS terminal_log (
+            "CREATE TABLE terminal_log (
                 id TEXT PRIMARY KEY,
                 terminal_id TEXT NOT NULL,
                 log_type TEXT NOT NULL,
@@ -1441,81 +1438,6 @@ mod tests {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )",
         )
-        .execute(&db.pool)
-        .await
-        .unwrap();
-
-        sqlx::query(
-            "CREATE TABLE IF NOT EXISTS terminal (
-                id TEXT PRIMARY KEY NOT NULL,
-                workflow_task_id TEXT NOT NULL,
-                cli_type_id TEXT NOT NULL,
-                model_config_id TEXT NOT NULL,
-                order_index INTEGER NOT NULL,
-                status TEXT NOT NULL DEFAULT 'not_started',
-                auto_confirm INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-            )",
-        )
-        .execute(&db.pool)
-        .await
-        .unwrap();
-
-        let project_id = Uuid::new_v4();
-        sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
-            .bind(project_id)
-            .bind("test-project")
-            .bind(chrono::Utc::now())
-            .bind(chrono::Utc::now())
-            .execute(&db.pool)
-            .await
-            .unwrap();
-
-        let workflow_id = Uuid::new_v4().to_string();
-        sqlx::query(
-            "INSERT INTO workflow (id, project_id, name, status, merge_terminal_cli_id, merge_terminal_model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        )
-        .bind(&workflow_id)
-        .bind(project_id)
-        .bind("test-workflow")
-        .bind("created")
-        .bind("cli-claude-code")
-        .bind("model-claude-sonnet")
-        .bind(chrono::Utc::now())
-        .bind(chrono::Utc::now())
-        .execute(&db.pool)
-        .await
-        .unwrap();
-
-        let workflow_task_id = Uuid::new_v4().to_string();
-        sqlx::query(
-            "INSERT INTO workflow_task (id, workflow_id, name, branch, order_index, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        )
-        .bind(&workflow_task_id)
-        .bind(&workflow_id)
-        .bind("task-1")
-        .bind("main")
-        .bind(0)
-        .bind("pending")
-        .bind(chrono::Utc::now())
-        .bind(chrono::Utc::now())
-        .execute(&db.pool)
-        .await
-        .unwrap();
-
-        sqlx::query(
-            "INSERT OR IGNORE INTO terminal (id, workflow_task_id, cli_type_id, model_config_id, order_index, status, auto_confirm, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(terminal_id)
-        .bind(&workflow_task_id)
-        .bind("cli-claude-code")
-        .bind("model-claude-sonnet")
-        .bind(0)
-        .bind("waiting")
-        .bind(true)
-        .bind(chrono::Utc::now())
-        .bind(chrono::Utc::now())
         .execute(&db.pool)
         .await
         .unwrap();
