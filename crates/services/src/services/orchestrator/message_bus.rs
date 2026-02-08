@@ -238,11 +238,65 @@ impl MessageBus {
             input: input.to_string(),
             decision,
         };
-        // Publish to terminal-specific topic for targeted routing
+
+        // Publish to terminal-specific topic first (preferred path for PTY routing).
+        // If no terminal-input subscriber is present, fall back to legacy session topic.
+        // This avoids silent drop while preventing duplicate PTY delivery.
         let topic = format!("{}{}", TERMINAL_INPUT_TOPIC_PREFIX, terminal_id);
-        let _ = self.publish(&topic, message.clone()).await;
+        let topic_subscriber_count = self.subscriber_count(&topic).await;
+
+        if topic_subscriber_count > 0 {
+            if let Err(err) = self.publish(&topic, message.clone()).await {
+                tracing::error!(
+                    ?err,
+                    terminal_id = %terminal_id,
+                    session_id = %session_id,
+                    topic = %topic,
+                    "Failed to publish terminal input to primary topic"
+                );
+            }
+        } else {
+            let fallback_topic = session_id.to_string();
+            let fallback_subscriber_count = self.subscriber_count(&fallback_topic).await;
+
+            if fallback_subscriber_count > 0 {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    session_id = %session_id,
+                    primary_topic = %topic,
+                    fallback_topic = %fallback_topic,
+                    "No primary terminal-input subscribers; falling back to legacy session topic"
+                );
+
+                if let Err(err) = self.publish(&fallback_topic, message.clone()).await {
+                    tracing::error!(
+                        ?err,
+                        terminal_id = %terminal_id,
+                        session_id = %session_id,
+                        topic = %fallback_topic,
+                        "Failed to publish terminal input to fallback topic"
+                    );
+                }
+            } else {
+                tracing::error!(
+                    terminal_id = %terminal_id,
+                    session_id = %session_id,
+                    primary_topic = %topic,
+                    fallback_topic = %fallback_topic,
+                    "Dropping terminal input: no primary or fallback subscribers"
+                );
+            }
+        }
+
         // Also broadcast for legacy compatibility
-        let _ = self.broadcast(message);
+        if let Err(err) = self.broadcast(message) {
+            tracing::debug!(
+                ?err,
+                terminal_id = %terminal_id,
+                session_id = %session_id,
+                "Terminal-input broadcast skipped because no broadcast subscribers are active"
+            );
+        }
     }
 
     /// Publishes a terminal prompt decision for UI updates.
@@ -270,3 +324,87 @@ impl Default for MessageBus {
 }
 
 pub type SharedMessageBus = Arc<MessageBus>;
+
+#[cfg(test)]
+mod tests {
+    use tokio::time::{Duration, timeout};
+
+    use super::{BusMessage, MessageBus};
+
+    #[tokio::test]
+    async fn publish_terminal_input_falls_back_to_legacy_topic_without_primary_subscribers() {
+        let bus = MessageBus::new(8);
+        let mut legacy_rx = bus.subscribe("session-1").await;
+        let mut broadcast_rx = bus.subscribe_broadcast();
+
+        bus.publish_terminal_input("term-1", "session-1", "y", None)
+            .await;
+
+        let legacy_message = timeout(Duration::from_millis(200), legacy_rx.recv())
+            .await
+            .expect("expected legacy topic message")
+            .expect("legacy topic channel should be open");
+
+        assert!(matches!(
+            legacy_message,
+            BusMessage::TerminalInput {
+                ref terminal_id,
+                ref session_id,
+                ref input,
+                ..
+            } if terminal_id == "term-1" && session_id == "session-1" && input == "y"
+        ));
+
+        let broadcast_message = timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected broadcast message")
+            .expect("broadcast channel should be open");
+
+        assert!(matches!(
+            broadcast_message,
+            BusMessage::TerminalInput { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn publish_terminal_input_prefers_primary_topic_without_legacy_duplicate() {
+        let bus = MessageBus::new(8);
+        let mut primary_rx = bus.subscribe("terminal.input.term-1").await;
+        let mut legacy_rx = bus.subscribe("session-1").await;
+        let mut broadcast_rx = bus.subscribe_broadcast();
+
+        bus.publish_terminal_input("term-1", "session-1", "n", None)
+            .await;
+
+        let primary_message = timeout(Duration::from_millis(200), primary_rx.recv())
+            .await
+            .expect("expected primary topic message")
+            .expect("primary topic channel should be open");
+
+        assert!(matches!(
+            primary_message,
+            BusMessage::TerminalInput {
+                ref terminal_id,
+                ref session_id,
+                ref input,
+                ..
+            } if terminal_id == "term-1" && session_id == "session-1" && input == "n"
+        ));
+
+        let legacy_message = timeout(Duration::from_millis(100), legacy_rx.recv()).await;
+        assert!(
+            legacy_message.is_err(),
+            "legacy topic should not receive duplicate terminal input when primary subscribers exist"
+        );
+
+        let broadcast_message = timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected broadcast message")
+            .expect("broadcast channel should be open");
+
+        assert!(matches!(
+            broadcast_message,
+            BusMessage::TerminalInput { .. }
+        ));
+    }
+}

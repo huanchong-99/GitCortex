@@ -376,6 +376,39 @@ impl OrchestratorRuntime {
         start_result
     }
 
+    /// Submit user response for an interactive prompt in a running workflow.
+    ///
+    /// Looks up the running agent by workflow_id and forwards the response.
+    /// The runtime lock is released before awaiting agent handling.
+    /// Returns an error when the workflow is not running or the terminal is not awaiting approval.
+    pub async fn submit_user_prompt_response(
+        &self,
+        workflow_id: &str,
+        terminal_id: &str,
+        user_response: &str,
+    ) -> Result<()> {
+        let agent = {
+            let running = self.running_workflows.lock().await;
+            let running_workflow = running
+                .get(workflow_id)
+                .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?;
+
+            Arc::clone(&running_workflow.agent)
+        };
+
+        agent
+            .handle_user_prompt_response(terminal_id, user_response)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to submit user prompt response for workflow {} and terminal {}: {}",
+                    workflow_id,
+                    terminal_id,
+                    e
+                )
+            })
+    }
+
     /// Stop orchestrating a workflow
     ///
     /// Sends shutdown signal to the agent and waits for graceful shutdown.
@@ -580,7 +613,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::services::orchestrator::MessageBus;
+    use crate::services::orchestrator::{MessageBus, MockLLMClient};
 
     async fn setup_runtime_with_ready_workflow() -> (Arc<OrchestratorRuntime>, String) {
         let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
@@ -691,9 +724,10 @@ mod tests {
         let non_guard_error_count = results
             .iter()
             .filter(|result| {
-                result.as_ref().err().is_some_and(|error| {
-                    !error.to_string().contains("already running")
-                })
+                result
+                    .as_ref()
+                    .err()
+                    .is_some_and(|error| !error.to_string().contains("already running"))
             })
             .count();
 
@@ -721,5 +755,65 @@ mod tests {
         if runtime.is_running(&workflow_id).await {
             runtime.stop_workflow(&workflow_id).await.unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn test_submit_user_prompt_response_returns_error_when_workflow_not_running() {
+        let (runtime, workflow_id) = setup_runtime_with_ready_workflow().await;
+
+        let result = runtime
+            .submit_user_prompt_response(&workflow_id, "terminal-1", "approve")
+            .await;
+
+        let error = result.expect_err("workflow not running should return error");
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("Workflow {} is not running", workflow_id))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_submit_user_prompt_response_forwards_to_running_agent() {
+        let (runtime, workflow_id) = setup_runtime_with_ready_workflow().await;
+
+        let agent = Arc::new(
+            OrchestratorAgent::with_llm_client(
+                OrchestratorConfig::default(),
+                workflow_id.clone(),
+                runtime.message_bus.clone(),
+                runtime.db.clone(),
+                Box::new(MockLLMClient::new()),
+            )
+            .expect("should create test agent"),
+        );
+
+        let task_handle = tokio::spawn(async {});
+        {
+            let mut running = runtime.running_workflows.lock().await;
+            running.insert(workflow_id.clone(), RunningWorkflow { agent, task_handle });
+        }
+
+        let terminal_id = "terminal-missing";
+        let result = runtime
+            .submit_user_prompt_response(&workflow_id, terminal_id, "approve")
+            .await;
+
+        let error = result.expect_err("running workflow should forward to agent");
+        let error_text = error.to_string();
+        assert!(
+            error_text.contains("Failed to submit user prompt response for workflow"),
+            "unexpected error: {error_text}"
+        );
+        assert!(
+            error_text.contains(terminal_id),
+            "unexpected error: {error_text}"
+        );
+        assert!(
+            !error_text.contains("is not running"),
+            "unexpected error: {error_text}"
+        );
+
+        runtime.stop_workflow(&workflow_id).await.unwrap();
     }
 }

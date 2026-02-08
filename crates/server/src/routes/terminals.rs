@@ -405,64 +405,53 @@ pub async fn start_terminal(
     }
 
     // Register PromptWatcher for background prompt detection
-    // This enables auto-confirm to work even without WebSocket connection
+    // This enables both auto-confirm and AskUser prompt handling without WebSocket connection
     // Use handle.session_id (the actual PTY session) not terminal.pty_session_id (stale DB value)
-    if !terminal.auto_confirm {
-        deployment.prompt_watcher().unregister(&id).await;
-        tracing::debug!(
-            terminal_id = %id,
-            "Skipped PromptWatcher registration because auto_confirm is disabled"
-        );
-    } else {
-        match db::models::WorkflowTask::find_by_id(
-            &deployment.db().pool,
-            &terminal.workflow_task_id,
-        )
+    match db::models::WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id)
         .await
-        {
-            Ok(Some(task)) => {
-                if let Err(e) = deployment
-                    .prompt_watcher()
-                    .register(
-                        &id,
-                        &task.workflow_id,
-                        &terminal.workflow_task_id,
-                        &handle.session_id,
-                        terminal.auto_confirm,
-                    )
-                    .await
-                {
-                    tracing::warn!(
-                        terminal_id = %id,
-                        workflow_id = %task.workflow_id,
-                        pty_session_id = %handle.session_id,
-                        error = %e,
-                        "Failed to register PromptWatcher for background prompt detection"
-                    );
-                } else {
-                    tracing::info!(
-                        terminal_id = %id,
-                        workflow_id = %task.workflow_id,
-                        pty_session_id = %handle.session_id,
-                        "PromptWatcher registered for background prompt detection"
-                    );
-                }
-            }
-            Ok(None) => {
+    {
+        Ok(Some(task)) => {
+            if let Err(e) = deployment
+                .prompt_watcher()
+                .register(
+                    &id,
+                    &task.workflow_id,
+                    &terminal.workflow_task_id,
+                    &handle.session_id,
+                    terminal.auto_confirm,
+                )
+                .await
+            {
                 tracing::warn!(
                     terminal_id = %id,
-                    workflow_task_id = %terminal.workflow_task_id,
-                    "Skipped PromptWatcher registration: workflow task not found"
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    terminal_id = %id,
-                    workflow_task_id = %terminal.workflow_task_id,
+                    workflow_id = %task.workflow_id,
+                    pty_session_id = %handle.session_id,
                     error = %e,
-                    "Failed to query workflow task for PromptWatcher registration (non-fatal)"
+                    "Failed to register PromptWatcher for background prompt detection"
+                );
+            } else {
+                tracing::info!(
+                    terminal_id = %id,
+                    workflow_id = %task.workflow_id,
+                    pty_session_id = %handle.session_id,
+                    "PromptWatcher registered for background prompt detection"
                 );
             }
+        }
+        Ok(None) => {
+            tracing::warn!(
+                terminal_id = %id,
+                workflow_task_id = %terminal.workflow_task_id,
+                "Skipped PromptWatcher registration: workflow task not found"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                terminal_id = %id,
+                workflow_task_id = %terminal.workflow_task_id,
+                error = %e,
+                "Failed to query workflow task for PromptWatcher registration (non-fatal)"
+            );
         }
     }
 

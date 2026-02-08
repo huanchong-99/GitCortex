@@ -482,22 +482,6 @@ async fn sync_prompt_watcher_registration(
         }
     };
 
-    if !terminal.auto_confirm {
-        if prompt_watcher.is_registered(terminal_id).await {
-            prompt_watcher.unregister(terminal_id).await;
-            tracing::info!(
-                terminal_id = %terminal_id,
-                "Unregistered prompt watcher because auto_confirm is disabled"
-            );
-        } else {
-            tracing::trace!(
-                terminal_id = %terminal_id,
-                "Prompt watcher remains disabled because auto_confirm is false"
-            );
-        }
-        return;
-    }
-
     if prompt_watcher.is_registered(terminal_id).await {
         tracing::trace!(
             terminal_id = %terminal_id,

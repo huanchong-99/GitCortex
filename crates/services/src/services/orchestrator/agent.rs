@@ -1307,6 +1307,72 @@ impl OrchestratorAgent {
             .await
     }
 
+    /// Handle user response for an interactive terminal prompt.
+    ///
+    /// Wrapper around PromptHandler::handle_user_approval that resolves
+    /// workflow_id and terminal session_id from the agent/database context.
+    pub async fn handle_user_prompt_response(
+        &self,
+        terminal_id: &str,
+        user_response: &str,
+    ) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        let terminal = db::models::Terminal::find_by_id(&self.db.pool, terminal_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get terminal: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
+
+        let workflow_task_id = terminal.workflow_task_id.clone();
+        let task = db::models::WorkflowTask::find_by_id(&self.db.pool, &workflow_task_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get workflow task: {e}"))?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Workflow task {} not found for terminal {}",
+                    workflow_task_id,
+                    terminal_id
+                )
+            })?;
+
+        if task.workflow_id != workflow_id {
+            return Err(anyhow!(
+                "Terminal {} does not belong to workflow {}",
+                terminal_id,
+                workflow_id
+            ));
+        }
+
+        let session_id = terminal
+            .pty_session_id
+            .or(terminal.session_id)
+            .filter(|id| !id.trim().is_empty())
+            .ok_or_else(|| {
+                anyhow!(
+                    "Terminal {} has no session_id for prompt response",
+                    terminal_id
+                )
+            })?;
+
+        let handled = self
+            .prompt_handler
+            .handle_user_prompt_response(terminal_id, &session_id, &workflow_id, user_response)
+            .await;
+
+        if !handled {
+            return Err(anyhow!(
+                "Terminal {} is not waiting for prompt approval in workflow {}",
+                terminal_id,
+                workflow_id
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Execute slash commands for this workflow
     ///
     /// Loads all slash commands associated with the workflow, renders their

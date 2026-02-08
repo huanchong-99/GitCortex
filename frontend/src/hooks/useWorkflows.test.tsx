@@ -1,11 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const { mockLogApiError } = vi.hoisted(() => ({
+  mockLogApiError: vi.fn(),
+}));
+
+vi.mock('@/lib/api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
+  return {
+    ...actual,
+    logApiError: mockLogApiError,
+  };
+});
+
 import {
   useWorkflows,
   useWorkflow,
   useCreateWorkflow,
   useStartWorkflow,
+  useSubmitWorkflowPromptResponse,
   useMergeWorkflow,
   useDeleteWorkflow,
   getWorkflowActions,
@@ -387,6 +401,72 @@ describe('useMergeWorkflow', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: workflowKeys.all,
     });
+  });
+});
+
+describe('useSubmitWorkflowPromptResponse', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should submit prompt response and invalidate workflow cache', async () => {
+    const queryClient = createMockQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const fetchMock = vi.fn(() => createSuccessResponse(undefined));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useSubmitWorkflowPromptResponse(), {
+      wrapper: scopedWrapper,
+    });
+
+    result.current.mutate({
+      workflow_id: 'workflow-1',
+      terminal_id: 'terminal-1',
+      response: 'yes',
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/workflows/workflow-1/prompts/respond',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          terminal_id: 'terminal-1',
+          response: 'yes',
+        }),
+      })
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.byId('workflow-1'),
+    });
+  });
+
+  it('should log error when submitting prompt response fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => createErrorResponse('Submit failed')));
+
+    const { result } = renderHook(() => useSubmitWorkflowPromptResponse(), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      workflow_id: 'workflow-1',
+      terminal_id: 'terminal-1',
+      response: 'yes',
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(mockLogApiError).toHaveBeenCalledWith(
+      'Failed to submit workflow prompt response:',
+      expect.any(Error)
+    );
   });
 });
 

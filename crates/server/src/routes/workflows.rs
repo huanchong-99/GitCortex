@@ -128,6 +128,10 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/{workflow_id}/start", post(start_workflow))
         .route("/{workflow_id}/pause", post(pause_workflow))
         .route("/{workflow_id}/stop", post(stop_workflow))
+        .route(
+            "/{workflow_id}/prompts/respond",
+            post(submit_prompt_response),
+        )
         .route("/{workflow_id}/merge", post(merge_workflow))
         .route("/{workflow_id}/tasks", get(list_workflow_tasks))
         .route(
@@ -895,11 +899,6 @@ async fn refresh_prompt_watcher_registrations(deployment: &DeploymentImpl, workf
         .collect();
 
     for terminal in terminals {
-        if !terminal.auto_confirm {
-            deployment.prompt_watcher().unregister(&terminal.id).await;
-            continue;
-        }
-
         let Some(session_id) = terminal
             .pty_session_id
             .clone()
@@ -1328,6 +1327,14 @@ pub struct UpdateTaskStatusRequest {
     pub status: String,
 }
 
+/// Request body for submitting interactive prompt response
+#[derive(Debug, Deserialize)]
+pub struct SubmitPromptResponseRequest {
+    #[serde(rename = "terminalId", alias = "terminal_id")]
+    pub terminal_id: String,
+    pub response: String,
+}
+
 /// PUT /api/workflows/:workflow_id/tasks/:task_id/status
 /// Update task status (for Kanban drag-and-drop)
 async fn update_task_status(
@@ -1399,6 +1406,67 @@ async fn list_task_terminals(
 
     let terminals = Terminal::find_by_task(&deployment.db().pool, &task_id).await?;
     Ok(ResponseJson(ApiResponse::success(terminals)))
+}
+
+/// POST /api/workflows/:workflow_id/prompts/respond
+/// Submit user response for interactive terminal prompt
+async fn submit_prompt_response(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+    Json(payload): Json<SubmitPromptResponseRequest>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let terminal_id = payload.terminal_id.trim();
+    if terminal_id.is_empty() {
+        return Err(ApiError::BadRequest("terminalId is required".to_string()));
+    }
+
+    let response = payload.response.trim();
+    if response.is_empty() {
+        return Err(ApiError::BadRequest("response is required".to_string()));
+    }
+
+    let _workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    let terminal = Terminal::find_by_id(&deployment.db().pool, terminal_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Terminal not found".to_string()))?;
+
+    let task = WorkflowTask::find_by_id(&deployment.db().pool, &terminal.workflow_task_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow task not found".to_string()))?;
+
+    validate_task_workflow_scope(&task, &workflow_id)?;
+
+    let runtime = deployment.orchestrator_runtime();
+    if !runtime.is_running(&workflow_id).await {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot submit prompt response: workflow '{}' is not running",
+            workflow_id
+        )));
+    }
+
+    runtime
+        .submit_user_prompt_response(&workflow_id, terminal_id, response)
+        .await
+        .map_err(|e| {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                terminal_id = %terminal_id,
+                error = %e,
+                "Failed to submit prompt response"
+            );
+            ApiError::BadRequest(format!("Failed to submit prompt response: {e}"))
+        })?;
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        terminal_id = %terminal_id,
+        "Submitted prompt response"
+    );
+
+    Ok(ResponseJson(ApiResponse::success(())))
 }
 
 /// POST /api/workflows/:workflow_id/merge
@@ -1730,5 +1798,94 @@ mod workflow_guard_tests {
             validate_task_workflow_scope(&task, "wf-2"),
             Err(ApiError::BadRequest(_))
         ));
+    }
+}
+
+#[cfg(test)]
+mod prompt_response_route_tests {
+    use axum::{
+        body::{Body, to_bytes},
+        http::{Request, StatusCode},
+    };
+    use deployment::Deployment;
+    use serde_json::json;
+    use tower::ServiceExt;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn submit_prompt_response_requires_terminal_id() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+
+        let app = workflows_routes().with_state(deployment);
+        let payload = json!({
+            "terminalId": "   ",
+            "response": "yes"
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/prompts/respond")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let body_json: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse response JSON");
+        assert_eq!(
+            body_json.get("message").and_then(serde_json::Value::as_str),
+            Some("terminalId is required")
+        );
+    }
+
+    #[tokio::test]
+    async fn submit_prompt_response_requires_response() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+
+        let app = workflows_routes().with_state(deployment);
+        let payload = json!({
+            "terminalId": "terminal-1",
+            "response": "   "
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/prompts/respond")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let body_json: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse response JSON");
+        assert_eq!(
+            body_json.get("message").and_then(serde_json::Value::as_str),
+            Some("response is required")
+        );
     }
 }

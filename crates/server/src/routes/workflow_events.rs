@@ -305,6 +305,8 @@ impl WsEvent {
             BusMessage::TerminalPromptDetected(event) => {
                 let workflow_id = event.workflow_id;
                 let terminal_id = event.terminal_id;
+                let task_id = event.task_id;
+                let session_id = event.session_id;
                 let prompt_kind = prompt_kind_to_wire(event.prompt.kind);
                 let legacy_prompt_kind = format!("{:?}", event.prompt.kind);
                 let prompt_text = event.prompt.raw_text;
@@ -320,6 +322,8 @@ impl WsEvent {
                 let payload = json!({
                     "workflowId": workflow_id,
                     "terminalId": terminal_id,
+                    "taskId": task_id,
+                    "sessionId": session_id,
                     "promptKind": prompt_kind,
                     "promptText": prompt_text,
                     "confidence": confidence,
@@ -329,6 +333,8 @@ impl WsEvent {
                     "selectedIndex": selected_index,
                     "workflow_id": workflow_id,
                     "terminal_id": terminal_id,
+                    "task_id": task_id,
+                    "session_id": session_id,
                     "prompt_kind": prompt_kind,
                     "prompt_text": prompt_text,
                     "has_dangerous_keywords": has_dangerous_keywords,
@@ -570,6 +576,8 @@ mod tests {
         assert_eq!(event.event_type, WsEventType::TerminalPromptDetected);
         assert_eq!(event.payload["workflowId"], "wf-123");
         assert_eq!(event.payload["terminalId"], "term-789");
+        assert_eq!(event.payload["taskId"], "task-456");
+        assert_eq!(event.payload["sessionId"], "session-111");
         assert_eq!(event.payload["promptKind"], "arrow_select");
         assert_eq!(event.payload["promptText"], "Select option");
         assert_eq!(event.payload["hasDangerousKeywords"], false);
@@ -579,6 +587,8 @@ mod tests {
         assert_eq!(event.payload["optionDetails"][1]["selected"], true);
         assert_eq!(event.payload["workflow_id"], "wf-123");
         assert_eq!(event.payload["terminal_id"], "term-789");
+        assert_eq!(event.payload["task_id"], "task-456");
+        assert_eq!(event.payload["session_id"], "session-111");
         assert_eq!(event.payload["prompt_kind"], "arrow_select");
         assert_eq!(event.payload["prompt_text"], "Select option");
         assert_eq!(event.payload["selected_index"], 1);
@@ -703,6 +713,14 @@ mod tests {
         assert_eq!(
             prompt_detected.payload["terminalId"],
             prompt_detected.payload["terminal_id"]
+        );
+        assert_eq!(
+            prompt_detected.payload["taskId"],
+            prompt_detected.payload["task_id"]
+        );
+        assert_eq!(
+            prompt_detected.payload["sessionId"],
+            prompt_detected.payload["session_id"]
         );
         assert_eq!(
             prompt_detected.payload["promptKind"],

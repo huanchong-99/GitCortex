@@ -48,6 +48,12 @@ interface WorkflowScopedConnection {
   lastHeartbeat: Date | null;
 }
 
+export interface TerminalPromptResponsePayload {
+  workflowId: string;
+  terminalId: string;
+  response: string;
+}
+
 interface WsState {
   // State
   connectionStatus: ConnectionStatus;
@@ -72,6 +78,7 @@ interface WsState {
   disconnectWorkflow: (workflowId: string) => void;
   disconnect: () => void;
   send: (message: WsMessage) => void;
+  sendPromptResponse: (payload: TerminalPromptResponsePayload) => void;
   subscribe: (eventType: string, handler: MessageHandler) => () => void;
   subscribeToWorkflow: (
     workflowId: string,
@@ -300,6 +307,24 @@ function normalizePromptOptions(payload: JsonRecord): {
   };
 }
 
+function extractPromptEventContext(
+  payload: JsonRecord
+): Pick<PromptEventContext, 'taskId' | 'sessionId'> {
+  const context: Pick<PromptEventContext, 'taskId' | 'sessionId'> = {};
+
+  const taskId = getStringField(payload, 'taskId', 'task_id');
+  if (taskId) {
+    context.taskId = taskId;
+  }
+
+  const sessionId = getStringField(payload, 'sessionId', 'session_id');
+  if (sessionId) {
+    context.sessionId = sessionId;
+  }
+
+  return context;
+}
+
 function normalizeTerminalCompletedPayload(payload: unknown): unknown {
   if (!isJsonRecord(payload)) {
     return payload;
@@ -348,6 +373,7 @@ function normalizeTerminalPromptDetectedPayload(payload: unknown): unknown {
   const rawPromptKind = getStringField(payload, 'promptKind', 'prompt_kind');
   const normalizedPromptKind = normalizePromptKindValue(rawPromptKind);
   const { options, optionDetails } = normalizePromptOptions(payload);
+  const promptContext = extractPromptEventContext(payload);
 
   let selectedIndex = getNumberField(
     payload,
@@ -361,6 +387,7 @@ function normalizeTerminalPromptDetectedPayload(payload: unknown): unknown {
   const normalizedPayload: TerminalPromptDetectedPayload = {
     workflowId,
     terminalId,
+    ...promptContext,
     promptKind: normalizedPromptKind,
     promptText:
       getStringField(
@@ -431,6 +458,8 @@ function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
     return payload;
   }
 
+  const promptContext = extractPromptEventContext(payload);
+
   const decisionSource = payload.decision;
 
   if (typeof decisionSource === 'string') {
@@ -445,6 +474,7 @@ function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
     const normalizedPayload: TerminalPromptDecisionPayload = {
       workflowId,
       terminalId,
+      ...promptContext,
       decision: normalizedDecision,
     };
 
@@ -470,6 +500,7 @@ function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
     const normalizedPayload: TerminalPromptDecisionPayload = {
       workflowId,
       terminalId,
+      ...promptContext,
       decision: decisionAction,
       decisionDetail: normalizeDecisionDetail(decisionSource),
       decisionRaw: decisionSource,
@@ -483,6 +514,7 @@ function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
   const normalizedPayload: TerminalPromptDecisionPayload = {
     workflowId,
     terminalId,
+    ...promptContext,
     decision: topLevelDecisionAction,
   };
 
@@ -896,7 +928,10 @@ export const useWsStore = create<WsState>((set, get) => ({
               try {
                 handler(normalizedPayload);
               } catch (error) {
-                console.error('Error in message handler:', error);
+                console.error(
+                  `[wsStore] Global handler failed for event "${message.type}" (workflow "${targetWorkflowId}")`,
+                  error
+                );
               }
             });
           }
@@ -906,12 +941,18 @@ export const useWsStore = create<WsState>((set, get) => ({
               try {
                 handler(normalizedPayload);
               } catch (error) {
-                console.error('Error in message handler:', error);
+                console.error(
+                  `[wsStore] Workflow handler failed for event "${message.type}" (workflow "${targetWorkflowId}")`,
+                  error
+                );
               }
             });
           }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error(
+            `[wsStore] Failed to parse inbound message for workflow "${targetWorkflowId}"`,
+            error
+          );
         }
       };
 
@@ -1058,7 +1099,9 @@ export const useWsStore = create<WsState>((set, get) => ({
 
       ws.onerror = () => {
         if (isStale()) return;
-        console.error('WebSocket error occurred');
+        console.error(
+          `[wsStore] WebSocket error on workflow "${targetWorkflowId}"`
+        );
       };
     };
 
@@ -1173,7 +1216,7 @@ export const useWsStore = create<WsState>((set, get) => ({
       }
 
       console.warn(
-        `WebSocket for workflow ${targetWorkflowId} is not connected, cannot send message`
+        `[wsStore] Cannot send "${message.type}" because workflow "${targetWorkflowId}" is not connected`
       );
       return;
     }
@@ -1185,7 +1228,24 @@ export const useWsStore = create<WsState>((set, get) => ({
       return;
     }
 
-    console.warn('WebSocket is not connected, cannot send message');
+    console.warn(
+      `[wsStore] Cannot send "${message.type}" because there is no active WebSocket connection`
+    );
+  },
+
+  // Send a response for terminal interactive prompts via workflow-scoped WebSocket.
+  sendPromptResponse: (payload: TerminalPromptResponsePayload) => {
+    const { workflowId, terminalId, response } = payload;
+    get().send({
+      type: 'terminal.prompt_response',
+      payload: {
+        workflowId,
+        terminalId,
+        response,
+      },
+      timestamp: new Date().toISOString(),
+      id: generateMessageId(),
+    });
   },
 
   subscribe: (eventType: string, handler: MessageHandler) => {
@@ -1297,11 +1357,18 @@ export interface TerminalPromptOption {
   index: number;
   label: string;
   selected: boolean;
+  [key: string]: unknown;
 }
 
-export interface TerminalPromptDetectedPayload {
+export interface PromptEventContext {
   workflowId: string;
   terminalId: string;
+  taskId?: string;
+  sessionId?: string;
+  autoConfirm?: boolean;
+}
+
+export interface TerminalPromptDetectedPayload extends PromptEventContext {
   promptKind: TerminalPromptKind;
   promptText: string;
   confidence: number;
@@ -1310,6 +1377,9 @@ export interface TerminalPromptDetectedPayload {
   selectedIndex: number | null;
   optionDetails?: TerminalPromptOption[];
   promptKindRaw?: string;
+  legacyPromptKind?: string;
+  detectedAt?: string;
+  [key: string]: unknown;
 }
 
 export type PromptDecisionAction =
@@ -1329,13 +1399,24 @@ export interface PromptDecisionDetail {
   [key: string]: unknown;
 }
 
-export interface TerminalPromptDecisionPayload {
-  workflowId: string;
-  terminalId: string;
+export interface TerminalPromptDecisionPayload extends PromptEventContext {
   decision: PromptDecisionAction;
   decisionDetail?: PromptDecisionDetail;
   decisionRaw?: unknown;
+  decidedAt?: string;
+  [key: string]: unknown;
 }
+
+export type WorkflowEventHandlers = {
+  onWorkflowStatusChanged?: (payload: WorkflowStatusPayload) => void;
+  onTerminalStatusChanged?: (payload: TerminalStatusPayload) => void;
+  onTaskStatusChanged?: (payload: TaskStatusPayload) => void;
+  onTerminalCompleted?: (payload: TerminalCompletedPayload) => void;
+  onTerminalPromptDetected?: (payload: TerminalPromptDetectedPayload) => void;
+  onTerminalPromptDecision?: (payload: TerminalPromptDecisionPayload) => void;
+  onGitCommitDetected?: (payload: GitCommitPayload) => void;
+  onSystemError?: (payload: SystemErrorPayload) => void;
+} & Record<string, unknown>;
 
 /**
  * Hook to connect to workflow events and subscribe to specific event types
@@ -1343,16 +1424,7 @@ export interface TerminalPromptDecisionPayload {
  */
 export function useWorkflowEvents(
   workflowId: string | null | undefined,
-  handlers?: {
-    onWorkflowStatusChanged?: (payload: WorkflowStatusPayload) => void;
-    onTerminalStatusChanged?: (payload: TerminalStatusPayload) => void;
-    onTaskStatusChanged?: (payload: TaskStatusPayload) => void;
-    onTerminalCompleted?: (payload: TerminalCompletedPayload) => void;
-    onTerminalPromptDetected?: (payload: TerminalPromptDetectedPayload) => void;
-    onTerminalPromptDecision?: (payload: TerminalPromptDecisionPayload) => void;
-    onGitCommitDetected?: (payload: GitCommitPayload) => void;
-    onSystemError?: (payload: SystemErrorPayload) => void;
-  }
+  handlers?: WorkflowEventHandlers
 ) {
   const connectToWorkflow = useWsStore((s) => s.connectToWorkflow);
   const disconnectWorkflow = useWsStore((s) => s.disconnectWorkflow);

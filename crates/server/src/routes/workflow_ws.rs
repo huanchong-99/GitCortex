@@ -12,7 +12,10 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
+use deployment::Deployment;
 use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
+use services::services::orchestrator::OrchestratorRuntime;
 use tokio::{
     sync::broadcast,
     time::{Duration, interval},
@@ -31,6 +34,29 @@ use crate::{DeploymentImpl, error::ApiError};
 
 /// Heartbeat interval for keep-alive (30 seconds).
 const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+/// Client message type for responding to interactive terminal prompts.
+const WS_CLIENT_PROMPT_RESPONSE_TYPE: &str = "terminal.prompt_response";
+
+/// Client message type for keep-alive heartbeats.
+const WS_CLIENT_HEARTBEAT_TYPE: &str = "system.heartbeat";
+
+#[derive(Debug, Deserialize)]
+struct WorkflowWsClientMessage {
+    #[serde(rename = "type")]
+    message_type: String,
+    #[serde(default)]
+    payload: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct PromptResponsePayload {
+    #[serde(rename = "workflowId", alias = "workflow_id")]
+    workflow_id: Option<String>,
+    #[serde(rename = "terminalId", alias = "terminal_id")]
+    terminal_id: String,
+    response: String,
+}
 
 // ============================================================================
 // Route Definition
@@ -52,7 +78,7 @@ pub fn workflow_ws_routes() -> Router<DeploymentImpl> {
 async fn workflow_ws_handler(
     ws: WebSocketUpgrade,
     Path(workflow_id): Path<String>,
-    State(_deployment): State<DeploymentImpl>,
+    State(deployment): State<DeploymentImpl>,
     Extension(hub): Extension<SharedSubscriptionHub>,
 ) -> impl IntoResponse {
     // Validate workflow_id format (UUID)
@@ -61,7 +87,7 @@ async fn workflow_ws_handler(
         return ApiError::BadRequest(format!("Invalid workflow_id format: {e}")).into_response();
     }
 
-    ws.on_upgrade(move |socket| handle_workflow_socket(socket, workflow_id, hub))
+    ws.on_upgrade(move |socket| handle_workflow_socket(socket, workflow_id, hub, deployment))
 }
 
 /// Handle workflow WebSocket connection.
@@ -69,6 +95,7 @@ async fn handle_workflow_socket(
     socket: WebSocket,
     workflow_id: String,
     hub: SharedSubscriptionHub,
+    deployment: DeploymentImpl,
 ) {
     info!("Workflow WS connected: {}", workflow_id);
 
@@ -82,6 +109,8 @@ async fn handle_workflow_socket(
     // Clone for cleanup
     let workflow_id_cleanup = workflow_id.clone();
     let hub_cleanup = hub.clone();
+    let workflow_id_for_recv = workflow_id.clone();
+    let runtime = deployment.orchestrator_runtime().clone();
 
     // Send task: forwards events from hub to WebSocket
     let send_task = tokio::spawn(async move {
@@ -136,9 +165,8 @@ async fn handle_workflow_socket(
                 Ok(Message::Pong(_)) => {
                     // Pong received
                 }
-                Ok(Message::Text(_)) => {
-                    // Client messages are ignored for now
-                    // Could be used for client-side heartbeat or commands
+                Ok(Message::Text(text)) => {
+                    handle_client_text_message(&text, &workflow_id_for_recv, &runtime).await;
                 }
                 Ok(Message::Binary(_)) => {
                     // Binary messages not supported
@@ -167,6 +195,85 @@ async fn handle_workflow_socket(
     info!("Workflow WS disconnected: {}", workflow_id_cleanup);
 }
 
+async fn handle_client_text_message(text: &str, workflow_id: &str, runtime: &OrchestratorRuntime) {
+    let message = match serde_json::from_str::<WorkflowWsClientMessage>(text) {
+        Ok(message) => message,
+        Err(err) => {
+            debug!(
+                workflow_id = %workflow_id,
+                error = %err,
+                "Ignoring non-JSON workflow WS client message"
+            );
+            return;
+        }
+    };
+
+    match message.message_type.as_str() {
+        WS_CLIENT_HEARTBEAT_TYPE => {
+            // Heartbeat acknowledged implicitly.
+        }
+        WS_CLIENT_PROMPT_RESPONSE_TYPE => {
+            let payload = match serde_json::from_value::<PromptResponsePayload>(message.payload) {
+                Ok(payload) => payload,
+                Err(err) => {
+                    warn!(
+                        workflow_id = %workflow_id,
+                        error = %err,
+                        "Invalid terminal.prompt_response payload"
+                    );
+                    return;
+                }
+            };
+
+            let response = payload.response.trim();
+            if response.is_empty() {
+                warn!(
+                    workflow_id = %workflow_id,
+                    terminal_id = %payload.terminal_id,
+                    "Ignoring terminal.prompt_response with empty response"
+                );
+                return;
+            }
+
+            if let Some(payload_workflow_id) = payload.workflow_id.as_deref()
+                && payload_workflow_id != workflow_id
+            {
+                warn!(
+                    workflow_id = %workflow_id,
+                    payload_workflow_id = %payload_workflow_id,
+                    "Prompt response payload workflow_id mismatch; using WS path workflow_id"
+                );
+            }
+
+            if let Err(err) = runtime
+                .submit_user_prompt_response(workflow_id, &payload.terminal_id, response)
+                .await
+            {
+                warn!(
+                    workflow_id = %workflow_id,
+                    terminal_id = %payload.terminal_id,
+                    error = %err,
+                    "Failed to forward terminal prompt response to orchestrator runtime"
+                );
+                return;
+            }
+
+            debug!(
+                workflow_id = %workflow_id,
+                terminal_id = %payload.terminal_id,
+                "Forwarded terminal prompt response to orchestrator runtime"
+            );
+        }
+        other_type => {
+            debug!(
+                workflow_id = %workflow_id,
+                message_type = %other_type,
+                "Ignoring unsupported workflow WS client message"
+            );
+        }
+    }
+}
+
 /// Send a WebSocket event to the client.
 ///
 /// Returns `true` if successful, `false` if the connection should be closed.
@@ -191,11 +298,230 @@ async fn send_ws_event(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use db::DBService;
+    use services::services::orchestrator::MessageBus;
+    use tracing::{Event, Level, Subscriber};
+    use tracing_subscriber::{Layer, Registry, layer::Context, prelude::*};
+
     use super::*;
+
+    #[derive(Clone, Debug)]
+    struct CapturedLog {
+        level: Level,
+        message: Option<String>,
+    }
+
+    #[derive(Clone, Default)]
+    struct CapturedLogs {
+        entries: Arc<Mutex<Vec<CapturedLog>>>,
+    }
+
+    impl CapturedLogs {
+        fn push(&self, level: Level, message: Option<String>) {
+            self.entries
+                .lock()
+                .expect("captured log mutex poisoned")
+                .push(CapturedLog { level, message });
+        }
+
+        fn messages_for_level(&self, level: Level) -> Vec<String> {
+            self.entries
+                .lock()
+                .expect("captured log mutex poisoned")
+                .iter()
+                .filter(|entry| entry.level == level)
+                .filter_map(|entry| entry.message.clone())
+                .collect()
+        }
+    }
+
+    #[derive(Default)]
+    struct MessageVisitor {
+        message: Option<String>,
+    }
+
+    impl tracing::field::Visit for MessageVisitor {
+        fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+            if field.name() == "message" {
+                self.message = Some(value.to_string());
+            }
+        }
+
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            if field.name() == "message" {
+                self.message = Some(format!("{value:?}"));
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    struct CaptureLayer {
+        logs: CapturedLogs,
+    }
+
+    impl<S> Layer<S> for CaptureLayer
+    where
+        S: Subscriber,
+    {
+        fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+            let mut visitor = MessageVisitor::default();
+            event.record(&mut visitor);
+            self.logs.push(*event.metadata().level(), visitor.message);
+        }
+    }
+
+    async fn test_runtime() -> OrchestratorRuntime {
+        let pool = sqlx::SqlitePool::connect(":memory:")
+            .await
+            .expect("in-memory sqlite should be available");
+        let db = Arc::new(DBService { pool });
+        let message_bus = Arc::new(MessageBus::new(32));
+        OrchestratorRuntime::new(db, message_bus)
+    }
 
     #[test]
     fn test_workflow_ws_routes_created() {
         // Verify routes can be created without panic
         let _routes = workflow_ws_routes();
+    }
+
+    #[tokio::test]
+    async fn test_prompt_response_message_dispatches_to_runtime() {
+        let runtime = test_runtime().await;
+        let workflow_id = "00000000-0000-0000-0000-000000000001";
+        let message = serde_json::json!({
+            "type": WS_CLIENT_PROMPT_RESPONSE_TYPE,
+            "payload": {
+                "terminalId": "terminal-1",
+                "response": "yes"
+            }
+        })
+        .to_string();
+
+        let logs = CapturedLogs::default();
+        let subscriber = Registry::default().with(CaptureLayer { logs: logs.clone() });
+        let dispatch = tracing::Dispatch::new(subscriber);
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+
+        handle_client_text_message(&message, workflow_id, &runtime).await;
+
+        let warn_messages = logs.messages_for_level(Level::WARN);
+        assert!(
+            warn_messages.iter().any(|msg| msg
+                .contains("Failed to forward terminal prompt response to orchestrator runtime")),
+            "Expected runtime forwarding warning after dispatch, got: {warn_messages:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_prompt_response_with_invalid_payload_does_not_panic() {
+        let runtime = test_runtime().await;
+        let workflow_id = "00000000-0000-0000-0000-000000000002";
+        let message = serde_json::json!({
+            "type": WS_CLIENT_PROMPT_RESPONSE_TYPE,
+            "payload": {
+                "terminalId": 123,
+                "response": "yes"
+            }
+        })
+        .to_string();
+
+        let logs = CapturedLogs::default();
+        let subscriber = Registry::default().with(CaptureLayer { logs: logs.clone() });
+        let dispatch = tracing::Dispatch::new(subscriber);
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+
+        handle_client_text_message(&message, workflow_id, &runtime).await;
+
+        let warn_messages = logs.messages_for_level(Level::WARN);
+        assert!(
+            warn_messages
+                .iter()
+                .any(|msg| msg.contains("Invalid terminal.prompt_response payload")),
+            "Expected invalid payload warning, got: {warn_messages:?}"
+        );
+        assert!(
+            !warn_messages.iter().any(|msg| msg
+                .contains("Failed to forward terminal prompt response to orchestrator runtime")),
+            "Invalid payload should not reach runtime forwarding branch"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_unknown_client_message_type_is_ignored_without_panic() {
+        let runtime = test_runtime().await;
+        let workflow_id = "00000000-0000-0000-0000-000000000003";
+        let message = serde_json::json!({
+            "type": "terminal.unknown_type",
+            "payload": {
+                "terminalId": "terminal-1",
+                "response": "noop"
+            }
+        })
+        .to_string();
+
+        let logs = CapturedLogs::default();
+        let subscriber = Registry::default().with(CaptureLayer { logs: logs.clone() });
+        let dispatch = tracing::Dispatch::new(subscriber);
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+
+        handle_client_text_message(&message, workflow_id, &runtime).await;
+
+        let debug_messages = logs.messages_for_level(Level::DEBUG);
+        assert!(
+            debug_messages
+                .iter()
+                .any(|msg| msg.contains("Ignoring unsupported workflow WS client message")),
+            "Expected unsupported-message debug log, got: {debug_messages:?}"
+        );
+
+        let warn_messages = logs.messages_for_level(Level::WARN);
+        assert!(
+            !warn_messages
+                .iter()
+                .any(|msg| msg.contains("Invalid terminal.prompt_response payload")),
+            "Unknown type should not be parsed as prompt response"
+        );
+        assert!(
+            !warn_messages.iter().any(|msg| msg
+                .contains("Failed to forward terminal prompt response to orchestrator runtime")),
+            "Unknown type should not trigger runtime forwarding"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_prompt_response_with_empty_response_is_ignored() {
+        let runtime = test_runtime().await;
+        let workflow_id = "00000000-0000-0000-0000-000000000004";
+        let message = serde_json::json!({
+            "type": WS_CLIENT_PROMPT_RESPONSE_TYPE,
+            "payload": {
+                "terminalId": "terminal-1",
+                "response": "   "
+            }
+        })
+        .to_string();
+
+        let logs = CapturedLogs::default();
+        let subscriber = Registry::default().with(CaptureLayer { logs: logs.clone() });
+        let dispatch = tracing::Dispatch::new(subscriber);
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+
+        handle_client_text_message(&message, workflow_id, &runtime).await;
+
+        let warn_messages = logs.messages_for_level(Level::WARN);
+        assert!(
+            warn_messages
+                .iter()
+                .any(|msg| msg.contains("Ignoring terminal.prompt_response with empty response")),
+            "Expected empty-response warning, got: {warn_messages:?}"
+        );
+        assert!(
+            !warn_messages.iter().any(|msg| msg
+                .contains("Failed to forward terminal prompt response to orchestrator runtime")),
+            "Empty response should not trigger runtime forwarding"
+        );
     }
 }

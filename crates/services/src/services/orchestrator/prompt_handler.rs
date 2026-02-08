@@ -7,9 +7,9 @@
 //!
 //! 1. **auto_confirm=false**: Ask user for every prompt (never auto-respond)
 //! 2. **EnterConfirm** (high confidence, no dangerous keywords): Auto-send `\n`
-//! 2. **Password**: Always ask user (never auto-respond)
-//! 3. **Dangerous keywords detected**: Escalate to LLM or ask user
-//! 4. **YesNo/Choice/ArrowSelect/Input**: LLM decision
+//! 3. **Password**: Always ask user (never auto-respond)
+//! 4. **Dangerous keywords detected**: Escalate to LLM or ask user
+//! 5. **YesNo/Choice/ArrowSelect/Input**: LLM decision
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -18,7 +18,8 @@ use tokio::sync::RwLock;
 use super::{
     message_bus::SharedMessageBus,
     types::{
-        DetectedPrompt, PromptDecision, PromptKind, TerminalPromptEvent, TerminalPromptStateMachine,
+        DetectedPrompt, PromptDecision, PromptKind, PromptState, TerminalPromptEvent,
+        TerminalPromptStateMachine,
     },
 };
 
@@ -332,42 +333,87 @@ impl PromptHandler {
         }
     }
 
-    /// Handle user approval for a waiting prompt
+    /// Handle user response for a waiting prompt.
+    ///
+    /// Returns `true` when the response is accepted and forwarded to PTY.
+    pub async fn handle_user_prompt_response(
+        &self,
+        terminal_id: &str,
+        session_id: &str,
+        workflow_id: &str,
+        user_response: &str,
+    ) -> bool {
+        let response = format!("{}\n", user_response);
+
+        let (decision, should_publish_input, handled) = {
+            let mut state_machines = self.state_machines.write().await;
+
+            match state_machines.get_mut(terminal_id) {
+                Some(sm) if sm.state == PromptState::WaitingForApproval => {
+                    let decision = PromptDecision::LLMDecision {
+                        response: response.clone(),
+                        reasoning: "User provided response".to_string(),
+                        target_index: None,
+                    };
+                    sm.on_response_sent(decision.clone());
+                    (decision, true, true)
+                }
+                Some(sm) => {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        workflow_id = %workflow_id,
+                        state = ?sm.state,
+                        "Received user prompt response while terminal is not waiting for approval"
+                    );
+                    (
+                        PromptDecision::skip(&format!(
+                            "Ignored prompt response: terminal is not waiting for approval (state: {:?})",
+                            sm.state
+                        )),
+                        false,
+                        false,
+                    )
+                }
+                None => {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        workflow_id = %workflow_id,
+                        "Received user prompt response for terminal without prompt state"
+                    );
+                    (
+                        PromptDecision::skip(
+                            "Ignored prompt response: terminal has no active prompt state",
+                        ),
+                        false,
+                        false,
+                    )
+                }
+            }
+        };
+
+        if should_publish_input {
+            self.message_bus
+                .publish_terminal_input(terminal_id, session_id, &response, Some(decision.clone()))
+                .await;
+        }
+
+        self.message_bus
+            .publish_terminal_prompt_decision(terminal_id, workflow_id, decision)
+            .await;
+
+        handled
+    }
+
+    /// Backward-compatible alias for `handle_user_prompt_response`.
     pub async fn handle_user_approval(
         &self,
         terminal_id: &str,
         session_id: &str,
         workflow_id: &str,
         user_response: &str,
-    ) {
-        // Update state machine
-        let mut state_machines = self.state_machines.write().await;
-        if let Some(sm) = state_machines.get_mut(terminal_id) {
-            let decision = PromptDecision::LLMDecision {
-                response: format!("{}\n", user_response),
-                reasoning: "User provided response".to_string(),
-                target_index: None,
-            };
-            sm.on_response_sent(decision.clone());
-
-            // Drop lock before publishing
-            drop(state_machines);
-
-            // Publish the response
-            self.message_bus
-                .publish_terminal_input(
-                    terminal_id,
-                    session_id,
-                    &format!("{}\n", user_response),
-                    Some(decision.clone()),
-                )
-                .await;
-
-            // Publish decision for UI
-            self.message_bus
-                .publish_terminal_prompt_decision(terminal_id, workflow_id, decision)
-                .await;
-        }
+    ) -> bool {
+        self.handle_user_prompt_response(terminal_id, session_id, workflow_id, user_response)
+            .await
     }
 }
 
@@ -726,9 +772,13 @@ mod tests {
             other => panic!("expected AskUser TerminalPromptDecision, got: {other:?}"),
         }
 
-        handler
-            .handle_user_approval("term-1", "session-1", "workflow-1", "n")
+        let handled = handler
+            .handle_user_prompt_response("term-1", "session-1", "workflow-1", "n")
             .await;
+        assert!(
+            handled,
+            "approval should be accepted when terminal is waiting"
+        );
 
         let input_broadcast = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
             .await
@@ -793,6 +843,87 @@ mod tests {
             }
             other => panic!("expected TerminalPromptDecision, got: {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_handle_user_approval_when_terminal_not_waiting_returns_false_with_feedback() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let handler = PromptHandler::new(message_bus.clone());
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        let event = TerminalPromptEvent {
+            terminal_id: "term-1".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            session_id: "session-1".to_string(),
+            auto_confirm: true,
+            prompt: create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.95),
+            detected_at: chrono::Utc::now(),
+        };
+
+        let decision = handler
+            .handle_prompt_event(&event)
+            .await
+            .expect("prompt should produce auto-confirm decision");
+        assert!(matches!(decision, PromptDecision::AutoConfirm { .. }));
+
+        let initial_decision =
+            tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+                .await
+                .expect("expected initial decision broadcast")
+                .expect("broadcast channel should be open");
+        assert!(matches!(
+            initial_decision,
+            BusMessage::TerminalPromptDecision {
+                decision: PromptDecision::AutoConfirm { .. },
+                ..
+            }
+        ));
+
+        let initial_input = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected initial terminal input broadcast")
+            .expect("broadcast channel should be open");
+        assert!(matches!(initial_input, BusMessage::TerminalInput { .. }));
+
+        let handled = handler
+            .handle_user_prompt_response("term-1", "session-1", "workflow-1", "n")
+            .await;
+        assert!(
+            !handled,
+            "approval should be rejected when terminal is not waiting"
+        );
+
+        let feedback = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected non-waiting feedback broadcast")
+            .expect("broadcast channel should be open");
+
+        match feedback {
+            BusMessage::TerminalPromptDecision {
+                terminal_id,
+                workflow_id,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(workflow_id, "workflow-1");
+                match decision {
+                    PromptDecision::Skip { reason } => {
+                        assert!(reason.contains("not waiting for approval"));
+                        assert!(reason.contains("prompt response"));
+                    }
+                    _ => panic!("Expected Skip feedback for non-waiting terminal"),
+                }
+            }
+            other => panic!("expected feedback TerminalPromptDecision, got: {other:?}"),
+        }
+
+        let no_follow_up =
+            tokio::time::timeout(Duration::from_millis(100), broadcast_rx.recv()).await;
+        assert!(
+            no_follow_up.is_err(),
+            "non-waiting approval should not publish terminal input"
+        );
     }
 
     #[test]

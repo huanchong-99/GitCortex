@@ -612,6 +612,112 @@ describe('wsStore', () => {
     );
   });
 
+  it('normalizes terminal.prompt_detected task/session context from camelCase and snake_case', async () => {
+    const { connectToWorkflow, subscribeToWorkflow } = useWsStore.getState();
+
+    connectToWorkflow('wf-prompt-context');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-prompt-context')
+      ).toBe('connected');
+    });
+
+    const onDetected = vi.fn();
+    subscribeToWorkflow(
+      'wf-prompt-context',
+      'terminal.prompt_detected',
+      onDetected
+    );
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-prompt-context/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_detected',
+      payload: {
+        workflowId: 'wf-prompt-context',
+        terminalId: 'term-context',
+        taskId: 'task-context',
+        sessionId: 'session-context',
+        promptKind: 'yes_no',
+        promptText: 'Proceed? [y/N]',
+        confidence: 0.92,
+        hasDangerousKeywords: false,
+        options: ['y', 'n'],
+        selectedIndex: 1,
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-prompt-context-camel',
+    });
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_detected',
+      payload: {
+        workflow_id: 'wf-prompt-context',
+        terminal_id: 'term-context',
+        task_id: 'task-context',
+        session_id: 'session-context',
+        prompt_kind: 'yes_no',
+        prompt_text: 'Proceed? [y/N]',
+        confidence: 0.92,
+        has_dangerous_keywords: false,
+        options: ['y', 'n'],
+        selected_index: 1,
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-prompt-context-snake',
+    });
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_detected',
+      payload: {
+        workflowId: 'wf-prompt-context',
+        terminalId: 'term-context',
+        promptKind: 'yes_no',
+        promptText: 'Proceed without context? [y/N]',
+        confidence: 0.81,
+        hasDangerousKeywords: false,
+        options: ['y', 'n'],
+        selectedIndex: 0,
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-prompt-context-legacy',
+    });
+
+    expect(onDetected).toHaveBeenCalledTimes(3);
+
+    const firstPayload = onDetected.mock.calls[0][0];
+    const secondPayload = onDetected.mock.calls[1][0];
+    const legacyPayload = onDetected.mock.calls[2][0];
+
+    expect(firstPayload).toEqual(
+      expect.objectContaining({
+        workflowId: 'wf-prompt-context',
+        terminalId: 'term-context',
+        taskId: 'task-context',
+        sessionId: 'session-context',
+        promptKind: 'yes_no',
+        promptText: 'Proceed? [y/N]',
+        selectedIndex: 1,
+      })
+    );
+    expect(secondPayload).toEqual(firstPayload);
+    expect(legacyPayload).toEqual(
+      expect.objectContaining({
+        workflowId: 'wf-prompt-context',
+        terminalId: 'term-context',
+        promptKind: 'yes_no',
+        promptText: 'Proceed without context? [y/N]',
+        selectedIndex: 0,
+      })
+    );
+    expect(legacyPayload).not.toHaveProperty('taskId');
+    expect(legacyPayload).not.toHaveProperty('sessionId');
+  });
+
   it('normalizes terminal.prompt_decision payload for structured decision object', async () => {
     const { connectToWorkflow, subscribeToWorkflow } = useWsStore.getState();
 
@@ -725,6 +831,207 @@ describe('wsStore', () => {
         decisionRaw: expect.objectContaining({
           action: 'llm_decision',
           target_index: 2,
+        }),
+      })
+    );
+  });
+
+  it('normalizes terminal.prompt_decision task/session context from camelCase and snake_case', async () => {
+    const { connectToWorkflow, subscribeToWorkflow } = useWsStore.getState();
+
+    connectToWorkflow('wf-decision-context');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-decision-context')
+      ).toBe('connected');
+    });
+
+    const onDecision = vi.fn();
+    subscribeToWorkflow(
+      'wf-decision-context',
+      'terminal.prompt_decision',
+      onDecision
+    );
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-decision-context/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_decision',
+      payload: {
+        workflowId: 'wf-decision-context',
+        terminalId: 'term-context',
+        taskId: 'task-context',
+        sessionId: 'session-context',
+        decision: 'auto_confirm',
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-decision-context-camel',
+    });
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_decision',
+      payload: {
+        workflow_id: 'wf-decision-context',
+        terminal_id: 'term-context',
+        task_id: 'task-context',
+        session_id: 'session-context',
+        decision: 'auto_confirm',
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-decision-context-snake',
+    });
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_decision',
+      payload: {
+        workflowId: 'wf-decision-context',
+        terminalId: 'term-context',
+        decision: 'auto_confirm',
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-decision-context-legacy',
+    });
+
+    expect(onDecision).toHaveBeenCalledTimes(3);
+
+    const firstPayload = onDecision.mock.calls[0][0];
+    const secondPayload = onDecision.mock.calls[1][0];
+    const legacyPayload = onDecision.mock.calls[2][0];
+
+    expect(firstPayload).toEqual(
+      expect.objectContaining({
+        workflowId: 'wf-decision-context',
+        terminalId: 'term-context',
+        taskId: 'task-context',
+        sessionId: 'session-context',
+        decision: 'auto_confirm',
+      })
+    );
+    expect(secondPayload).toEqual(firstPayload);
+    expect(legacyPayload).toEqual(
+      expect.objectContaining({
+        workflowId: 'wf-decision-context',
+        terminalId: 'term-context',
+        decision: 'auto_confirm',
+      })
+    );
+    expect(legacyPayload).not.toHaveProperty('taskId');
+    expect(legacyPayload).not.toHaveProperty('sessionId');
+  });
+
+  it('normalizes terminal.prompt_detected unknown prompt kind and mixed contract fields', async () => {
+    const { connectToWorkflow, subscribeToWorkflow } = useWsStore.getState();
+
+    connectToWorkflow('wf-prompt-unknown');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-prompt-unknown')
+      ).toBe('connected');
+    });
+
+    const onDetected = vi.fn();
+    subscribeToWorkflow(
+      'wf-prompt-unknown',
+      'terminal.prompt_detected',
+      onDetected
+    );
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-prompt-unknown/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_detected',
+      payload: {
+        workflow_id: 'wf-prompt-unknown',
+        terminal_id: 'term-unknown',
+        prompt_kind: 'ManualApproval',
+        raw_text: 'Run dangerous command?',
+        confidence: '0.76',
+        has_dangerous_keywords: 'true',
+        option_details: [
+          { index: '0', label: 'Yes', selected: 'false' },
+          { index: '1', label: 'No', selected: 'true' },
+        ],
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-prompt-unknown',
+    });
+
+    expect(onDetected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-prompt-unknown',
+        terminalId: 'term-unknown',
+        promptKind: 'unknown',
+        promptKindRaw: 'ManualApproval',
+        promptText: 'Run dangerous command?',
+        confidence: 0.76,
+        hasDangerousKeywords: true,
+        options: ['Yes', 'No'],
+        selectedIndex: 1,
+        optionDetails: [
+          { index: 0, label: 'Yes', selected: false },
+          { index: 1, label: 'No', selected: true },
+        ],
+      })
+    );
+  });
+
+  it('normalizes terminal.prompt_decision unknown action and extracts decision detail fields', async () => {
+    const { connectToWorkflow, subscribeToWorkflow } = useWsStore.getState();
+
+    connectToWorkflow('wf-decision-unknown');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-decision-unknown')
+      ).toBe('connected');
+    });
+
+    const onDecision = vi.fn();
+    subscribeToWorkflow(
+      'wf-decision-unknown',
+      'terminal.prompt_decision',
+      onDecision
+    );
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-decision-unknown/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_decision',
+      payload: {
+        workflowId: 'wf-decision-unknown',
+        terminal_id: 'term-unknown',
+        decision: 'manual_override',
+        decision_detail: {
+          response: 'n\n',
+          target_index: '3',
+          suggestions: ['Retry', 1, null, 'Cancel'],
+        },
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-decision-unknown',
+    });
+
+    expect(onDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-decision-unknown',
+        terminalId: 'term-unknown',
+        decision: 'unknown',
+        decisionRaw: 'manual_override',
+        decisionDetail: expect.objectContaining({
+          response: 'n\n',
+          targetIndex: 3,
+          suggestions: ['Retry', 'Cancel'],
         }),
       })
     );
@@ -846,6 +1153,93 @@ describe('wsStore', () => {
         }),
       })
     );
+  });
+
+  it('sendPromptResponse sends terminal.prompt_response with generated message envelope', async () => {
+    const { connectToWorkflow, sendPromptResponse } = useWsStore.getState();
+
+    connectToWorkflow('wf-prompt-send');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-prompt-send')
+      ).toBe('connected');
+    });
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-prompt-send/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.send.mockClear();
+
+    sendPromptResponse({
+      workflowId: 'wf-prompt-send',
+      terminalId: 'term-send',
+      response: 'y\n',
+    });
+
+    expect(ws!.send).toHaveBeenCalledTimes(1);
+
+    const [serializedMessage] = ws!.send.mock.calls[0] as [string];
+    const parsedMessage = JSON.parse(serializedMessage) as {
+      type: string;
+      payload: {
+        workflowId: string;
+        terminalId: string;
+        response: string;
+      };
+      timestamp: string;
+      id: string;
+    };
+
+    expect(parsedMessage.type).toBe('terminal.prompt_response');
+    expect(parsedMessage.payload).toEqual({
+      workflowId: 'wf-prompt-send',
+      terminalId: 'term-send',
+      response: 'y\n',
+    });
+    expect(parsedMessage.id).toMatch(/^msg-/);
+    expect(Number.isNaN(Date.parse(parsedMessage.timestamp))).toBe(false);
+  });
+
+  it('sendPromptResponse does not fall back to another workflow when target is unavailable', async () => {
+    const { connectToWorkflow, sendPromptResponse } = useWsStore.getState();
+
+    connectToWorkflow('wf-prompt-send-a');
+    connectToWorkflow('wf-prompt-send-b');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-prompt-send-a')
+      ).toBe('connected');
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-prompt-send-b')
+      ).toBe('connected');
+    });
+
+    const wsA = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-prompt-send-a/')
+    );
+    const wsB = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-prompt-send-b/')
+    );
+
+    expect(wsA).toBeDefined();
+    expect(wsB).toBeDefined();
+
+    wsA!.send.mockClear();
+    wsB!.send.mockClear();
+    wsA!.readyState = MockWebSocket.CLOSED;
+
+    sendPromptResponse({
+      workflowId: 'wf-prompt-send-a',
+      terminalId: 'term-a',
+      response: 'n\n',
+    });
+
+    expect(wsA!.send).not.toHaveBeenCalled();
+    expect(wsB!.send).not.toHaveBeenCalled();
   });
 
   it('send routes by workflowId payload and never falls back to another workflow', async () => {

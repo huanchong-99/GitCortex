@@ -212,6 +212,17 @@ export interface MergeWorkflowRequest {
   merge_strategy?: 'squash';
 }
 
+export interface SubmitWorkflowPromptResponseRequest {
+  workflow_id: string;
+  terminal_id: string;
+  response: string;
+  prompt_id?: string;
+  decision?: string;
+  decision_detail?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface WorkflowExecution {
   execution_id: string;
   workflow_id: string;
@@ -336,6 +347,26 @@ const workflowsApi = {
       }
     );
     return handleApiResponse<WorkflowExecution>(response);
+  },
+
+  /**
+   * Submit user response for an interactive prompt
+   */
+  submitPromptResponse: async (
+    data: SubmitWorkflowPromptResponseRequest
+  ): Promise<void> => {
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(data.workflow_id)}/prompts/respond`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          terminal_id: data.terminal_id,
+          response: data.response,
+        }),
+      }
+    );
+    return handleApiResponse<void>(response);
   },
 
   /**
@@ -525,6 +556,27 @@ export function useStopWorkflow() {
     },
     onError: (error) => {
       logApiError('Failed to stop workflow:', error);
+    },
+  });
+}
+
+/**
+ * Hook to submit user response for an interactive workflow prompt
+ * @returns Mutation object for submitting prompt responses
+ */
+export function useSubmitWorkflowPromptResponse() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: SubmitWorkflowPromptResponseRequest) =>
+      workflowsApi.submitPromptResponse(data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(variables.workflow_id),
+      });
+    },
+    onError: (error) => {
+      logApiError('Failed to submit workflow prompt response:', error);
     },
   });
 }
