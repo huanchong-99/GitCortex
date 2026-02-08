@@ -1630,6 +1630,7 @@ mod tests {
         );
 
         logger.append("limit-triggered-line").await;
+        logger.flush().await.unwrap();
 
         let rows: Vec<String> = sqlx::query_scalar(
             "SELECT content FROM terminal_log WHERE terminal_id = ? ORDER BY created_at ASC",
