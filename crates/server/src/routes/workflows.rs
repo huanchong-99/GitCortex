@@ -864,6 +864,52 @@ async fn rollback_prepare_failure(deployment: &DeploymentImpl, workflow_id: &str
     }
 }
 
+async fn resolve_workflow_working_dir(
+    deployment: &DeploymentImpl,
+    workflow: &Workflow,
+) -> Result<PathBuf, ApiError> {
+    let project = Project::find_by_id(&deployment.db().pool, workflow.project_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Project not found".to_string()))?;
+
+    if let Some(dir) = project
+        .default_agent_working_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|dir| !dir.is_empty())
+    {
+        return Ok(PathBuf::from(dir));
+    }
+
+    let repo_working_dir: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT r.path
+        FROM repos r
+        INNER JOIN project_repos pr ON pr.repo_id = r.id
+        WHERE pr.project_id = ?
+        ORDER BY r.display_name ASC
+        LIMIT 1
+        "#,
+    )
+    .bind(workflow.project_id)
+    .fetch_optional(&deployment.db().pool)
+    .await?
+    .flatten();
+
+    if let Some(dir) = repo_working_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|dir| !dir.is_empty())
+    {
+        return Ok(PathBuf::from(dir));
+    }
+
+    Err(ApiError::BadRequest(format!(
+        "Could not determine working directory for project {}",
+        workflow.project_id
+    )))
+}
+
 async fn refresh_prompt_watcher_registrations(deployment: &DeploymentImpl, workflow_id: &str) {
     let terminals = match Terminal::find_by_workflow(&deployment.db().pool, workflow_id).await {
         Ok(terminals) => terminals,
@@ -987,34 +1033,20 @@ async fn prepare_workflow(
         )));
     }
 
-    // Step 2: Get working directory from project
-    let project = match Project::find_by_id(&deployment.db().pool, workflow.project_id).await {
-        Ok(Some(project)) => project,
-        Ok(None) => {
-            rollback_prepare_failure(
-                &deployment,
-                &workflow_id,
-                "project not found during prepare",
-            )
-            .await;
-            return Err(ApiError::NotFound("Project not found".to_string()));
-        }
+    // Step 2: Resolve working directory.
+    // Priority: project.default_agent_working_dir -> first project repo path.
+    let working_dir = match resolve_workflow_working_dir(&deployment, &workflow).await {
+        Ok(path) => path,
         Err(e) => {
             rollback_prepare_failure(
                 &deployment,
                 &workflow_id,
-                "project lookup failed during prepare",
+                "working directory resolution failed during prepare",
             )
             .await;
-            return Err(e.into());
+            return Err(e);
         }
     };
-
-    let working_dir = project
-        .default_agent_working_dir
-        .as_ref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
     // Step 3: Launch PTY processes for all terminals
     let cc_switch = Arc::new(CCSwitchService::new(db_arc.clone()));
