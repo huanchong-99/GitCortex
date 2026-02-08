@@ -62,6 +62,19 @@ fn allowed_git_roots() -> Result<Vec<PathBuf>, ApiError> {
     }
     roots.push(std::env::current_dir()?);
 
+    #[cfg(windows)]
+    {
+        // Allow local absolute paths on all existing drive roots.
+        // This keeps path-boundary checks while supporting workspaces like E:\test\test.
+        for drive_letter in b'A'..=b'Z' {
+            let root = format!("{}:\\", char::from(drive_letter));
+            let root_path = PathBuf::from(&root);
+            if root_path.exists() {
+                roots.push(root_path);
+            }
+        }
+    }
+
     let mut normalized_roots = Vec::new();
     for root in roots {
         let canonical_root = std::fs::canonicalize(&root).unwrap_or(root);
