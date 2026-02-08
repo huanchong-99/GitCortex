@@ -45,7 +45,9 @@ import { wizardConfigToCreateRequest } from '@/components/workflow/types';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
+import { CreateProjectDialog } from '@/components/ui-new/dialogs/CreateProjectDialog';
 import { useTranslation } from 'react-i18next';
+import { projectsApi } from '@/lib/api';
 import {
   type TerminalPromptDecisionPayload,
   type TerminalPromptDetectedPayload,
@@ -56,6 +58,7 @@ import {
   ENTER_CONFIRM_RESPONSE_TOKEN,
   WorkflowPromptDialog,
 } from '@/components/workflow/WorkflowPromptDialog';
+import { useToast } from '@/components/ui/toast';
 
 interface WorkflowPromptQueueItem {
   id: string;
@@ -110,12 +113,14 @@ function isSamePromptContext(
 
 export function Workflows() {
   const { t } = useTranslation('workflow');
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [showWizard, setShowWizard] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
     null
   );
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
 
   // Get projectId from URL query params
   const projectIdFromUrl = searchParams.get('projectId');
@@ -470,6 +475,70 @@ export function Workflows() {
     setSelectedWorkflowId(null); // Clear selected workflow when switching projects
   };
 
+  const handleCreateProject = async () => {
+    const result = await CreateProjectDialog.show({});
+    if (result.status !== 'saved') {
+      return;
+    }
+
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('projectId', result.project.id);
+    setSearchParams(newParams, { replace: true });
+    setSelectedWorkflowId(null);
+    showToast(`Project "${result.project.name}" created`, 'success');
+  };
+
+  const handleDeleteProject = async () => {
+    if (!validProjectId) {
+      return;
+    }
+
+    if (projects.length <= 1) {
+      showToast('Cannot delete the last project', 'error');
+      return;
+    }
+
+    const deletingProject = projects.find((project) => project.id === validProjectId);
+    const result = await ConfirmDialog.show({
+      title: 'Delete Project',
+      message: `Delete project "${deletingProject?.name ?? validProjectId}"? This cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+
+    if (result !== 'confirmed') {
+      return;
+    }
+
+    try {
+      setIsDeletingProject(true);
+      await projectsApi.delete(validProjectId);
+
+      const remainingProjects = projects.filter(
+        (project) => project.id !== validProjectId
+      );
+      const fallbackProjectId = remainingProjects[0]?.id;
+      const newParams = new URLSearchParams(searchParams);
+
+      if (fallbackProjectId) {
+        newParams.set('projectId', fallbackProjectId);
+      } else {
+        newParams.delete('projectId');
+      }
+
+      setSearchParams(newParams, { replace: true });
+      setSelectedWorkflowId(null);
+      showToast('Project deleted', 'success');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to delete project';
+      showToast(message, 'error');
+    } finally {
+      setIsDeletingProject(false);
+    }
+  };
+
   // Get current project name for display
   const currentProject = projects.find((p) => p.id === validProjectId);
 
@@ -743,19 +812,19 @@ export function Workflows() {
   return (
     <div className="h-full min-h-0 overflow-auto space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold">Workflows</h1>
             <p className="text-low">
               Manage multi-terminal workflows for parallel task execution
             </p>
           </div>
-          {projects.length > 1 && (
+          <div className="flex items-center gap-2 flex-wrap">
             <Select
               value={validProjectId || ''}
               onValueChange={handleProjectChange}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Select project">
                   {currentProject?.name || 'Select project'}
                 </SelectValue>
@@ -768,12 +837,37 @@ export function Workflows() {
                 ))}
               </SelectContent>
             </Select>
-          )}
+            <Button variant="outline" onClick={() => void handleCreateProject()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Project
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void handleDeleteProject()}
+              disabled={!validProjectId || projects.length <= 1 || isDeletingProject}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {isDeletingProject ? 'Deleting...' : 'Delete Project'}
+            </Button>
+          </div>
         </div>
         <Button onClick={() => setShowWizard(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Create Workflow
         </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {projects.map((project) => (
+          <Button
+            key={project.id}
+            variant={project.id === validProjectId ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleProjectChange(project.id)}
+          >
+            {project.name}
+          </Button>
+        ))}
       </div>
 
       {showWizard && (
