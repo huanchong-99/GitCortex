@@ -266,6 +266,12 @@ impl Default for PromptState {
     }
 }
 
+/// Retry window for re-processing an identical prompt while mid-flight.
+///
+/// This prevents long-term suppression when prompt state gets stuck in
+/// `Detected/Deciding/Responding`, while still avoiding duplicate storms.
+const SAME_PROMPT_RETRY_WINDOW_SECS: i64 = 5;
+
 /// Terminal prompt state machine to prevent duplicate responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalPromptStateMachine {
@@ -304,21 +310,24 @@ impl TerminalPromptStateMachine {
         match self.state {
             PromptState::Idle => true,
             PromptState::Detected | PromptState::Deciding | PromptState::Responding => {
-                // Check if this is a different prompt
-                if let Some(ref last) = self.last_prompt {
-                    // Different prompt kind = new prompt
-                    if last.kind != prompt.kind {
-                        return true;
+                match self.last_prompt.as_ref() {
+                    // Missing last prompt in non-idle state: recover by processing.
+                    None => true,
+                    // Different prompt kind or text: process immediately.
+                    Some(last) if last.kind != prompt.kind || last.raw_text != prompt.raw_text => {
+                        true
                     }
-                    // Same kind but significantly different text = new prompt
-                    if last.raw_text != prompt.raw_text {
-                        return true;
-                    }
+                    // Same prompt: only retry after a guard window.
+                    Some(_) => self.same_prompt_retry_window_elapsed(),
                 }
-                false
             }
             PromptState::WaitingForApproval => false, // Never auto-process while waiting for user
         }
+    }
+
+    fn same_prompt_retry_window_elapsed(&self) -> bool {
+        chrono::Utc::now() - self.last_state_change
+            >= chrono::Duration::seconds(SAME_PROMPT_RETRY_WINDOW_SECS)
     }
 
     /// Transition to detected state
@@ -361,5 +370,76 @@ impl TerminalPromptStateMachine {
     /// Check if state machine is stale (no activity for given duration)
     pub fn is_stale(&self, timeout: chrono::Duration) -> bool {
         chrono::Utc::now() - self.last_state_change > timeout
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_prompt(kind: PromptKind, text: &str) -> DetectedPrompt {
+        DetectedPrompt::new(kind, text.to_string(), 0.95)
+    }
+
+    #[test]
+    fn same_prompt_blocked_inside_retry_window() {
+        let prompt = create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue");
+        let mut sm = TerminalPromptStateMachine::new();
+
+        sm.on_prompt_detected(prompt.clone());
+        sm.on_response_sent(PromptDecision::auto_enter());
+        sm.last_state_change = chrono::Utc::now() - chrono::Duration::seconds(1);
+
+        assert!(
+            !sm.should_process(&prompt),
+            "same prompt should be blocked before retry window expires"
+        );
+    }
+
+    #[test]
+    fn same_prompt_retried_after_retry_window_in_responding() {
+        let prompt = create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue");
+        let mut sm = TerminalPromptStateMachine::new();
+
+        sm.on_prompt_detected(prompt.clone());
+        sm.on_response_sent(PromptDecision::auto_enter());
+        sm.last_state_change =
+            chrono::Utc::now() - chrono::Duration::seconds(SAME_PROMPT_RETRY_WINDOW_SECS + 1);
+
+        assert!(
+            sm.should_process(&prompt),
+            "same prompt should be retried after retry window in responding state"
+        );
+    }
+
+    #[test]
+    fn same_prompt_retried_after_retry_window_in_detected() {
+        let prompt = create_test_prompt(PromptKind::YesNo, "Continue? [y/n]");
+        let mut sm = TerminalPromptStateMachine::new();
+
+        sm.on_prompt_detected(prompt.clone());
+        sm.last_state_change =
+            chrono::Utc::now() - chrono::Duration::seconds(SAME_PROMPT_RETRY_WINDOW_SECS + 1);
+
+        assert!(
+            sm.should_process(&prompt),
+            "same prompt should be retried after retry window in detected state"
+        );
+    }
+
+    #[test]
+    fn waiting_for_approval_still_blocks_reprocessing() {
+        let prompt = create_test_prompt(PromptKind::Password, "Password:");
+        let mut sm = TerminalPromptStateMachine::new();
+
+        sm.on_prompt_detected(prompt.clone());
+        sm.on_waiting_for_approval(PromptDecision::ask_password());
+        sm.last_state_change =
+            chrono::Utc::now() - chrono::Duration::seconds(SAME_PROMPT_RETRY_WINDOW_SECS + 10);
+
+        assert!(
+            !sm.should_process(&prompt),
+            "waiting-for-approval must continue to block auto processing"
+        );
     }
 }

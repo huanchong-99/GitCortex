@@ -1420,10 +1420,7 @@ async fn submit_prompt_response(
         return Err(ApiError::BadRequest("terminalId is required".to_string()));
     }
 
-    let response = payload.response.trim();
-    if response.is_empty() {
-        return Err(ApiError::BadRequest("response is required".to_string()));
-    }
+    let response = payload.response.as_str();
 
     let _workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
@@ -1852,7 +1849,7 @@ mod prompt_response_route_tests {
     }
 
     #[tokio::test]
-    async fn submit_prompt_response_requires_response() {
+    async fn submit_prompt_response_allows_empty_response() {
         let deployment = DeploymentImpl::new()
             .await
             .expect("Failed to create deployment");
@@ -1860,7 +1857,7 @@ mod prompt_response_route_tests {
         let app = workflows_routes().with_state(deployment);
         let payload = json!({
             "terminalId": "terminal-1",
-            "response": "   "
+            "response": ""
         })
         .to_string();
 
@@ -1876,7 +1873,7 @@ mod prompt_response_route_tests {
             .await
             .expect("Failed to execute request");
 
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
@@ -1885,7 +1882,34 @@ mod prompt_response_route_tests {
             serde_json::from_slice(&body).expect("Failed to parse response JSON");
         assert_eq!(
             body_json.get("message").and_then(serde_json::Value::as_str),
-            Some("response is required")
+            Some("Workflow not found")
         );
+    }
+
+    #[tokio::test]
+    async fn submit_prompt_response_requires_response_field() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+
+        let app = workflows_routes().with_state(deployment);
+        let payload = json!({
+            "terminalId": "terminal-1"
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/prompts/respond")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 }

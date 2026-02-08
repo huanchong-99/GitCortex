@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  within,
+  act,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workflows } from './Workflows';
@@ -7,6 +14,17 @@ import type { WorkflowDetailDto, WorkflowListItemDto } from 'shared/types';
 import { I18nextProvider } from 'react-i18next';
 import { i18n, setTestLanguage } from '@/test/renderWithI18n';
 import { ToastProvider } from '@/components/ui/toast';
+import type {
+  TerminalPromptDecisionPayload,
+  TerminalPromptDetectedPayload,
+  WorkflowEventHandlers,
+} from '@/stores/wsStore';
+
+const wsStoreMock = vi.hoisted(() => ({
+  sendPromptResponse: vi.fn(),
+  workflowId: null as string | null | undefined,
+  handlers: undefined as WorkflowEventHandlers | undefined,
+}));
 
 // Mock useProjects hook to avoid WebSocket connection in tests
 vi.mock('@/hooks/useProjects', () => ({
@@ -15,6 +33,26 @@ vi.mock('@/hooks/useProjects', () => ({
     isLoading: false,
     error: null,
   }),
+}));
+
+vi.mock('@/stores/wsStore', () => ({
+  useWorkflowEvents: vi.fn(
+    (workflowId: string | null | undefined, handlers?: WorkflowEventHandlers) => {
+      wsStoreMock.workflowId = workflowId;
+      wsStoreMock.handlers = handlers;
+      return { connectionStatus: 'connected' };
+    }
+  ),
+  useWsStore: vi.fn(
+    (
+      selector: (state: {
+        sendPromptResponse: typeof wsStoreMock.sendPromptResponse;
+      }) => unknown
+    ) =>
+      selector({
+        sendPromptResponse: wsStoreMock.sendPromptResponse,
+      })
+  ),
 }));
 
 // ============================================================================
@@ -151,6 +189,44 @@ const mockCompletedWorkflowDetail: WorkflowDetailDto = {
   commands: [],
 };
 
+const basePromptDetectedPayload: TerminalPromptDetectedPayload = {
+  workflowId: 'workflow-3',
+  terminalId: 'terminal-1',
+  taskId: 'task-1',
+  sessionId: 'session-1',
+  promptKind: 'yes_no',
+  promptText: 'Continue? [y/n]',
+  confidence: 0.95,
+  hasDangerousKeywords: false,
+  options: ['yes', 'no'],
+  selectedIndex: 0,
+};
+
+function emitPromptDetected(
+  payload: Partial<TerminalPromptDetectedPayload> = {}
+) {
+  const handler = wsStoreMock.handlers?.onTerminalPromptDetected;
+  if (!handler) {
+    throw new Error('onTerminalPromptDetected handler is not registered');
+  }
+  act(() => {
+    handler({
+      ...basePromptDetectedPayload,
+      ...payload,
+    });
+  });
+}
+
+function emitPromptDecision(payload: TerminalPromptDecisionPayload) {
+  const handler = wsStoreMock.handlers?.onTerminalPromptDecision;
+  if (!handler) {
+    throw new Error('onTerminalPromptDecision handler is not registered');
+  }
+  act(() => {
+    handler(payload);
+  });
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -158,6 +234,9 @@ const mockCompletedWorkflowDetail: WorkflowDetailDto = {
 describe('Workflows Page', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    wsStoreMock.sendPromptResponse.mockReset();
+    wsStoreMock.workflowId = null;
+    wsStoreMock.handlers = undefined;
     await setTestLanguage('en');
   });
 
@@ -437,6 +516,385 @@ describe('Workflows Page', () => {
         expect(
           screen.getByText(/Failed to load workflows/)
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Prompt Interaction', () => {
+    it('shows prompt dialog and submits yes/no response via API', async () => {
+      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.startsWith('/api/workflows?project_id=')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: mockWorkflows }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: mockCompletedWorkflowDetail,
+            }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3/prompts/respond') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: null }),
+          } as Response);
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<Workflows />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Merge Workflow' })
+        ).toBeInTheDocument();
+      });
+
+      emitPromptDetected({
+        workflowId: 'workflow-3',
+        terminalId: 'terminal-1',
+        promptKind: 'yes_no',
+        promptText: 'Proceed with operation? [y/n]',
+      });
+
+      const dialog = await screen.findByTestId('workflow-prompt-dialog');
+      expect(within(dialog).getByText('Proceed with operation? [y/n]')).toBeInTheDocument();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Yes' }));
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows/workflow-3/prompts/respond',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ terminal_id: 'terminal-1', response: 'y' }),
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('workflow-prompt-dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('submits choice and input/password prompt responses', async () => {
+      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.startsWith('/api/workflows?project_id=')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: mockWorkflows }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: mockCompletedWorkflowDetail,
+            }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3/prompts/respond') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: null }),
+          } as Response);
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<Workflows />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Merge Workflow' })
+        ).toBeInTheDocument();
+      });
+
+      emitPromptDetected({
+        promptKind: 'choice',
+        promptText: 'Select an option',
+        options: ['Apple', 'Banana', 'Cherry'],
+        selectedIndex: 0,
+      });
+
+      const choiceDialog = await screen.findByTestId('workflow-prompt-dialog');
+      fireEvent.click(within(choiceDialog).getByTestId('workflow-prompt-option-1'));
+      fireEvent.click(within(choiceDialog).getByTestId('workflow-prompt-submit-option'));
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows/workflow-3/prompts/respond',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({
+              terminal_id: 'terminal-1',
+              response: 'Banana',
+            }),
+          })
+        );
+      });
+
+      emitPromptDetected({
+        promptKind: 'arrow_select',
+        promptText: 'Select framework',
+        options: ['React', 'Vue', 'Svelte'],
+        selectedIndex: 0,
+      });
+
+      const arrowDialog = await screen.findByTestId('workflow-prompt-dialog');
+      fireEvent.click(within(arrowDialog).getByTestId('workflow-prompt-option-2'));
+      fireEvent.click(within(arrowDialog).getByTestId('workflow-prompt-submit-option'));
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows/workflow-3/prompts/respond',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({
+              terminal_id: 'terminal-1',
+              response: '\u001b[B\u001b[B',
+            }),
+          })
+        );
+      });
+
+      emitPromptDetected({
+        promptKind: 'input',
+        promptText: 'Enter username',
+        options: [],
+        selectedIndex: null,
+      });
+
+      const inputDialog = await screen.findByTestId('workflow-prompt-dialog');
+      fireEvent.change(within(inputDialog).getByTestId('workflow-prompt-input'), {
+        target: { value: 'alice' },
+      });
+      fireEvent.click(within(inputDialog).getByTestId('workflow-prompt-submit-input'));
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows/workflow-3/prompts/respond',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ terminal_id: 'terminal-1', response: 'alice' }),
+          })
+        );
+      });
+
+      emitPromptDetected({
+        promptKind: 'password',
+        promptText: 'Password:',
+        options: [],
+        selectedIndex: null,
+      });
+
+      const passwordDialog = await screen.findByTestId('workflow-prompt-dialog');
+      const passwordInput = within(passwordDialog).getByTestId(
+        'workflow-prompt-input'
+      ) as HTMLInputElement;
+      expect(passwordInput.type).toBe('password');
+
+      fireEvent.change(passwordInput, {
+        target: { value: 'secret-token' },
+      });
+      fireEvent.click(
+        within(passwordDialog).getByTestId('workflow-prompt-submit-input')
+      );
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows/workflow-3/prompts/respond',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({
+              terminal_id: 'terminal-1',
+              response: 'secret-token',
+            }),
+          })
+        );
+      });
+    });
+
+    it('prevents duplicate prompt enqueue and closes by prompt decision', async () => {
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.startsWith('/api/workflows?project_id=')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: mockWorkflows }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: mockCompletedWorkflowDetail,
+            }),
+          } as Response);
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<Workflows />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Merge Workflow' })
+        ).toBeInTheDocument();
+      });
+
+      emitPromptDetected({
+        promptKind: 'yes_no',
+        promptText: 'Duplicate guard?',
+      });
+      emitPromptDetected({
+        promptKind: 'yes_no',
+        promptText: 'Duplicate guard?',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('workflow-prompt-dialog')).toBeInTheDocument();
+      });
+      expect(screen.getAllByTestId('workflow-prompt-dialog')).toHaveLength(1);
+
+      emitPromptDecision({
+        workflowId: 'workflow-3',
+        terminalId: 'terminal-1',
+        taskId: 'task-1',
+        sessionId: 'session-1',
+        decision: 'llm_decision',
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('workflow-prompt-dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('falls back to workflow WS submission for enter_confirm when API rejects empty response', async () => {
+      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.startsWith('/api/workflows?project_id=')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: mockWorkflows }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: mockCompletedWorkflowDetail,
+            }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-3/prompts/respond') {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            statusText: 'Bad Request',
+            json: async () => ({ success: false, message: 'response is required' }),
+          } as Response);
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<Workflows />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Merge Workflow' })
+        ).toBeInTheDocument();
+      });
+
+      emitPromptDetected({
+        promptKind: 'enter_confirm',
+        promptText: 'Press Enter to continue',
+        options: [],
+        selectedIndex: null,
+      });
+
+      const dialog = await screen.findByTestId('workflow-prompt-dialog');
+      fireEvent.click(
+        within(dialog).getByTestId('workflow-prompt-enter-confirm')
+      );
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/workflows/workflow-3/prompts/respond',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ terminal_id: 'terminal-1', response: '' }),
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(wsStoreMock.sendPromptResponse).toHaveBeenCalledWith({
+          workflowId: 'workflow-3',
+          terminalId: 'terminal-1',
+          response: '',
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('workflow-prompt-dialog')).not.toBeInTheDocument();
       });
     });
   });

@@ -225,15 +225,16 @@ async fn handle_client_text_message(text: &str, workflow_id: &str, runtime: &Orc
                 }
             };
 
-            let response = payload.response.trim();
-            if response.is_empty() {
+            let terminal_id = payload.terminal_id.trim();
+            if terminal_id.is_empty() {
                 warn!(
                     workflow_id = %workflow_id,
-                    terminal_id = %payload.terminal_id,
-                    "Ignoring terminal.prompt_response with empty response"
+                    "Ignoring terminal.prompt_response with empty terminal_id"
                 );
                 return;
             }
+
+            let response = payload.response.as_str();
 
             if let Some(payload_workflow_id) = payload.workflow_id.as_deref()
                 && payload_workflow_id != workflow_id
@@ -246,12 +247,12 @@ async fn handle_client_text_message(text: &str, workflow_id: &str, runtime: &Orc
             }
 
             if let Err(err) = runtime
-                .submit_user_prompt_response(workflow_id, &payload.terminal_id, response)
+                .submit_user_prompt_response(workflow_id, terminal_id, response)
                 .await
             {
                 warn!(
                     workflow_id = %workflow_id,
-                    terminal_id = %payload.terminal_id,
+                    terminal_id = %terminal_id,
                     error = %err,
                     "Failed to forward terminal prompt response to orchestrator runtime"
                 );
@@ -260,7 +261,7 @@ async fn handle_client_text_message(text: &str, workflow_id: &str, runtime: &Orc
 
             debug!(
                 workflow_id = %workflow_id,
-                terminal_id = %payload.terminal_id,
+                terminal_id = %terminal_id,
                 "Forwarded terminal prompt response to orchestrator runtime"
             );
         }
@@ -492,14 +493,47 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_prompt_response_with_empty_response_is_ignored() {
+    async fn test_prompt_response_with_empty_response_is_forwarded() {
         let runtime = test_runtime().await;
         let workflow_id = "00000000-0000-0000-0000-000000000004";
         let message = serde_json::json!({
             "type": WS_CLIENT_PROMPT_RESPONSE_TYPE,
             "payload": {
                 "terminalId": "terminal-1",
-                "response": "   "
+                "response": ""
+            }
+        })
+        .to_string();
+
+        let logs = CapturedLogs::default();
+        let subscriber = Registry::default().with(CaptureLayer { logs: logs.clone() });
+        let dispatch = tracing::Dispatch::new(subscriber);
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+
+        handle_client_text_message(&message, workflow_id, &runtime).await;
+
+        let warn_messages = logs.messages_for_level(Level::WARN);
+        assert!(
+            warn_messages.iter().any(|msg| msg
+                .contains("Failed to forward terminal prompt response to orchestrator runtime")),
+            "Expected runtime forwarding warning after dispatch, got: {warn_messages:?}"
+        );
+        assert!(
+            !warn_messages.iter().any(|msg| msg
+                .contains("Ignoring terminal.prompt_response with empty terminal_id")),
+            "Empty response should not be rejected as invalid payload"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_prompt_response_with_empty_terminal_id_is_ignored() {
+        let runtime = test_runtime().await;
+        let workflow_id = "00000000-0000-0000-0000-000000000005";
+        let message = serde_json::json!({
+            "type": WS_CLIENT_PROMPT_RESPONSE_TYPE,
+            "payload": {
+                "terminalId": "   ",
+                "response": "yes"
             }
         })
         .to_string();
@@ -515,13 +549,13 @@ mod tests {
         assert!(
             warn_messages
                 .iter()
-                .any(|msg| msg.contains("Ignoring terminal.prompt_response with empty response")),
-            "Expected empty-response warning, got: {warn_messages:?}"
+                .any(|msg| msg.contains("Ignoring terminal.prompt_response with empty terminal_id")),
+            "Expected empty-terminal-id warning, got: {warn_messages:?}"
         );
         assert!(
             !warn_messages.iter().any(|msg| msg
                 .contains("Failed to forward terminal prompt response to orchestrator runtime")),
-            "Empty response should not trigger runtime forwarding"
+            "Empty terminal_id should not trigger runtime forwarding"
         );
     }
 }

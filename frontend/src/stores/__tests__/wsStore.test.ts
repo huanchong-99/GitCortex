@@ -1155,6 +1155,319 @@ describe('wsStore', () => {
     );
   });
 
+  it('covers enter_confirm ask_user flow with user submit and workflow continuation', async () => {
+    const { connectToWorkflow, subscribeToWorkflow, sendPromptResponse } =
+      useWsStore.getState();
+
+    connectToWorkflow('wf-enter-confirm-flow');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-enter-confirm-flow')
+      ).toBe('connected');
+    });
+
+    const onDetected = vi.fn();
+    const onDecision = vi.fn();
+    const onCompleted = vi.fn();
+
+    subscribeToWorkflow(
+      'wf-enter-confirm-flow',
+      'terminal.prompt_detected',
+      onDetected
+    );
+    subscribeToWorkflow(
+      'wf-enter-confirm-flow',
+      'terminal.prompt_decision',
+      onDecision
+    );
+    subscribeToWorkflow(
+      'wf-enter-confirm-flow',
+      'terminal.completed',
+      onCompleted
+    );
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-enter-confirm-flow/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_detected',
+      payload: {
+        workflow_id: 'wf-enter-confirm-flow',
+        terminal_id: 'term-enter',
+        task_id: 'task-enter',
+        session_id: 'session-enter',
+        prompt_kind: 'EnterConfirm',
+        prompt_text: 'Press Enter to continue',
+        confidence: 0.99,
+        has_dangerous_keywords: true,
+        options: [],
+        selected_index: null,
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-enter-detected',
+    });
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_decision',
+      payload: {
+        workflowId: 'wf-enter-confirm-flow',
+        terminalId: 'term-enter',
+        taskId: 'task-enter',
+        sessionId: 'session-enter',
+        decision: {
+          action: 'ask_user',
+          reason: 'dangerous keyword detected',
+          suggestions: ['confirm', 'cancel'],
+        },
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-enter-decision',
+    });
+
+    expect(onDetected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-enter-confirm-flow',
+        terminalId: 'term-enter',
+        taskId: 'task-enter',
+        sessionId: 'session-enter',
+        promptKind: 'enter_confirm',
+        promptText: 'Press Enter to continue',
+      })
+    );
+    expect(onDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-enter-confirm-flow',
+        terminalId: 'term-enter',
+        decision: 'ask_user',
+        decisionDetail: expect.objectContaining({
+          action: 'ask_user',
+          reason: 'dangerous keyword detected',
+          suggestions: ['confirm', 'cancel'],
+        }),
+      })
+    );
+
+    ws!.send.mockClear();
+
+    sendPromptResponse({
+      workflowId: 'wf-enter-confirm-flow',
+      terminalId: 'term-enter',
+      response: '\n',
+    });
+
+    expect(ws!.send).toHaveBeenCalledTimes(1);
+
+    const [enterSerializedMessage] = ws!.send.mock.calls[0] as [string];
+    const enterSubmittedMessage = JSON.parse(enterSerializedMessage) as {
+      type: string;
+      payload: {
+        workflowId: string;
+        terminalId: string;
+        response: string;
+      };
+    };
+
+    expect(enterSubmittedMessage).toEqual(
+      expect.objectContaining({
+        type: 'terminal.prompt_response',
+        payload: {
+          workflowId: 'wf-enter-confirm-flow',
+          terminalId: 'term-enter',
+          response: '\n',
+        },
+      })
+    );
+
+    ws!.simulateMessage({
+      type: 'terminal.completed',
+      payload: {
+        workflowId: 'wf-enter-confirm-flow',
+        taskId: 'task-enter',
+        terminalId: 'term-enter',
+        status: 'completed',
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-enter-completed',
+    });
+
+    expect(onCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-enter-confirm-flow',
+        taskId: 'task-enter',
+        terminalId: 'term-enter',
+        status: 'completed',
+      })
+    );
+    expect(onCompleted.mock.invocationCallOrder[0]).toBeGreaterThan(
+      ws!.send.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('covers arrow_select ask_user flow with user submit and workflow continuation', async () => {
+    const { connectToWorkflow, subscribeToWorkflow, sendPromptResponse } =
+      useWsStore.getState();
+
+    connectToWorkflow('wf-arrow-select-flow');
+
+    await vi.waitFor(() => {
+      expect(
+        useWsStore.getState().getWorkflowConnectionStatus('wf-arrow-select-flow')
+      ).toBe('connected');
+    });
+
+    const onDetected = vi.fn();
+    const onDecision = vi.fn();
+    const onCompleted = vi.fn();
+
+    subscribeToWorkflow(
+      'wf-arrow-select-flow',
+      'terminal.prompt_detected',
+      onDetected
+    );
+    subscribeToWorkflow(
+      'wf-arrow-select-flow',
+      'terminal.prompt_decision',
+      onDecision
+    );
+    subscribeToWorkflow(
+      'wf-arrow-select-flow',
+      'terminal.completed',
+      onCompleted
+    );
+
+    const ws = websocketInstances.find((instance) =>
+      instance.url.includes('/workflow/wf-arrow-select-flow/')
+    );
+    expect(ws).toBeDefined();
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_detected',
+      payload: {
+        workflowId: 'wf-arrow-select-flow',
+        terminalId: 'term-select',
+        taskId: 'task-select',
+        sessionId: 'session-select',
+        promptKind: 'ArrowSelect',
+        promptText: 'Select deployment environment',
+        confidence: 0.87,
+        hasDangerousKeywords: false,
+        optionDetails: [
+          { index: 0, label: 'Staging', selected: false },
+          { index: 1, label: 'Production', selected: true },
+          { index: 2, label: 'Canary', selected: false },
+        ],
+        selectedIndex: null,
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-select-detected',
+    });
+
+    ws!.simulateMessage({
+      type: 'terminal.prompt_decision',
+      payload: {
+        workflow_id: 'wf-arrow-select-flow',
+        terminal_id: 'term-select',
+        task_id: 'task-select',
+        session_id: 'session-select',
+        decision: 'ask_user',
+        decision_detail: {
+          action: 'ask_user',
+          reason: 'manual environment confirmation required',
+          target_index: 2,
+          suggestions: ['2', null, '1'],
+        },
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-select-decision',
+    });
+
+    expect(onDetected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-arrow-select-flow',
+        terminalId: 'term-select',
+        taskId: 'task-select',
+        sessionId: 'session-select',
+        promptKind: 'arrow_select',
+        promptText: 'Select deployment environment',
+        options: ['Staging', 'Production', 'Canary'],
+        selectedIndex: 1,
+      })
+    );
+    expect(onDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-arrow-select-flow',
+        terminalId: 'term-select',
+        taskId: 'task-select',
+        sessionId: 'session-select',
+        decision: 'ask_user',
+        decisionDetail: expect.objectContaining({
+          action: 'ask_user',
+          reason: 'manual environment confirmation required',
+          targetIndex: 2,
+          suggestions: ['2', '1'],
+        }),
+      })
+    );
+
+    ws!.send.mockClear();
+
+    sendPromptResponse({
+      workflowId: 'wf-arrow-select-flow',
+      terminalId: 'term-select',
+      response: '2\n',
+    });
+
+    expect(ws!.send).toHaveBeenCalledTimes(1);
+
+    const [selectSerializedMessage] = ws!.send.mock.calls[0] as [string];
+    const selectSubmittedMessage = JSON.parse(selectSerializedMessage) as {
+      type: string;
+      payload: {
+        workflowId: string;
+        terminalId: string;
+        response: string;
+      };
+    };
+
+    expect(selectSubmittedMessage).toEqual(
+      expect.objectContaining({
+        type: 'terminal.prompt_response',
+        payload: {
+          workflowId: 'wf-arrow-select-flow',
+          terminalId: 'term-select',
+          response: '2\n',
+        },
+      })
+    );
+
+    ws!.simulateMessage({
+      type: 'terminal.completed',
+      payload: {
+        workflow_id: 'wf-arrow-select-flow',
+        task_id: 'task-select',
+        terminal_id: 'term-select',
+        status: 'review_passed',
+      },
+      timestamp: new Date().toISOString(),
+      id: 'msg-select-completed',
+    });
+
+    expect(onCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'wf-arrow-select-flow',
+        taskId: 'task-select',
+        terminalId: 'term-select',
+        status: 'review_pass',
+      })
+    );
+    expect(onCompleted.mock.invocationCallOrder[0]).toBeGreaterThan(
+      ws!.send.mock.invocationCallOrder[0]
+    );
+  });
+
   it('sendPromptResponse sends terminal.prompt_response with generated message envelope', async () => {
     const { connectToWorkflow, sendPromptResponse } = useWsStore.getState();
 
