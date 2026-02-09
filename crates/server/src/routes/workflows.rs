@@ -1159,9 +1159,60 @@ async fn start_workflow(
     Path(workflow_id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     // Check workflow exists
-    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+    let mut workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    // Recover stale workflow status after restart: DB may still be `running`
+    // while runtime instance is no longer active.
+    if workflow.status == "running"
+        && !deployment
+            .orchestrator_runtime()
+            .is_running(&workflow_id)
+            .await
+    {
+        tracing::warn!(
+            workflow_id = %workflow_id,
+            "Workflow marked running but runtime is not active; recovering to paused"
+        );
+        Workflow::update_status(&deployment.db().pool, &workflow_id, "paused").await?;
+        workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+            .await?
+            .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+    }
+
+    // Self-heal for restarted backend: a workflow may still be `ready` while terminals were
+    // reconciled to `not_started` (missing active PTY/session). Re-prepare before starting.
+    if workflow.status == "ready" || workflow.status == "paused" {
+        let terminals = db::models::Terminal::find_by_workflow(&deployment.db().pool, &workflow_id)
+            .await?;
+
+        let needs_reprepare = terminals.iter().any(|terminal| {
+            terminal.status != "waiting"
+                || terminal
+                    .pty_session_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|session| !session.is_empty())
+                    .is_none()
+        });
+
+        if needs_reprepare {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                workflow_status = %workflow.status,
+                "Workflow terminals are not launch-ready; re-preparing before start"
+            );
+
+            Workflow::update_status(&deployment.db().pool, &workflow_id, "created").await?;
+
+            let _ = prepare_workflow(State(deployment.clone()), Path(workflow_id.clone())).await?;
+
+            workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+                .await?
+                .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+        }
+    }
 
     // Verify orchestrator is enabled (only check needed at API level)
     if !workflow.orchestrator_enabled {

@@ -30,6 +30,32 @@ use utils::{
     sentry::{self as sentry_utils, SentrySource, sentry_layer},
 };
 
+const DEV_DEFAULT_ENCRYPTION_KEY: &str = "12345678901234567890123456789012";
+
+fn ensure_dev_encryption_key() {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+
+    match std::env::var("GITCORTEX_ENCRYPTION_KEY") {
+        Ok(value) if value.len() == 32 => {}
+        Ok(value) => {
+            tracing::warn!(
+                provided_length = value.len(),
+                "GITCORTEX_ENCRYPTION_KEY is set but length is invalid; workflow start may fail"
+            );
+        }
+        Err(_) => {
+            unsafe {
+                std::env::set_var("GITCORTEX_ENCRYPTION_KEY", DEV_DEFAULT_ENCRYPTION_KEY);
+            }
+            tracing::warn!(
+                "GITCORTEX_ENCRYPTION_KEY not set; using development fallback key"
+            );
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum GitCortexError {
     #[error(transparent)]
@@ -46,6 +72,7 @@ pub enum GitCortexError {
 async fn main() -> Result<(), GitCortexError> {
     // Load environment variables from .env file
     dotenv::dotenv().ok();
+    ensure_dev_encryption_key();
 
     // Install rustls crypto provider before any TLS operations
     rustls::crypto::aws_lc_rs::default_provider()

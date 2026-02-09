@@ -1317,6 +1317,104 @@ mod orchestrator_tests {
     }
 
     #[tokio::test]
+    async fn test_execute_instruction_start_task_codex_uses_terminal_input_with_submit() {
+        use db::models::Terminal;
+
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(1, true).await;
+        let (terminal_id, pty_session_id) = terminals.first().cloned().unwrap();
+        let pty_session_id = pty_session_id.expect("PTY should be present");
+
+        sqlx::query("UPDATE terminal SET cli_type_id = ? WHERE id = ?")
+            .bind("cli-codex")
+            .bind(&terminal_id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow_id,
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let terminal_input_topic = format!("terminal.input.{terminal_id}");
+        let mut input_rx = message_bus.subscribe(&terminal_input_topic).await;
+
+        let instruction_json = format!(
+            r#"{{"type":"start_task","task_id":"{}","instruction":"echo start"}}"#,
+            task_id
+        );
+
+        let result = agent.execute_instruction(&instruction_json).await;
+        assert!(result.is_ok(), "StartTask should succeed for codex terminal");
+
+        let first = tokio::time::timeout(tokio::time::Duration::from_millis(700), input_rx.recv())
+            .await
+            .expect("expected first terminal input for codex")
+            .expect("terminal input channel should stay open");
+
+        match first {
+            BusMessage::TerminalInput {
+                terminal_id: tid,
+                session_id,
+                input,
+                ..
+            } => {
+                assert_eq!(tid, terminal_id);
+                assert_eq!(session_id, pty_session_id);
+                assert_eq!(input, "echo start");
+            }
+            other => panic!("Expected TerminalInput for codex instruction, got {other:?}"),
+        }
+
+        let submit_1 =
+            tokio::time::timeout(tokio::time::Duration::from_millis(700), input_rx.recv())
+                .await
+                .expect("expected first codex submit keystroke")
+                .expect("terminal input channel should stay open");
+
+        match submit_1 {
+            BusMessage::TerminalInput { input, .. } => {
+                assert_eq!(input, "");
+            }
+            other => panic!("Expected first codex submit keystroke, got {other:?}"),
+        }
+
+        let submit_2 =
+            tokio::time::timeout(tokio::time::Duration::from_millis(900), input_rx.recv())
+                .await
+                .expect("expected second codex submit keystroke")
+                .expect("terminal input channel should stay open");
+
+        match submit_2 {
+            BusMessage::TerminalInput { input, .. } => {
+                assert_eq!(input, "");
+            }
+            other => panic!("Expected second codex submit keystroke, got {other:?}"),
+        }
+
+        let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "working");
+    }
+
+    #[tokio::test]
     async fn test_execute_instruction_start_task_no_pty() {
         use db::models::{Terminal, WorkflowTask};
 

@@ -193,6 +193,20 @@ impl OrchestratorAgent {
             TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
         );
 
+        if let Some(existing_terminal) =
+            db::models::Terminal::find_by_id(&self.db.pool, &event.terminal_id).await?
+        {
+            if existing_terminal.completed_at.is_some() {
+                tracing::info!(
+                    terminal_id = %event.terminal_id,
+                    task_id = %event.task_id,
+                    status = %existing_terminal.status,
+                    "Ignoring duplicate terminal completion event for finalized terminal"
+                );
+                return Ok(());
+            }
+        }
+
         let workflow_id = {
             let state = self.state.read().await;
             state.workflow_id.clone()
@@ -985,28 +999,34 @@ impl OrchestratorAgent {
             )
             .await;
 
-        // 5. Send instruction to PTY session
-        self.message_bus
-            .publish(
-                &pty_session_id,
-                BusMessage::TerminalMessage {
-                    message: instruction.to_string(),
-                },
-            )
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to send instruction to terminal: {e}"))?;
-
-        // Codex occasionally keeps long injected prompts in the composer without submission.
-        // Send an additional explicit Enter keystroke as a minimal, terminal-specific fallback.
         if Self::needs_explicit_submit(terminal) {
-            sleep(Duration::from_millis(120)).await;
             self.message_bus
-                .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
+                .publish_terminal_input(&terminal.id, &pty_session_id, instruction, None)
                 .await;
-            tracing::debug!(
-                terminal_id = %terminal.id,
-                "Sent extra submit keystroke for Codex terminal instruction dispatch"
-            );
+
+            for (attempt, delay_ms) in [(1u8, 120u64), (2u8, 360u64)] {
+                sleep(Duration::from_millis(delay_ms)).await;
+                self.message_bus
+                    .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
+                    .await;
+                tracing::debug!(
+                    terminal_id = %terminal.id,
+                    attempt,
+                    delay_ms,
+                    "Sent explicit submit keystroke for Codex terminal instruction dispatch"
+                );
+            }
+        } else {
+            // 5. Send instruction to PTY session
+            self.message_bus
+                .publish(
+                    &pty_session_id,
+                    BusMessage::TerminalMessage {
+                        message: instruction.to_string(),
+                    },
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to send instruction to terminal: {e}"))?;
         }
 
         tracing::info!(

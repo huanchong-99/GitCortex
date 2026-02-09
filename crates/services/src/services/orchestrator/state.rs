@@ -92,6 +92,22 @@ impl OrchestratorState {
     /// Records a terminal completion for a task.
     pub fn mark_terminal_completed(&mut self, task_id: &str, terminal_id: &str, success: bool) {
         if let Some(state) = self.task_states.get_mut(task_id) {
+            let already_recorded = state
+                .completed_terminals
+                .iter()
+                .any(|id| id == terminal_id)
+                || state.failed_terminals.iter().any(|id| id == terminal_id);
+
+            if already_recorded {
+                tracing::debug!(
+                    task_id = %task_id,
+                    terminal_id = %terminal_id,
+                    success,
+                    "Ignoring duplicate terminal completion event"
+                );
+                return;
+            }
+
             if success {
                 state.completed_terminals.push(terminal_id.to_string());
             } else {
@@ -457,5 +473,21 @@ mod tests {
     fn test_task_has_failures_nonexistent() {
         let state = OrchestratorState::new("test-workflow".to_string());
         assert!(!state.task_has_failures("nonexistent-task"));
+    }
+
+    #[test]
+    fn test_duplicate_terminal_completion_does_not_advance_task() {
+        let mut state = OrchestratorState::new("test-workflow".to_string());
+        state.init_task("task-1".to_string(), 3);
+
+        state.mark_terminal_completed("task-1", "term-1", true);
+        state.mark_terminal_completed("task-1", "term-2", true);
+        state.mark_terminal_completed("task-1", "term-2", true);
+
+        assert!(!state.is_task_completed("task-1"));
+
+        let task_state = state.task_states.get("task-1").expect("task state exists");
+        assert_eq!(task_state.completed_terminals.len(), 2);
+        assert_eq!(task_state.failed_terminals.len(), 0);
     }
 }
