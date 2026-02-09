@@ -152,6 +152,8 @@ export function WorkflowDebugPage() {
         return 'not_started';
       case 'starting':
         return 'starting';
+      case 'waiting':
+        return 'waiting';
       case 'running':
       case 'working':
         return 'working';

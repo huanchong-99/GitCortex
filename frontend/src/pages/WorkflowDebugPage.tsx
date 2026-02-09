@@ -33,7 +33,10 @@ function mapTerminalStatus(status: string): TerminalStatus {
 
 export function WorkflowDebugPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
-  const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');
+  const { data: workflow, isLoading } = useWorkflow(workflowId ?? '', {
+    refetchInterval: 1500,
+    staleTime: 0,
+  });
 
   if (isLoading) return <div className="p-6 text-low">Loading...</div>;
   if (!workflow) return <div className="p-6 text-low">Workflow not found</div>;

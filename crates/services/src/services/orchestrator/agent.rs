@@ -4,7 +4,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::anyhow;
 use db::DBService;
-use tokio::sync::RwLock;
+use tokio::{
+    sync::RwLock,
+    time::{Duration, sleep},
+};
 
 use super::{
     config::OrchestratorConfig,
@@ -190,6 +193,41 @@ impl OrchestratorAgent {
             TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
         );
 
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
+        let terminal_final_status = if success {
+            TERMINAL_STATUS_COMPLETED
+        } else {
+            TERMINAL_STATUS_FAILED
+        };
+
+        if let Err(e) =
+            db::models::Terminal::set_completed(&self.db.pool, &event.terminal_id, terminal_final_status)
+                .await
+        {
+            tracing::error!(
+                "Failed to mark terminal {} {}: {}",
+                event.terminal_id,
+                terminal_final_status,
+                e
+            );
+        }
+
+        let _ = self
+            .message_bus
+            .publish_workflow_event(
+                &workflow_id,
+                BusMessage::TerminalStatusUpdate {
+                    workflow_id: workflow_id.clone(),
+                    terminal_id: event.terminal_id.clone(),
+                    status: terminal_final_status.to_string(),
+                },
+            )
+            .await;
+
         // Update state and get next terminal info
         let (next_terminal_index, task_completed, has_next, task_failed) = {
             let mut state = self.state.write().await;
@@ -212,35 +250,40 @@ impl OrchestratorAgent {
 
         // Update task status based on completion/failure
         // Fail fast: if terminal failed, mark task as failed immediately to avoid stalled tasks
-        if !success {
-            // Terminal failed - mark task as failed immediately
-            if let Err(e) =
-                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, "failed")
-                    .await
-            {
-                tracing::error!("Failed to mark task {} failed: {}", event.task_id, e);
-            }
+        let task_final_status = if !success {
             tracing::warn!(
                 "Task {} marked as failed due to terminal {} failure",
                 event.task_id,
                 event.terminal_id
             );
+            Some("failed")
         } else if task_failed && task_completed {
-            // Task has failures and all terminals are done - mark as failed
-            if let Err(e) =
-                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, "failed")
-                    .await
-            {
-                tracing::error!("Failed to mark task {} failed: {}", event.task_id, e);
-            }
+            Some("failed")
         } else if task_completed {
-            // Task completed successfully
+            Some("completed")
+        } else {
+            None
+        };
+
+        if let Some(task_status) = task_final_status {
             if let Err(e) =
-                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, "completed")
+                db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, task_status)
                     .await
             {
-                tracing::error!("Failed to mark task {} completed: {}", event.task_id, e);
+                tracing::error!("Failed to mark task {} {}: {}", event.task_id, task_status, e);
             }
+
+            let _ = self
+                .message_bus
+                .publish_workflow_event(
+                    &workflow_id,
+                    BusMessage::TaskStatusUpdate {
+                        workflow_id: workflow_id.clone(),
+                        task_id: event.task_id.clone(),
+                        status: task_status.to_string(),
+                    },
+                )
+                .await;
         }
 
         // 构建提示并调用 LLM
@@ -826,6 +869,11 @@ impl OrchestratorAgent {
         terminal: &db::models::Terminal,
         instruction: &str,
     ) -> anyhow::Result<()> {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
         // 0. Check terminal status - only dispatch if waiting
         if terminal.status != "waiting" {
             tracing::warn!(
@@ -845,12 +893,6 @@ impl OrchestratorAgent {
                     terminal.id
                 );
                 tracing::error!("{}", error_msg);
-
-                // Get workflow_id for broadcasting
-                let workflow_id = {
-                    let state = self.state.read().await;
-                    state.workflow_id.clone()
-                };
 
                 // Mark terminal as failed
                 let _ = db::models::Terminal::update_status(
@@ -919,7 +961,31 @@ impl OrchestratorAgent {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to update task status: {e}"))?;
 
-        // 4. Send instruction to PTY session
+        // 4. Broadcast live status updates for UI
+        let _ = self
+            .message_bus
+            .publish_workflow_event(
+                &workflow_id,
+                BusMessage::TerminalStatusUpdate {
+                    workflow_id: workflow_id.clone(),
+                    terminal_id: terminal.id.clone(),
+                    status: "working".to_string(),
+                },
+            )
+            .await;
+        let _ = self
+            .message_bus
+            .publish_workflow_event(
+                &workflow_id,
+                BusMessage::TaskStatusUpdate {
+                    workflow_id: workflow_id.clone(),
+                    task_id: task_id.to_string(),
+                    status: "running".to_string(),
+                },
+            )
+            .await;
+
+        // 5. Send instruction to PTY session
         self.message_bus
             .publish(
                 &pty_session_id,
@@ -930,6 +996,19 @@ impl OrchestratorAgent {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send instruction to terminal: {e}"))?;
 
+        // Codex occasionally keeps long injected prompts in the composer without submission.
+        // Send an additional explicit Enter keystroke as a minimal, terminal-specific fallback.
+        if Self::needs_explicit_submit(terminal) {
+            sleep(Duration::from_millis(120)).await;
+            self.message_bus
+                .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
+                .await;
+            tracing::debug!(
+                terminal_id = %terminal.id,
+                "Sent extra submit keystroke for Codex terminal instruction dispatch"
+            );
+        }
+
         tracing::info!(
             "Dispatched terminal {} for task {} with instruction: {}",
             terminal.id,
@@ -938,6 +1017,10 @@ impl OrchestratorAgent {
         );
 
         Ok(())
+    }
+
+    fn needs_explicit_submit(terminal: &db::models::Terminal) -> bool {
+        terminal.cli_type_id.to_ascii_lowercase().contains("codex")
     }
 
     /// Builds a task instruction from task and terminal information.
@@ -1013,6 +1096,10 @@ impl OrchestratorAgent {
         ));
         parts.push(
             "If there are no file changes, create an empty commit with --allow-empty so GitWatcher/Orchestrator can advance."
+                .to_string(),
+        );
+        parts.push(
+            "If the current branch is already the integration branch, commit directly and do not create an extra branch or redundant self-merge."
                 .to_string(),
         );
 
@@ -1259,6 +1346,16 @@ impl OrchestratorAgent {
 
         // Merge each task branch
         for (task_id, task_branch) in task_branches {
+            if task_branch.eq_ignore_ascii_case(target_branch) {
+                tracing::info!(
+                    "Skipping merge for task {} because task branch '{}' already equals target branch '{}'.",
+                    task_id,
+                    task_branch,
+                    target_branch
+                );
+                continue;
+            }
+
             tracing::info!("Merging task branch {} for task {}", task_branch, task_id);
 
             // Determine task worktree path
@@ -1636,6 +1733,7 @@ mod tests {
         assert!(instruction.contains("terminal_id: terminal-0"));
         assert!(instruction.contains("status: completed"));
         assert!(instruction.contains("next_action: continue"));
+        assert!(instruction.contains("do not create an extra branch"));
     }
 
     #[test]
@@ -1651,6 +1749,7 @@ mod tests {
         assert!(!instruction.contains("Task objective:"));
         assert!(!instruction.contains("Execution context:"));
         assert!(instruction.contains("Completion contract:"));
+        assert!(instruction.contains("do not create an extra branch"));
     }
 
     #[test]

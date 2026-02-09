@@ -256,6 +256,11 @@ export const workflowKeys = {
   byId: (workflowId: string) => ['workflows', 'detail', workflowId] as const,
 };
 
+interface UseWorkflowOptions {
+  refetchInterval?: number | false;
+  staleTime?: number;
+}
+
 // ============================================================================
 // Workflow API
 // ============================================================================
@@ -445,13 +450,15 @@ export function useWorkflows(
  * @returns Query result with workflow details
  */
 export function useWorkflow(
-  workflowId: string
+  workflowId: string,
+  options?: UseWorkflowOptions
 ): UseQueryResult<Workflow, Error> {
   return useQuery({
     queryKey: workflowKeys.byId(workflowId),
     queryFn: () => workflowsApi.getById(workflowId),
     enabled: !!workflowId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: options?.staleTime ?? 1000 * 60 * 5, // default 5 minutes
+    refetchInterval: options?.refetchInterval,
   });
 }
 
