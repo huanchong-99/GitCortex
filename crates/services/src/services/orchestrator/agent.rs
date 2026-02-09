@@ -9,6 +9,7 @@ use tokio::sync::RwLock;
 use super::{
     config::OrchestratorConfig,
     constants::{
+        GIT_COMMIT_METADATA_SEPARATOR,
         TERMINAL_STATUS_COMPLETED, TERMINAL_STATUS_FAILED, TERMINAL_STATUS_REVIEW_PASSED,
         TERMINAL_STATUS_REVIEW_REJECTED, WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
         WORKFLOW_STATUS_MERGING, WORKFLOW_TOPIC_PREFIX,
@@ -302,8 +303,14 @@ impl OrchestratorAgent {
             return Ok(());
         }
 
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+
         // Build and dispatch instruction
-        let instruction = Self::build_task_instruction(&task, &terminal, terminals.len());
+        let instruction =
+            Self::build_task_instruction(&workflow_id, &task, &terminal, terminals.len());
         self.dispatch_terminal(task_id, &terminal, &instruction)
             .await
     }
@@ -935,6 +942,7 @@ impl OrchestratorAgent {
 
     /// Builds a task instruction from task and terminal information.
     fn build_task_instruction(
+        workflow_id: &str,
         task: &db::models::WorkflowTask,
         terminal: &db::models::Terminal,
         total_terminals: usize,
@@ -987,6 +995,26 @@ impl OrchestratorAgent {
                     .to_string(),
             );
         }
+
+        let terminal_order = (terminal.order_index + 1).max(1);
+        let commit_metadata_template = format!(
+            "{separator}\\nworkflow_id: {workflow_id}\\ntask_id: {task_id}\\nterminal_id: {terminal_id}\\nterminal_order: {terminal_order}\\nstatus: completed\\nnext_action: continue",
+            separator = GIT_COMMIT_METADATA_SEPARATOR,
+            task_id = task.id,
+            terminal_id = terminal.id,
+            terminal_order = terminal_order,
+        );
+        parts.push(
+            "Completion contract: when your scoped work is done, you MUST create a git commit before stopping."
+                .to_string(),
+        );
+        parts.push(format!(
+            "Commit message must include this metadata block exactly: {commit_metadata_template}"
+        ));
+        parts.push(
+            "If there are no file changes, create an empty commit with --allow-empty so GitWatcher/Orchestrator can advance."
+                .to_string(),
+        );
 
         parts.push("Please start implementing immediately.".to_string());
 
@@ -1087,7 +1115,8 @@ impl OrchestratorAgent {
             }
 
             // Build and dispatch instruction
-            let instruction = Self::build_task_instruction(&task, &terminal, terminals.len());
+            let instruction =
+                Self::build_task_instruction(&workflow_id, &task, &terminal, terminals.len());
             if let Err(e) = self
                 .dispatch_terminal(&task.id, &terminal, &instruction)
                 .await
@@ -1588,29 +1617,40 @@ mod tests {
 
     #[test]
     fn build_task_instruction_for_multi_terminal_uses_objective_not_full_description() {
+        let workflow_id = "workflow-1";
         let task = make_task(Some(
             "Build a local guestbook with frontend and backend, persist to local json file and display in UI",
         ));
         let terminal = make_terminal(0);
 
-        let instruction = OrchestratorAgent::build_task_instruction(&task, &terminal, 3);
+        let instruction =
+            OrchestratorAgent::build_task_instruction(workflow_id, &task, &terminal, 3);
 
         assert!(instruction.contains("Task objective:"));
         assert!(!instruction.contains("Task description:"));
         assert!(instruction.contains("Execution context: terminal 1/3."));
         assert!(instruction.contains("Focus only on your scoped role"));
+        assert!(instruction.contains("Completion contract:"));
+        assert!(instruction.contains("workflow_id: workflow-1"));
+        assert!(instruction.contains("task_id: task-1"));
+        assert!(instruction.contains("terminal_id: terminal-0"));
+        assert!(instruction.contains("status: completed"));
+        assert!(instruction.contains("next_action: continue"));
     }
 
     #[test]
     fn build_task_instruction_for_single_terminal_keeps_full_description() {
+        let workflow_id = "workflow-1";
         let task = make_task(Some("Complete full implementation end-to-end"));
         let terminal = make_terminal(0);
 
-        let instruction = OrchestratorAgent::build_task_instruction(&task, &terminal, 1);
+        let instruction =
+            OrchestratorAgent::build_task_instruction(workflow_id, &task, &terminal, 1);
 
         assert!(instruction.contains("Task description: Complete full implementation end-to-end"));
         assert!(!instruction.contains("Task objective:"));
         assert!(!instruction.contains("Execution context:"));
+        assert!(instruction.contains("Completion contract:"));
     }
 
     #[test]

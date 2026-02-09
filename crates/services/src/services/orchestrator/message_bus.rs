@@ -169,18 +169,49 @@ impl MessageBus {
             return Ok(0);
         }
 
+        let mut delivered = 0usize;
+        let mut had_closed_subscribers = false;
+
         for tx in &subscribers {
-            tx.send(message.clone())
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to send message to subscriber: {e}"))?;
+            match tx.send(message.clone()).await {
+                Ok(()) => {
+                    delivered += 1;
+                }
+                Err(err) => {
+                    had_closed_subscribers = true;
+                    tracing::debug!(
+                        topic = %topic,
+                        ?err,
+                        "Dropping closed topic subscriber during publish"
+                    );
+                }
+            }
+        }
+
+        if had_closed_subscribers {
+            let mut subscribers = self.subscribers.write().await;
+            if let Some(topic_subscribers) = subscribers.get_mut(topic) {
+                topic_subscribers.retain(|sender| !sender.is_closed());
+                if topic_subscribers.is_empty() {
+                    subscribers.remove(topic);
+                }
+            }
+        }
+
+        if delivered == 0 {
+            if require_subscribers {
+                return Err(anyhow::anyhow!("No active subscribers for topic: {topic}"));
+            }
+            tracing::warn!(topic = %topic, "Dropping message: no active subscribers");
+            return Ok(0);
         }
 
         tracing::trace!(
             topic = %topic,
-            subscriber_count = subscribers.len(),
+            subscriber_count = delivered,
             "Published message to topic subscribers"
         );
-        Ok(subscribers.len())
+        Ok(delivered)
     }
 
     /// Publishes a terminal completion event to workflow topic and broadcast channel.
@@ -247,23 +278,37 @@ impl MessageBus {
         let fallback_topic = session_id.to_string();
 
         if topic_subscriber_count > 0 {
-            if let Err(err) = self.publish(&topic, message.clone()).await {
-                tracing::error!(
-                    ?err,
-                    terminal_id = %terminal_id,
-                    session_id = %session_id,
-                    topic = %topic,
-                    "Failed to publish terminal input to primary topic"
-                );
-                self.publish_terminal_input_fallback(
-                    terminal_id,
-                    session_id,
-                    &topic,
-                    &fallback_topic,
-                    &message,
-                    "primary topic publish failed",
-                )
-                .await;
+            match self.publish_inner(&topic, message.clone(), false).await {
+                Ok(delivered) if delivered > 0 => {}
+                Ok(_) => {
+                    self.publish_terminal_input_fallback(
+                        terminal_id,
+                        session_id,
+                        &topic,
+                        &fallback_topic,
+                        &message,
+                        "primary topic had no active subscribers",
+                    )
+                    .await;
+                }
+                Err(err) => {
+                    tracing::error!(
+                        ?err,
+                        terminal_id = %terminal_id,
+                        session_id = %session_id,
+                        topic = %topic,
+                        "Failed to publish terminal input to primary topic"
+                    );
+                    self.publish_terminal_input_fallback(
+                        terminal_id,
+                        session_id,
+                        &topic,
+                        &fallback_topic,
+                        &message,
+                        "primary topic publish failed",
+                    )
+                    .await;
+                }
             }
         } else {
             self.publish_terminal_input_fallback(
@@ -465,5 +510,65 @@ mod tests {
                 ..
             } if terminal_id == "term-1" && session_id == "session-1" && input == "approve"
         ));
+    }
+
+    #[tokio::test]
+    async fn publish_succeeds_when_topic_contains_stale_and_live_subscribers() {
+        let bus = MessageBus::new(8);
+        let stale_rx = bus.subscribe("workflow:wf-1").await;
+        drop(stale_rx);
+        let mut live_rx = bus.subscribe("workflow:wf-1").await;
+
+        let publish_result = bus
+            .publish(
+                "workflow:wf-1",
+                BusMessage::StatusUpdate {
+                    workflow_id: "wf-1".to_string(),
+                    status: "starting".to_string(),
+                },
+            )
+            .await;
+
+        assert!(publish_result.is_ok(), "publish should ignore stale subscribers");
+
+        let live_message = timeout(Duration::from_millis(200), live_rx.recv())
+            .await
+            .expect("expected live subscriber message")
+            .expect("live subscriber channel should be open");
+
+        assert!(matches!(
+            live_message,
+            BusMessage::StatusUpdate {
+                ref workflow_id,
+                ref status
+            } if workflow_id == "wf-1" && status == "starting"
+        ));
+    }
+
+    #[tokio::test]
+    async fn publish_prunes_fully_stale_topic_subscribers() {
+        let bus = MessageBus::new(8);
+        let stale_rx = bus.subscribe("workflow:wf-2").await;
+        drop(stale_rx);
+
+        let publish_result = bus
+            .publish(
+                "workflow:wf-2",
+                BusMessage::StatusUpdate {
+                    workflow_id: "wf-2".to_string(),
+                    status: "starting".to_string(),
+                },
+            )
+            .await;
+
+        assert!(
+            publish_result.is_ok(),
+            "publish should not fail when all subscribers are stale"
+        );
+        assert_eq!(
+            bus.subscriber_count("workflow:wf-2").await,
+            0,
+            "stale subscribers should be removed after publish"
+        );
     }
 }
