@@ -411,19 +411,28 @@ impl GitWatcher {
             metadata.status
         );
 
-        // Determine completion status
-        let completion_status = match metadata.status.as_str() {
-            "completed" => TerminalCompletionStatus::Completed,
-            "review_pass" => TerminalCompletionStatus::ReviewPass,
-            "review_reject" => TerminalCompletionStatus::ReviewReject,
-            "failed" => TerminalCompletionStatus::Failed,
-            _ => {
-                tracing::warn!(
-                    "Unknown status '{}', defaulting to Completed",
-                    metadata.status
-                );
-                TerminalCompletionStatus::Completed
-            }
+        // Determine completion status.
+        // `status=completed` with `next_action=continue` means checkpoint commit,
+        // not terminal handoff/completion.
+        let Some(completion_status) = Self::completion_status_from_metadata(&metadata) else {
+            tracing::info!(
+                terminal_id = %metadata.terminal_id,
+                task_id = %metadata.task_id,
+                status = %metadata.status,
+                next_action = %metadata.next_action,
+                "Commit metadata indicates continue mode; skipping TerminalCompleted publish"
+            );
+
+            self.message_bus
+                .publish_git_event(
+                    &metadata.workflow_id,
+                    &commit.hash,
+                    &commit.branch,
+                    &commit.message,
+                )
+                .await;
+
+            return Ok(());
         };
 
         // Create terminal completion event
@@ -446,6 +455,25 @@ impl GitWatcher {
         );
 
         Ok(())
+    }
+
+    fn completion_status_from_metadata(metadata: &CommitMetadata) -> Option<TerminalCompletionStatus> {
+        let status = metadata.status.trim().to_ascii_lowercase();
+        let next_action = metadata.next_action.trim().to_ascii_lowercase();
+
+        match status.as_str() {
+            "completed" => {
+                if matches!(next_action.as_str(), "continue" | "retry") {
+                    None
+                } else {
+                    Some(TerminalCompletionStatus::Completed)
+                }
+            }
+            "review_pass" => Some(TerminalCompletionStatus::ReviewPass),
+            "review_reject" => Some(TerminalCompletionStatus::ReviewReject),
+            "failed" => Some(TerminalCompletionStatus::Failed),
+            _ => None,
+        }
     }
 }
 
@@ -630,5 +658,65 @@ next_action: continue"#;
         assert_eq!(metadata.severity, Some("info".to_string()));
         assert_eq!(metadata.reviewed_terminal, Some("terminal-001".to_string()));
         assert_eq!(metadata.next_action, "continue");
+    }
+
+    #[test]
+    fn test_completion_status_completed_continue_does_not_advance() {
+        let metadata = CommitMetadata {
+            workflow_id: "wf-1".to_string(),
+            task_id: "task-1".to_string(),
+            terminal_id: "term-1".to_string(),
+            terminal_order: 1,
+            cli: "claude-code".to_string(),
+            model: "opus".to_string(),
+            status: "completed".to_string(),
+            severity: None,
+            reviewed_terminal: None,
+            issues: None,
+            next_action: "continue".to_string(),
+        };
+
+        let status = GitWatcher::completion_status_from_metadata(&metadata);
+        assert!(status.is_none());
+    }
+
+    #[test]
+    fn test_completion_status_completed_handoff_advances() {
+        let metadata = CommitMetadata {
+            workflow_id: "wf-1".to_string(),
+            task_id: "task-1".to_string(),
+            terminal_id: "term-1".to_string(),
+            terminal_order: 1,
+            cli: "claude-code".to_string(),
+            model: "opus".to_string(),
+            status: "completed".to_string(),
+            severity: None,
+            reviewed_terminal: None,
+            issues: None,
+            next_action: "handoff".to_string(),
+        };
+
+        let status = GitWatcher::completion_status_from_metadata(&metadata);
+        assert!(matches!(status, Some(TerminalCompletionStatus::Completed)));
+    }
+
+    #[test]
+    fn test_completion_status_unknown_does_not_advance() {
+        let metadata = CommitMetadata {
+            workflow_id: "wf-1".to_string(),
+            task_id: "task-1".to_string(),
+            terminal_id: "term-1".to_string(),
+            terminal_order: 1,
+            cli: "claude-code".to_string(),
+            model: "opus".to_string(),
+            status: "processing".to_string(),
+            severity: None,
+            reviewed_terminal: None,
+            issues: None,
+            next_action: "continue".to_string(),
+        };
+
+        let status = GitWatcher::completion_status_from_metadata(&metadata);
+        assert!(status.is_none());
     }
 }

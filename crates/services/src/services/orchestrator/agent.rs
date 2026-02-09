@@ -1101,7 +1101,7 @@ impl OrchestratorAgent {
 
         let terminal_order = (terminal.order_index + 1).max(1);
         let commit_metadata_template = format!(
-            "{separator}\\nworkflow_id: {workflow_id}\\ntask_id: {task_id}\\nterminal_id: {terminal_id}\\nterminal_order: {terminal_order}\\nstatus: completed\\nnext_action: continue",
+            "{separator}\\nworkflow_id: {workflow_id}\\ntask_id: {task_id}\\nterminal_id: {terminal_id}\\nterminal_order: {terminal_order}\\nstatus: completed\\nnext_action: handoff",
             separator = GIT_COMMIT_METADATA_SEPARATOR,
             task_id = task.id,
             terminal_id = terminal.id,
@@ -1752,7 +1752,7 @@ mod tests {
         assert!(instruction.contains("task_id: task-1"));
         assert!(instruction.contains("terminal_id: terminal-0"));
         assert!(instruction.contains("status: completed"));
-        assert!(instruction.contains("next_action: continue"));
+        assert!(instruction.contains("next_action: handoff"));
         assert!(instruction.contains("do not create an extra branch"));
     }
 
