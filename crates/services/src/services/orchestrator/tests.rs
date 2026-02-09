@@ -841,7 +841,7 @@ mod orchestrator_tests {
         .bind("cli-claude-code") // From migration
         .bind("model-claude-sonnet") // From migration
         .bind(0)
-        .bind("waiting")
+        .bind("working")
         .bind(&pty_session_id)
         .bind(chrono::Utc::now())
         .bind(chrono::Utc::now())
@@ -2154,7 +2154,7 @@ next_action: handoff"#;
         sqlx::query(
             r#"
             UPDATE terminal
-            SET started_at = ?1, updated_at = ?1
+            SET status = 'working', started_at = ?1, updated_at = ?1
             WHERE id = ?2
             "#,
         )
