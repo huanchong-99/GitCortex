@@ -12,6 +12,8 @@
 //! 5. **YesNo** - Binary yes/no confirmation
 //! 6. **EnterConfirm** - Simple Enter key confirmation
 
+use std::collections::HashSet;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -474,8 +476,36 @@ impl PromptDetector {
             }
         }
 
+        let selected_count = options.iter().filter(|option| option.selected).count();
+        let unique_label_count = options
+            .iter()
+            .map(|option| option.label.trim().to_ascii_lowercase())
+            .filter(|label| !label.is_empty())
+            .collect::<HashSet<_>>()
+            .len();
+
         // Need at least 2 options to be considered an arrow select
         if options.len() >= 2 && (has_arrow_hint || options.len() >= 3) {
+            if unique_label_count < 2 {
+                tracing::debug!(
+                    option_count = options.len(),
+                    selected_count,
+                    unique_label_count,
+                    has_arrow_hint,
+                    "Ignoring ArrowSelect detection due to non-distinct option labels"
+                );
+                return None;
+            }
+
+            if selected_count > 1 && !has_arrow_hint {
+                tracing::debug!(
+                    option_count = options.len(),
+                    selected_count,
+                    "Ignoring ArrowSelect detection due to multiple selected markers without arrow hint"
+                );
+                return None;
+            }
+
             let raw_text = self.line_buffer.join("\n");
             let confidence = if has_arrow_hint { 0.95 } else { 0.75 };
 
@@ -653,6 +683,34 @@ mod tests {
         assert!(options[0].selected);
         assert_eq!(options[1].label, "Vue");
         assert!(!options[1].selected);
+    }
+
+    #[test]
+    fn test_detect_arrow_select_ignores_non_distinct_spinner_like_options() {
+        let mut detector = PromptDetector::new();
+
+        detector.process_line("* Brewing…");
+        detector.process_line("* Brewing…");
+        let result = detector.process_line("* Brewing…");
+
+        assert!(
+            result.is_none(),
+            "Repeated non-distinct labels should not be detected as ArrowSelect"
+        );
+    }
+
+    #[test]
+    fn test_detect_arrow_select_ignores_multiple_selected_markers_without_hint() {
+        let mut detector = PromptDetector::new();
+
+        detector.process_line("> Option A");
+        detector.process_line("* Option B");
+        let result = detector.process_line("> Option C");
+
+        assert!(
+            result.is_none(),
+            "Multiple selected markers without arrow hint should be treated as unstable noise"
+        );
     }
 
     #[test]

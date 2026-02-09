@@ -30,6 +30,8 @@ use super::{
 /// Confidence threshold for auto-confirming EnterConfirm prompts
 const AUTO_CONFIRM_CONFIDENCE_THRESHOLD: f32 = 0.85;
 
+const SPINNER_NOISE_MARKERS: [&str; 2] = ["brewing", "loading"];
+
 // ============================================================================
 // LLM Prompt Decision Request/Response
 // ============================================================================
@@ -266,6 +268,24 @@ impl PromptHandler {
             }
 
             PromptKind::ArrowSelect => {
+                let normalized_prompt = prompt.raw_text.to_ascii_lowercase();
+                let spinner_noise_score = SPINNER_NOISE_MARKERS
+                    .iter()
+                    .filter(|marker| normalized_prompt.contains(**marker))
+                    .count();
+
+                if spinner_noise_score > 0 {
+                    tracing::warn!(
+                        raw_text = %prompt.raw_text,
+                        spinner_noise_score,
+                        "ArrowSelect prompt looks like spinner noise; skip auto arrow injection"
+                    );
+                    return PromptDecision::Skip {
+                        reason: "Ignore spinner-like pseudo menu to avoid wrong key injection"
+                            .to_string(),
+                    };
+                }
+
                 // Default to first option (index 0)
                 // In production, this should use LLM
                 let current_index = prompt.selected_index.unwrap_or(0);
@@ -554,6 +574,75 @@ mod tests {
             PromptDecision::AskUser { .. } => {}
             _ => panic!("Expected AskUser decision for Input prompt"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_spinner_like_arrow_select_is_skipped() {
+        let handler = create_test_handler();
+        let mut prompt = create_test_prompt(
+            PromptKind::ArrowSelect,
+            "* Brewing…\n* Brewing…\n* Brewing…",
+            0.95,
+        );
+        prompt.selected_index = Some(0);
+
+        let decision = handler.make_decision(&prompt, true).await;
+
+        match decision {
+            PromptDecision::Skip { reason } => {
+                assert!(reason.contains("spinner-like"));
+            }
+            _ => panic!("Expected Skip decision for spinner-like ArrowSelect noise"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_spinner_like_arrow_select_does_not_publish_terminal_input() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let handler = PromptHandler::new(message_bus.clone());
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        let mut prompt = create_test_prompt(
+            PromptKind::ArrowSelect,
+            "* Brewing…\n* Brewing…\n* Brewing…",
+            0.95,
+        );
+        prompt.selected_index = Some(0);
+
+        let event = TerminalPromptEvent {
+            terminal_id: "term-1".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            session_id: "session-1".to_string(),
+            auto_confirm: true,
+            prompt,
+            detected_at: chrono::Utc::now(),
+        };
+
+        let decision = handler
+            .handle_prompt_event(&event)
+            .await
+            .expect("spinner-like prompt should still produce a decision");
+        assert!(matches!(decision, PromptDecision::Skip { .. }));
+
+        let decision_message = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected decision broadcast")
+            .expect("broadcast channel should be open");
+
+        assert!(matches!(
+            decision_message,
+            BusMessage::TerminalPromptDecision {
+                decision: PromptDecision::Skip { .. },
+                ..
+            }
+        ));
+
+        let maybe_input = tokio::time::timeout(Duration::from_millis(120), broadcast_rx.recv()).await;
+        assert!(
+            maybe_input.is_err(),
+            "spinner-like prompt should not emit TerminalInput"
+        );
     }
 
     #[tokio::test]

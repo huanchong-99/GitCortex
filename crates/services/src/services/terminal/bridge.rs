@@ -408,10 +408,10 @@ impl TerminalBridge {
         Ok(())
     }
 
-    /// Normalizes a message by ensuring it ends with a newline.
+    /// Normalizes a message by ensuring it ends with an Enter key payload.
     ///
-    /// On Windows, uses `\r\n` for compatibility with some CLI tools.
-    /// On Unix, uses `\n`.
+    /// PTY-based TUIs are generally Enter-key driven (`\r`) rather than
+    /// line-feed-driven (`\n`/`\r\n`).
     ///
     /// # Arguments
     ///
@@ -423,22 +423,27 @@ impl TerminalBridge {
     fn normalize_message(message: &str) -> String {
         let mut payload = message.to_string();
 
-        // Already has newline
-        if payload.ends_with('\n') {
-            if cfg!(windows) && !payload.ends_with("\r\n") {
-                payload.pop();
-                payload.push_str("\r\n");
-            }
+        if payload.is_empty() {
+            return "\r".to_string();
+        }
+
+        if payload.ends_with("\r\n") {
+            payload.truncate(payload.len().saturating_sub(2));
+            payload.push('\r');
             return payload;
         }
 
-        // Append platform-appropriate newline
-        if cfg!(windows) {
-            payload.push_str("\r\n");
-        } else {
-            payload.push('\n');
+        if payload.ends_with('\n') {
+            payload.pop();
+            payload.push('\r');
+            return payload;
         }
 
+        if payload.ends_with('\r') {
+            return payload;
+        }
+
+        payload.push('\r');
         payload
     }
 }
@@ -454,49 +459,27 @@ mod tests {
     #[test]
     fn test_normalize_message_adds_newline() {
         let result = TerminalBridge::normalize_message("hello");
-        assert!(result.ends_with('\n'), "Should end with newline");
+        assert!(result.ends_with('\r'), "Should end with carriage return");
     }
 
     #[test]
     fn test_normalize_message_preserves_existing_newline() {
         let result = TerminalBridge::normalize_message("hello\n");
-        if cfg!(windows) {
-            assert_eq!(
-                result, "hello\r\n",
-                "Windows should normalize LF newline to CRLF"
-            );
-        } else {
-            assert_eq!(result, "hello\n", "Should preserve existing newline");
-        }
+        assert_eq!(result, "hello\r", "LF should normalize to carriage return");
     }
 
-    #[cfg(windows)]
     #[test]
-    fn test_normalize_message_preserves_existing_crlf_on_windows() {
+    fn test_normalize_message_converts_existing_crlf() {
         let result = TerminalBridge::normalize_message("hello\r\n");
-        assert_eq!(result, "hello\r\n", "Windows should preserve existing CRLF");
+        assert_eq!(
+            result, "hello\r",
+            "CRLF should normalize to a single carriage return"
+        );
     }
 
     #[test]
     fn test_normalize_message_empty_string() {
         let result = TerminalBridge::normalize_message("");
-        assert!(result.ends_with('\n'), "Empty string should get newline");
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn test_normalize_message_windows_crlf() {
-        let result = TerminalBridge::normalize_message("hello");
-        assert!(result.ends_with("\r\n"), "Windows should use CRLF");
-    }
-
-    #[cfg(not(windows))]
-    #[test]
-    fn test_normalize_message_unix_lf() {
-        let result = TerminalBridge::normalize_message("hello");
-        assert!(
-            result.ends_with('\n') && !result.ends_with("\r\n"),
-            "Unix should use LF only"
-        );
+        assert_eq!(result, "\r", "Empty string should normalize to Enter key");
     }
 }
