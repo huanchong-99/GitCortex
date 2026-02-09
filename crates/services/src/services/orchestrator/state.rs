@@ -58,6 +58,9 @@ pub struct OrchestratorState {
 
     /// Set of processed commit hashes for idempotency.
     pub processed_commits: HashSet<String>,
+
+    /// Terminals currently waiting for quiet-window completion checks.
+    pub pending_quiet_completion_checks: HashSet<String>,
 }
 
 impl OrchestratorState {
@@ -71,6 +74,7 @@ impl OrchestratorState {
             total_tokens_used: 0,
             error_count: 0,
             processed_commits: HashSet::new(),
+            pending_quiet_completion_checks: HashSet::new(),
         }
     }
 

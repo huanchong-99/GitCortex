@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use db::DBService;
 use tokio::{
     sync::RwLock,
-    time::{Duration, sleep},
+    time::{Duration, Instant, sleep},
 };
 
 use super::{
@@ -212,6 +212,20 @@ impl OrchestratorAgent {
             state.workflow_id.clone()
         };
 
+        if success {
+            if !self
+                .wait_for_terminal_quiet_window(&event.terminal_id, Duration::from_secs(40))
+                .await?
+            {
+                tracing::info!(
+                    terminal_id = %event.terminal_id,
+                    task_id = %event.task_id,
+                    "Skipping terminal completion because quiet window was interrupted"
+                );
+                return Ok(());
+            }
+        }
+
         let terminal_final_status = if success {
             TERMINAL_STATUS_COMPLETED
         } else {
@@ -327,6 +341,116 @@ impl OrchestratorAgent {
         }
 
         Ok(())
+    }
+
+    async fn wait_for_terminal_quiet_window(
+        &self,
+        terminal_id: &str,
+        quiet_window: Duration,
+    ) -> anyhow::Result<bool> {
+        {
+            let mut state = self.state.write().await;
+            if !state
+                .pending_quiet_completion_checks
+                .insert(terminal_id.to_string())
+            {
+                tracing::debug!(
+                    terminal_id = %terminal_id,
+                    "Quiet-window check already in progress for terminal"
+                );
+                return Ok(false);
+            }
+        }
+
+        let result = self
+            .wait_for_terminal_quiet_window_inner(terminal_id, quiet_window)
+            .await;
+
+        {
+            let mut state = self.state.write().await;
+            state.pending_quiet_completion_checks.remove(terminal_id);
+        }
+
+        result
+    }
+
+    async fn wait_for_terminal_quiet_window_inner(
+        &self,
+        terminal_id: &str,
+        quiet_window: Duration,
+    ) -> anyhow::Result<bool> {
+        if quiet_window.is_zero() {
+            return Ok(true);
+        }
+
+        let mut last_activity = self.latest_terminal_log_instant(terminal_id).await?;
+        let deadline = Instant::now() + quiet_window + Duration::from_secs(5);
+
+        tracing::info!(
+            terminal_id = %terminal_id,
+            quiet_window_secs = quiet_window.as_secs(),
+            "Waiting for terminal quiet window before marking completion"
+        );
+
+        loop {
+            if let Some(log_time) = self.latest_terminal_log_instant(terminal_id).await? {
+                if last_activity.map(|ts| ts < log_time).unwrap_or(true) {
+                    last_activity = Some(log_time);
+                }
+            }
+
+            let elapsed = match last_activity {
+                Some(activity_time) => activity_time.elapsed(),
+                None => quiet_window,
+            };
+
+            if elapsed >= quiet_window {
+                tracing::info!(
+                    terminal_id = %terminal_id,
+                    elapsed_secs = elapsed.as_secs(),
+                    "Terminal quiet window satisfied"
+                );
+                return Ok(true);
+            }
+
+            if Instant::now() >= deadline {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    elapsed_secs = elapsed.as_secs(),
+                    "Terminal quiet-window wait timed out"
+                );
+                return Ok(false);
+            }
+
+            sleep(Duration::from_millis(400)).await;
+        }
+    }
+
+    async fn latest_terminal_log_instant(&self, terminal_id: &str) -> anyhow::Result<Option<Instant>> {
+        let latest: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+            r#"
+            SELECT MAX(created_at)
+            FROM terminal_log
+            WHERE terminal_id = ?
+            "#,
+        )
+        .bind(terminal_id)
+        .fetch_one(&self.db.pool)
+        .await?;
+
+        let now = chrono::Utc::now();
+        let instant = latest.and_then(|ts| {
+            let diff = now.signed_duration_since(ts);
+            let millis = diff.num_milliseconds();
+            if millis <= 0 {
+                Some(Instant::now())
+            } else {
+                let duration = Duration::from_millis(millis as u64);
+                Instant::now().checked_sub(duration)
+            }
+        });
+
+        Ok(instant)
     }
 
     /// Dispatches the next terminal in a task sequence.

@@ -1637,7 +1637,7 @@ workflow_id: {}
 task_id: {}
 terminal_id: {}
 status: completed
-next_action: continue"#,
+next_action: handoff"#,
             workflow.id, terminal.workflow_task_id, terminal.id
         );
 
@@ -1774,7 +1774,7 @@ workflow_id: different-workflow
 task_id: task-1
 terminal_id: term-1
 status: completed
-next_action: continue"#;
+next_action: handoff"#;
 
         // Should succeed but do nothing (workflow mismatch)
         let result = agent
@@ -1965,7 +1965,7 @@ workflow_id: {}
 task_id: {}
 terminal_id: {}
 status: completed
-next_action: continue"#,
+next_action: handoff"#,
             workflow.id, terminal.workflow_task_id, terminal.id
         );
 
