@@ -2000,6 +2000,20 @@ next_action: handoff"#;
     async fn test_commit_idempotency() {
         let (db, workflow, terminal) = setup_test_workflow().await;
 
+        // Ensure terminal is already quiet long enough to satisfy completion gate.
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now() - chrono::Duration::seconds(90))
+        .bind(&terminal.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
         let config = OrchestratorConfig {
             api_type: "openai".to_string(),
             base_url: "https://api.openai.com/v1".to_string(),
