@@ -246,40 +246,6 @@ impl MessageBus {
         let topic_subscriber_count = self.subscriber_count(&topic).await;
         let fallback_topic = session_id.to_string();
 
-        let mut try_publish_fallback = |reason: &str| async {
-            let fallback_subscriber_count = self.subscriber_count(&fallback_topic).await;
-
-            if fallback_subscriber_count > 0 {
-                tracing::warn!(
-                    terminal_id = %terminal_id,
-                    session_id = %session_id,
-                    primary_topic = %topic,
-                    fallback_topic = %fallback_topic,
-                    reason = %reason,
-                    "Falling back to legacy session topic for terminal input"
-                );
-
-                if let Err(err) = self.publish(&fallback_topic, message.clone()).await {
-                    tracing::error!(
-                        ?err,
-                        terminal_id = %terminal_id,
-                        session_id = %session_id,
-                        topic = %fallback_topic,
-                        "Failed to publish terminal input to fallback topic"
-                    );
-                }
-            } else {
-                tracing::error!(
-                    terminal_id = %terminal_id,
-                    session_id = %session_id,
-                    primary_topic = %topic,
-                    fallback_topic = %fallback_topic,
-                    reason = %reason,
-                    "Dropping terminal input: no primary or fallback subscribers"
-                );
-            }
-        };
-
         if topic_subscriber_count > 0 {
             if let Err(err) = self.publish(&topic, message.clone()).await {
                 tracing::error!(
@@ -289,10 +255,26 @@ impl MessageBus {
                     topic = %topic,
                     "Failed to publish terminal input to primary topic"
                 );
-                try_publish_fallback("primary topic publish failed").await;
+                self.publish_terminal_input_fallback(
+                    terminal_id,
+                    session_id,
+                    &topic,
+                    &fallback_topic,
+                    &message,
+                    "primary topic publish failed",
+                )
+                .await;
             }
         } else {
-            try_publish_fallback("no primary terminal-input subscribers").await;
+            self.publish_terminal_input_fallback(
+                terminal_id,
+                session_id,
+                &topic,
+                &fallback_topic,
+                &message,
+                "no primary terminal-input subscribers",
+            )
+            .await;
         }
 
         // Also broadcast for legacy compatibility
@@ -302,6 +284,48 @@ impl MessageBus {
                 terminal_id = %terminal_id,
                 session_id = %session_id,
                 "Terminal-input broadcast skipped because no broadcast subscribers are active"
+            );
+        }
+    }
+
+    async fn publish_terminal_input_fallback(
+        &self,
+        terminal_id: &str,
+        session_id: &str,
+        primary_topic: &str,
+        fallback_topic: &str,
+        message: &BusMessage,
+        reason: &str,
+    ) {
+        let fallback_subscriber_count = self.subscriber_count(fallback_topic).await;
+
+        if fallback_subscriber_count > 0 {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                session_id = %session_id,
+                primary_topic = %primary_topic,
+                fallback_topic = %fallback_topic,
+                reason = %reason,
+                "Falling back to legacy session topic for terminal input"
+            );
+
+            if let Err(err) = self.publish(fallback_topic, message.clone()).await {
+                tracing::error!(
+                    ?err,
+                    terminal_id = %terminal_id,
+                    session_id = %session_id,
+                    topic = %fallback_topic,
+                    "Failed to publish terminal input to fallback topic"
+                );
+            }
+        } else {
+            tracing::error!(
+                terminal_id = %terminal_id,
+                session_id = %session_id,
+                primary_topic = %primary_topic,
+                fallback_topic = %fallback_topic,
+                reason = %reason,
+                "Dropping terminal input: no primary or fallback subscribers"
             );
         }
     }
