@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use db::DBService;
 use tokio::{
     sync::RwLock,
-    time::{Duration, Instant, sleep},
+    time::{Duration, sleep},
 };
 
 use super::{
@@ -213,14 +213,18 @@ impl OrchestratorAgent {
         };
 
         if success {
-            if !self
-                .wait_for_terminal_quiet_window(&event.terminal_id, Duration::from_secs(40))
+            let quiet_window = Duration::from_secs(40);
+            if let Some(remaining) = self
+                .remaining_terminal_quiet_duration(&event.terminal_id, quiet_window)
                 .await?
             {
+                self.defer_terminal_completion(event.clone(), quiet_window, remaining)
+                    .await?;
                 tracing::info!(
                     terminal_id = %event.terminal_id,
                     task_id = %event.task_id,
-                    "Skipping terminal completion because quiet window was interrupted"
+                    remaining_secs = remaining.as_secs(),
+                    "Deferring terminal completion until quiet window is satisfied"
                 );
                 return Ok(());
             }
@@ -343,91 +347,111 @@ impl OrchestratorAgent {
         Ok(())
     }
 
-    async fn wait_for_terminal_quiet_window(
+    async fn defer_terminal_completion(
         &self,
-        terminal_id: &str,
+        event: TerminalCompletionEvent,
         quiet_window: Duration,
-    ) -> anyhow::Result<bool> {
+        initial_remaining: Duration,
+    ) -> anyhow::Result<()> {
         {
             let mut state = self.state.write().await;
             if !state
                 .pending_quiet_completion_checks
-                .insert(terminal_id.to_string())
+                .insert(event.terminal_id.clone())
             {
                 tracing::debug!(
-                    terminal_id = %terminal_id,
+                    terminal_id = %event.terminal_id,
                     "Quiet-window check already in progress for terminal"
                 );
-                return Ok(false);
+                return Ok(());
             }
         }
 
-        let result = self
-            .wait_for_terminal_quiet_window_inner(terminal_id, quiet_window)
-            .await;
+        let db = self.db.clone();
+        let message_bus = self.message_bus.clone();
+        let state = self.state.clone();
+        let terminal_id = event.terminal_id.clone();
+        let workflow_id = event.workflow_id.clone();
 
-        {
-            let mut state = self.state.write().await;
-            state.pending_quiet_completion_checks.remove(terminal_id);
-        }
+        tokio::spawn(async move {
+            let mut wait_for = if initial_remaining.is_zero() {
+                Duration::from_millis(100)
+            } else {
+                initial_remaining
+            };
 
-        result
+            loop {
+                sleep(wait_for).await;
+
+                match Self::remaining_terminal_quiet_duration_from_db(
+                    &db.pool,
+                    &terminal_id,
+                    quiet_window,
+                )
+                .await
+                {
+                    Ok(Some(remaining)) => {
+                        wait_for = remaining.min(Duration::from_secs(5));
+                    }
+                    Ok(None) => {
+                        {
+                            let mut locked = state.write().await;
+                            locked.pending_quiet_completion_checks.remove(&terminal_id);
+                        }
+
+                        if let Err(e) = message_bus
+                            .publish_workflow_event(
+                                &workflow_id,
+                                BusMessage::TerminalCompleted(event.clone()),
+                            )
+                            .await
+                        {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                workflow_id = %workflow_id,
+                                error = %e,
+                                "Failed to publish deferred terminal completion event"
+                            );
+                        }
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            terminal_id = %terminal_id,
+                            workflow_id = %workflow_id,
+                            error = %e,
+                            "Failed to evaluate terminal quiet window; dropping deferred completion"
+                        );
+                        let mut locked = state.write().await;
+                        locked.pending_quiet_completion_checks.remove(&terminal_id);
+                        break;
+                    }
+                }
+            }
+        });
+
+        Ok(())
     }
 
-    async fn wait_for_terminal_quiet_window_inner(
+    async fn remaining_terminal_quiet_duration(
         &self,
         terminal_id: &str,
         quiet_window: Duration,
-    ) -> anyhow::Result<bool> {
-        if quiet_window.is_zero() {
-            return Ok(true);
-        }
-
-        let mut last_activity = self.latest_terminal_log_instant(terminal_id).await?;
-        let deadline = Instant::now() + quiet_window + Duration::from_secs(5);
-
-        tracing::info!(
-            terminal_id = %terminal_id,
-            quiet_window_secs = quiet_window.as_secs(),
-            "Waiting for terminal quiet window before marking completion"
-        );
-
-        loop {
-            if let Some(log_time) = self.latest_terminal_log_instant(terminal_id).await? {
-                if last_activity.map(|ts| ts < log_time).unwrap_or(true) {
-                    last_activity = Some(log_time);
-                }
-            }
-
-            let elapsed = match last_activity {
-                Some(activity_time) => activity_time.elapsed(),
-                None => quiet_window,
-            };
-
-            if elapsed >= quiet_window {
-                tracing::info!(
-                    terminal_id = %terminal_id,
-                    elapsed_secs = elapsed.as_secs(),
-                    "Terminal quiet window satisfied"
-                );
-                return Ok(true);
-            }
-
-            if Instant::now() >= deadline {
-                tracing::warn!(
-                    terminal_id = %terminal_id,
-                    elapsed_secs = elapsed.as_secs(),
-                    "Terminal quiet-window wait timed out"
-                );
-                return Ok(false);
-            }
-
-            sleep(Duration::from_millis(400)).await;
-        }
+    ) -> anyhow::Result<Option<Duration>> {
+        Self::remaining_terminal_quiet_duration_from_db(&self.db.pool, terminal_id, quiet_window)
+            .await
     }
 
-    async fn latest_terminal_log_instant(&self, terminal_id: &str) -> anyhow::Result<Option<Instant>> {
-        let latest: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+    async fn remaining_terminal_quiet_duration_from_db(
+        pool: &sqlx::SqlitePool,
+        terminal_id: &str,
+        quiet_window: Duration,
+    ) -> anyhow::Result<Option<Duration>> {
+        if quiet_window.is_zero() {
+            return Ok(None);
+        }
+
+        let latest_output_at: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
             r#"
             SELECT MAX(created_at)
             FROM terminal_log
@@ -435,22 +459,40 @@ impl OrchestratorAgent {
             "#,
         )
         .bind(terminal_id)
-        .fetch_one(&self.db.pool)
+        .fetch_one(pool)
         .await?;
 
-        let now = chrono::Utc::now();
-        let instant = latest.and_then(|ts| {
-            let diff = now.signed_duration_since(ts);
-            let millis = diff.num_milliseconds();
-            if millis <= 0 {
-                Some(Instant::now())
-            } else {
-                let duration = Duration::from_millis(millis as u64);
-                Instant::now().checked_sub(duration)
-            }
-        });
+        let last_activity_at = if let Some(last_output_at) = latest_output_at {
+            Some(last_output_at)
+        } else {
+            sqlx::query_scalar(
+                r#"
+                SELECT COALESCE(started_at, updated_at, created_at)
+                FROM terminal
+                WHERE id = ?
+                "#,
+            )
+            .bind(terminal_id)
+            .fetch_optional(pool)
+            .await?
+            .flatten()
+        };
 
-        Ok(instant)
+        let Some(last_activity_at) = last_activity_at else {
+            return Ok(Some(quiet_window));
+        };
+
+        let elapsed_ms = chrono::Utc::now()
+            .signed_duration_since(last_activity_at)
+            .num_milliseconds()
+            .max(0);
+        let quiet_ms = quiet_window.as_millis() as i64;
+
+        if elapsed_ms >= quiet_ms {
+            Ok(None)
+        } else {
+            Ok(Some(Duration::from_millis((quiet_ms - elapsed_ms) as u64)))
+        }
     }
 
     /// Dispatches the next terminal in a task sequence.
@@ -656,13 +698,8 @@ impl OrchestratorAgent {
             commit_hash
         );
 
-        // 1. Update terminal status
-        db::models::Terminal::update_status(&self.db.pool, terminal_id, TERMINAL_STATUS_COMPLETED)
-            .await?;
-
-        // 2. Publish completion event
         let workflow_id = self.state.read().await.workflow_id.clone();
-        let event = BusMessage::TerminalCompleted(TerminalCompletionEvent {
+        let event = TerminalCompletionEvent {
             terminal_id: terminal_id.to_string(),
             task_id: task_id.to_string(),
             workflow_id: workflow_id.clone(),
@@ -670,14 +707,9 @@ impl OrchestratorAgent {
             commit_hash: Some(commit_hash.to_string()),
             commit_message: Some(commit_message.to_string()),
             metadata: None,
-        });
+        };
 
-        self.message_bus
-            .publish_workflow_event(&workflow_id, event)
-            .await?;
-
-        // 3. Awaken orchestrator to process the event
-        self.awaken().await;
+        self.handle_terminal_completed(event).await?;
 
         Ok(())
     }
