@@ -244,19 +244,9 @@ impl MessageBus {
         // This avoids silent drop while preventing duplicate PTY delivery.
         let topic = format!("{}{}", TERMINAL_INPUT_TOPIC_PREFIX, terminal_id);
         let topic_subscriber_count = self.subscriber_count(&topic).await;
+        let fallback_topic = session_id.to_string();
 
-        if topic_subscriber_count > 0 {
-            if let Err(err) = self.publish(&topic, message.clone()).await {
-                tracing::error!(
-                    ?err,
-                    terminal_id = %terminal_id,
-                    session_id = %session_id,
-                    topic = %topic,
-                    "Failed to publish terminal input to primary topic"
-                );
-            }
-        } else {
-            let fallback_topic = session_id.to_string();
+        let mut try_publish_fallback = |reason: &str| async {
             let fallback_subscriber_count = self.subscriber_count(&fallback_topic).await;
 
             if fallback_subscriber_count > 0 {
@@ -265,7 +255,8 @@ impl MessageBus {
                     session_id = %session_id,
                     primary_topic = %topic,
                     fallback_topic = %fallback_topic,
-                    "No primary terminal-input subscribers; falling back to legacy session topic"
+                    reason = %reason,
+                    "Falling back to legacy session topic for terminal input"
                 );
 
                 if let Err(err) = self.publish(&fallback_topic, message.clone()).await {
@@ -283,9 +274,25 @@ impl MessageBus {
                     session_id = %session_id,
                     primary_topic = %topic,
                     fallback_topic = %fallback_topic,
+                    reason = %reason,
                     "Dropping terminal input: no primary or fallback subscribers"
                 );
             }
+        };
+
+        if topic_subscriber_count > 0 {
+            if let Err(err) = self.publish(&topic, message.clone()).await {
+                tracing::error!(
+                    ?err,
+                    terminal_id = %terminal_id,
+                    session_id = %session_id,
+                    topic = %topic,
+                    "Failed to publish terminal input to primary topic"
+                );
+                try_publish_fallback("primary topic publish failed").await;
+            }
+        } else {
+            try_publish_fallback("no primary terminal-input subscribers").await;
         }
 
         // Also broadcast for legacy compatibility
@@ -405,6 +412,34 @@ mod tests {
         assert!(matches!(
             broadcast_message,
             BusMessage::TerminalInput { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn publish_terminal_input_falls_back_when_primary_subscriber_is_stale() {
+        let bus = MessageBus::new(8);
+
+        let primary_rx = bus.subscribe("terminal.input.term-1").await;
+        drop(primary_rx);
+
+        let mut legacy_rx = bus.subscribe("session-1").await;
+
+        bus.publish_terminal_input("term-1", "session-1", "approve", None)
+            .await;
+
+        let legacy_message = timeout(Duration::from_millis(200), legacy_rx.recv())
+            .await
+            .expect("expected fallback message")
+            .expect("legacy topic channel should be open");
+
+        assert!(matches!(
+            legacy_message,
+            BusMessage::TerminalInput {
+                ref terminal_id,
+                ref session_id,
+                ref input,
+                ..
+            } if terminal_id == "term-1" && session_id == "session-1" && input == "approve"
         ));
     }
 }

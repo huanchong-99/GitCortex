@@ -303,7 +303,7 @@ impl OrchestratorAgent {
         }
 
         // Build and dispatch instruction
-        let instruction = Self::build_task_instruction(&task, &terminal);
+        let instruction = Self::build_task_instruction(&task, &terminal, terminals.len());
         self.dispatch_terminal(task_id, &terminal, &instruction)
             .await
     }
@@ -937,6 +937,7 @@ impl OrchestratorAgent {
     fn build_task_instruction(
         task: &db::models::WorkflowTask,
         terminal: &db::models::Terminal,
+        total_terminals: usize,
     ) -> String {
         let mut parts = vec![format!("Start task: {} ({})", task.name, task.id)];
 
@@ -946,7 +947,12 @@ impl OrchestratorAgent {
                 .collect::<Vec<_>>()
                 .join(" ");
             if !normalized.is_empty() {
-                parts.push(format!("Task description: {}", normalized));
+                if total_terminals > 1 {
+                    let summary = Self::truncate_instruction_text(&normalized, 200);
+                    parts.push(format!("Task objective: {}", summary));
+                } else {
+                    parts.push(format!("Task description: {}", normalized));
+                }
             }
         }
 
@@ -967,12 +973,34 @@ impl OrchestratorAgent {
             }
         }
 
-        parts.push(
-            "Please start implementing immediately and continue until the task is complete."
-                .to_string(),
-        );
+        if total_terminals > 1 {
+            let terminal_order = (terminal.order_index + 1).max(1);
+            parts.push(format!(
+                "Execution context: terminal {terminal_order}/{total_terminals}."
+            ));
+            parts.push(
+                "Focus only on your scoped role and do not take over work assigned to other terminals."
+                    .to_string(),
+            );
+            parts.push(
+                "When finished, leave concise handoff notes for the next terminal."
+                    .to_string(),
+            );
+        }
+
+        parts.push("Please start implementing immediately.".to_string());
 
         parts.join(" | ")
+    }
+
+    fn truncate_instruction_text(input: &str, max_chars: usize) -> String {
+        let char_count = input.chars().count();
+        if char_count <= max_chars {
+            return input.to_string();
+        }
+
+        let truncated: String = input.chars().take(max_chars).collect();
+        format!("{truncated}…")
     }
 
     /// Auto-dispatches the first terminal for each task when workflow starts.
@@ -1059,7 +1087,7 @@ impl OrchestratorAgent {
             }
 
             // Build and dispatch instruction
-            let instruction = Self::build_task_instruction(&task, &terminal);
+            let instruction = Self::build_task_instruction(&task, &terminal, terminals.len());
             if let Err(e) = self
                 .dispatch_terminal(&task.id, &terminal, &instruction)
                 .await
@@ -1503,5 +1531,94 @@ impl OrchestratorAgent {
 
         tracing::info!("All slash commands executed for workflow {}", workflow_id);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use super::OrchestratorAgent;
+
+    fn make_task(description: Option<&str>) -> db::models::WorkflowTask {
+        let now = Utc::now();
+        db::models::WorkflowTask {
+            id: "task-1".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            vk_task_id: None,
+            name: "Implement feature".to_string(),
+            description: description.map(str::to_string),
+            branch: "workflow/workflow-1/implement-feature".to_string(),
+            status: "pending".to_string(),
+            order_index: 0,
+            started_at: None,
+            completed_at: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn make_terminal(order_index: i32) -> db::models::Terminal {
+        let now = Utc::now();
+        db::models::Terminal {
+            id: format!("terminal-{order_index}"),
+            workflow_task_id: "task-1".to_string(),
+            cli_type_id: "cli-codex".to_string(),
+            model_config_id: "model-1".to_string(),
+            custom_base_url: None,
+            custom_api_key: None,
+            role: Some("backend developer".to_string()),
+            role_description: Some("Implement backend service only".to_string()),
+            order_index,
+            status: "waiting".to_string(),
+            process_id: None,
+            pty_session_id: None,
+            session_id: None,
+            execution_process_id: None,
+            vk_session_id: None,
+            auto_confirm: true,
+            last_commit_hash: None,
+            last_commit_message: None,
+            started_at: None,
+            completed_at: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn build_task_instruction_for_multi_terminal_uses_objective_not_full_description() {
+        let task = make_task(Some(
+            "Build a local guestbook with frontend and backend, persist to local json file and display in UI",
+        ));
+        let terminal = make_terminal(0);
+
+        let instruction = OrchestratorAgent::build_task_instruction(&task, &terminal, 3);
+
+        assert!(instruction.contains("Task objective:"));
+        assert!(!instruction.contains("Task description:"));
+        assert!(instruction.contains("Execution context: terminal 1/3."));
+        assert!(instruction.contains("Focus only on your scoped role"));
+    }
+
+    #[test]
+    fn build_task_instruction_for_single_terminal_keeps_full_description() {
+        let task = make_task(Some("Complete full implementation end-to-end"));
+        let terminal = make_terminal(0);
+
+        let instruction = OrchestratorAgent::build_task_instruction(&task, &terminal, 1);
+
+        assert!(instruction.contains("Task description: Complete full implementation end-to-end"));
+        assert!(!instruction.contains("Task objective:"));
+        assert!(!instruction.contains("Execution context:"));
+    }
+
+    #[test]
+    fn truncate_instruction_text_limits_length_with_ellipsis() {
+        let input = "a".repeat(260);
+        let result = OrchestratorAgent::truncate_instruction_text(&input, 200);
+
+        assert_eq!(result.chars().count(), 201);
+        assert!(result.ends_with('…'));
     }
 }
