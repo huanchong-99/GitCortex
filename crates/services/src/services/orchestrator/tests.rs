@@ -1599,7 +1599,7 @@ mod orchestrator_tests {
         sqlx::query(
             r#"
             UPDATE terminal
-            SET started_at = ?1, updated_at = ?1
+            SET status = 'working', started_at = ?1, updated_at = ?1
             WHERE id = ?2
             "#,
         )
@@ -1732,6 +1732,156 @@ next_action: handoff"#,
             .unwrap();
         assert_eq!(updated_terminal.status, "waiting");
         assert!(updated_terminal.completed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_terminal_completed_ignores_non_working_terminal() {
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'waiting', started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now() - chrono::Duration::seconds(90))
+        .bind(&terminal.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus,
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let commit_message = format!(
+            r#"Terminal completed
+
+---METADATA---
+workflow_id: {}
+task_id: {}
+terminal_id: {}
+status: completed
+next_action: handoff"#,
+            workflow.id, terminal.workflow_task_id, terminal.id
+        );
+
+        agent
+            .handle_git_event(&workflow.id, "abc123", "main", commit_message.as_str())
+            .await
+            .unwrap();
+
+        let updated_terminal = db::models::Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(updated_terminal.status, "waiting");
+        assert!(updated_terminal.completed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_terminal_completed_ignores_out_of_order_terminal() {
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(2, true).await;
+        let first_terminal_id = terminals[0].0.clone();
+        let second_terminal_id = terminals[1].0.clone();
+
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'waiting', started_at = ?1, updated_at = ?1
+            WHERE workflow_task_id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now() - chrono::Duration::seconds(90))
+        .bind(&task_id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow_id.clone(),
+            message_bus,
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let commit_message = format!(
+            r#"Terminal completed
+
+---METADATA---
+workflow_id: {}
+task_id: {}
+terminal_id: {}
+status: completed
+next_action: handoff"#,
+            workflow_id, task_id, second_terminal_id
+        );
+
+        agent
+            .handle_git_event(&workflow_id, "def456", "main", commit_message.as_str())
+            .await
+            .unwrap();
+
+        let first_terminal = db::models::Terminal::find_by_id(&db.pool, &first_terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let second_terminal = db::models::Terminal::find_by_id(&db.pool, &second_terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(first_terminal.status, "waiting");
+        assert_eq!(second_terminal.status, "waiting");
+        assert!(first_terminal.completed_at.is_none());
+        assert!(second_terminal.completed_at.is_none());
     }
 
     #[tokio::test]

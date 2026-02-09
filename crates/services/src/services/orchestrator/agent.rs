@@ -193,6 +193,33 @@ impl OrchestratorAgent {
             TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
         );
 
+        let expected_terminal_id = {
+            let next_index = {
+                let state = self.state.read().await;
+                state.get_next_terminal_for_task(&event.task_id)
+            };
+
+            if let Some(index) = next_index {
+                let terminals = db::models::Terminal::find_by_task(&self.db.pool, &event.task_id).await?;
+                terminals.get(index).map(|terminal| terminal.id.clone())
+            } else {
+                None
+            }
+        };
+
+        if let Some(expected_terminal_id) = expected_terminal_id {
+            if expected_terminal_id != event.terminal_id {
+                tracing::warn!(
+                    task_id = %event.task_id,
+                    terminal_id = %event.terminal_id,
+                    expected_terminal_id = %expected_terminal_id,
+                    status = ?event.status,
+                    "Ignoring out-of-order terminal completion event"
+                );
+                return Ok(());
+            }
+        }
+
         if let Some(existing_terminal) =
             db::models::Terminal::find_by_id(&self.db.pool, &event.terminal_id).await?
         {
@@ -202,6 +229,17 @@ impl OrchestratorAgent {
                     task_id = %event.task_id,
                     status = %existing_terminal.status,
                     "Ignoring duplicate terminal completion event for finalized terminal"
+                );
+                return Ok(());
+            }
+
+            if success && existing_terminal.status != "working" {
+                tracing::warn!(
+                    terminal_id = %event.terminal_id,
+                    task_id = %event.task_id,
+                    terminal_status = %existing_terminal.status,
+                    completion_status = ?event.status,
+                    "Ignoring terminal completion event because terminal is not working"
                 );
                 return Ok(());
             }
@@ -319,11 +357,17 @@ impl OrchestratorAgent {
         }
 
         // 构建提示并调用 LLM
-        let prompt = Self::build_completion_prompt(&event);
-        let response = self.call_llm(&prompt).await?;
+        let should_run_completion_llm = !(success && has_next && !task_failed);
+        let mut completion_response: Option<String> = None;
+        if should_run_completion_llm {
+            let prompt = Self::build_completion_prompt(&event);
+            completion_response = Some(self.call_llm(&prompt).await?);
+        }
 
         // 解析并执行指令
-        self.execute_instruction(&response).await?;
+        if let Some(response) = completion_response.as_deref() {
+            self.execute_instruction(response).await?;
+        }
 
         // Auto-dispatch next terminal if successful, there's more to do, and task hasn't failed
         if success && has_next && !task_failed {
@@ -892,15 +936,47 @@ impl OrchestratorAgent {
                         .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
 
                     // 2. Get PTY session ID
-                    let pty_session_id = terminal.pty_session_id.ok_or_else(|| {
+                    let pty_session_id = terminal.pty_session_id.clone().ok_or_else(|| {
                         anyhow::anyhow!("Terminal {terminal_id} has no PTY session")
                     })?;
 
+                    // 防止在串行链路中向已完成/等待中的终端再次注入消息，避免并发执行错位。
+                    if terminal.status != "working" {
+                        tracing::info!(
+                            terminal_id = %terminal.id,
+                            status = %terminal.status,
+                            "Skipping SendToTerminal instruction because terminal is not in working state"
+                        );
+                        return Ok(());
+                    }
+
                     // 3. Send message via message bus
                     self.message_bus
-                        .publish(&pty_session_id, BusMessage::TerminalMessage { message })
+                        .publish(
+                            &pty_session_id,
+                            BusMessage::TerminalMessage {
+                                message: message.clone(),
+                            },
+                        )
                         .await
                         .map_err(|e| anyhow::anyhow!("Failed to send message: {e}"))?;
+
+                    // Fallback submit keystroke: some terminal TUIs keep pasted text in composer
+                    // until an additional Enter is sent.
+                    for (attempt, delay_ms) in
+                        Self::submit_keystroke_schedule_ms(&terminal).iter().enumerate()
+                    {
+                        sleep(Duration::from_millis(*delay_ms)).await;
+                        self.message_bus
+                            .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
+                            .await;
+                        tracing::debug!(
+                            terminal_id = %terminal.id,
+                            attempt = attempt + 1,
+                            delay_ms,
+                            "Sent submit keystroke after SendToTerminal dispatch"
+                        );
+                    }
 
                     tracing::debug!("Message sent to terminal {}", terminal_id);
                 }
@@ -1159,19 +1235,6 @@ impl OrchestratorAgent {
             self.message_bus
                 .publish_terminal_input(&terminal.id, &pty_session_id, instruction, None)
                 .await;
-
-            for (attempt, delay_ms) in [(1u8, 120u64), (2u8, 360u64)] {
-                sleep(Duration::from_millis(delay_ms)).await;
-                self.message_bus
-                    .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
-                    .await;
-                tracing::debug!(
-                    terminal_id = %terminal.id,
-                    attempt,
-                    delay_ms,
-                    "Sent explicit submit keystroke for Codex terminal instruction dispatch"
-                );
-            }
         } else {
             // 5. Send instruction to PTY session
             self.message_bus
@@ -1183,6 +1246,22 @@ impl OrchestratorAgent {
                 )
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to send instruction to terminal: {e}"))?;
+        }
+
+        // Fallback submit keystroke: some terminal TUIs keep pasted text in composer
+        // until an additional Enter is sent.
+        for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(terminal).iter().enumerate() {
+            sleep(Duration::from_millis(*delay_ms)).await;
+            self.message_bus
+                .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
+                .await;
+            tracing::debug!(
+                terminal_id = %terminal.id,
+                cli_type_id = %terminal.cli_type_id,
+                attempt = attempt + 1,
+                delay_ms,
+                "Sent submit keystroke after terminal instruction dispatch"
+            );
         }
 
         tracing::info!(
@@ -1197,6 +1276,14 @@ impl OrchestratorAgent {
 
     fn needs_explicit_submit(terminal: &db::models::Terminal) -> bool {
         terminal.cli_type_id.to_ascii_lowercase().contains("codex")
+    }
+
+    fn submit_keystroke_schedule_ms(terminal: &db::models::Terminal) -> &'static [u64] {
+        if Self::needs_explicit_submit(terminal) {
+            &[120, 360, 900]
+        } else {
+            &[220]
+        }
     }
 
     /// Builds a task instruction from task and terminal information.

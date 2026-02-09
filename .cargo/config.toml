@@ -19,12 +19,12 @@ rustflags = [
 ]
 
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "link-arg=/DEBUG:FASTLINK"]
+rustflags = ["-C", "link-arg=/DEBUG"]
 
 [target.aarch64-pc-windows-msvc]
-rustflags = ["-C", "link-arg=/DEBUG:FASTLINK"]
+rustflags = ["-C", "link-arg=/DEBUG"]
 
 [env]
 AWS_LC_SYS_STATIC = "0"
-AWS_LC_SYS_NO_PREGENERATED_SRC = "1"
+AWS_LC_SYS_NO_PREGENERATED_SRC = "0"
 SQLX_OFFLINE = "true"
