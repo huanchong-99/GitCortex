@@ -2,6 +2,9 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+#[cfg(unix)]
+use nix::unistd::Pid;
+
 use anyhow::anyhow;
 use db::DBService;
 use tokio::{
@@ -1416,6 +1419,25 @@ impl OrchestratorAgent {
             );
         }
 
+        if let Some(pid) = terminal.process_id {
+            if let Err(error) = self.force_terminate_terminal_process(pid) {
+                tracing::warn!(
+                    terminal_id = %terminal.id,
+                    workflow_id = %workflow_id,
+                    process_id = pid,
+                    error = %error,
+                    "Failed to force terminate terminal process during completion"
+                );
+            } else {
+                tracing::info!(
+                    terminal_id = %terminal.id,
+                    workflow_id = %workflow_id,
+                    process_id = pid,
+                    "Force-terminated terminal process during completion"
+                );
+            }
+        }
+
         if let Err(e) = db::models::Terminal::update_process(&self.db.pool, &terminal.id, None, None).await {
             tracing::warn!(
                 terminal_id = %terminal.id,
@@ -1433,6 +1455,55 @@ impl OrchestratorAgent {
                 "Failed to clear terminal session binding after completion"
             );
         }
+    }
+
+    fn force_terminate_terminal_process(&self, pid: i32) -> anyhow::Result<()> {
+        if pid <= 0 {
+            return Err(anyhow!("invalid process id: {}", pid));
+        }
+
+        #[cfg(unix)]
+        {
+            use nix::sys::signal::{self, Signal};
+
+            let target_pid = Pid::from_raw(pid);
+
+            if signal::kill(target_pid, None).is_err() {
+                return Ok(());
+            }
+
+            signal::kill(target_pid, Signal::SIGTERM)
+                .map_err(|e| anyhow!("failed to send SIGTERM to {}: {}", pid, e))?;
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            let _ = signal::kill(target_pid, Signal::SIGKILL);
+            return Ok(());
+        }
+
+        #[cfg(windows)]
+        {
+            let output = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output()
+                .map_err(|e| anyhow!("failed to execute taskkill: {}", e))?;
+
+            if output.status.success() {
+                return Ok(());
+            }
+
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            if stderr.contains("not found")
+                || stderr.contains("not running")
+                || stderr.contains("No running instance")
+                || stderr.contains("no running instance")
+            {
+                return Ok(());
+            }
+
+            return Err(anyhow!("taskkill failed for {}: {}", pid, stderr));
+        }
+
+        #[allow(unreachable_code)]
+        Ok(())
     }
 
     fn needs_explicit_submit(terminal: &db::models::Terminal) -> bool {

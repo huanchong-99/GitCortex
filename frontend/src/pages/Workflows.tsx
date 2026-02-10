@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import {
   useMergeWorkflow,
   useDeleteWorkflow,
   useWorkflow,
+  workflowKeys,
   getWorkflowActions,
   useSubmitWorkflowPromptResponse,
 } from '@/hooks/useWorkflows';
@@ -114,6 +116,7 @@ function isSamePromptContext(
 export function Workflows() {
   const { t } = useTranslation('workflow');
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [showWizard, setShowWizard] = useState(false);
@@ -283,9 +286,29 @@ export function Workflows() {
     []
   );
 
+  const handleRealtimeWorkflowSignal = useCallback(() => {
+    if (!selectedWorkflowId) {
+      return;
+    }
+
+    queryClient.invalidateQueries({
+      queryKey: workflowKeys.byId(selectedWorkflowId),
+    });
+
+    if (validProjectId) {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.forProject(validProjectId),
+      });
+    }
+  }, [queryClient, selectedWorkflowId, validProjectId]);
+
   useWorkflowEvents(selectedWorkflowId, {
     onTerminalPromptDetected: handleTerminalPromptDetected,
     onTerminalPromptDecision: handleTerminalPromptDecision,
+    onWorkflowStatusChanged: handleRealtimeWorkflowSignal,
+    onTaskStatusChanged: handleRealtimeWorkflowSignal,
+    onTerminalStatusChanged: handleRealtimeWorkflowSignal,
+    onTerminalCompleted: handleRealtimeWorkflowSignal,
   });
 
   const activePrompt = useMemo(() => promptQueue[0] ?? null, [promptQueue]);
@@ -345,15 +368,21 @@ export function Workflows() {
         const promptContextKey = getPromptContextKey(currentPrompt.detected);
 
         if (isEnterConfirmResponse) {
-          pendingPromptDecisionsRef.current.delete(promptContextKey);
-          sendPromptResponseOverWorkflowWs({
+          const sent = sendPromptResponseOverWorkflowWs({
             workflowId: currentPrompt.detected.workflowId,
             terminalId: currentPrompt.detected.terminalId,
             response: '',
           });
-          setPromptQueue((previousQueue) =>
-            previousQueue.filter((item) => item.id !== currentPrompt.id)
-          );
+          if (sent) {
+            pendingPromptDecisionsRef.current.delete(promptContextKey);
+            setPromptQueue((previousQueue) =>
+              previousQueue.filter((item) => item.id !== currentPrompt.id)
+            );
+            return;
+          }
+
+          promptSubmittedHistoryRef.current.delete(currentPrompt.id);
+          setPromptSubmitError('Failed to submit prompt response over WebSocket');
           return;
         }
 

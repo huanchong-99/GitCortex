@@ -262,7 +262,7 @@ impl MessageBus {
         session_id: &str,
         input: &str,
         decision: Option<PromptDecision>,
-    ) {
+    ) -> bool {
         let message = BusMessage::TerminalInput {
             terminal_id: terminal_id.to_string(),
             session_id: session_id.to_string(),
@@ -276,10 +276,9 @@ impl MessageBus {
         let topic = format!("{}{}", TERMINAL_INPUT_TOPIC_PREFIX, terminal_id);
         let topic_subscriber_count = self.subscriber_count(&topic).await;
         let fallback_topic = session_id.to_string();
-
-        if topic_subscriber_count > 0 {
+        let delivered = if topic_subscriber_count > 0 {
             match self.publish_inner(&topic, message.clone(), false).await {
-                Ok(delivered) if delivered > 0 => {}
+                Ok(primary_delivered) if primary_delivered > 0 => true,
                 Ok(_) => {
                     self.publish_terminal_input_fallback(
                         terminal_id,
@@ -289,7 +288,7 @@ impl MessageBus {
                         &message,
                         "primary topic had no active subscribers",
                     )
-                    .await;
+                    .await
                 }
                 Err(err) => {
                     tracing::error!(
@@ -307,7 +306,7 @@ impl MessageBus {
                         &message,
                         "primary topic publish failed",
                     )
-                    .await;
+                    .await
                 }
             }
         } else {
@@ -319,8 +318,8 @@ impl MessageBus {
                 &message,
                 "no primary terminal-input subscribers",
             )
-            .await;
-        }
+            .await
+        };
 
         // Also broadcast for legacy compatibility
         if let Err(err) = self.broadcast(message) {
@@ -331,6 +330,8 @@ impl MessageBus {
                 "Terminal-input broadcast skipped because no broadcast subscribers are active"
             );
         }
+
+        delivered
     }
 
     async fn publish_terminal_input_fallback(
@@ -341,7 +342,7 @@ impl MessageBus {
         fallback_topic: &str,
         message: &BusMessage,
         reason: &str,
-    ) {
+    ) -> bool {
         let fallback_subscriber_count = self.subscriber_count(fallback_topic).await;
 
         if fallback_subscriber_count > 0 {
@@ -354,15 +355,19 @@ impl MessageBus {
                 "Falling back to legacy session topic for terminal input"
             );
 
-            if let Err(err) = self.publish(fallback_topic, message.clone()).await {
-                tracing::error!(
-                    ?err,
-                    terminal_id = %terminal_id,
-                    session_id = %session_id,
-                    topic = %fallback_topic,
-                    "Failed to publish terminal input to fallback topic"
-                );
-            }
+            return match self.publish(fallback_topic, message.clone()).await {
+                Ok(_) => true,
+                Err(err) => {
+                    tracing::error!(
+                        ?err,
+                        terminal_id = %terminal_id,
+                        session_id = %session_id,
+                        topic = %fallback_topic,
+                        "Failed to publish terminal input to fallback topic"
+                    );
+                    false
+                }
+            };
         } else {
             tracing::error!(
                 terminal_id = %terminal_id,
@@ -372,6 +377,7 @@ impl MessageBus {
                 reason = %reason,
                 "Dropping terminal input: no primary or fallback subscribers"
             );
+            false
         }
     }
 
@@ -413,8 +419,10 @@ mod tests {
         let mut legacy_rx = bus.subscribe("session-1").await;
         let mut broadcast_rx = bus.subscribe_broadcast();
 
-        bus.publish_terminal_input("term-1", "session-1", "y", None)
+        let delivered = bus
+            .publish_terminal_input("term-1", "session-1", "y", None)
             .await;
+        assert!(delivered);
 
         let legacy_message = timeout(Duration::from_millis(200), legacy_rx.recv())
             .await
@@ -449,8 +457,10 @@ mod tests {
         let mut legacy_rx = bus.subscribe("session-1").await;
         let mut broadcast_rx = bus.subscribe_broadcast();
 
-        bus.publish_terminal_input("term-1", "session-1", "n", None)
+        let delivered = bus
+            .publish_terminal_input("term-1", "session-1", "n", None)
             .await;
+        assert!(delivered);
 
         let primary_message = timeout(Duration::from_millis(200), primary_rx.recv())
             .await
@@ -493,8 +503,10 @@ mod tests {
 
         let mut legacy_rx = bus.subscribe("session-1").await;
 
-        bus.publish_terminal_input("term-1", "session-1", "approve", None)
+        let delivered = bus
+            .publish_terminal_input("term-1", "session-1", "approve", None)
             .await;
+        assert!(delivered);
 
         let legacy_message = timeout(Duration::from_millis(200), legacy_rx.recv())
             .await
@@ -510,6 +522,23 @@ mod tests {
                 ..
             } if terminal_id == "term-1" && session_id == "session-1" && input == "approve"
         ));
+    }
+
+    #[tokio::test]
+    async fn publish_terminal_input_returns_false_when_no_route_subscribers() {
+        let bus = MessageBus::new(8);
+        let mut broadcast_rx = bus.subscribe_broadcast();
+
+        let delivered = bus
+            .publish_terminal_input("term-1", "session-1", "approve", None)
+            .await;
+        assert!(!delivered);
+
+        let broadcast_message = timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected broadcast message")
+            .expect("broadcast channel should be open");
+        assert!(matches!(broadcast_message, BusMessage::TerminalInput { .. }));
     }
 
     #[tokio::test]

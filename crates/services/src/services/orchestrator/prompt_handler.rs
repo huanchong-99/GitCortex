@@ -147,18 +147,13 @@ impl PromptHandler {
         // Drop lock before publishing
         drop(state_machines);
 
-        // Publish decision for UI updates
-        self.message_bus
-            .publish_terminal_prompt_decision(
-                &event.terminal_id,
-                &event.workflow_id,
-                decision.clone(),
-            )
-            .await;
+        let mut decision_to_publish = decision.clone();
 
-        // If decision has a response, publish terminal input
+        // If decision has a response, publish terminal input first.
+        // Only publish non-skip decision when input has a delivery route.
         if let Some(response) = self.get_response_from_decision(&decision) {
-            self.message_bus
+            let delivered = self
+                .message_bus
                 .publish_terminal_input(
                     &event.terminal_id,
                     &event.session_id,
@@ -166,7 +161,22 @@ impl PromptHandler {
                     Some(decision.clone()),
                 )
                 .await;
+
+            if !delivered {
+                decision_to_publish = PromptDecision::skip(
+                    "Skipped prompt response: terminal input could not be delivered",
+                );
+            }
         }
+
+        // Publish decision for UI updates
+        self.message_bus
+            .publish_terminal_prompt_decision(
+                &event.terminal_id,
+                &event.workflow_id,
+                decision_to_publish,
+            )
+            .await;
 
         Some(decision)
     }
@@ -411,14 +421,22 @@ impl PromptHandler {
             }
         };
 
+        let mut decision_to_publish = decision.clone();
+
         if should_publish_input {
-            self.message_bus
+            let delivered = self
+                .message_bus
                 .publish_terminal_input(terminal_id, session_id, &response, Some(decision.clone()))
                 .await;
+            if !delivered {
+                decision_to_publish = PromptDecision::skip(
+                    "Skipped prompt response: terminal input could not be delivered",
+                );
+            }
         }
 
         self.message_bus
-            .publish_terminal_prompt_decision(terminal_id, workflow_id, decision)
+            .publish_terminal_prompt_decision(terminal_id, workflow_id, decision_to_publish)
             .await;
 
         handled
@@ -762,41 +780,46 @@ mod tests {
 
         let first_message = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
             .await
-            .expect("expected prompt decision broadcast")
+            .expect("expected first broadcast event")
             .expect("broadcast channel should be open");
-
-        match first_message {
-            BusMessage::TerminalPromptDecision {
-                terminal_id,
-                workflow_id,
-                decision,
-            } => {
-                assert_eq!(terminal_id, "term-1");
-                assert_eq!(workflow_id, "workflow-1");
-                assert!(matches!(decision, PromptDecision::AutoConfirm { .. }));
-            }
-            other => panic!("expected TerminalPromptDecision, got: {other:?}"),
-        }
-
         let second_message = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
             .await
-            .expect("expected terminal input broadcast")
+            .expect("expected second broadcast event")
             .expect("broadcast channel should be open");
 
-        match second_message {
-            BusMessage::TerminalInput {
-                terminal_id,
-                session_id,
-                input,
-                decision,
-            } => {
-                assert_eq!(terminal_id, "term-1");
-                assert_eq!(session_id, "session-1");
-                assert_eq!(input, "\n");
-                assert!(matches!(decision, Some(PromptDecision::AutoConfirm { .. })));
+        let mut saw_auto_confirm_decision = false;
+        let mut saw_terminal_input = false;
+
+        for message in [first_message, second_message] {
+            match message {
+                BusMessage::TerminalPromptDecision {
+                    terminal_id,
+                    workflow_id,
+                    decision,
+                } => {
+                    assert_eq!(terminal_id, "term-1");
+                    assert_eq!(workflow_id, "workflow-1");
+                    assert!(matches!(decision, PromptDecision::AutoConfirm { .. }));
+                    saw_auto_confirm_decision = true;
+                }
+                BusMessage::TerminalInput {
+                    terminal_id,
+                    session_id,
+                    input,
+                    decision,
+                } => {
+                    assert_eq!(terminal_id, "term-1");
+                    assert_eq!(session_id, "session-1");
+                    assert_eq!(input, "\n");
+                    assert!(matches!(decision, Some(PromptDecision::AutoConfirm { .. })));
+                    saw_terminal_input = true;
+                }
+                other => panic!("unexpected broadcast message: {other:?}"),
             }
-            other => panic!("expected TerminalInput, got: {other:?}"),
         }
+
+        assert!(saw_auto_confirm_decision);
+        assert!(saw_terminal_input);
 
         let topic_message = tokio::time::timeout(Duration::from_millis(200), input_topic_rx.recv())
             .await
@@ -939,6 +962,7 @@ mod tests {
         let message_bus = Arc::new(MessageBus::new(100));
         let handler = PromptHandler::new(message_bus.clone());
         let mut broadcast_rx = message_bus.subscribe_broadcast();
+        let mut input_topic_rx = message_bus.subscribe("terminal.input.term-1").await;
 
         let event = TerminalPromptEvent {
             terminal_id: "term-1".to_string(),
@@ -956,24 +980,41 @@ mod tests {
             .expect("prompt should produce auto-confirm decision");
         assert!(matches!(decision, PromptDecision::AutoConfirm { .. }));
 
-        let initial_decision =
-            tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
-                .await
-                .expect("expected initial decision broadcast")
-                .expect("broadcast channel should be open");
-        assert!(matches!(
-            initial_decision,
-            BusMessage::TerminalPromptDecision {
-                decision: PromptDecision::AutoConfirm { .. },
-                ..
-            }
-        ));
-
-        let initial_input = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+        let initial_message_1 = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
             .await
-            .expect("expected initial terminal input broadcast")
+            .expect("expected first initial broadcast")
             .expect("broadcast channel should be open");
-        assert!(matches!(initial_input, BusMessage::TerminalInput { .. }));
+        let initial_message_2 = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected second initial broadcast")
+            .expect("broadcast channel should be open");
+
+        let mut saw_auto_confirm_decision = false;
+        let mut saw_terminal_input = false;
+
+        for message in [initial_message_1, initial_message_2] {
+            match message {
+                BusMessage::TerminalPromptDecision {
+                    decision: PromptDecision::AutoConfirm { .. },
+                    ..
+                } => {
+                    saw_auto_confirm_decision = true;
+                }
+                BusMessage::TerminalInput { .. } => {
+                    saw_terminal_input = true;
+                }
+                other => panic!("unexpected initial message: {other:?}"),
+            }
+        }
+
+        assert!(saw_auto_confirm_decision);
+        assert!(saw_terminal_input);
+
+        let topic_input = tokio::time::timeout(Duration::from_millis(200), input_topic_rx.recv())
+            .await
+            .expect("expected topic terminal input")
+            .expect("topic channel should be open");
+        assert!(matches!(topic_input, BusMessage::TerminalInput { .. }));
 
         let handled = handler
             .handle_user_prompt_response("term-1", "session-1", "workflow-1", "n")

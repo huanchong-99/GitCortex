@@ -77,8 +77,8 @@ interface WsState {
   connectToWorkflow: (workflowId: string) => void;
   disconnectWorkflow: (workflowId: string) => void;
   disconnect: () => void;
-  send: (message: WsMessage) => void;
-  sendPromptResponse: (payload: TerminalPromptResponsePayload) => void;
+  send: (message: WsMessage) => boolean;
+  sendPromptResponse: (payload: TerminalPromptResponsePayload) => boolean;
   subscribe: (eventType: string, handler: MessageHandler) => () => void;
   subscribeToWorkflow: (
     workflowId: string,
@@ -1212,31 +1212,32 @@ export const useWsStore = create<WsState>((set, get) => ({
       const targetConnection = state._workflowConnections.get(targetWorkflowId);
       if (targetConnection?.ws?.readyState === WebSocket.OPEN) {
         targetConnection.ws.send(JSON.stringify(message));
-        return;
+        return true;
       }
 
       console.warn(
         `[wsStore] Cannot send "${message.type}" because workflow "${targetWorkflowId}" is not connected`
       );
-      return;
+      return false;
     }
 
     const legacyConnection =
       state._workflowConnections.get(LEGACY_CONNECTION_ID);
     if (legacyConnection?.ws?.readyState === WebSocket.OPEN) {
       legacyConnection.ws.send(JSON.stringify(message));
-      return;
+      return true;
     }
 
     console.warn(
       `[wsStore] Cannot send "${message.type}" because there is no active WebSocket connection`
     );
+    return false;
   },
 
   // Send a response for terminal interactive prompts via workflow-scoped WebSocket.
   sendPromptResponse: (payload: TerminalPromptResponsePayload) => {
     const { workflowId, terminalId, response } = payload;
-    get().send({
+    return get().send({
       type: 'terminal.prompt_response',
       payload: {
         workflowId,

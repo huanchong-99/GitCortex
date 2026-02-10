@@ -136,7 +136,8 @@ describe('wsStore', () => {
       id: 'msg-1',
     };
 
-    send(message);
+    const sent = send(message);
+    expect(sent).toBe(true);
 
     const ws = useWsStore.getState()._ws as unknown as MockWebSocket;
     expect(ws.send).toHaveBeenCalledWith(JSON.stringify(message));
@@ -1252,11 +1253,12 @@ describe('wsStore', () => {
 
     ws!.send.mockClear();
 
-    sendPromptResponse({
+    const sent = sendPromptResponse({
       workflowId: 'wf-enter-confirm-flow',
       terminalId: 'term-enter',
       response: '\n',
     });
+    expect(sent).toBe(true);
 
     expect(ws!.send).toHaveBeenCalledTimes(1);
 
@@ -1414,11 +1416,12 @@ describe('wsStore', () => {
 
     ws!.send.mockClear();
 
-    sendPromptResponse({
+    const sent = sendPromptResponse({
       workflowId: 'wf-arrow-select-flow',
       terminalId: 'term-select',
       response: '2\n',
     });
+    expect(sent).toBe(true);
 
     expect(ws!.send).toHaveBeenCalledTimes(1);
 
@@ -1545,11 +1548,12 @@ describe('wsStore', () => {
     wsB!.send.mockClear();
     wsA!.readyState = MockWebSocket.CLOSED;
 
-    sendPromptResponse({
+    const sent = sendPromptResponse({
       workflowId: 'wf-prompt-send-a',
       terminalId: 'term-a',
       response: 'n\n',
     });
+    expect(sent).toBe(false);
 
     expect(wsA!.send).not.toHaveBeenCalled();
     expect(wsB!.send).not.toHaveBeenCalled();
@@ -1584,12 +1588,13 @@ describe('wsStore', () => {
     wsB!.send.mockClear();
     wsA!.readyState = MockWebSocket.CLOSED;
 
-    send({
+    const sent = send({
       type: 'terminal.input',
       payload: { workflowId: 'wf-send-a', terminalId: 'term-a', data: 'hello' },
       timestamp: new Date().toISOString(),
       id: 'msg-send-by-workflow',
     });
+    expect(sent).toBe(false);
 
     expect(wsA!.send).not.toHaveBeenCalled();
     expect(wsB!.send).not.toHaveBeenCalled();
@@ -1623,12 +1628,13 @@ describe('wsStore', () => {
     wsA!.send.mockClear();
     wsB!.send.mockClear();
 
-    send({
+    const sent = send({
       type: 'system.heartbeat',
       payload: {},
       timestamp: new Date().toISOString(),
       id: 'msg-send-current',
     });
+    expect(sent).toBe(true);
 
     expect(wsA!.send).not.toHaveBeenCalled();
     expect(wsB!.send).toHaveBeenCalledTimes(1);
