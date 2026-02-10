@@ -1317,6 +1317,265 @@ mod orchestrator_tests {
     }
 
     #[tokio::test]
+    async fn test_execute_instruction_start_task_skips_dispatch_when_terminal_not_waiting() {
+        use db::models::{Terminal, WorkflowTask};
+
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(1, true).await;
+        let (terminal_id, pty_session_id) = terminals.first().cloned().unwrap();
+        let pty_session_id = pty_session_id.expect("PTY should be present");
+
+        sqlx::query("UPDATE terminal SET status = 'working' WHERE id = ?")
+            .bind(&terminal_id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow_id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{}", workflow_id)).await;
+        let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
+
+        let instruction_json = format!(
+            r#"{{"type":"start_task","task_id":"{}","instruction":"echo start"}}"#,
+            task_id
+        );
+
+        let result = agent.execute_instruction(&instruction_json).await;
+        assert!(result.is_ok(), "StartTask should skip safely when terminal is not waiting");
+
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), terminal_rx.recv()).await;
+        assert!(timeout.is_err(), "Should not dispatch any terminal message");
+
+        let workflow_timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), workflow_rx.recv()).await;
+        assert!(
+            workflow_timeout.is_err(),
+            "Should not publish workflow status updates when dispatch is skipped"
+        );
+
+        let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "working");
+
+        let task = WorkflowTask::find_by_id(&db.pool, &task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(task.status, "pending");
+    }
+
+    #[tokio::test]
+    async fn test_execute_instruction_start_task_uses_latest_pty_after_cas() {
+        use db::models::Terminal;
+
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(1, true).await;
+        let (terminal_id, original_pty) = terminals.first().cloned().unwrap();
+        let original_pty = original_pty.expect("PTY should be present");
+        let fresh_pty = format!("{}-fresh", original_pty);
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow_id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        sqlx::query("UPDATE terminal SET pty_session_id = ?1 WHERE id = ?2")
+            .bind(&fresh_pty)
+            .bind(&terminal_id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let mut old_session_rx = message_bus.subscribe(&original_pty).await;
+        let mut new_session_rx = message_bus.subscribe(&fresh_pty).await;
+
+        let instruction_json = format!(
+            r#"{{"type":"start_task","task_id":"{}","instruction":"echo latest-pty"}}"#,
+            task_id
+        );
+
+        let result = agent.execute_instruction(&instruction_json).await;
+        assert!(result.is_ok(), "StartTask should succeed with refreshed PTY binding");
+
+        let old_timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), old_session_rx.recv()).await;
+        assert!(
+            old_timeout.is_err(),
+            "Legacy PTY topic should not receive dispatch after metadata refresh"
+        );
+
+        let new_msg =
+            tokio::time::timeout(tokio::time::Duration::from_millis(500), new_session_rx.recv())
+                .await
+                .expect("Expected message on refreshed PTY topic")
+                .expect("PTY subscriber should remain active");
+
+        match new_msg {
+            BusMessage::TerminalMessage { message } => {
+                assert_eq!(message, "echo latest-pty");
+            }
+            other => panic!("Expected TerminalMessage, got {other:?}"),
+        }
+
+        let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.status, "working");
+        assert_eq!(terminal.pty_session_id.as_deref(), Some(fresh_pty.as_str()));
+    }
+
+    #[tokio::test]
+    async fn test_execute_instruction_send_to_terminal_requires_working_status() {
+        use db::models::{Terminal, WorkflowTask};
+
+        let (db, workflow, terminal) = setup_test_workflow().await;
+        let pty_session_id = terminal
+            .pty_session_id
+            .clone()
+            .expect("PTY should be present");
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
+        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{}", workflow.id)).await;
+
+        let instruction_json = format!(
+            r#"{{"type":"send_to_terminal","terminal_id":"{}","message":"echo gated"}}"#,
+            terminal.id
+        );
+
+        // setup_test_workflow creates terminal in waiting state: should skip dispatch.
+        let first_result = agent.execute_instruction(&instruction_json).await;
+        assert!(
+            first_result.is_ok(),
+            "SendToTerminal should return ok when skipping non-working terminal"
+        );
+
+        let first_timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), terminal_rx.recv()).await;
+        assert!(
+            first_timeout.is_err(),
+            "Non-working terminal should not receive dispatched message"
+        );
+
+        let first_workflow_timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), workflow_rx.recv()).await;
+        assert!(
+            first_workflow_timeout.is_err(),
+            "Skipped SendToTerminal should not publish workflow status updates"
+        );
+
+        let terminal_after_skip = Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal_after_skip.status, "waiting");
+
+        let task_after_skip = WorkflowTask::find_by_id(&db.pool, &terminal.workflow_task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(task_after_skip.status, "pending");
+
+        sqlx::query("UPDATE terminal SET status = 'working' WHERE id = ?")
+            .bind(&terminal.id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let second_result = agent.execute_instruction(&instruction_json).await;
+        assert!(
+            second_result.is_ok(),
+            "SendToTerminal should dispatch after status becomes working"
+        );
+
+        let msg = tokio::time::timeout(tokio::time::Duration::from_millis(500), terminal_rx.recv())
+            .await
+            .expect("expected terminal message after legal status transition")
+            .expect("terminal channel should remain open");
+
+        match msg {
+            BusMessage::TerminalMessage { message } => {
+                assert_eq!(message, "echo gated");
+            }
+            other => panic!("Expected TerminalMessage, got {other:?}"),
+        }
+
+        let second_workflow_timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), workflow_rx.recv()).await;
+        assert!(
+            second_workflow_timeout.is_err(),
+            "SendToTerminal dispatch should not publish workflow status updates"
+        );
+
+        let terminal_after_dispatch = Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal_after_dispatch.status, "working");
+
+        let task_after_dispatch = WorkflowTask::find_by_id(&db.pool, &terminal.workflow_task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(task_after_dispatch.status, "pending");
+    }
+
+    #[tokio::test]
     async fn test_execute_instruction_start_task_codex_uses_terminal_input_with_submit() {
         use db::models::Terminal;
 
@@ -1668,6 +1927,10 @@ next_action: handoff"#,
             .unwrap();
 
         assert_eq!(updated_terminal.status, "completed");
+        assert!(updated_terminal.pty_session_id.is_none());
+        assert!(updated_terminal.process_id.is_none());
+        assert!(updated_terminal.session_id.is_none());
+        assert!(updated_terminal.execution_process_id.is_none());
 
         // Verify event published
         let timeout =
@@ -1679,6 +1942,20 @@ next_action: handoff"#,
     #[tokio::test]
     async fn test_handle_git_event_terminal_completed_defers_when_not_quiet() {
         let (db, workflow, terminal) = setup_test_workflow().await;
+
+        // Terminal is currently executing but still within quiet window.
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'working', started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now())
+        .bind(&terminal.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
 
         let config = OrchestratorConfig {
             api_type: "openai".to_string(),
@@ -1702,11 +1979,15 @@ next_action: handoff"#,
         let agent = OrchestratorAgent::with_llm_client(
             config,
             workflow.id.clone(),
-            message_bus,
+            message_bus.clone(),
             db.clone(),
             mock_llm,
         )
         .unwrap();
+
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{}", workflow.id))
+            .await;
 
         let commit_message = format!(
             r#"Terminal completed
@@ -1730,8 +2011,109 @@ next_action: handoff"#,
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(updated_terminal.status, "waiting");
+        assert_eq!(updated_terminal.status, "working");
         assert!(updated_terminal.completed_at.is_none());
+
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), workflow_rx.recv()).await;
+        assert!(
+            timeout.is_err(),
+            "Quiet-window deferral should not emit completion status updates"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_terminal_completed_race_keeps_terminal_unfinished_within_quiet_window(
+    ) {
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'working', started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now())
+        .bind(&terminal.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus.clone(),
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{}", workflow.id))
+            .await;
+
+        let commit_message = format!(
+            r#"Terminal completed
+
+---METADATA---
+workflow_id: {}
+task_id: {}
+terminal_id: {}
+status: completed
+next_action: handoff"#,
+            workflow.id, terminal.workflow_task_id, terminal.id
+        );
+
+        let first_call = agent.handle_git_event(
+            &workflow.id,
+            "race_completion_hash_1",
+            "main",
+            commit_message.as_str(),
+        );
+        let second_call = agent.handle_git_event(
+            &workflow.id,
+            "race_completion_hash_2",
+            "main",
+            commit_message.as_str(),
+        );
+
+        let (first_result, second_result) = tokio::join!(first_call, second_call);
+        assert!(first_result.is_ok(), "First completion event should be handled safely");
+        assert!(second_result.is_ok(), "Second completion event should be handled safely");
+
+        let updated_terminal = db::models::Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated_terminal.status, "working");
+        assert!(updated_terminal.completed_at.is_none());
+
+        let timeout =
+            tokio::time::timeout(tokio::time::Duration::from_millis(250), workflow_rx.recv()).await;
+        assert!(
+            timeout.is_err(),
+            "Concurrent in-window completions should not emit finalized status updates"
+        );
     }
 
     #[tokio::test]

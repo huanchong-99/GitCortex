@@ -411,6 +411,34 @@ impl Terminal {
         Ok(())
     }
 
+    /// Compare-and-set terminal status.
+    ///
+    /// Returns `Ok(true)` when the transition succeeds, `Ok(false)` when the
+    /// current status does not match `expected_status`.
+    pub async fn update_status_cas(
+        pool: &SqlitePool,
+        id: &str,
+        expected_status: &str,
+        next_status: &str,
+    ) -> sqlx::Result<bool> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            r"
+            UPDATE terminal
+            SET status = ?, updated_at = ?
+            WHERE id = ? AND status = ?
+            ",
+        )
+        .bind(next_status)
+        .bind(now)
+        .bind(id)
+        .bind(expected_status)
+        .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Update terminal process info
     pub async fn update_process(
         pool: &SqlitePool,
@@ -544,6 +572,65 @@ impl Terminal {
         .execute(pool)
         .await?;
         Ok(())
+    }
+
+    /// Compare-and-set terminal completion status.
+    ///
+    /// Returns `Ok(true)` when the transition succeeds, `Ok(false)` when the
+    /// current status does not match `expected_status`.
+    pub async fn set_completed_cas(
+        pool: &SqlitePool,
+        id: &str,
+        expected_status: &str,
+        next_status: &str,
+    ) -> sqlx::Result<bool> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            r"
+            UPDATE terminal
+            SET status = ?, completed_at = ?, updated_at = ?
+            WHERE id = ? AND status = ?
+            ",
+        )
+        .bind(next_status)
+        .bind(now)
+        .bind(now)
+        .bind(id)
+        .bind(expected_status)
+        .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Set terminal completion status only when terminal is not finalized yet.
+    ///
+    /// Returns `Ok(true)` when the transition succeeds, `Ok(false)` when the
+    /// terminal is already finalized (completed/cancelled or completed_at set).
+    pub async fn set_completed_if_unfinished(
+        pool: &SqlitePool,
+        id: &str,
+        status: &str,
+    ) -> sqlx::Result<bool> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            r"
+            UPDATE terminal
+            SET status = ?, completed_at = ?, updated_at = ?
+            WHERE id = ?
+              AND completed_at IS NULL
+              AND status != 'completed'
+              AND status != 'cancelled'
+            ",
+        )
+        .bind(status)
+        .bind(now)
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 }
 
@@ -927,6 +1014,186 @@ mod tests {
                 assert!(!json.contains("custom_api_key"));
             },
         );
+    }
+
+    #[tokio::test]
+    async fn test_update_status_cas_transitions_and_miss() {
+        let pool = SqlitePool::connect(":memory:").await.unwrap();
+        sqlx::query(
+            r#"
+            CREATE TABLE terminal (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                updated_at TEXT,
+                completed_at TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query("INSERT INTO terminal (id, status) VALUES (?1, ?2)")
+            .bind("term-cas-1")
+            .bind("waiting")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let transitioned = Terminal::update_status_cas(&pool, "term-cas-1", "waiting", "working")
+            .await
+            .unwrap();
+        assert!(transitioned);
+
+        let status: String = sqlx::query_scalar("SELECT status FROM terminal WHERE id = ?1")
+            .bind("term-cas-1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(status, "working");
+
+        let cas_miss = Terminal::update_status_cas(&pool, "term-cas-1", "waiting", "completed")
+            .await
+            .unwrap();
+        assert!(!cas_miss);
+
+        let status_after_miss: String =
+            sqlx::query_scalar("SELECT status FROM terminal WHERE id = ?1")
+                .bind("term-cas-1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status_after_miss, "working");
+    }
+
+    #[tokio::test]
+    async fn test_set_completed_cas_sets_completed_at() {
+        let pool = SqlitePool::connect(":memory:").await.unwrap();
+        sqlx::query(
+            r#"
+            CREATE TABLE terminal (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                updated_at TEXT,
+                completed_at TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query("INSERT INTO terminal (id, status, completed_at) VALUES (?1, ?2, NULL)")
+            .bind("term-cas-2")
+            .bind("working")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let transitioned =
+            Terminal::set_completed_cas(&pool, "term-cas-2", "working", "completed")
+                .await
+                .unwrap();
+        assert!(transitioned);
+
+        let status: String = sqlx::query_scalar("SELECT status FROM terminal WHERE id = ?1")
+            .bind("term-cas-2")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(status, "completed");
+
+        let completed_exists: i64 =
+            sqlx::query_scalar("SELECT CASE WHEN completed_at IS NULL THEN 0 ELSE 1 END FROM terminal WHERE id = ?1")
+                .bind("term-cas-2")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(completed_exists, 1);
+
+        let cas_miss = Terminal::set_completed_cas(&pool, "term-cas-2", "working", "failed")
+            .await
+            .unwrap();
+        assert!(!cas_miss);
+    }
+
+    #[tokio::test]
+    async fn test_set_completed_if_unfinished_respects_final_states() {
+        let pool = SqlitePool::connect(":memory:").await.unwrap();
+        sqlx::query(
+            r#"
+            CREATE TABLE terminal (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                updated_at TEXT,
+                completed_at TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query("INSERT INTO terminal (id, status, completed_at) VALUES (?1, ?2, NULL)")
+            .bind("term-fallback-1")
+            .bind("waiting")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let updated = Terminal::set_completed_if_unfinished(&pool, "term-fallback-1", "failed")
+            .await
+            .unwrap();
+        assert!(updated);
+
+        let waiting_to_failed: String =
+            sqlx::query_scalar("SELECT status FROM terminal WHERE id = ?1")
+                .bind("term-fallback-1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(waiting_to_failed, "failed");
+
+        sqlx::query("INSERT INTO terminal (id, status, completed_at) VALUES (?1, ?2, ?3)")
+            .bind("term-fallback-2")
+            .bind("completed")
+            .bind(chrono::Utc::now())
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let finalized_skip =
+            Terminal::set_completed_if_unfinished(&pool, "term-fallback-2", "failed")
+                .await
+                .unwrap();
+        assert!(!finalized_skip);
+
+        let completed_stays: String = sqlx::query_scalar("SELECT status FROM terminal WHERE id = ?1")
+            .bind("term-fallback-2")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(completed_stays, "completed");
+
+        sqlx::query("INSERT INTO terminal (id, status, completed_at) VALUES (?1, ?2, NULL)")
+            .bind("term-fallback-3")
+            .bind("cancelled")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let cancelled_skip =
+            Terminal::set_completed_if_unfinished(&pool, "term-fallback-3", "failed")
+                .await
+                .unwrap();
+        assert!(!cancelled_skip);
+
+        let cancelled_stays: String = sqlx::query_scalar("SELECT status FROM terminal WHERE id = ?1")
+            .bind("term-fallback-3")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(cancelled_stays, "cancelled");
     }
 }
 

@@ -14,6 +14,10 @@ const logInfo = (...args: unknown[]) => {
   console.log(...args);
 };
 
+const DISCONNECTED_HINT = 'Disconnected from terminal stream. Click Restart to reconnect.';
+
+type ConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected';
+
 interface Props {
   terminalId: string;
   wsUrl?: string;
@@ -39,6 +43,18 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     const wsRef = useRef<WebSocket | null>(null);
     const terminalReadyRef = useRef(false);
     const [wsKey, setWsKey] = useState(0);
+    const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
+    const [disconnectHint, setDisconnectHint] = useState<string | null>(null);
+
+    const markConnecting = useCallback(() => {
+      setConnectionState('connecting');
+      setDisconnectHint(null);
+    }, []);
+
+    const markDisconnected = useCallback((hint?: string) => {
+      setConnectionState('disconnected');
+      setDisconnectHint(hint ?? DISCONNECTED_HINT);
+    }, []);
 
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
@@ -50,6 +66,12 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       },
       reconnect: () => {
         // Close existing connection and trigger reconnect
+        if (wsUrl) {
+          markConnecting();
+        } else {
+          setConnectionState('idle');
+          setDisconnectHint(null);
+        }
         if (wsRef.current) {
           wsRef.current.close();
           wsRef.current = null;
@@ -131,17 +153,28 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
 
     // WebSocket connection
     useEffect(() => {
-      if (!wsUrl || !terminalReadyRef.current) return;
+      if (!wsUrl || !terminalReadyRef.current) {
+        setConnectionState('idle');
+        setDisconnectHint(null);
+        return;
+      }
+
+      markConnecting();
 
       // Basic validation
       if (!terminalId || !TERMINAL_ID_REGEX.test(terminalId)) {
+        markDisconnected('Disconnected: invalid terminal identifier.');
         notifyError('Invalid terminalId');
         return;
       }
 
+      let isActive = true;
       const ws = new WebSocket(`${wsUrl}/terminal/${terminalId}`);
 
       ws.onopen = () => {
+        if (!isActive) return;
+        setConnectionState('connected');
+        setDisconnectHint(null);
         logInfo('Terminal WebSocket connected');
         if (terminalRef.current) {
           const { cols, rows } = terminalRef.current;
@@ -170,27 +203,63 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       };
 
       ws.onerror = (error) => {
+        if (isActive) {
+          markDisconnected();
+        }
         notifyError('Terminal WebSocket error', error);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event?: CloseEvent) => {
+        if (isActive) {
+          const reason = event?.reason?.trim();
+          const code = event?.code;
+          const showCode = typeof code === 'number' && code !== 1000 && code !== 1005;
+          const detail = reason ? reason : showCode ? `code ${code}` : '';
+          markDisconnected(detail ? `${DISCONNECTED_HINT} (${detail})` : DISCONNECTED_HINT);
+        }
         logInfo('Terminal WebSocket closed');
       };
 
       wsRef.current = ws;
 
       return () => {
+        isActive = false;
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
         ws.close();
       };
-    }, [wsUrl, terminalId, notifyError, wsKey]);
+    }, [wsUrl, terminalId, notifyError, markConnecting, markDisconnected, wsKey]);
+
+    const showConnectingHint = Boolean(wsUrl && connectionState === 'connecting');
 
     return (
-      <div
-        ref={containerRef}
-        className="w-full h-full min-h-[300px] bg-[#1e1e1e] rounded-lg overflow-hidden"
-        role="terminal"
-        aria-label="Terminal emulator"
-      />
+      <div className="relative w-full h-full min-h-[300px]">
+        <div
+          ref={containerRef}
+          className="w-full h-full bg-[#1e1e1e] rounded-lg overflow-hidden"
+          role="terminal"
+          aria-label="Terminal emulator"
+        />
+        {showConnectingHint ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute right-3 top-3 rounded-md bg-black/70 px-2 py-1 text-xs text-amber-200"
+          >
+            Connecting terminal stream...
+          </div>
+        ) : null}
+        {connectionState === 'disconnected' ? (
+          <div
+            role="status"
+            aria-live="assertive"
+            className="pointer-events-none absolute left-3 right-3 top-3 rounded-md border border-red-500/60 bg-red-950/90 px-3 py-2 text-xs text-red-100"
+          >
+            {disconnectHint ?? DISCONNECTED_HINT}
+          </div>
+        ) : null}
+      </div>
     );
   }
 );

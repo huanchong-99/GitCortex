@@ -1,9 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { forwardRef } from 'react';
 import { TerminalDebugView } from './TerminalDebugView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
+
+const terminalEmulatorPropsSpy = vi.fn();
+const fetchMock = vi.fn();
+
+const createFetchOkResponse = () =>
+  ({
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+  }) as Response;
+
+vi.mock('./TerminalEmulator', () => ({
+  TerminalEmulator: forwardRef((props: { terminalId: string }, _ref) => {
+    terminalEmulatorPropsSpy(props);
+    return <div data-testid="terminal-emulator" data-terminal-id={props.terminalId} />;
+  }),
+}));
 
 vi.mock('@xterm/xterm', () => {
   class MockTerminal {
@@ -95,7 +113,15 @@ const mockTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
 describe('TerminalDebugView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    terminalEmulatorPropsSpy.mockClear();
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(createFetchOkResponse());
+    vi.stubGlobal('fetch', fetchMock);
     void setTestLanguage();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('Rendering', () => {
@@ -186,8 +212,102 @@ describe('TerminalDebugView', () => {
       fireEvent.click(devButton);
 
       await waitFor(() => {
-        const container = document.querySelector('.bg-\\[\\#1e1e1e\\]');
-        expect(container).toBeInTheDocument();
+        expect(screen.getByTestId('terminal-emulator')).toBeInTheDocument();
+      });
+    });
+
+    it('should rebuild terminal emulator when switching terminals', async () => {
+      const switchableTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
+        {
+          ...mockTasks[0],
+          terminals: mockTasks[0].terminals.map((terminal) =>
+            terminal.id === 'term-2' ? { ...terminal, status: 'working' } : terminal
+          ),
+        },
+      ];
+
+      renderWithI18n(<TerminalDebugView tasks={switchableTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      const reviewerButton = screen.getByText('Reviewer').closest('button');
+
+      if (!devButton || !reviewerButton) {
+        throw new Error('Expected terminal buttons to be rendered.');
+      }
+
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-1');
+      });
+
+      const terminalIdsAfterFirstSelection = terminalEmulatorPropsSpy.mock.calls.map(
+        (args) => args[0]?.terminalId as string
+      );
+      expect(terminalIdsAfterFirstSelection).toContain('term-1');
+      expect(terminalIdsAfterFirstSelection).not.toContain('term-2');
+
+      fireEvent.click(reviewerButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-2');
+      });
+
+      const terminalIds = terminalEmulatorPropsSpy.mock.calls.map(
+        (args) => args[0]?.terminalId as string
+      );
+
+      expect(terminalIds).toContain('term-1');
+      expect(terminalIds).toContain('term-2');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should show starting placeholder when switching from working to not_started terminal', async () => {
+      let resolveStartRequest: ((value: Response) => void) | null = null;
+      fetchMock.mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveStartRequest = resolve;
+          })
+      );
+
+      renderWithI18n(<TerminalDebugView tasks={mockTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      const reviewerButton = screen.getByText('Reviewer').closest('button');
+
+      if (!devButton || !reviewerButton) {
+        throw new Error('Expected terminal buttons to be rendered.');
+      }
+
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-1');
+        expect(screen.getByText('claude-code - model-1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(reviewerButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('cursor - model-2')).toBeInTheDocument();
+        expect(screen.queryByText('claude-code - model-1')).not.toBeInTheDocument();
+        expect(screen.getByText(i18n.t('workflow:terminalDebug.starting'))).toBeInTheDocument();
+        expect(screen.queryByTestId('terminal-emulator')).not.toBeInTheDocument();
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-2/start', { method: 'POST' });
+
+      if (!resolveStartRequest) {
+        throw new Error('Expected terminal start request to be pending.');
+      }
+
+      resolveStartRequest(createFetchOkResponse());
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-2');
+        expect(screen.queryByText(i18n.t('workflow:terminalDebug.starting'))).not.toBeInTheDocument();
       });
     });
   });

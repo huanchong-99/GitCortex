@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { TerminalEmulator, TerminalEmulatorRef } from './TerminalEmulator';
 
@@ -30,20 +30,26 @@ vi.mock('@xterm/addon-fit', () => {
 
 // Mock WebSocket
 class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+  static autoOpen = true;
+
   url = '';
   readyState = 0;
   lastSent: string | null = null;
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
   onerror: ((error: Event) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event?: CloseEvent) => void) | null = null;
 
   constructor(url: string) {
     this.url = url;
-    setTimeout(() => {
-      this.readyState = 1; // OPEN
-      this.onopen?.();
-    }, 0);
+    MockWebSocket.instances.push(this);
+    if (MockWebSocket.autoOpen) {
+      setTimeout(() => {
+        this.readyState = 1; // OPEN
+        this.onopen?.();
+      }, 0);
+    }
   }
 
   send(data: string) {
@@ -52,7 +58,17 @@ class MockWebSocket {
 
   close() {
     this.readyState = 3; // CLOSED
-    this.onclose?.();
+    this.onclose?.({ code: 1000, reason: '' } as CloseEvent);
+  }
+
+  simulateOpen() {
+    this.readyState = 1;
+    this.onopen?.();
+  }
+
+  simulateUnexpectedClose(reason = 'network drop') {
+    this.readyState = 3;
+    this.onclose?.({ code: 1006, reason } as CloseEvent);
   }
 
   addEventListener(event: string, handler: () => void) {
@@ -65,6 +81,8 @@ globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
 describe('TerminalEmulator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    MockWebSocket.instances = [];
+    MockWebSocket.autoOpen = false;
   });
 
   describe('Rendering', () => {
@@ -124,7 +142,31 @@ describe('TerminalEmulator', () => {
 
   describe('WebSocket Connection', () => {
     it('should establish WebSocket connection when wsUrl is provided', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      render(
+        <TerminalEmulator
+          terminalId={VALID_TERMINAL_ID}
+          wsUrl="ws://localhost:8080"
+        />
+      );
+
+      await waitFor(() => {
+        expect(MockWebSocket.instances).toHaveLength(1);
+      });
+
+      const socket = MockWebSocket.instances[0];
+      expect(socket.url).toBe(`ws://localhost:8080/terminal/${VALID_TERMINAL_ID}`);
+
+      act(() => {
+        socket.simulateOpen();
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Connecting terminal stream...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should show connecting hint before stream is open', async () => {
+      MockWebSocket.autoOpen = false;
 
       render(
         <TerminalEmulator
@@ -133,10 +175,9 @@ describe('TerminalEmulator', () => {
         />
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(consoleSpy).not.toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      await waitFor(() => {
+        expect(screen.getByText('Connecting terminal stream...')).toBeInTheDocument();
+      });
     });
 
     it('should not connect WebSocket when wsUrl is not provided', () => {
@@ -227,6 +268,30 @@ describe('TerminalEmulator', () => {
   });
 
   describe('Error Handling', () => {
+    it('should show disconnected hint when stream closes unexpectedly', async () => {
+      render(
+        <TerminalEmulator
+          terminalId={VALID_TERMINAL_ID}
+          wsUrl="ws://localhost:8080"
+        />
+      );
+
+      await waitFor(() => {
+        expect(MockWebSocket.instances.length).toBeGreaterThan(0);
+      });
+
+      const socket = MockWebSocket.instances[0];
+      act(() => {
+        socket.simulateUnexpectedClose('network');
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Disconnected from terminal stream/)).toBeInTheDocument();
+      });
+
+      expect(screen.getByText(/network/)).toBeInTheDocument();
+    });
+
     it('should handle malformed WebSocket messages', () => {
       const onError = vi.fn();
 

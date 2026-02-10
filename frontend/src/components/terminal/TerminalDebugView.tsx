@@ -231,6 +231,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                 (!['failed', 'not_started'].includes(selectedTerminal.status) &&
                  ['waiting', 'working', 'running', 'active', 'completed'].includes(selectedTerminal.status))) ? (
                 <TerminalEmulator
+                  key={selectedTerminal.id}
                   ref={terminalRef}
                   terminalId={selectedTerminal.id}
                   wsUrl={wsUrl}

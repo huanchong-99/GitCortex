@@ -220,29 +220,37 @@ impl OrchestratorAgent {
             }
         }
 
-        if let Some(existing_terminal) =
+        let Some(existing_terminal) =
             db::models::Terminal::find_by_id(&self.db.pool, &event.terminal_id).await?
-        {
-            if existing_terminal.completed_at.is_some() {
-                tracing::info!(
-                    terminal_id = %event.terminal_id,
-                    task_id = %event.task_id,
-                    status = %existing_terminal.status,
-                    "Ignoring duplicate terminal completion event for finalized terminal"
-                );
-                return Ok(());
-            }
+        else {
+            tracing::warn!(
+                terminal_id = %event.terminal_id,
+                task_id = %event.task_id,
+                completion_status = ?event.status,
+                "Ignoring terminal completion event because terminal does not exist"
+            );
+            return Ok(());
+        };
 
-            if success && existing_terminal.status != "working" {
-                tracing::warn!(
-                    terminal_id = %event.terminal_id,
-                    task_id = %event.task_id,
-                    terminal_status = %existing_terminal.status,
-                    completion_status = ?event.status,
-                    "Ignoring terminal completion event because terminal is not working"
-                );
-                return Ok(());
-            }
+        if existing_terminal.completed_at.is_some() {
+            tracing::info!(
+                terminal_id = %event.terminal_id,
+                task_id = %event.task_id,
+                status = %existing_terminal.status,
+                "Ignoring duplicate terminal completion event for finalized terminal"
+            );
+            return Ok(());
+        }
+
+        if success && existing_terminal.status != "working" {
+            tracing::warn!(
+                terminal_id = %event.terminal_id,
+                task_id = %event.task_id,
+                terminal_status = %existing_terminal.status,
+                completion_status = ?event.status,
+                "Ignoring terminal completion event because terminal is not working"
+            );
+            return Ok(());
         }
 
         let workflow_id = {
@@ -274,16 +282,97 @@ impl OrchestratorAgent {
             TERMINAL_STATUS_FAILED
         };
 
-        if let Err(e) =
-            db::models::Terminal::set_completed(&self.db.pool, &event.terminal_id, terminal_final_status)
-                .await
-        {
-            tracing::error!(
-                "Failed to mark terminal {} {}: {}",
-                event.terminal_id,
+        let completion_updated = if success {
+            match db::models::Terminal::set_completed_cas(
+                &self.db.pool,
+                &event.terminal_id,
+                "working",
                 terminal_final_status,
-                e
-            );
+            )
+            .await
+            {
+                Ok(true) => true,
+                Ok(false) => {
+                    tracing::info!(
+                        terminal_id = %event.terminal_id,
+                        task_id = %event.task_id,
+                        expected_status = "working",
+                        target_status = %terminal_final_status,
+                        "Skipping terminal completion because CAS status transition did not match"
+                    );
+                    false
+                }
+                Err(e) => {
+                    tracing::error!(
+                        terminal_id = %event.terminal_id,
+                        task_id = %event.task_id,
+                        target_status = %terminal_final_status,
+                        error = %e,
+                        "Failed to mark terminal completion with CAS"
+                    );
+                    false
+                }
+            }
+        } else {
+            match db::models::Terminal::set_completed_cas(
+                &self.db.pool,
+                &event.terminal_id,
+                "working",
+                terminal_final_status,
+            )
+            .await
+            {
+                Ok(true) => true,
+                Ok(false) => {
+                    match db::models::Terminal::set_completed_if_unfinished(
+                        &self.db.pool,
+                        &event.terminal_id,
+                        terminal_final_status,
+                    )
+                    .await
+                    {
+                        Ok(true) => true,
+                        Ok(false) => {
+                            tracing::info!(
+                                terminal_id = %event.terminal_id,
+                                task_id = %event.task_id,
+                                target_status = %terminal_final_status,
+                                "Skipping terminal completion fallback because terminal is already finalized"
+                            );
+                            false
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                terminal_id = %event.terminal_id,
+                                task_id = %event.task_id,
+                                target_status = %terminal_final_status,
+                                error = %e,
+                                "Failed to mark terminal completion after CAS miss fallback"
+                            );
+                            false
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        terminal_id = %event.terminal_id,
+                        task_id = %event.task_id,
+                        target_status = %terminal_final_status,
+                        error = %e,
+                        "Failed to mark terminal completion with CAS"
+                    );
+                    false
+                }
+            }
+        };
+
+        if !completion_updated {
+            return Ok(());
+        }
+
+        if success {
+            self.enforce_terminal_completion_shutdown(&workflow_id, &existing_terminal)
+                .await;
         }
 
         let _ = self
@@ -1120,30 +1209,50 @@ impl OrchestratorAgent {
             state.workflow_id.clone()
         };
 
-        // 0. Check terminal status - only dispatch if waiting
-        if terminal.status != "waiting" {
-            tracing::warn!(
-                "Skipping dispatch for terminal {} due to status {}",
-                terminal.id,
-                terminal.status
+        // 1. CAS update terminal status waiting -> working.
+        let dispatch_acquired = db::models::Terminal::update_status_cas(
+            &self.db.pool,
+            &terminal.id,
+            "waiting",
+            "working",
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to update terminal status with CAS: {e}"))?;
+
+        if !dispatch_acquired {
+            tracing::info!(
+                terminal_id = %terminal.id,
+                task_id = %task_id,
+                "Skipping dispatch because terminal CAS waiting->working failed"
             );
             return Ok(());
         }
 
-        // 1. Get PTY session ID, fail if not available
-        let pty_session_id = match terminal.pty_session_id.as_deref() {
+        // 2. Refresh terminal snapshot after CAS to avoid stale PTY/session metadata.
+        let active_terminal = db::models::Terminal::find_by_id(&self.db.pool, &terminal.id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to reload terminal after CAS: {e}"))?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Terminal {} not found after CAS dispatch acquisition",
+                    terminal.id
+                )
+            })?;
+
+        // 3. Get PTY session ID, fail if not available.
+        let pty_session_id = match active_terminal.pty_session_id.as_deref() {
             Some(id) => id.to_string(),
             None => {
                 let error_msg = format!(
                     "Terminal {} has no PTY session, marking as failed",
-                    terminal.id
+                    active_terminal.id
                 );
                 tracing::error!("{}", error_msg);
 
                 // Mark terminal as failed
                 let _ = db::models::Terminal::update_status(
                     &self.db.pool,
-                    &terminal.id,
+                    &active_terminal.id,
                     TERMINAL_STATUS_FAILED,
                 )
                 .await;
@@ -1155,7 +1264,7 @@ impl OrchestratorAgent {
                         &workflow_id,
                         BusMessage::TerminalStatusUpdate {
                             workflow_id: workflow_id.clone(),
-                            terminal_id: terminal.id.clone(),
+                            terminal_id: active_terminal.id.clone(),
                             status: TERMINAL_STATUS_FAILED.to_string(),
                         },
                     )
@@ -1192,29 +1301,24 @@ impl OrchestratorAgent {
 
                 return Err(anyhow::anyhow!(
                     "Terminal {} has no PTY session",
-                    terminal.id
+                    active_terminal.id
                 ));
             }
         };
 
-        // 2. Update terminal status to working
-        db::models::Terminal::update_status(&self.db.pool, &terminal.id, "working")
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to update terminal status: {e}"))?;
-
-        // 3. Update task status to running
+        // 4. Update task status to running.
         db::models::WorkflowTask::update_status(&self.db.pool, task_id, "running")
             .await
             .map_err(|e| anyhow::anyhow!("Failed to update task status: {e}"))?;
 
-        // 4. Broadcast live status updates for UI
+        // 5. Broadcast live status updates for UI.
         let _ = self
             .message_bus
             .publish_workflow_event(
                 &workflow_id,
                 BusMessage::TerminalStatusUpdate {
                     workflow_id: workflow_id.clone(),
-                    terminal_id: terminal.id.clone(),
+                    terminal_id: active_terminal.id.clone(),
                     status: "working".to_string(),
                 },
             )
@@ -1231,12 +1335,12 @@ impl OrchestratorAgent {
             )
             .await;
 
-        if Self::needs_explicit_submit(terminal) {
+        if Self::needs_explicit_submit(&active_terminal) {
             self.message_bus
-                .publish_terminal_input(&terminal.id, &pty_session_id, instruction, None)
+                .publish_terminal_input(&active_terminal.id, &pty_session_id, instruction, None)
                 .await;
         } else {
-            // 5. Send instruction to PTY session
+            // 6. Send instruction to PTY session.
             self.message_bus
                 .publish(
                     &pty_session_id,
@@ -1250,14 +1354,17 @@ impl OrchestratorAgent {
 
         // Fallback submit keystroke: some terminal TUIs keep pasted text in composer
         // until an additional Enter is sent.
-        for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(terminal).iter().enumerate() {
+        for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(&active_terminal)
+            .iter()
+            .enumerate()
+        {
             sleep(Duration::from_millis(*delay_ms)).await;
             self.message_bus
-                .publish_terminal_input(&terminal.id, &pty_session_id, "", None)
+                .publish_terminal_input(&active_terminal.id, &pty_session_id, "", None)
                 .await;
             tracing::debug!(
-                terminal_id = %terminal.id,
-                cli_type_id = %terminal.cli_type_id,
+                terminal_id = %active_terminal.id,
+                cli_type_id = %active_terminal.cli_type_id,
                 attempt = attempt + 1,
                 delay_ms,
                 "Sent submit keystroke after terminal instruction dispatch"
@@ -1266,12 +1373,66 @@ impl OrchestratorAgent {
 
         tracing::info!(
             "Dispatched terminal {} for task {} with instruction: {}",
-            terminal.id,
+            active_terminal.id,
             task_id,
             instruction
         );
 
         Ok(())
+    }
+
+    async fn enforce_terminal_completion_shutdown(
+        &self,
+        workflow_id: &str,
+        terminal: &db::models::Terminal,
+    ) {
+        let pty_session_id = terminal
+            .pty_session_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|session_id| !session_id.is_empty())
+            .map(str::to_string);
+
+        if let Some(session_id) = pty_session_id.as_deref() {
+            let _ = self
+                .message_bus
+                .publish(
+                    session_id,
+                    BusMessage::TerminalInput {
+                        terminal_id: terminal.id.clone(),
+                        session_id: session_id.to_string(),
+                        input: "\u{3}".to_string(),
+                        decision: None,
+                    },
+                )
+                .await;
+
+            let _ = self.message_bus.publish(session_id, BusMessage::Shutdown).await;
+            tracing::info!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                pty_session_id = %session_id,
+                "Issued completion shutdown signals for terminal"
+            );
+        }
+
+        if let Err(e) = db::models::Terminal::update_process(&self.db.pool, &terminal.id, None, None).await {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to clear terminal process binding after completion"
+            );
+        }
+
+        if let Err(e) = db::models::Terminal::update_session(&self.db.pool, &terminal.id, None, None).await {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to clear terminal session binding after completion"
+            );
+        }
     }
 
     fn needs_explicit_submit(terminal: &db::models::Terminal) -> bool {
