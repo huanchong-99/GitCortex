@@ -692,23 +692,23 @@ mod tests {
         let runtime_a = runtime.clone();
         let workflow_id_a = workflow_id.clone();
         let barrier_a = barrier.clone();
-        let start_a = tokio::spawn(async move {
+        let reserve_a = tokio::spawn(async move {
             barrier_a.wait().await;
-            runtime_a.start_workflow(&workflow_id_a).await
+            runtime_a.reserve_start_slot(&workflow_id_a).await
         });
 
         let runtime_b = runtime.clone();
         let workflow_id_b = workflow_id.clone();
         let barrier_b = barrier.clone();
-        let start_b = tokio::spawn(async move {
+        let reserve_b = tokio::spawn(async move {
             barrier_b.wait().await;
-            runtime_b.start_workflow(&workflow_id_b).await
+            runtime_b.reserve_start_slot(&workflow_id_b).await
         });
 
         barrier.wait().await;
 
-        let result_a = start_a.await.unwrap();
-        let result_b = start_b.await.unwrap();
+        let result_a = reserve_a.await.unwrap();
+        let result_b = reserve_b.await.unwrap();
         let results = [result_a, result_b];
 
         let success_count = results.iter().filter(|result| result.is_ok()).count();
@@ -721,40 +721,23 @@ mod tests {
                     .is_some_and(|error| error.to_string().contains("already running"))
             })
             .count();
-        let non_guard_error_count = results
-            .iter()
-            .filter(|result| {
-                result
-                    .as_ref()
-                    .err()
-                    .is_some_and(|error| !error.to_string().contains("already running"))
-            })
-            .count();
 
-        assert!(
-            success_count <= 1,
-            "Concurrent duplicate start should not produce more than one successful start: {:?}",
+        assert_eq!(
+            success_count, 1,
+            "Exactly one caller should reserve the start slot: {:?}",
             results
         );
         assert_eq!(
             already_running_error_count, 1,
-            "Competing start should fail with already running: {:?}",
-            results
-        );
-        assert_eq!(
-            success_count + non_guard_error_count,
-            1,
-            "Exactly one attempt should pass the concurrency guard: {:?}",
+            "Competing reserve should fail with already running: {:?}",
             results
         );
         assert!(
-            runtime.running_count().await <= 1,
-            "At most one workflow instance should be registered as running"
+            runtime.running_count().await == 0,
+            "Reserving start slot should not register running workflow instances"
         );
 
-        if runtime.is_running(&workflow_id).await {
-            runtime.stop_workflow(&workflow_id).await.unwrap();
-        }
+        runtime.release_start_slot(&workflow_id).await;
     }
 
     #[tokio::test]
