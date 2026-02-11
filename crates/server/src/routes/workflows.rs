@@ -9,9 +9,9 @@ use axum::{
     routing::{get, post, put},
 };
 use db::models::{
-    CliType, CreateTerminalRequest, CreateWorkflowRequest, CreateWorkflowTaskRequest,
-    InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal, Workflow, WorkflowCommand,
-    WorkflowTask, project::Project,
+    CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
+    Workflow, WorkflowCommand, WorkflowTask, project::Project,
+    workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest},
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
