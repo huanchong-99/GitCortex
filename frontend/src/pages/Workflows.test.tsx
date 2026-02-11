@@ -272,6 +272,55 @@ const mockCompletedWorkflowDetail: WorkflowDetailDto = {
   commands: [],
 };
 
+const mockUnorderedWorkflowDetail: WorkflowDetailDto = {
+  ...mockCompletedWorkflowDetail,
+  id: 'workflow-unordered',
+  projectId: 'proj-1',
+  name: 'Unordered Workflow',
+  tasks: [
+    {
+      ...mockCompletedWorkflowDetail.tasks[0],
+      id: 'task-2',
+      name: 'Task B',
+      orderIndex: 1,
+      terminals: [
+        {
+          ...mockCompletedWorkflowDetail.tasks[0].terminals[0],
+          id: 'terminal-b2',
+          orderIndex: 1,
+          status: 'completed',
+        },
+        {
+          ...mockCompletedWorkflowDetail.tasks[0].terminals[0],
+          id: 'terminal-b1',
+          orderIndex: 0,
+          status: 'completed',
+        },
+      ],
+    },
+    {
+      ...mockCompletedWorkflowDetail.tasks[0],
+      id: 'task-1',
+      name: 'Task A',
+      orderIndex: 0,
+      terminals: [
+        {
+          ...mockCompletedWorkflowDetail.tasks[0].terminals[0],
+          id: 'terminal-a2',
+          orderIndex: 1,
+          status: 'completed',
+        },
+        {
+          ...mockCompletedWorkflowDetail.tasks[0].terminals[0],
+          id: 'terminal-a1',
+          orderIndex: 0,
+          status: 'completed',
+        },
+      ],
+    },
+  ],
+};
+
 const basePromptDetectedPayload: TerminalPromptDetectedPayload = {
   workflowId: 'workflow-3',
   terminalId: 'terminal-1',
@@ -1088,6 +1137,66 @@ describe('Workflows Page', () => {
       expect(
         screen.getByText('Failed to submit prompt response over WebSocket')
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('Project and Pipeline Consistency', () => {
+    it('renders tasks and terminals in orderIndex order', async () => {
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = typeof input === 'string' ? input : input.toString();
+
+        if (url.startsWith('/api/workflows?project_id=')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: [
+                {
+                  ...mockWorkflows[0],
+                  id: 'workflow-unordered',
+                  name: 'Unordered Workflow',
+                },
+              ],
+            }),
+          } as Response);
+        }
+
+        if (url === '/api/workflows/workflow-unordered') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true, data: mockUnorderedWorkflowDetail }),
+          } as Response);
+        }
+
+        return Promise.reject(new Error(`Unexpected request: ${url}`));
+      });
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<Workflows />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText('Unordered Workflow')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Unordered Workflow').closest('.cursor-pointer')!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Task A')).toBeInTheDocument();
+        expect(screen.getByText('Task B')).toBeInTheDocument();
+      });
+
+      const taskTitles = screen
+        .getAllByText(/Task [AB]/)
+        .map((el) => el.textContent);
+      expect(taskTitles[0]).toBe('Task A');
+      expect(taskTitles[1]).toBe('Task B');
+
+      const taskHeaderSpans = screen
+        .getAllByText(/Task [12]/)
+        .map((el) => el.textContent);
+      expect(taskHeaderSpans.filter((text) => text === 'Task 1').length).toBeGreaterThan(0);
+      expect(taskHeaderSpans.filter((text) => text === 'Task 2').length).toBeGreaterThan(0);
     });
   });
 

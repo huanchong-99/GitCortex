@@ -499,6 +499,9 @@ export function usePrepareWorkflow() {
       queryClient.invalidateQueries({
         queryKey: workflowKeys.byId(workflowId),
       });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.all,
+      });
     },
     onError: (error) => {
       logApiError('Failed to prepare workflow:', error);
@@ -520,6 +523,9 @@ export function useStartWorkflow() {
       queryClient.invalidateQueries({
         queryKey: workflowKeys.byId(variables.workflow_id),
       });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.all,
+      });
     },
     onError: (error) => {
       logApiError('Failed to start workflow:', error);
@@ -540,6 +546,9 @@ export function usePauseWorkflow() {
       queryClient.invalidateQueries({
         queryKey: workflowKeys.byId(variables.workflow_id),
       });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.all,
+      });
     },
     onError: (error) => {
       logApiError('Failed to pause workflow:', error);
@@ -559,6 +568,9 @@ export function useStopWorkflow() {
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({
         queryKey: workflowKeys.byId(variables.workflow_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.all,
       });
     },
     onError: (error) => {

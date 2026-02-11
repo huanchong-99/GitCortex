@@ -149,6 +149,7 @@ export function Workflows() {
       const newParams = new URLSearchParams(searchParams);
       newParams.set('projectId', validProjectId!);
       setSearchParams(newParams, { replace: true });
+      setSelectedWorkflowId(null);
     }
   }, [
     projectIdFromUrl,
@@ -302,14 +303,23 @@ export function Workflows() {
     }
   }, [queryClient, selectedWorkflowId, validProjectId]);
 
-  useWorkflowEvents(selectedWorkflowId, {
-    onTerminalPromptDetected: handleTerminalPromptDetected,
-    onTerminalPromptDecision: handleTerminalPromptDecision,
-    onWorkflowStatusChanged: handleRealtimeWorkflowSignal,
-    onTaskStatusChanged: handleRealtimeWorkflowSignal,
-    onTerminalStatusChanged: handleRealtimeWorkflowSignal,
-    onTerminalCompleted: handleRealtimeWorkflowSignal,
-  });
+  const workflowEventHandlers = useMemo(
+    () => ({
+      onTerminalPromptDetected: handleTerminalPromptDetected,
+      onTerminalPromptDecision: handleTerminalPromptDecision,
+      onWorkflowStatusChanged: handleRealtimeWorkflowSignal,
+      onTaskStatusChanged: handleRealtimeWorkflowSignal,
+      onTerminalStatusChanged: handleRealtimeWorkflowSignal,
+      onTerminalCompleted: handleRealtimeWorkflowSignal,
+    }),
+    [
+      handleTerminalPromptDetected,
+      handleTerminalPromptDecision,
+      handleRealtimeWorkflowSignal,
+    ]
+  );
+
+  useWorkflowEvents(selectedWorkflowId, workflowEventHandlers);
 
   const activePrompt = useMemo(() => promptQueue[0] ?? null, [promptQueue]);
 
@@ -480,11 +490,15 @@ export function Workflows() {
 
   // Helper to map DTO tasks to PipelineView tasks
   const mapWorkflowTasks = (dtoTasks: WorkflowTaskDto[]): WorkflowTask[] => {
-    return dtoTasks.map((task) => ({
+    return [...dtoTasks]
+      .sort((a, b) => a.orderIndex - b.orderIndex)
+      .map((task) => ({
       id: task.id,
       name: task.name,
       branch: task.branch,
-      terminals: task.terminals.map((terminal) => ({
+      terminals: [...task.terminals]
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((terminal) => ({
         id: terminal.id,
         workflowTaskId: task.id,
         cliTypeId: terminal.cliTypeId,

@@ -163,6 +163,11 @@ impl PromptHandler {
                 .await;
 
             if !delivered {
+                let mut state_machines = self.state_machines.write().await;
+                if let Some(sm) = state_machines.get_mut(&event.terminal_id) {
+                    sm.reset();
+                }
+
                 decision_to_publish = PromptDecision::skip(
                     "Skipped prompt response: terminal input could not be delivered",
                 );
@@ -429,6 +434,11 @@ impl PromptHandler {
                 .publish_terminal_input(terminal_id, session_id, &response, Some(decision.clone()))
                 .await;
             if !delivered {
+                let mut state_machines = self.state_machines.write().await;
+                if let Some(sm) = state_machines.get_mut(terminal_id) {
+                    sm.reset();
+                }
+
                 decision_to_publish = PromptDecision::skip(
                     "Skipped prompt response: terminal input could not be delivered",
                 );
@@ -1073,5 +1083,32 @@ mod tests {
         assert!(prompt.contains("Continue? [y/n]"));
         assert!(prompt.contains("Installing dependencies"));
         assert!(prompt.contains("JSON"));
+    }
+
+    #[tokio::test]
+    async fn test_failed_delivery_resets_state_machine_after_auto_confirm() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let handler = PromptHandler::new(message_bus.clone());
+
+        let event = TerminalPromptEvent {
+            terminal_id: "term-no-route".to_string(),
+            workflow_id: "workflow-1".to_string(),
+            task_id: "task-1".to_string(),
+            session_id: "session-no-route".to_string(),
+            auto_confirm: true,
+            prompt: create_test_prompt(PromptKind::EnterConfirm, "Press Enter to continue", 0.95),
+            detected_at: chrono::Utc::now(),
+        };
+
+        let _ = handler
+            .handle_prompt_event(&event)
+            .await
+            .expect("prompt should produce decision");
+
+        let state_machines = handler.state_machines.read().await;
+        let terminal_state = state_machines
+            .get("term-no-route")
+            .expect("state machine should exist");
+        assert_eq!(terminal_state.state, PromptState::Idle);
     }
 }

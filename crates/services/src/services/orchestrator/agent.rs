@@ -46,6 +46,9 @@ pub struct OrchestratorAgent {
 }
 
 impl OrchestratorAgent {
+    const NEXT_TERMINAL_WAIT_RETRY_ATTEMPTS: usize = 20;
+    const NEXT_TERMINAL_WAIT_RETRY_INTERVAL: Duration = Duration::from_millis(500);
+
     /// Builds a new orchestrator agent with a configured LLM client.
     pub fn new(
         config: OrchestratorConfig,
@@ -652,14 +655,44 @@ impl OrchestratorAgent {
             anyhow::anyhow!("Terminal index {terminal_index} out of range for task {task_id}")
         })?;
 
-        // Only dispatch if terminal is in waiting status
-        if terminal.status != "waiting" {
-            tracing::debug!(
-                "Skipping next terminal {} due to status {}",
-                terminal.id,
-                terminal.status
-            );
-            return Ok(());
+        let terminal_id = terminal.id.clone();
+        let mut active_terminal = terminal;
+
+        for attempt in 0..=Self::NEXT_TERMINAL_WAIT_RETRY_ATTEMPTS {
+            if active_terminal.status == "waiting" {
+                break;
+            }
+
+            if matches!(
+                active_terminal.status.as_str(),
+                "working" | "completed" | "failed" | "cancelled"
+            ) {
+                tracing::debug!(
+                    terminal_id = %active_terminal.id,
+                    task_id = %task_id,
+                    status = %active_terminal.status,
+                    "Skipping next terminal dispatch because terminal already reached terminal state"
+                );
+                return Ok(());
+            }
+
+            if attempt == Self::NEXT_TERMINAL_WAIT_RETRY_ATTEMPTS {
+                tracing::warn!(
+                    terminal_id = %active_terminal.id,
+                    task_id = %task_id,
+                    status = %active_terminal.status,
+                    attempts = Self::NEXT_TERMINAL_WAIT_RETRY_ATTEMPTS,
+                    "Timed out waiting next terminal to become ready for dispatch"
+                );
+                return Ok(());
+            }
+
+            sleep(Self::NEXT_TERMINAL_WAIT_RETRY_INTERVAL).await;
+
+            active_terminal = db::models::Terminal::find_by_id(&self.db.pool, &terminal_id)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to refresh terminal status: {e}"))?
+                .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
         }
 
         let workflow_id = {
@@ -669,8 +702,8 @@ impl OrchestratorAgent {
 
         // Build and dispatch instruction
         let instruction =
-            Self::build_task_instruction(&workflow_id, &task, &terminal, terminals.len());
-        self.dispatch_terminal(task_id, &terminal, &instruction)
+            Self::build_task_instruction(&workflow_id, &task, &active_terminal, terminals.len());
+        self.dispatch_terminal(task_id, &active_terminal, &instruction)
             .await
     }
 
@@ -741,6 +774,17 @@ impl OrchestratorAgent {
         // 3. Route to handler based on status
         match metadata.status.as_str() {
             TERMINAL_STATUS_COMPLETED => {
+                if Self::should_skip_completed_handoff(&metadata.next_action) {
+                    tracing::info!(
+                        commit_hash = %commit_hash,
+                        terminal_id = %metadata.terminal_id,
+                        task_id = %metadata.task_id,
+                        next_action = %metadata.next_action,
+                        "Skipping completed handoff for continue/retry commit"
+                    );
+                    return Ok(());
+                }
+
                 self.handle_git_terminal_completed(
                     &metadata.terminal_id,
                     &metadata.task_id,
@@ -782,6 +826,13 @@ impl OrchestratorAgent {
         }
 
         Ok(())
+    }
+
+    fn should_skip_completed_handoff(next_action: &str) -> bool {
+        matches!(
+            next_action.trim().to_ascii_lowercase().as_str(),
+            "continue" | "retry"
+        )
     }
 
     /// Handle git event without METADATA - wake up orchestrator for decision.
@@ -2254,5 +2305,14 @@ mod tests {
 
         assert_eq!(result.chars().count(), 201);
         assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn should_skip_completed_handoff_for_continue_and_retry() {
+        assert!(OrchestratorAgent::should_skip_completed_handoff("continue"));
+        assert!(OrchestratorAgent::should_skip_completed_handoff("retry"));
+        assert!(OrchestratorAgent::should_skip_completed_handoff(" Continue "));
+        assert!(!OrchestratorAgent::should_skip_completed_handoff("handoff"));
+        assert!(!OrchestratorAgent::should_skip_completed_handoff(""));
     }
 }

@@ -18,7 +18,10 @@ import {
   useWorkflows,
   useWorkflow,
   useCreateWorkflow,
+  usePrepareWorkflow,
   useStartWorkflow,
+  usePauseWorkflow,
+  useStopWorkflow,
   useSubmitWorkflowPromptResponse,
   useMergeWorkflow,
   useDeleteWorkflow,
@@ -331,6 +334,112 @@ describe('useStartWorkflow', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(executionResponse);
+  });
+});
+
+describe('status mutations cache invalidation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('prepare invalidates detail and list caches', async () => {
+    const queryClient = createMockQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(undefined)));
+
+    const { result } = renderHook(() => usePrepareWorkflow(), {
+      wrapper: scopedWrapper,
+    });
+
+    result.current.mutate('workflow-1');
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.byId('workflow-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.all,
+    });
+  });
+
+  it('start invalidates detail and list caches', async () => {
+    const queryClient = createMockQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(undefined)));
+
+    const { result } = renderHook(() => useStartWorkflow(), {
+      wrapper: scopedWrapper,
+    });
+
+    result.current.mutate({ workflow_id: 'workflow-1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.byId('workflow-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.all,
+    });
+  });
+
+  it('pause invalidates detail and list caches', async () => {
+    const queryClient = createMockQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(undefined)));
+
+    const { result } = renderHook(() => usePauseWorkflow(), {
+      wrapper: scopedWrapper,
+    });
+
+    result.current.mutate({ workflow_id: 'workflow-1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.byId('workflow-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.all,
+    });
+  });
+
+  it('stop invalidates detail and list caches', async () => {
+    const queryClient = createMockQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    vi.stubGlobal('fetch', vi.fn(() => createSuccessResponse(undefined)));
+
+    const { result } = renderHook(() => useStopWorkflow(), {
+      wrapper: scopedWrapper,
+    });
+
+    result.current.mutate({ workflow_id: 'workflow-1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.byId('workflow-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: workflowKeys.all,
+    });
   });
 });
 
