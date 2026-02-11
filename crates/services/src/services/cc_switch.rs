@@ -628,26 +628,49 @@ impl CCSwitchService {
                     env.unset.push("ANTHROPIC_BASE_URL".to_string());
                 }
 
-                // Resolve API key: custom first, then from existing config
-                let api_key = if let Some(custom) = terminal.get_custom_api_key()? {
-                    custom
-                } else {
+                // Resolve API key with fallback chain:
+                // 1. Terminal custom_api_key
+                // 2. Global Claude config (~/.claude/settings.json)
+                // 3. Workflow orchestrator config (same as Codex fallback)
+                let custom_api_key = terminal.get_custom_api_key()?;
+                let mut fallback_api_key = None;
+
+                if custom_api_key.is_none() {
+                    // Try global Claude config first
                     let config = match read_claude_config().await {
                         Ok(cfg) => cfg,
                         Err(e) => {
                             tracing::warn!(
                                 error = %e,
-                                "Failed to read Claude config file, will check for auth token anyway"
+                                "Failed to read Claude config file, will try workflow orchestrator fallback"
                             );
                             Default::default()
                         }
                     };
-                    config.env.auth_token
-                        .or(config.env.api_key)
-                        .ok_or_else(|| anyhow::anyhow!(
-                            "Claude Code auth token not configured. Please login via CLI (claude login) or set terminal custom_api_key"
-                        ))?
-                };
+                    fallback_api_key = config.env.auth_token.or(config.env.api_key);
+
+                    // If global config also doesn't have API key, try workflow orchestrator
+                    if fallback_api_key.is_none() {
+                        let (_, orch_api_key) = self
+                            .resolve_workflow_orchestrator_fallback(&terminal.workflow_task_id)
+                            .await?;
+                        fallback_api_key = orch_api_key;
+
+                        if fallback_api_key.is_some() {
+                            tracing::info!(
+                                terminal_id = %terminal.id,
+                                workflow_task_id = %terminal.workflow_task_id,
+                                "Using workflow orchestrator API key as Claude Code terminal fallback"
+                            );
+                        }
+                    }
+                }
+
+                let api_key = custom_api_key.or(fallback_api_key).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Claude Code auth token not configured. Please login via CLI (claude login), set terminal custom_api_key, or configure workflow orchestrator API key"
+                    )
+                })?;
 
                 // Create config.json to skip authentication
                 if let Err(e) = create_claude_config(&claude_home, &api_key) {
