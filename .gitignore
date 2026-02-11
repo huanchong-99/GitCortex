@@ -49,7 +49,15 @@ frontend/dist/
 
 # Test data with API keys
 TEST_DATA.md
-docs/TEST_DATA.md
+docs/TEST_DATA*.md
+
+# Local test artifacts (manual/CI output)
+test-results/
+test-output/
+playwright-report/
+coverage/
+*.trace
+*.trace.log
 
 # Personal AI local configuration
 AGENTS.md
