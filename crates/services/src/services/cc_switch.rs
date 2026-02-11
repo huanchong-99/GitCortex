@@ -630,46 +630,76 @@ impl CCSwitchService {
 
                 // Resolve API key with fallback chain:
                 // 1. Terminal custom_api_key
-                // 2. Global Claude config (~/.claude/settings.json)
-                // 3. Workflow orchestrator config (same as Codex fallback)
+                // 2. Global Claude config (~/.claude/settings.json) - only for official Anthropic API
+                // 3. Workflow orchestrator config (only if base URLs are compatible)
                 let custom_api_key = terminal.get_custom_api_key()?;
                 let mut fallback_api_key = None;
 
                 if custom_api_key.is_none() {
-                    // Try global Claude config first
-                    let config = match read_claude_config().await {
-                        Ok(cfg) => cfg,
-                        Err(e) => {
-                            tracing::warn!(
-                                error = %e,
-                                "Failed to read Claude config file, will try workflow orchestrator fallback"
-                            );
-                            Default::default()
-                        }
-                    };
-                    fallback_api_key = config.env.auth_token.or(config.env.api_key);
+                    // Try global Claude config first, but ONLY if terminal uses official Anthropic API
+                    // Global config is designed for Anthropic API and won't work with custom endpoints
+                    if terminal.custom_base_url.is_none() {
+                        let config = match read_claude_config().await {
+                            Ok(cfg) => cfg,
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    "Failed to read Claude config file, will try workflow orchestrator fallback"
+                                );
+                                Default::default()
+                            }
+                        };
+                        fallback_api_key = config.env.auth_token.or(config.env.api_key);
+                    }
 
                     // If global config also doesn't have API key, try workflow orchestrator
+                    // BUT only if the base URLs are compatible (same API service)
                     if fallback_api_key.is_none() {
-                        let (_, orch_api_key) = self
+                        let (orch_base_url, orch_api_key) = self
                             .resolve_workflow_orchestrator_fallback(&terminal.workflow_task_id)
                             .await?;
-                        fallback_api_key = orch_api_key;
 
-                        if fallback_api_key.is_some() {
-                            tracing::info!(
+                        // Check if base URLs are compatible
+                        let terminal_base_url = terminal.custom_base_url.as_deref();
+                        let can_use_fallback = match (terminal_base_url, orch_base_url.as_deref()) {
+                            // Both use official Anthropic API (no custom base URL)
+                            (None, None) => true,
+                            // Both use the same custom base URL
+                            (Some(t_url), Some(o_url)) if t_url == o_url => true,
+                            // Different base URLs - cannot use fallback
+                            _ => false,
+                        };
+
+                        if can_use_fallback {
+                            fallback_api_key = orch_api_key;
+                            if fallback_api_key.is_some() {
+                                tracing::info!(
+                                    terminal_id = %terminal.id,
+                                    workflow_task_id = %terminal.workflow_task_id,
+                                    "Using workflow orchestrator API key as Claude Code terminal fallback"
+                                );
+                            }
+                        } else {
+                            tracing::warn!(
                                 terminal_id = %terminal.id,
-                                workflow_task_id = %terminal.workflow_task_id,
-                                "Using workflow orchestrator API key as Claude Code terminal fallback"
+                                terminal_base_url = ?terminal_base_url,
+                                orchestrator_base_url = ?orch_base_url,
+                                "Cannot use workflow orchestrator API key fallback: base URLs are incompatible"
                             );
                         }
                     }
                 }
 
                 let api_key = custom_api_key.or(fallback_api_key).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Claude Code auth token not configured. Please login via CLI (claude login), set terminal custom_api_key, or configure workflow orchestrator API key"
-                    )
+                    if terminal.custom_base_url.is_some() {
+                        anyhow::anyhow!(
+                            "Claude Code auth token not configured for custom API endpoint. Please set terminal custom_api_key"
+                        )
+                    } else {
+                        anyhow::anyhow!(
+                            "Claude Code auth token not configured. Please login via CLI (claude login), set terminal custom_api_key, or configure workflow orchestrator API key"
+                        )
+                    }
                 })?;
 
                 // Create config.json to skip authentication
