@@ -11,8 +11,8 @@ use axum::{
 use db::models::{
     CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
     Workflow, WorkflowCommand, WorkflowTask, project::Project,
-    workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest},
 };
+use db::models::workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
