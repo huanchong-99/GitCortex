@@ -377,6 +377,11 @@
     "restart": "Restart",
     "selectPrompt": "Select a terminal to start debugging",
     "starting": "Starting terminal...",
+    "historyTitle": "Terminal history",
+    "historyLoading": "Loading terminal history...",
+    "historyLoadFailed": "Failed to load terminal history.",
+    "reloadHistory": "Reload history",
+    "historyEmpty": "No terminal history available yet.",
     "status": {
       "not_started": "Not started",
       "starting": "Starting",

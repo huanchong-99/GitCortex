@@ -376,6 +376,11 @@
     "restart": "重启",
     "selectPrompt": "选择一个终端开始调试",
     "starting": "正在启动终端...",
+    "historyTitle": "终端历史",
+    "historyLoading": "正在加载终端历史...",
+    "historyLoadFailed": "加载终端历史失败。",
+    "reloadHistory": "重新加载历史",
+    "historyEmpty": "暂无终端历史日志。",
     "status": {
       "not_started": "未开始",
       "starting": "启动中",

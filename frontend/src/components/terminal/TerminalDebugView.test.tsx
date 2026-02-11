@@ -321,6 +321,12 @@ describe('TerminalDebugView', () => {
         },
       ];
 
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: [] }),
+      } as Response);
+
       renderWithI18n(<TerminalDebugView tasks={completedTasks} wsUrl="ws://localhost:8080" />);
 
       const devButton = screen.getByText('Developer').closest('button');
@@ -330,25 +336,11 @@ describe('TerminalDebugView', () => {
       fireEvent.click(devButton);
 
       await waitFor(() => {
-        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-1');
+        expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-1/logs?limit=1000');
+        expect(screen.queryByTestId('terminal-emulator')).not.toBeInTheDocument();
       });
 
-      const latestCall = terminalEmulatorPropsSpy.mock.calls[
-        terminalEmulatorPropsSpy.mock.calls.length - 1
-      ];
-      const latestProps = latestCall?.[0] as
-        | { onError?: (error: Error) => void }
-        | undefined;
-
-      await act(async () => {
-        latestProps?.onError?.(
-          new Error('Terminal process not running. Please start the terminal first.')
-        );
-      });
-
-      await waitFor(() => {
-        expect(fetchMock).not.toHaveBeenCalled();
-      });
+      expect(fetchMock).not.toHaveBeenCalledWith('/api/terminals/term-1/start', { method: 'POST' });
     });
 
     it('should auto-restart working terminal on process-not-running error', async () => {
@@ -379,6 +371,49 @@ describe('TerminalDebugView', () => {
 
       await waitFor(() => {
         expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-1/start', { method: 'POST' });
+      });
+    });
+
+    it('should render history view instead of websocket for completed terminal', async () => {
+      const completedTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
+        {
+          ...mockTasks[0],
+          terminals: mockTasks[0].terminals.map((terminal) =>
+            terminal.id === 'term-1' ? { ...terminal, status: 'completed' } : terminal
+          ),
+        },
+      ];
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: [
+            { id: 'l1', content: 'line 1\n' },
+            { id: 'l2', content: 'line 2\n' },
+          ],
+        }),
+      } as Response);
+
+      renderWithI18n(<TerminalDebugView tasks={completedTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      if (!devButton) {
+        throw new Error('Expected terminal button to be rendered.');
+      }
+
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-1/logs?limit=1000');
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('terminal-emulator')).not.toBeInTheDocument();
+        const historyPanel = screen.getByText('Terminal history').parentElement;
+        expect(historyPanel).toHaveTextContent('line 1');
+        expect(historyPanel).toHaveTextContent('line 2');
       });
     });
   });

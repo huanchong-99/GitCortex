@@ -11,12 +11,27 @@ interface Props {
   wsUrl: string;
 }
 
+interface TerminalLogEntry {
+  id: string;
+  content: string;
+}
+
+interface TerminalHistoryState {
+  loading: boolean;
+  loaded: boolean;
+  lines: string[];
+  error: string | null;
+}
+
+const TERMINAL_HISTORY_LIMIT = 1000;
+
 /**
  * Renders the terminal debugging UI with a terminal list and active emulator.
  */
 export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const { t } = useTranslation('workflow');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
+  const [historyByTerminalId, setHistoryByTerminalId] = useState<Record<string, TerminalHistoryState>>({});
   const readyTerminalIdsRef = useRef<Set<string>>(new Set());
   const [, forceUpdate] = useState({});
   const startingTerminalIdsRef = useRef<Set<string>>(new Set());
@@ -40,6 +55,101 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
 
   const getStatusLabel = (status: Terminal['status']) =>
     t(`terminalDebug.status.${status}`, { defaultValue: status });
+
+  const isHistoricalTerminalStatus = useCallback((status: Terminal['status'] | undefined) => {
+    if (!status) {
+      return false;
+    }
+
+    return ['completed', 'failed'].includes(status);
+  }, []);
+
+  const shouldRenderLiveTerminal = useCallback(
+    (terminal: Terminal | undefined) => {
+      if (!terminal) {
+        return false;
+      }
+
+      if (needsRestartRef.current.has(terminal.id)) {
+        return false;
+      }
+
+      if (isHistoricalTerminalStatus(terminal.status)) {
+        return false;
+      }
+
+      if (readyTerminalIdsRef.current.has(terminal.id)) {
+        return true;
+      }
+
+      return (
+        !['failed', 'not_started'].includes(terminal.status) &&
+        ['starting', 'waiting', 'working', 'running', 'active'].includes(terminal.status)
+      );
+    },
+    [isHistoricalTerminalStatus]
+  );
+
+  const loadTerminalHistory = useCallback(
+    async (terminalId: string) => {
+      setHistoryByTerminalId((prev) => ({
+        ...prev,
+        [terminalId]: {
+          loading: true,
+          loaded: false,
+          lines: prev[terminalId]?.lines ?? [],
+          error: null,
+        },
+      }));
+
+      try {
+        const response = await fetch(`/api/terminals/${terminalId}/logs?limit=${TERMINAL_HISTORY_LIMIT}`);
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const message =
+            payload && typeof payload === 'object' && 'message' in payload
+              ? String((payload as { message?: unknown }).message ?? '')
+              : '';
+          throw new Error(message || `Failed to load terminal history (${response.status})`);
+        }
+
+        const entries =
+          payload &&
+          typeof payload === 'object' &&
+          'data' in payload &&
+          Array.isArray((payload as { data?: unknown }).data)
+            ? ((payload as { data: unknown[] }).data as TerminalLogEntry[])
+            : [];
+
+        const lines = entries
+          .map((entry) => (typeof entry.content === 'string' ? entry.content : ''))
+          .filter((line) => line.length > 0);
+
+        setHistoryByTerminalId((prev) => ({
+          ...prev,
+          [terminalId]: {
+            loading: false,
+            loaded: true,
+            lines,
+            error: null,
+          },
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load terminal history';
+        setHistoryByTerminalId((prev) => ({
+          ...prev,
+          [terminalId]: {
+            loading: false,
+            loaded: true,
+            lines: prev[terminalId]?.lines ?? [],
+            error: message,
+          },
+        }));
+      }
+    },
+    []
+  );
 
   const handleClear = () => {
     terminalRef.current?.clear();
@@ -175,12 +285,38 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     }
   }, [selectedTerminalId, selectedTerminal?.status]);
 
+  useEffect(() => {
+    if (!selectedTerminalId || !selectedTerminal) {
+      return;
+    }
+
+    if (!isHistoricalTerminalStatus(selectedTerminal.status)) {
+      return;
+    }
+
+    const existingHistory = historyByTerminalId[selectedTerminalId];
+    if (existingHistory?.loading || existingHistory?.loaded) {
+      return;
+    }
+
+    void loadTerminalHistory(selectedTerminalId);
+  }, [
+    historyByTerminalId,
+    isHistoricalTerminalStatus,
+    loadTerminalHistory,
+    selectedTerminal,
+    selectedTerminalId,
+  ]);
+
   const handleRestart = async () => {
     if (!selectedTerminalId) return;
     // Reset restart attempts when user manually restarts
     restartAttemptsRef.current.delete(selectedTerminalId);
     await startTerminal(selectedTerminalId);
   };
+
+  const isHistoricalTerminal = isHistoricalTerminalStatus(selectedTerminal?.status);
+  const currentHistory = selectedTerminalId ? historyByTerminalId[selectedTerminalId] : undefined;
 
   return (
     <div className="flex h-full">
@@ -241,10 +377,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
               </div>
             </div>
             <div className="flex-1 p-4">
-              {!needsRestartRef.current.has(selectedTerminal.id) &&
-               (readyTerminalIdsRef.current.has(selectedTerminal.id) ||
-                (!['failed', 'not_started'].includes(selectedTerminal.status) &&
-                 ['waiting', 'working', 'running', 'active', 'completed'].includes(selectedTerminal.status))) ? (
+              {shouldRenderLiveTerminal(selectedTerminal) ? (
                 <TerminalEmulator
                   key={selectedTerminal.id}
                   ref={terminalRef}
@@ -252,6 +385,54 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                   wsUrl={wsUrl}
                   onError={handleTerminalError}
                 />
+              ) : isHistoricalTerminal ? (
+                <div className="h-full rounded-lg border bg-background p-4 overflow-auto">
+                  <div className="text-sm text-muted-foreground mb-3">
+                    {t('terminalDebug.historyTitle', {
+                      defaultValue: 'Terminal history',
+                    })}
+                  </div>
+
+                  {currentHistory?.loading ? (
+                    <div className="text-sm text-muted-foreground">
+                      {t('terminalDebug.historyLoading', {
+                        defaultValue: 'Loading terminal history...',
+                      })}
+                    </div>
+                  ) : currentHistory?.error ? (
+                    <div className="space-y-3">
+                      <div className="text-sm text-red-500">
+                        {t('terminalDebug.historyLoadFailed', {
+                          defaultValue: 'Failed to load terminal history.',
+                        })}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (!selectedTerminalId) {
+                            return;
+                          }
+                          void loadTerminalHistory(selectedTerminalId);
+                        }}
+                      >
+                        {t('terminalDebug.reloadHistory', {
+                          defaultValue: 'Reload history',
+                        })}
+                      </Button>
+                    </div>
+                  ) : currentHistory?.lines.length ? (
+                    <pre className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground">
+                      {currentHistory.lines.join('')}
+                    </pre>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      {t('terminalDebug.historyEmpty', {
+                        defaultValue: 'No terminal history available yet.',
+                      })}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
                   {t('terminalDebug.starting')}
