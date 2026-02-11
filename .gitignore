@@ -61,4 +61,5 @@ coverage/
 
 # Personal AI local configuration
 AGENTS.md
+CLAUDE.md
 .claude/
