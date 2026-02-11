@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="docs/assets/gitcortex-logo.svg" alt="GitCortex Logo" width="200">
-</p>
-
-<p align="center">
   <strong>AI Agent 跨终端任务协调平台</strong>
 </p>
 
@@ -24,7 +20,7 @@ GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编�
 | **多任务并行** | 多个 Task 同时执行，每个 Task 有独立 Git 分支 |
 | **任务内串行** | 每个 Task 内的 Terminal 按顺序执行（编码→审核→修复） |
 | **cc-switch 集成** | 一键切换任意 CLI 的模型配置 |
-| **事件驱动** | 基于 Git 提交的事件驱动模式，节省 98%+ Token 消耗 |
+| **事件驱动** | 基于 Git 提交与消息总线事件推进工作流，减少不必要轮询与上下文重复 |
 | **终端调试视图** | 启动后可进入原生终端验证环境配置 |
 | **工作流持久化** | 完整的 Workflow/Task/Terminal 三层数据模型 |
 | **斜杠命令系统** | 可复用的提示词预设，支持模板变量替换 |
@@ -58,6 +54,186 @@ GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编�
                           [ main ]
 ```
 
+### 关键协作机制（重点补充）
+
+> 这一节专门说明 GitCortex 最核心的价值：**一个总 Agent（Orchestrator）调度多个 CLI 终端协作完成复杂任务**。
+
+#### 1) 为什么是“一个总 Agent”而不是“多个总 Agent”
+
+在 GitCortex 中，Orchestrator 是唯一的全局调度者，负责统一决策与推进，避免多个主控同时下达指令造成冲突。
+
+它主要做四件事：
+
+1. **任务拆解与分发**：把 workflow 目标分配到不同 task。
+2. **终端串行推进**：在每个 task 内按 `orderIndex` 启动下一终端。
+3. **状态机收敛**：统一维护 workflow/task/terminal 三层状态。
+4. **事件闭环**：消费 Git 事件、Prompt 事件、WS 事件并决定后续动作。
+
+这意味着你看到的“多终端协作”背后不是乱序并发，而是**中心化编排 + 可观测状态机**。
+
+#### 2) 多 CLI 协作模型（横向）
+
+GitCortex 支持把不同 CLI 放进同一个 workflow：
+
+- `claude-code` 负责主开发
+- `codex` 负责审计/修复建议
+- `gemini-cli` 负责文档或测试补全
+
+它们可以在：
+
+- **任务层并行**（Task A / B / C 同时跑）
+- **任务内串行**（Terminal 1 → Terminal 2 → Terminal 3）
+
+实现“并行加速 + 串行把关”的组合策略。
+
+#### 3) 同一种 CLI 的多模型协作（纵向）
+
+GitCortex 不要求“一个 CLI 只能对应一个模型”。
+
+你完全可以在同一个 task 里，使用**同一种 AI CLI + 不同模型**形成角色分工，例如都用 `claude-code`：
+
+| Terminal | CLI | 模型 | 典型角色 |
+|---|---|---|---|
+| T1 | `claude-code` | `glm-4.7` | 前端实现 |
+| T2 | `claude-code` | `claude-opus-4.6` | 后端实现 |
+| T3 | `codex` | `gpt-5.3-codex-xhigh` | 代码审计/收敛 |
+
+这样做的价值是：
+
+- 保留同一 CLI 的操作习惯与上下文风格
+- 利用不同模型在代码生成、推理深度、审计能力上的差异
+- 通过 Orchestrator 保证交接顺序与状态一致性
+
+#### 4) cc-switch 在协作中的作用
+
+`cc-switch` 负责把“终端实例”与“模型配置”解耦，让你在同一 CLI 生态内灵活切模型：
+
+- 启动前写入目标模型配置
+- 启动后保持该终端会话的一致模型语义
+- 支持不同终端绑定不同模型，不互相污染
+
+因此 GitCortex 支持两类协作：
+
+- **跨 CLI 协作**（Claude + Codex + Gemini）
+- **同 CLI 多模型协作**（例如多个 Claude Code 终端各自绑定不同模型）
+
+#### 5) 复杂任务是如何被稳定推进的
+
+在真实开发场景中，一个“复杂任务”通常不是一次生成，而是多轮闭环：
+
+1. 终端 A 先实现主逻辑
+2. 终端 B 复核并补测试
+3. 终端 C 做审计与风险收敛
+4. Merge Terminal 统一合并到目标分支
+
+GitCortex 的重点不是“单次回答质量”，而是让这个闭环过程可重复、可监控、可回放、可恢复。
+
+换句话说，GitCortex 提供的是 **Agent 协作流水线能力**，而不仅是“调用某个模型”。
+
+---
+
+## 技术栈
+
+### 后端
+
+- **语言与运行时**：Rust + Tokio
+- **Web 框架**：Axum（REST + WebSocket）
+- **数据层**：SQLx + SQLite
+- **工程结构**：Rust Workspace（`crates/server`、`crates/services`、`crates/db`、`crates/cc-switch` 等）
+
+### 前端
+
+- **框架**：React 18 + TypeScript
+- **构建工具**：Vite
+- **状态与数据**：TanStack Query + WebSocket Store
+- **终端渲染**：xterm.js（终端调试与输出展示）
+
+### 协作运行时组件（核心）
+
+- `OrchestratorRuntime`：统一调度 workflow 生命周期
+- `OrchestratorAgent`：执行编排决策与状态推进
+- `MessageBus`：跨终端/跨模块事件总线
+- `TerminalCoordinator`：终端准备与串行推进协调
+- `TerminalLauncher`：终端进程启动与生命周期管理
+- `GitWatcher`：监听 Git 提交并触发事件
+- `CCSwitchService`：CLI/模型配置切换与隔离
+
+以上组件对应源码可在 `crates/services/src/services/` 与 `crates/server/src/routes/` 中找到。
+
+---
+
+## 部署指南
+
+### 部署模式
+
+- **开发模式（双服务）**：前端开发服务器 + 后端 API 服务分开运行
+  - 前端：`23457`
+  - 后端：`23456`
+- **生产模式（单服务）**：仅运行后端二进制，后端同时提供 `/api` 与前端静态资源
+
+### 开发模式部署（推荐本地开发）
+
+```bash
+pnpm install
+
+# 必需：设置 32 字符加密密钥
+# Windows PowerShell
+$env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
+
+# Linux/macOS
+export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
+
+# 按需准备 SQLx 查询缓存
+npm run prepare-db
+
+# 启动前后端
+pnpm run dev
+```
+
+访问地址：
+
+- 前端：`http://localhost:23457`
+- 后端：`http://localhost:23456/api`
+
+### 生产模式部署（单机）
+
+```bash
+# 1) 安装依赖
+pnpm install
+
+# 2) 构建前端（用于后端静态资源嵌入）
+cd frontend && pnpm install && pnpm build && cd ..
+
+# 3) 构建后端
+cargo build --release -p server
+
+# 4) 设置运行环境变量
+# Windows PowerShell
+$env:GITCORTEX_ENCRYPTION_KEY="your-32-character-key"
+$env:BACKEND_PORT="23456"   # 可选
+$env:HOST="127.0.0.1"       # 可选，外网部署可设 0.0.0.0
+
+# 5) 启动服务
+# Windows
+.\target\release\server.exe
+
+# Linux/macOS
+./target/release/server
+```
+
+健康检查：
+
+```bash
+# 未启用 GITCORTEX_API_TOKEN 时
+curl http://127.0.0.1:23456/api/health
+
+# 启用 GITCORTEX_API_TOKEN 时（所有 /api 路由需 Bearer）
+curl http://127.0.0.1:23456/api/health \
+  -H "Authorization: Bearer <your-token>"
+```
+
+> 更完整的运维、备份、升级、回滚流程，请查看：`docs/ops/runbook.md` 与 `docs/ops/troubleshooting.md`。
+
 ---
 
 ## 快速开始
@@ -66,8 +242,8 @@ GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编�
 
 | 工具 | 版本要求 | 说明 |
 |------|----------|------|
-| **Rust** | 1.75+ 或 nightly-2025-12-04 | 定义在 `rust-toolchain.toml` |
-| **Node.js** | >= 20 | 前端运行时 |
+| **Rust** | nightly-2025-12-04 | 定义在 `rust-toolchain.toml` |
+| **Node.js** | >= 18（建议 20） | 前端运行时 |
 | **pnpm** | 10.13.1 | 包管理器 |
 | **CMake** | 最新版 | 构建工具（某些系统需要） |
 | **SQLite** | 3.x | 数据库（通常内置） |
@@ -127,19 +303,19 @@ $env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 # Linux/macOS
 export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 
-# 运行数据库迁移
-pnpm run db:migrate
+# 生成/校验 SQLx 查询缓存（按需）
+npm run prepare-db
 
 # 构建后端（Rust）
 cargo build --release
 
-# 启动开发服务器
+# 启动开发服务器（前后端）
 pnpm run dev
 ```
 
 访问：
-- 前端：http://localhost:3000
-- 后端 API：http://localhost:3001/api
+- 前端：http://localhost:23457
+- 后端 API：http://localhost:23456/api
 
 **详细运维指南：** 查看 [Operations Manual](docs/ops/runbook.md) 了解生产部署、监控、升级等详细操作。
 
@@ -179,19 +355,19 @@ pnpm run dev
 创建 `.env` 文件或设置系统环境变量：
 
 ```bash
-# 必需：加密密钥（32字节十六进制）
-GITCORTEX_ENCRYPTION_KEY=your-32-byte-hex-key-here
+# 必需：加密密钥（32字符字符串）
+GITCORTEX_ENCRYPTION_KEY=your-32-character-key-here
 
 # 可选
-PORT=3001                    # 后端端口
-VITE_PORT=3000               # 前端端口
-DATABASE_URL=crates/db/data.db  # 数据库路径
+BACKEND_PORT=23456           # 后端端口（默认）
+HOST=127.0.0.1               # 后端监听地址（默认）
+GITCORTEX_API_TOKEN=your-api-token   # 开启 API Bearer 鉴权（可选）
 ```
 
 ### 数据库
 
 项目使用 SQLite（嵌入式），无需安装数据库服务器：
-- 位置：`crates/db/data.db`
+- 开发默认位置：`dev_assets/db.sqlite`
 - 迁移文件：`crates/db/migrations/`
 
 ### 验证安装
@@ -201,11 +377,11 @@ DATABASE_URL=crates/db/data.db  # 数据库路径
 cargo check --workspace
 
 # 前端编译检查
-pnpm run check
+cd frontend && npm run check && cd ..
 
 # 运行测试
 cargo test --workspace
-pnpm test -- --run
+cd frontend && npm run test:run && cd ..
 ```
 
 ---
@@ -220,8 +396,7 @@ GitCortex/
 │   ├── services/              # 业务逻辑层
 │   │   ├── orchestrator/      # 主 Agent 编排逻辑
 │   │   ├── terminal/          # 终端进程管理
-│   │   ├── git_watcher/       # Git 事件监听
-│   │   └── cc_switch/         # 模型切换服务
+│   │   └── ...                # git_watcher.rs / cc_switch.rs 等服务
 │   └── utils/                 # 工具函数
 ├── frontend/                  # React + TypeScript 前端
 │   ├── src/
@@ -235,7 +410,7 @@ GitCortex/
 ├── shared/                    # 前后端共享类型（自动生成）
 ├── docs/                      # 文档
 │   ├── plans/                 # 实施计划
-│   └── assets/                # 资源文件
+│   └── issue-archive/         # 问题归档
 ├── Cargo.toml                 # Workspace 配置
 ├── rust-toolchain.toml        # Rust 版本锁定
 ├── package.json               # Root package.json
@@ -246,8 +421,8 @@ GitCortex/
 
 ## 开发进度
 
-> **当前状态：** Phase 11 已完成（单项目结构迁移 + 代码审计 68/100 分）
-> **下一步：** Phase 12 - Workflow API 契约与类型生成对齐
+> **当前状态：** 总体完成率 97.3%（已完成 288/296，见 `docs/plans/TODO.md`）
+> **下一步：** Phase 27 - Docker 容器化与一键部署（以及 Phase 21 剩余项）
 
 | Phase | 内容 | 状态 | 完成时间 |
 |-------|------|------|----------|
@@ -264,23 +439,28 @@ GitCortex/
 | Phase 9 | S级代码质量冲刺（100分） | ✅ | 2026-01-20 |
 | Phase 10 | 告警清零交付 | ✅ | 2026-01-20 |
 | **Phase 11** | **单项目结构迁移 + 审计** | ✅ | **2026-01-21** |
-| Phase 12 | Workflow API 契约与类型对齐 | ⬜ | - |
-| Phase 13 | Workflow 创建与持久化 | ⬜ | - |
-| Phase 14 | Orchestrator 运行时接入 | ⬜ | - |
-| Phase 15 | 终端执行与 WebSocket 链路 | ⬜ | - |
-| Phase 16 | 前端工作流体验完备 | ⬜ | - |
-| Phase 17 | 斜杠命令系统与提示词 | ⬜ | - |
-| Phase 18 | 全链路测试与发布就绪 | ⬜ | - |
+| Phase 12 | Workflow API 契约与类型对齐 | ✅ | 2026-01 |
+| Phase 13 | Workflow 创建与持久化 | ✅ | 2026-01 |
+| Phase 14 | Orchestrator 运行时接入 | ✅ | 2026-01 |
+| Phase 15 | 终端执行与 WebSocket 链路 | ✅ | 2026-01 |
+| Phase 16 | 前端工作流体验完备 | ✅ | 2026-01 |
+| Phase 17 | 斜杠命令系统与提示词 | ✅ | 2026-01 |
+| Phase 18 | 全链路测试与发布就绪 | ✅ | 2026-01 |
+| Phase 19 | Docker 容器化部署 | ⏸ 延后 | - |
+| Phase 20 | 自动化协调核心（自动派发） | ✅ | 2026-02 |
+| Phase 21 | Git 事件驱动接入 | 🚧 部分完成 | - |
+| Phase 22 | WebSocket 事件广播完善 | ✅ | 2026-02 |
+| Phase 23 | 终端进程隔离修复 | ✅ | 2026-02 |
+| Phase 24 | 终端自动确认与消息桥接 | ✅ | 2026-02 |
+| Phase 25 | 自动确认可靠性修复 | ✅ | 2026-02 |
+| Phase 26 | 联合审计问题全量修复 | ✅ | 2026-02 |
+| Phase 27 | Docker 容器化与一键部署 | ⬜ | - |
 
-**总体进度：** 11/18 Phase 完成（61.1%）
+**总体进度：** 288/296 任务完成（97.3%）
 
 详细进度追踪：[docs/plans/TODO.md](docs/plans/TODO.md)
 
-**已知问题（影响审计评分）：**
-- Terminal 日志缓冲满时未持久化，存在日志丢失风险 (Task 4.1)
-- Terminal 启动时 CLI 名称硬编码 ✅ (已修复 - Task 4.2)
-- asset_dir 错误处理使用 panic ✅ (已修复 - Task 4.3)
-- Terminal 状态语义不一致 ✅ (已修复 - Task 4.4)
+**质量状态：** 以 `docs/plans/TODO.md` 为准，当前记录为 S 级（100/100）。
 
 ---
 
@@ -304,7 +484,7 @@ GitCortex 采用三层模型：
 3. **Terminal（终端）** - 底层执行单元
    - 绑定特定 CLI 类型（Claude/Gemini/Codex）
    - 绑定特定模型配置
-   - 串行执行：waiting → working → completed
+   - 串行执行：not_started → starting → waiting → working → completed（异常可到 failed/cancelled）
 
 ### 状态机
 
@@ -331,7 +511,7 @@ not_started → starting → waiting → working → completed
 | **TerminalLauncher** | 终端进程启动与管理 |
 | **GitWatcher** | 监听 Git 事件（.git/refs/heads 变化） |
 | **CCSwitchService** | 模型配置切换（原子写入配置文件） |
-| **WorkflowService** | 工作流 CRUD 与状态管理 |
+| **Workflow API + DB Models** | 工作流 CRUD 与状态管理（`routes/workflows.rs` + `db/models/workflow*.rs`） |
 
 ---
 
@@ -394,10 +574,11 @@ CC-Switch 提供原子写入机制，安全切换 CLI 模型配置：
 ```bash
 # 运行测试
 cargo test --workspace
-pnpm test -- --run
+cd frontend && npm run test:run && cd ..
 
-# 构建生产版本
-pnpm run build
+# 构建生产版本（前端 + 后端）
+cd frontend && npm run build && cd ..
+cargo build --release -p server
 
 # 类型生成
 pnpm run generate-types
@@ -411,8 +592,8 @@ pnpm run generate-types:check
 ### 实施计划
 
 - [总体概览](docs/plans/00-overview.md)
-- [Phase 0-11](docs/plans)（已完成阶段）
-- [Phase 12-18](docs/plans)（待实施阶段）
+- [阶段计划目录](docs/plans)
+- [最新进度追踪（以此为准）](docs/plans/TODO.md)
 
 ### 核心设计文档
 
@@ -480,13 +661,14 @@ pnpm dlx browserslist@latest --update-db
 
 ### 代码质量标准
 
-项目当前代码审计分数：**68/100 (B级，目标 90+)**
+当前质量状态以 `docs/plans/TODO.md` 为准：**100/100 (S级)**。
 
-- 架构与设计一致性：需提升
-- 代码健壮性与逻辑：需提升
-- 代码风格与可维护性：部分达标
-- 性能与安全性：需提升
-- 文档与注释：需补充
+建议在每次发版前执行：
+
+- `cargo check --workspace`
+- `cargo test --workspace`
+- `npm run check`
+- `cd frontend && npm run test:run`
 
 ---
 
