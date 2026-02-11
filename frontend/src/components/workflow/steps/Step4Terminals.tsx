@@ -133,8 +133,7 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
 
       return Array.from({ length: task.terminalCount }, (_, orderIndex) => {
         const byOrderIndex = existingTerminals.find((terminal) => terminal.orderIndex === orderIndex);
-        const fallbackByPosition = existingTerminals[orderIndex];
-        const existingTerminal = byOrderIndex ?? fallbackByPosition;
+        const existingTerminal = byOrderIndex;
 
         if (existingTerminal) {
           return {

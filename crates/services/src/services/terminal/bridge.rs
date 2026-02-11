@@ -102,9 +102,11 @@ impl TerminalBridge {
             return Err(anyhow::anyhow!("terminal_id is empty"));
         }
 
-        // Check if already registered
+        // Keep exactly one active bridge per terminal.
+        // A terminal restart may produce a new PTY session while an old bridge task
+        // is still alive; evict stale bridge tasks eagerly.
         {
-            let active = self.active_sessions.read().await;
+            let mut active = self.active_sessions.write().await;
             if active.contains_key(session_id) {
                 tracing::debug!(
                     terminal_id = %terminal_id,
@@ -112,6 +114,26 @@ impl TerminalBridge {
                     "Terminal bridge already registered"
                 );
                 return Ok(());
+            }
+
+            let stale_session_ids: Vec<String> = active
+                .iter()
+                .filter(|(existing_session_id, handle)| {
+                    handle.terminal_id == terminal_id && existing_session_id.as_str() != session_id
+                })
+                .map(|(existing_session_id, _)| existing_session_id.clone())
+                .collect();
+
+            for stale_session_id in stale_session_ids {
+                if let Some(stale_handle) = active.remove(&stale_session_id) {
+                    stale_handle.task_handle.abort();
+                    tracing::info!(
+                        terminal_id = %terminal_id,
+                        stale_pty_session_id = %stale_session_id,
+                        new_pty_session_id = %session_id,
+                        "Evicted stale terminal bridge before registering new session"
+                    );
+                }
             }
         }
 
@@ -257,8 +279,14 @@ impl TerminalBridge {
                 input,
                 ..
             }) => {
-                // Strict routing check: accept only matching terminal or session
-                if message_terminal_id != terminal_id && message_session_id != pty_session_id {
+                // Strict routing:
+                // - if session_id is present, it must match current PTY session;
+                // - only when session_id is absent, fallback to terminal_id matching.
+                if !message_session_id.trim().is_empty() {
+                    if message_session_id != pty_session_id {
+                        return Ok(false);
+                    }
+                } else if message_terminal_id != terminal_id {
                     return Ok(false);
                 }
 
@@ -311,6 +339,15 @@ impl TerminalBridge {
             .get_handle(&terminal_id)
             .await
             .ok_or_else(|| anyhow::anyhow!("Terminal not running: {}", terminal_id))?;
+
+        if handle.session_id != pty_session_id {
+            return Err(anyhow::anyhow!(
+                "PTY session mismatch for terminal {}: expected {}, got {}",
+                terminal_id,
+                pty_session_id,
+                handle.session_id
+            ));
+        }
 
         let writer = handle.writer.ok_or_else(|| {
             anyhow::anyhow!("PTY writer unavailable for terminal {}", terminal_id)
@@ -378,6 +415,26 @@ impl TerminalBridge {
                             terminal_id = %terminal_id,
                             pty_session_id = %pty_session_id,
                             "Terminal process no longer running; stopping bridge"
+                        );
+                        break;
+                    }
+
+                    // Stop stale bridge if this terminal has switched to a newer PTY session.
+                    let Some(current_handle) = process_manager.get_handle(&terminal_id).await else {
+                        tracing::info!(
+                            terminal_id = %terminal_id,
+                            pty_session_id = %pty_session_id,
+                            "Terminal handle missing during health check; stopping bridge"
+                        );
+                        break;
+                    };
+
+                    if current_handle.session_id != pty_session_id {
+                        tracing::info!(
+                            terminal_id = %terminal_id,
+                            bridge_session_id = %pty_session_id,
+                            active_session_id = %current_handle.session_id,
+                            "Detected stale terminal bridge session; stopping bridge"
                         );
                         break;
                     }
@@ -481,5 +538,48 @@ mod tests {
     fn test_normalize_message_empty_string() {
         let result = TerminalBridge::normalize_message("");
         assert_eq!(result, "\r", "Empty string should normalize to Enter key");
+    }
+
+    #[tokio::test]
+    async fn test_forward_terminal_input_rejects_mismatched_non_empty_session() {
+        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1);
+        let should_stop = TerminalBridge::forward_bus_message(
+            &tx,
+            "term-1",
+            "session-1",
+            Some(BusMessage::TerminalInput {
+                terminal_id: "term-1".to_string(),
+                session_id: "session-old".to_string(),
+                input: "hello".to_string(),
+                decision: None,
+            }),
+        )
+        .await
+        .expect("forward should not error");
+
+        assert!(!should_stop);
+        assert!(rx.try_recv().is_err(), "mismatched session must not be forwarded");
+    }
+
+    #[tokio::test]
+    async fn test_forward_terminal_input_allows_terminal_fallback_when_session_missing() {
+        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1);
+        let should_stop = TerminalBridge::forward_bus_message(
+            &tx,
+            "term-1",
+            "session-1",
+            Some(BusMessage::TerminalInput {
+                terminal_id: "term-1".to_string(),
+                session_id: "".to_string(),
+                input: "hello".to_string(),
+                decision: None,
+            }),
+        )
+        .await
+        .expect("forward should not error");
+
+        assert!(!should_stop);
+        let forwarded = rx.recv().await.expect("expected forwarded payload");
+        assert_eq!(forwarded, b"hello\r");
     }
 }

@@ -41,6 +41,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     const terminalRef = useRef<Terminal | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    const pendingInputRef = useRef<string[]>([]);
     const terminalReadyRef = useRef(false);
     const [wsKey, setWsKey] = useState(0);
     const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
@@ -85,6 +86,8 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       onData?.(data);
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'input', data }));
+      } else {
+        pendingInputRef.current.push(data);
       }
     }, [onData]);
 
@@ -176,6 +179,14 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         setConnectionState('connected');
         setDisconnectHint(null);
         logInfo('Terminal WebSocket connected');
+
+        if (pendingInputRef.current.length > 0) {
+          const pending = pendingInputRef.current.splice(0, pendingInputRef.current.length);
+          for (const input of pending) {
+            ws.send(JSON.stringify({ type: 'input', data: input }));
+          }
+        }
+
         if (terminalRef.current) {
           const { cols, rows } = terminalRef.current;
           if (ws.readyState === WebSocket.OPEN) {

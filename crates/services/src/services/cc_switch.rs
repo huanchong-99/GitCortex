@@ -130,11 +130,15 @@ api_key = "{}"
     Ok(())
 }
 
-/// Creates Claude Code config.json in isolated directory to skip authentication
-fn create_claude_config(claude_home: &Path) -> anyhow::Result<()> {
+/// Creates Claude Code config.json in isolated directory.
+///
+/// Keep `primaryApiKey` aligned with terminal key to avoid runtime precedence
+/// ambiguity between `config.json`, `settings.json`, and env-based auth.
+fn create_claude_config(claude_home: &Path, api_key: &str) -> anyhow::Result<()> {
     let config_path = claude_home.join("config.json");
 
-    // Only set primaryApiKey = "any" to skip authentication
+    // Keep primaryApiKey synced with terminal key.
+    // Some Claude runtime paths prefer config key over env token.
     // Preserve other fields if file exists
     let config_content = if config_path.exists() {
         let existing = std::fs::read_to_string(&config_path)?;
@@ -144,14 +148,14 @@ fn create_claude_config(claude_home: &Path) -> anyhow::Result<()> {
         if let Some(obj) = value.as_object_mut() {
             obj.insert(
                 "primaryApiKey".to_string(),
-                serde_json::Value::String("any".to_string()),
+                serde_json::Value::String(api_key.to_string()),
             );
         }
 
         serde_json::to_string_pretty(&value)?
     } else {
         serde_json::to_string_pretty(&serde_json::json!({
-            "primaryApiKey": "any"
+            "primaryApiKey": api_key
         }))?
     };
 
@@ -164,6 +168,65 @@ fn create_claude_config(claude_home: &Path) -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+/// Creates Claude Code settings.json in isolated directory and returns its path.
+/// This is passed via `--settings <path>` to avoid global ~/.claude settings interference.
+fn create_claude_settings(
+    claude_home: &Path,
+    api_key: &str,
+    base_url: Option<&str>,
+    model: &str,
+) -> anyhow::Result<std::path::PathBuf> {
+    let settings_path = claude_home.join("settings.json");
+
+    let mut env_obj = serde_json::Map::new();
+    env_obj.insert(
+        "ANTHROPIC_AUTH_TOKEN".to_string(),
+        serde_json::Value::String(api_key.to_string()),
+    );
+    env_obj.insert(
+        "ANTHROPIC_API_KEY".to_string(),
+        serde_json::Value::String(api_key.to_string()),
+    );
+    env_obj.insert(
+        "ANTHROPIC_MODEL".to_string(),
+        serde_json::Value::String(model.to_string()),
+    );
+    env_obj.insert(
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL".to_string(),
+        serde_json::Value::String(model.to_string()),
+    );
+    env_obj.insert(
+        "ANTHROPIC_DEFAULT_SONNET_MODEL".to_string(),
+        serde_json::Value::String(model.to_string()),
+    );
+    env_obj.insert(
+        "ANTHROPIC_DEFAULT_OPUS_MODEL".to_string(),
+        serde_json::Value::String(model.to_string()),
+    );
+    if let Some(url) = base_url {
+        env_obj.insert(
+            "ANTHROPIC_BASE_URL".to_string(),
+            serde_json::Value::String(url.to_string()),
+        );
+    }
+
+    let settings = serde_json::json!({
+        "env": env_obj,
+        "primaryApiKey": api_key,
+    });
+
+    let content = serde_json::to_string_pretty(&settings)?;
+    std::fs::write(&settings_path, content)
+        .map_err(|e| anyhow::anyhow!("Failed to write Claude settings.json: {}", e))?;
+
+    tracing::debug!(
+        settings_path = %settings_path.display(),
+        "Created Claude Code settings.json for isolated authentication"
+    );
+
+    Ok(settings_path)
 }
 
 /// Creates Gemini .env in isolated directory to skip authentication
@@ -551,15 +614,6 @@ impl CCSwitchService {
                     }
                 }
 
-                // Create config.json to skip authentication
-                if let Err(e) = create_claude_config(&claude_home) {
-                    tracing::warn!(
-                        terminal_id = %terminal.id,
-                        error = %e,
-                        "Failed to create Claude config for authentication skip, continuing anyway"
-                    );
-                }
-
                 // Set CLAUDE_HOME to isolated directory
                 env.set.insert(
                     "CLAUDE_HOME".to_string(),
@@ -573,9 +627,6 @@ impl CCSwitchService {
                 } else {
                     env.unset.push("ANTHROPIC_BASE_URL".to_string());
                 }
-
-                // Prevent inherited API key from parent environment polluting child process
-                env.unset.push("ANTHROPIC_API_KEY".to_string());
 
                 // Resolve API key: custom first, then from existing config
                 let api_key = if let Some(custom) = terminal.get_custom_api_key()? {
@@ -598,7 +649,35 @@ impl CCSwitchService {
                         ))?
                 };
 
-                env.set.insert("ANTHROPIC_AUTH_TOKEN".to_string(), api_key);
+                // Create config.json to skip authentication
+                if let Err(e) = create_claude_config(&claude_home, &api_key) {
+                    tracing::warn!(
+                        terminal_id = %terminal.id,
+                        error = %e,
+                        "Failed to create Claude config for authentication skip, continuing anyway"
+                    );
+                }
+
+                // Create settings.json and force Claude CLI to load it via --settings.
+                // This prevents global ~/.claude/settings.json from overriding isolated auth config.
+                if let Ok(settings_path) = create_claude_settings(
+                    &claude_home,
+                    &api_key,
+                    terminal.custom_base_url.as_deref(),
+                    &model_config
+                        .api_model_id
+                        .clone()
+                        .unwrap_or_else(|| model_config.name.clone()),
+                ) {
+                    args.push("--settings".to_string());
+                    args.push(settings_path.to_string_lossy().to_string());
+                }
+
+                // Inject both token and API key to support different Claude runtime auth paths.
+                env.set
+                    .insert("ANTHROPIC_AUTH_TOKEN".to_string(), api_key.clone());
+                env.set
+                    .insert("ANTHROPIC_API_KEY".to_string(), api_key.clone());
 
                 // Set model for all tiers
                 let model = model_config

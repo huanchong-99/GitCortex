@@ -58,12 +58,27 @@ static CODEX_CONFIRM_APPLY_PATCH_RE: Lazy<Regex> = Lazy::new(|| {
         .expect("CODEX_CONFIRM_APPLY_PATCH_RE must compile")
 });
 
+/// Claude custom API key selection prompt.
+/// Example:
+/// "Detected a custom API key in your environment"
+/// "Do you want to use this API key?"
+static CLAUDE_CUSTOM_API_KEY_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)(do\s+you\s+want\s+to\s+use\s+this\s+api\s+key\?|detected\s+a\s+custom\s+api\s+key\s+in\s+your\s+environment)",
+    )
+        .expect("CLAUDE_CUSTOM_API_KEY_PROMPT_RE must compile")
+});
+
 fn is_bypass_permissions_prompt(line: &str) -> bool {
     BYPASS_PERMISSIONS_PROMPT_RE.is_match(line)
 }
 
 fn is_codex_apply_patch_confirmation(text: &str) -> bool {
     CODEX_CONFIRM_APPLY_PATCH_RE.is_match(text)
+}
+
+fn is_claude_custom_api_key_prompt(text: &str) -> bool {
+    CLAUDE_CUSTOM_API_KEY_PROMPT_RE.is_match(text)
 }
 
 // ============================================================================
@@ -398,10 +413,62 @@ impl PromptWatcher {
         // Check and reset stale state
         state.check_and_reset_stale();
 
+        // Chunk-level fallback: Claude custom API key prompt can appear inside
+        // heavily ANSI-rendered TUI frames without clean newline boundaries.
+        // Detect directly from normalized chunk and auto-reply with ArrowUp+Enter
+        // to choose "Yes".
+        let normalized_output = normalize_text_for_detection(output);
+        let normalized_output_lower = normalized_output.to_ascii_lowercase();
+        let bypass_needs_enter_context = normalized_output_lower.contains("interrupted")
+            || normalized_output_lower.contains("press ctrl-c again to exit");
+        let has_claude_custom_api_key_context =
+            is_claude_custom_api_key_prompt(&normalized_output);
+
+        if state.auto_confirm
+            && !state.should_debounce()
+            && has_claude_custom_api_key_context
+        {
+            let decision = PromptDecision::LLMDecision {
+                response: "\u{1b}[A\n".to_string(),
+                reasoning: "Auto-select 'Yes' for custom API key prompt via ArrowUp + Enter"
+                    .to_string(),
+                target_index: Some(0),
+            };
+            let detected_prompt = DetectedPrompt::new(
+                PromptKind::ArrowSelect,
+                normalized_output.clone(),
+                0.95,
+            );
+
+            state.last_detection = Some(Instant::now());
+            state.state_machine.on_prompt_detected(detected_prompt);
+            state.state_machine.on_response_sent(decision.clone());
+            state.detector.clear_buffer();
+
+            let response_terminal_id = state.terminal_id.clone();
+            let response_session_id = state.session_id.clone();
+
+            tracing::info!(
+                terminal_id = %response_terminal_id,
+                session_id = %response_session_id,
+                "Detected custom API key selection prompt (chunk); sending ArrowUp + Enter to choose Yes"
+            );
+
+            drop(terminals);
+            self.message_bus
+                .publish_terminal_input(
+                    &response_terminal_id,
+                    &response_session_id,
+                    "\u{1b}[A\n",
+                    Some(decision),
+                )
+                .await;
+            return;
+        }
+
         // Chunk-level fallback: Codex confirmation prompt can appear inside
         // heavily ANSI-rendered TUI frames without clean newline boundaries.
         // Detect directly from normalized chunk and auto-reply with "y".
-        let normalized_output = normalize_text_for_detection(output);
         if state.auto_confirm
             && !state.should_debounce()
             && is_codex_apply_patch_confirmation(&normalized_output)
@@ -446,11 +513,58 @@ impl PromptWatcher {
         for line in output.lines() {
             let normalized_line = normalize_text_for_detection(line);
 
+            // Claude custom API key prompt fallback:
+            // force "Yes" selection via ArrowUp + Enter.
+            // This avoids defaulting to "No (recommended)" which can block model access.
+            if state.auto_confirm
+                && !state.should_debounce()
+                && is_claude_custom_api_key_prompt(&normalized_line)
+            {
+                let decision = PromptDecision::LLMDecision {
+                    response: "\u{1b}[A\n".to_string(),
+                    reasoning: "Auto-select 'Yes' for custom API key prompt via ArrowUp + Enter"
+                        .to_string(),
+                    target_index: Some(0),
+                };
+                let detected_prompt = DetectedPrompt::new(
+                    PromptKind::ArrowSelect,
+                    normalized_line.clone(),
+                    0.95,
+                );
+
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected custom API key selection prompt; sending ArrowUp + Enter to choose Yes"
+                );
+
+                // Publish input (drop lock first to avoid deadlock)
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "\u{1b}[A\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+
             // 兜底逻辑：对 bypass permissions 提示直接回车，避免 workflow 卡死。
             // 该提示在真实终端里常带 ANSI/控制序列，需先清洗再匹配。
             if state.auto_confirm
                 && !state.should_debounce()
                 && is_bypass_permissions_prompt(&normalized_line)
+                && bypass_needs_enter_context
             {
                 let decision = PromptDecision::auto_enter();
                 let detected_prompt = DetectedPrompt::new(
@@ -487,6 +601,80 @@ impl PromptWatcher {
             }
 
             if let Some(prompt) = state.process_line(line) {
+                // Direct fallback for EnterConfirm prompts when auto_confirm is enabled.
+                // This keeps terminals responsive even when Orchestrator is not running
+                // (e.g. workflow in ready/prepare stage).
+                let skip_enter_confirm_fallback = has_claude_custom_api_key_context
+                    || bypass_needs_enter_context
+                    || normalized_output_lower.contains("interrupted")
+                    || normalized_output_lower.contains("custom api key");
+
+                if state.auto_confirm
+                    && prompt.kind == PromptKind::EnterConfirm
+                    && !prompt.has_dangerous_keywords
+                    && !skip_enter_confirm_fallback
+                {
+                    if has_claude_custom_api_key_context {
+                        let decision = PromptDecision::LLMDecision {
+                            response: "\u{1b}[A\n".to_string(),
+                            reasoning:
+                                "Auto-select 'Yes' for custom API key prompt via ArrowUp + Enter"
+                                    .to_string(),
+                            target_index: Some(0),
+                        };
+
+                        state.state_machine.on_response_sent(decision.clone());
+                        state.detector.clear_buffer();
+
+                        let response_terminal_id = state.terminal_id.clone();
+                        let response_session_id = state.session_id.clone();
+
+                        tracing::info!(
+                            terminal_id = %response_terminal_id,
+                            session_id = %response_session_id,
+                            confidence = prompt.confidence,
+                            "Detected EnterConfirm under custom API key context; sending ArrowUp + Enter fallback"
+                        );
+
+                        drop(terminals);
+                        self.message_bus
+                            .publish_terminal_input(
+                                &response_terminal_id,
+                                &response_session_id,
+                                "\u{1b}[A\n",
+                                Some(decision),
+                            )
+                            .await;
+                        return;
+                    }
+
+                    let decision = PromptDecision::auto_enter();
+
+                    state.state_machine.on_response_sent(decision.clone());
+                    state.detector.clear_buffer();
+
+                    let response_terminal_id = state.terminal_id.clone();
+                    let response_session_id = state.session_id.clone();
+
+                    tracing::info!(
+                        terminal_id = %response_terminal_id,
+                        session_id = %response_session_id,
+                        confidence = prompt.confidence,
+                        "Detected EnterConfirm prompt; sending direct auto-enter fallback"
+                    );
+
+                    drop(terminals);
+                    self.message_bus
+                        .publish_terminal_input(
+                            &response_terminal_id,
+                            &response_session_id,
+                            "\n",
+                            Some(decision),
+                        )
+                        .await;
+                    return;
+                }
+
                 let event = TerminalPromptEvent {
                     terminal_id: state.terminal_id.clone(),
                     workflow_id: state.workflow_id.clone(),
@@ -767,6 +955,111 @@ mod tests {
                 assert_eq!(terminal_id, "term-1");
                 assert_eq!(session_id, "session-1");
                 assert_eq!(input, "y");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_claude_custom_api_key_prompt_auto_select_yes() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        watcher
+            .process_output("term-1", "Do you want to use this API key?")
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "\u{1b}[A\n");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_claude_custom_api_key_environment_banner_auto_select_yes() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        watcher
+            .process_output(
+                "term-1",
+                "Detected a custom API key in your environment\nPress Enter to continue",
+            )
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "\u{1b}[A\n");
                 assert!(matches!(
                     decision,
                     Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
