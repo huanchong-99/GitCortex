@@ -416,6 +416,53 @@ describe('TerminalDebugView', () => {
         expect(historyPanel).toHaveTextContent('line 2');
       });
     });
+
+    it('should sanitize ansi and control sequences in completed terminal history', async () => {
+      const completedTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
+        {
+          ...mockTasks[0],
+          terminals: mockTasks[0].terminals.map((terminal) =>
+            terminal.id === 'term-1' ? { ...terminal, status: 'completed' } : terminal
+          ),
+        },
+      ];
+
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: [
+            { id: 'l1', content: '\u001b[?2026h\u001b[38;2;215;119;87mMoseying\u001b[0m\n' },
+            { id: 'l2', content: '\u0007Running required command\r\n' },
+          ],
+        }),
+      } as Response);
+
+      renderWithI18n(<TerminalDebugView tasks={completedTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      if (!devButton) {
+        throw new Error('Expected terminal button to be rendered.');
+      }
+
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-1/logs?limit=1000');
+      });
+
+      await waitFor(() => {
+        const historyPanel = screen.getByText('Terminal history').parentElement;
+        expect(historyPanel).toHaveTextContent('Moseying');
+        expect(historyPanel).toHaveTextContent('Running required command');
+
+        const content = historyPanel?.textContent ?? '';
+        expect(content).not.toContain('\u001b');
+        expect(content).not.toContain('[?2026h');
+        expect(content).not.toContain('\u0007');
+      });
+    });
   });
 
   describe('Control Buttons', () => {

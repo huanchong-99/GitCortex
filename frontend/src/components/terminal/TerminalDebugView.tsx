@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import type { Terminal } from '@/components/workflow/TerminalCard';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import { useTranslation } from 'react-i18next';
+import { stripAnsi } from 'fancy-ansi';
 
 interface Props {
   tasks: (WorkflowTask & { terminals: Terminal[] })[];
@@ -24,6 +25,13 @@ interface TerminalHistoryState {
 }
 
 const TERMINAL_HISTORY_LIMIT = 1000;
+const CONTROL_CHARACTERS_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+const sanitizeTerminalHistoryContent = (content: string) =>
+  stripAnsi(content)
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(CONTROL_CHARACTERS_REGEX, '');
 
 /**
  * Renders the terminal debugging UI with a terminal list and active emulator.
@@ -317,6 +325,9 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
 
   const isHistoricalTerminal = isHistoricalTerminalStatus(selectedTerminal?.status);
   const currentHistory = selectedTerminalId ? historyByTerminalId[selectedTerminalId] : undefined;
+  const currentHistoryText = currentHistory?.lines.length
+    ? sanitizeTerminalHistoryContent(currentHistory.lines.join(''))
+    : '';
 
   return (
     <div className="flex h-full">
@@ -376,7 +387,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                 </Button>
               </div>
             </div>
-            <div className="flex-1 p-4">
+            <div className="flex-1 min-h-0 p-4">
               {shouldRenderLiveTerminal(selectedTerminal) ? (
                 <TerminalEmulator
                   key={selectedTerminal.id}
@@ -386,7 +397,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                   onError={handleTerminalError}
                 />
               ) : isHistoricalTerminal ? (
-                <div className="h-full rounded-lg border bg-background p-4 overflow-auto">
+                <div className="h-full min-h-0 rounded-lg border bg-background p-4 flex flex-col">
                   <div className="text-sm text-muted-foreground mb-3">
                     {t('terminalDebug.historyTitle', {
                       defaultValue: 'Terminal history',
@@ -422,9 +433,11 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                       </Button>
                     </div>
                   ) : currentHistory?.lines.length ? (
-                    <pre className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground">
-                      {currentHistory.lines.join('')}
-                    </pre>
+                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto pr-1">
+                      <pre className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground">
+                        {currentHistoryText}
+                      </pre>
+                    </div>
                   ) : (
                     <div className="text-sm text-muted-foreground">
                       {t('terminalDebug.historyEmpty', {
