@@ -9,8 +9,9 @@ use axum::{
     routing::{get, post, put},
 };
 use db::models::{
-    CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
-    Workflow, WorkflowCommand, WorkflowTask, project::Project,
+    CliType, CreateTerminalRequest, CreateWorkflowRequest, CreateWorkflowTaskRequest,
+    InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal, Workflow, WorkflowCommand,
+    WorkflowTask, project::Project,
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
@@ -31,30 +32,6 @@ use crate::{DeploymentImpl, error::ApiError};
 // ============================================================================
 // Request/Response Types
 // ============================================================================
-
-/// Create Workflow Task Request
-#[derive(Debug, Deserialize)]
-pub struct CreateWorkflowTaskRequest {
-    /// Task name
-    pub name: String,
-    /// Task description
-    pub description: Option<String>,
-    /// Git branch name (optional, auto-generated)
-    pub branch: Option<String>,
-    /// Terminals list
-    pub terminals: Vec<CreateTerminalRequest>,
-}
-
-/// Create Terminal Request
-#[derive(Debug, Deserialize)]
-pub struct CreateTerminalRequest {
-    pub cli_type_id: String,
-    pub model_config_id: String,
-    pub custom_base_url: Option<String>,
-    pub custom_api_key: Option<String>,
-    pub role: Option<String>,
-    pub role_description: Option<String>,
-}
 
 /// Workflow Detail Response
 #[derive(Debug, Serialize)]
