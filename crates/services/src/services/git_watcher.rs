@@ -403,6 +403,19 @@ impl GitWatcher {
             }
         };
 
+        if let Some(bound_workflow_id) = self.workflow_id.as_deref()
+            && metadata.workflow_id != bound_workflow_id
+        {
+            tracing::warn!(
+                commit_hash = %commit.hash,
+                commit_workflow_id = %metadata.workflow_id,
+                bound_workflow_id = %bound_workflow_id,
+                terminal_id = %metadata.terminal_id,
+                "Commit metadata workflow_id does not match watcher binding, skipping"
+            );
+            return Ok(());
+        }
+
         tracing::info!(
             "Processing commit with workflow_id={}, task_id={}, terminal_id={}, status={}",
             metadata.workflow_id,
@@ -494,6 +507,7 @@ pub fn parse_commit_metadata(message: &str) -> Result<CommitMetadata> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn test_parse_commit_metadata_basic() {
@@ -718,5 +732,58 @@ next_action: continue"#;
 
         let status = GitWatcher::completion_status_from_metadata(&metadata);
         assert!(status.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_new_commit_skips_when_metadata_workflow_mismatch() {
+        let mut repo_path = std::env::temp_dir();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        repo_path.push(format!(
+            "gitwatcher-mismatch-test-{}-{}",
+            std::process::id(),
+            unique
+        ));
+        std::fs::create_dir_all(repo_path.join(".git")).expect("create mock git repo should succeed");
+
+        let message_bus = MessageBus::new(16);
+        let mut watcher = GitWatcher::new(
+            GitWatcherConfig::new(repo_path.clone(), 100),
+            message_bus.clone(),
+        )
+        .expect("watcher should be created");
+        watcher.set_workflow_id("wf-bound");
+
+        let mut workflow_rx = message_bus.subscribe("workflow:wf-bound").await;
+        let commit = ParsedCommit {
+            hash: "abc123".to_string(),
+            branch: "main".to_string(),
+            message: "feat: test mismatch".to_string(),
+            metadata: Some(CommitMetadata {
+                workflow_id: "wf-other".to_string(),
+                task_id: "task-1".to_string(),
+                terminal_id: "terminal-1".to_string(),
+                terminal_order: 0,
+                cli: "claude-code".to_string(),
+                model: "model".to_string(),
+                status: "completed".to_string(),
+                severity: None,
+                reviewed_terminal: None,
+                issues: None,
+                next_action: "handoff".to_string(),
+            }),
+        };
+
+        watcher
+            .handle_new_commit(commit)
+            .await
+            .expect("mismatch should be handled safely");
+
+        let recv = tokio::time::timeout(Duration::from_millis(150), workflow_rx.recv()).await;
+        assert!(recv.is_err(), "mismatch commit should not publish events");
+
+        let _ = std::fs::remove_dir_all(repo_path);
     }
 }

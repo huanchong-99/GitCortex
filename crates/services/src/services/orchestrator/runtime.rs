@@ -14,7 +14,7 @@ use sqlx::Row;
 use tokio::{
     sync::Mutex,
     task::JoinHandle,
-    time::{Duration, timeout},
+    time::{Duration, sleep, timeout},
 };
 use tracing::{debug, error, info, warn};
 
@@ -318,6 +318,8 @@ impl OrchestratorRuntime {
 
         // Spawn agent task with error handling
         let agent_clone = agent.clone();
+        let running_workflows = self.running_workflows.clone();
+        let git_watchers = self.git_watchers.clone();
         let workflow_id_owned = workflow_id.to_string();
         let task_handle = tokio::spawn(async move {
             if let Err(e) = agent_clone.run().await {
@@ -325,6 +327,46 @@ impl OrchestratorRuntime {
                     "Orchestrator agent failed for workflow {}: {}",
                     workflow_id_owned, e
                 );
+            }
+
+            // Best-effort cleanup for naturally completed workflow runs.
+            // Guard against removing a newly restarted workflow with the same ID.
+            let mut removed_running = false;
+            for _ in 0..5 {
+                let mut running = running_workflows.lock().await;
+                let can_remove = running
+                    .get(&workflow_id_owned)
+                    .map(|entry| entry.task_handle.is_finished())
+                    .unwrap_or(false);
+
+                if can_remove {
+                    running.remove(&workflow_id_owned);
+                    removed_running = true;
+                    break;
+                }
+
+                drop(running);
+                sleep(Duration::from_millis(100)).await;
+            }
+
+            if removed_running {
+                let git_watcher_handle = {
+                    let mut watchers = git_watchers.lock().await;
+                    watchers.remove(&workflow_id_owned)
+                };
+
+                if let Some(handle) = git_watcher_handle {
+                    handle.watcher.stop();
+                    let mut watcher_task = handle.task_handle;
+                    let shutdown_result = timeout(Duration::from_secs(5), &mut watcher_task).await;
+                    match shutdown_result {
+                        Ok(_) => {}
+                        Err(_) => {
+                            watcher_task.abort();
+                            watcher_task.await.ok();
+                        }
+                    }
+                }
             }
         });
 

@@ -5,10 +5,47 @@ import { WorkflowKanbanBoard } from '@/components/board/WorkflowKanbanBoard';
 import { TerminalActivityPanel } from '@/components/board/TerminalActivityPanel';
 import { StatusBar } from '@/components/board/StatusBar';
 import { ViewHeader } from '@/components/ui-new/primitives/ViewHeader';
+import { useWorkflowEvents } from '@/stores/wsStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { workflowKeys } from '@/hooks/useWorkflows';
 
 export function Board() {
   const { t } = useTranslation('workflow');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  useWorkflowEvents(selectedWorkflowId, {
+    onWorkflowStatusChanged: () => {
+      if (!selectedWorkflowId) return;
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(selectedWorkflowId),
+      });
+    },
+    onTaskStatusChanged: () => {
+      if (!selectedWorkflowId) return;
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(selectedWorkflowId),
+      });
+    },
+    onTerminalStatusChanged: () => {
+      if (!selectedWorkflowId) return;
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(selectedWorkflowId),
+      });
+    },
+    onTerminalCompleted: () => {
+      if (!selectedWorkflowId) return;
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(selectedWorkflowId),
+      });
+    },
+    onGitCommitDetected: () => {
+      if (!selectedWorkflowId) return;
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(selectedWorkflowId),
+      });
+    },
+  });
 
   return (
     <div className="app-canvas flex h-full min-h-0 w-full">

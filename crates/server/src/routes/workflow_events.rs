@@ -314,6 +314,8 @@ impl WsEvent {
                 let has_dangerous_keywords = event.prompt.has_dangerous_keywords;
                 let selected_index = event.prompt.selected_index;
                 let option_details = event.prompt.options.unwrap_or_default();
+                let auto_confirm = event.auto_confirm;
+                let detected_at = event.detected_at.to_rfc3339();
                 let options: Vec<String> = option_details
                     .iter()
                     .map(|option| option.label.clone())
@@ -328,6 +330,8 @@ impl WsEvent {
                     "promptText": prompt_text,
                     "confidence": confidence,
                     "hasDangerousKeywords": has_dangerous_keywords,
+                    "autoConfirm": auto_confirm,
+                    "detectedAt": detected_at,
                     "options": options,
                     "optionDetails": option_details,
                     "selectedIndex": selected_index,
@@ -338,6 +342,8 @@ impl WsEvent {
                     "prompt_kind": prompt_kind,
                     "prompt_text": prompt_text,
                     "has_dangerous_keywords": has_dangerous_keywords,
+                    "auto_confirm": auto_confirm,
+                    "detected_at": detected_at,
                     "selected_index": selected_index,
                     "legacyPromptKind": legacy_prompt_kind
                 });
@@ -581,6 +587,8 @@ mod tests {
         assert_eq!(event.payload["promptKind"], "arrow_select");
         assert_eq!(event.payload["promptText"], "Select option");
         assert_eq!(event.payload["hasDangerousKeywords"], false);
+        assert_eq!(event.payload["autoConfirm"], true);
+        assert!(event.payload["detectedAt"].is_string());
         assert_eq!(event.payload["selectedIndex"], 1);
         assert_eq!(event.payload["options"], json!(["Option A", "Option B"]));
         assert_eq!(event.payload["optionDetails"][1]["label"], "Option B");
@@ -591,6 +599,8 @@ mod tests {
         assert_eq!(event.payload["session_id"], "session-111");
         assert_eq!(event.payload["prompt_kind"], "arrow_select");
         assert_eq!(event.payload["prompt_text"], "Select option");
+        assert_eq!(event.payload["auto_confirm"], true);
+        assert!(event.payload["detected_at"].is_string());
         assert_eq!(event.payload["selected_index"], 1);
         assert_eq!(event.payload["legacyPromptKind"], "ArrowSelect");
     }
@@ -729,6 +739,14 @@ mod tests {
         assert_eq!(
             prompt_detected.payload["promptText"],
             prompt_detected.payload["prompt_text"]
+        );
+        assert_eq!(
+            prompt_detected.payload["autoConfirm"],
+            prompt_detected.payload["auto_confirm"]
+        );
+        assert_eq!(
+            prompt_detected.payload["detectedAt"],
+            prompt_detected.payload["detected_at"]
         );
         assert_eq!(
             prompt_detected.payload["selectedIndex"],

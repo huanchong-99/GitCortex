@@ -84,7 +84,10 @@ function StatusBadge({ status }: { status: string }) {
 export function WorkflowDebugPage() {
   const { t } = useTranslation('workflow');
   const { workflowId } = useParams<{ workflowId: string }>();
-  const { data, isLoading, error } = useWorkflow(workflowId ?? '');
+  const { data, isLoading, error } = useWorkflow(workflowId ?? '', {
+    staleTime: 0,
+    refetchInterval: 2000,
+  });
 
   // Workflow control hooks
   const startMutation = useStartWorkflow();

@@ -9,7 +9,11 @@ export function StatusBar({ workflowId }: StatusBarProps) {
   const workflow = useWorkflowStore((state) =>
     workflowId ? state.workflows.get(workflowId) : undefined
   );
-  const connectionStatus = useWsStore((state) => state.connectionStatus);
+  const connectionStatus = useWsStore((state) =>
+    workflowId
+      ? state.getWorkflowConnectionStatus(workflowId)
+      : state.connectionStatus
+  );
 
   // Count running terminals across all tasks
   // Note: Backend uses 'working' for active terminals, frontend may also see 'running'

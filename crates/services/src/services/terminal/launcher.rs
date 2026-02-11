@@ -489,12 +489,9 @@ impl TerminalLauncher {
             }
             Err(e) => {
                 tracing::error!("Failed to start terminal {}: {}", terminal_id, e);
-                LaunchResult {
-                    terminal_id,
-                    process_handle: None,
-                    success: false,
-                    error: Some(format!("Process spawn failed: {e}")),
-                }
+                self
+                    .rollback_launch_after_spawn(&terminal_id, format!("Process spawn failed: {e}"))
+                    .await
             }
         }
     }

@@ -35,7 +35,10 @@ vi.mock('@/stores/workflowStore', () => ({
 
 vi.mock('@/stores/wsStore', () => ({
   useWsStore: vi.fn((selector) => {
-    const state = { connectionStatus: 'connected' };
+    const state = {
+      connectionStatus: 'connected',
+      getWorkflowConnectionStatus: vi.fn(() => 'connected'),
+    };
     return selector(state);
   }),
 }));
