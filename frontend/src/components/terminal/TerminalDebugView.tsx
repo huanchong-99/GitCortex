@@ -101,12 +101,27 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     }
   }, [resetAutoStart]);
 
+  const shouldAutoRecoverTerminal = useCallback((status: Terminal['status'] | undefined) => {
+    if (!status) {
+      return false;
+    }
+
+    return ['starting', 'waiting', 'working'].includes(status);
+  }, []);
+
   // Handle terminal errors - auto-restart if process is not running
   const handleTerminalError = useCallback((error: Error) => {
     console.error('Terminal error:', error.message);
 
     // If the error indicates the process is not running, auto-restart (with limit)
     if (error.message.includes('Terminal process not running') && selectedTerminalId) {
+      if (!shouldAutoRecoverTerminal(selectedTerminal?.status)) {
+        console.info(
+          `Skip auto-restart for terminal ${selectedTerminalId} because status is ${selectedTerminal?.status ?? 'unknown'}`
+        );
+        return;
+      }
+
       const attempts = restartAttemptsRef.current.get(selectedTerminalId) || 0;
       if (attempts >= MAX_RESTART_ATTEMPTS) {
         console.error(`Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for terminal ${selectedTerminalId}`);
@@ -129,7 +144,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
       // Start the terminal
       void startTerminal(selectedTerminalId);
     }
-  }, [selectedTerminalId, startTerminal]);
+  }, [selectedTerminal?.status, selectedTerminalId, shouldAutoRecoverTerminal, startTerminal]);
 
   // Auto-start terminal when selected and not yet started
   useEffect(() => {

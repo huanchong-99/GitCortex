@@ -299,14 +299,43 @@ impl OrchestratorAgent {
             {
                 Ok(true) => true,
                 Ok(false) => {
-                    tracing::info!(
-                        terminal_id = %event.terminal_id,
-                        task_id = %event.task_id,
-                        expected_status = "working",
-                        target_status = %terminal_final_status,
-                        "Skipping terminal completion because CAS status transition did not match"
-                    );
-                    false
+                    match db::models::Terminal::set_completed_if_unfinished(
+                        &self.db.pool,
+                        &event.terminal_id,
+                        terminal_final_status,
+                    )
+                    .await
+                    {
+                        Ok(true) => {
+                            tracing::info!(
+                                terminal_id = %event.terminal_id,
+                                task_id = %event.task_id,
+                                target_status = %terminal_final_status,
+                                "Applied terminal completion fallback after CAS miss"
+                            );
+                            true
+                        }
+                        Ok(false) => {
+                            tracing::info!(
+                                terminal_id = %event.terminal_id,
+                                task_id = %event.task_id,
+                                expected_status = "working",
+                                target_status = %terminal_final_status,
+                                "Skipping terminal completion because terminal is already finalized"
+                            );
+                            false
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                terminal_id = %event.terminal_id,
+                                task_id = %event.task_id,
+                                target_status = %terminal_final_status,
+                                error = %e,
+                                "Failed to mark terminal completion after CAS miss fallback"
+                            );
+                            false
+                        }
+                    }
                 }
                 Err(e) => {
                     tracing::error!(

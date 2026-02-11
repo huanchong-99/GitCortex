@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { forwardRef } from 'react';
 import { TerminalDebugView } from './TerminalDebugView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
@@ -308,6 +308,77 @@ describe('TerminalDebugView', () => {
       await waitFor(() => {
         expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-2');
         expect(screen.queryByText(i18n.t('workflow:terminalDebug.starting'))).not.toBeInTheDocument();
+      });
+    });
+
+    it('should not auto-restart completed terminal on process-not-running error', async () => {
+      const completedTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
+        {
+          ...mockTasks[0],
+          terminals: mockTasks[0].terminals.map((terminal) =>
+            terminal.id === 'term-1' ? { ...terminal, status: 'completed' } : terminal
+          ),
+        },
+      ];
+
+      renderWithI18n(<TerminalDebugView tasks={completedTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      if (!devButton) {
+        throw new Error('Expected terminal button to be rendered.');
+      }
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-1');
+      });
+
+      const latestCall = terminalEmulatorPropsSpy.mock.calls[
+        terminalEmulatorPropsSpy.mock.calls.length - 1
+      ];
+      const latestProps = latestCall?.[0] as
+        | { onError?: (error: Error) => void }
+        | undefined;
+
+      await act(async () => {
+        latestProps?.onError?.(
+          new Error('Terminal process not running. Please start the terminal first.')
+        );
+      });
+
+      await waitFor(() => {
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should auto-restart working terminal on process-not-running error', async () => {
+      renderWithI18n(<TerminalDebugView tasks={mockTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      if (!devButton) {
+        throw new Error('Expected terminal button to be rendered.');
+      }
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-1');
+      });
+
+      const latestCall = terminalEmulatorPropsSpy.mock.calls[
+        terminalEmulatorPropsSpy.mock.calls.length - 1
+      ];
+      const latestProps = latestCall?.[0] as
+        | { onError?: (error: Error) => void }
+        | undefined;
+
+      await act(async () => {
+        latestProps?.onError?.(
+          new Error('Terminal process not running. Please start the terminal first.')
+        );
+      });
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-1/start', { method: 'POST' });
       });
     });
   });
