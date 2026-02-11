@@ -1,38 +1,42 @@
 <p align="center">
-  <strong>AI Agent 跨终端任务协调平台</strong>
+  <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
-  基于 <a href="https://github.com/BloopAI/vibe-kanban">Vibe Kanban</a> 改造，集成 <a href="https://github.com/farion1231/cc-switch">CC-Switch</a> 模型切换能力
+  <strong>AI Agent Cross-Terminal Task Coordination Platform</strong>
+</p>
+
+<p align="center">
+  Based on <a href="https://github.com/BloopAI/vibe-kanban">Vibe Kanban</a>, integrated with <a href="https://github.com/farion1231/cc-switch">CC-Switch</a> model switching capabilities
 </p>
 
 ---
 
-## 概述
+## Overview
 
-GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编码代理（Claude Code、Gemini CLI、Codex 等）能够并行协作完成复杂的软件开发任务。
+GitCortex is an AI-driven multi-terminal task coordination platform that enables multiple AI coding agents (Claude Code, Gemini CLI, Codex, etc.) to collaborate in parallel on complex software development tasks.
 
-### 核心特性
+### Core Features
 
-| 特性 | 说明 |
-|------|------|
-| **主 Agent 协调** | AI 驱动的中央控制器，负责任务分发、进度监控、结果审核 |
-| **多任务并行** | 多个 Task 同时执行，每个 Task 有独立 Git 分支 |
-| **任务内串行** | 每个 Task 内的 Terminal 按顺序执行（编码→审核→修复） |
-| **cc-switch 集成** | 一键切换任意 CLI 的模型配置 |
-| **事件驱动** | 基于 Git 提交与消息总线事件推进工作流，减少不必要轮询与上下文重复 |
-| **终端调试视图** | 启动后可进入原生终端验证环境配置 |
-| **工作流持久化** | 完整的 Workflow/Task/Terminal 三层数据模型 |
-| **斜杠命令系统** | 可复用的提示词预设，支持模板变量替换 |
-| **多模型支持** | 支持 Claude、Gemini、OpenAI 等多种 AI 模型 |
-| **Git 集成** | 深度集成 Git，自动管理分支和合并 |
+| Feature | Description |
+|---------|-------------|
+| **Main Agent Coordination** | AI-driven central controller responsible for task distribution, progress monitoring, and result review |
+| **Multi-Task Parallelism** | Multiple Tasks execute simultaneously, each with independent Git branches |
+| **Intra-Task Serial Execution** | Terminals within each Task execute sequentially (coding→review→fix) |
+| **cc-switch Integration** | One-click model configuration switching for any CLI |
+| **Event-Driven** | Workflow progression based on Git commits and message bus events, reducing unnecessary polling and context repetition |
+| **Terminal Debug View** | Native terminal access for environment configuration verification after startup |
+| **Workflow Persistence** | Complete three-layer data model: Workflow/Task/Terminal |
+| **Slash Command System** | Reusable prompt presets with template variable substitution |
+| **Multi-Model Support** | Support for Claude, Gemini, OpenAI, and other AI models |
+| **Git Integration** | Deep Git integration with automatic branch and merge management |
 
-### 架构概览
+### Architecture Overview
 
 ```
 ╔═══════════════════════════════════════════════════════════════════╗
-║                     Orchestrator (主 Agent)                        ║
-║           用户配置: API类型 + Base URL + API Key + 模型            ║
+║                     Orchestrator (Main Agent)                      ║
+║      User Config: API Type + Base URL + API Key + Model           ║
 ╚═══════════════════════════════════════════════════════════════════╝
          │                      │                      │
          ▼                      ▼                      ▼
@@ -43,177 +47,177 @@ GitCortex 是一个 AI 驱动的多终端任务协调平台，让多个 AI 编�
   └─────────────┘       └─────────────┘       └─────────────┘
          ║                      ║                      ║
          ╚══════════════════════╩══════════════════════╝
-                         任务间并行执行
+                    Parallel Task Execution
                               │
                               ▼
   ┌─────────────────────────────────────────────────────────────────┐
-  │                   全局合并终端 (Merge Terminal)                  │
+  │                   Global Merge Terminal                          │
   └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
                           [ main ]
 ```
 
-### 关键协作机制（重点补充）
+### Key Collaboration Mechanisms (Critical)
 
-> 这一节专门说明 GitCortex 最核心的价值：**一个总 Agent（Orchestrator）调度多个 CLI 终端协作完成复杂任务**。
+> This section explains GitCortex's core value: **a single Orchestrator Agent coordinating multiple CLI terminals to complete complex tasks collaboratively**.
 
-#### 1) 为什么是“一个总 Agent”而不是“多个总 Agent”
+#### 1) Why "One Orchestrator" Instead of "Multiple Orchestrators"
 
-在 GitCortex 中，Orchestrator 是唯一的全局调度者，负责统一决策与推进，避免多个主控同时下达指令造成冲突。
+In GitCortex, the Orchestrator is the sole global scheduler responsible for unified decision-making and progression, avoiding conflicts from multiple controllers issuing simultaneous commands.
 
-它主要做四件事：
+It performs four main functions:
 
-1. **任务拆解与分发**：把 workflow 目标分配到不同 task。
-2. **终端串行推进**：在每个 task 内按 `orderIndex` 启动下一终端。
-3. **状态机收敛**：统一维护 workflow/task/terminal 三层状态。
-4. **事件闭环**：消费 Git 事件、Prompt 事件、WS 事件并决定后续动作。
+1. **Task Decomposition & Distribution**: Allocate workflow goals to different tasks.
+2. **Terminal Serial Progression**: Launch next terminal within each task by `orderIndex`.
+3. **State Machine Convergence**: Maintain unified three-layer state (workflow/task/terminal).
+4. **Event Loop Closure**: Consume Git events, Prompt events, WS events and decide subsequent actions.
 
-这意味着你看到的“多终端协作”背后不是乱序并发，而是**中心化编排 + 可观测状态机**。
+This means the "multi-terminal collaboration" you see is not chaotic concurrency, but **centralized orchestration + observable state machine**.
 
-#### 2) 多 CLI 协作模型（横向）
+#### 2) Multi-CLI Collaboration Model (Horizontal)
 
-GitCortex 支持把不同 CLI 放进同一个 workflow：
+GitCortex supports placing different CLIs in the same workflow:
 
-- `claude-code` 负责主开发
-- `codex` 负责审计/修复建议
-- `gemini-cli` 负责文档或测试补全
+- `claude-code` handles main development
+- `codex` handles audit/fix suggestions
+- `gemini-cli` handles documentation or test completion
 
-它们可以在：
+They can operate in:
 
-- **任务层并行**（Task A / B / C 同时跑）
-- **任务内串行**（Terminal 1 → Terminal 2 → Terminal 3）
+- **Task-level parallelism** (Task A / B / C run simultaneously)
+- **Intra-task serial execution** (Terminal 1 → Terminal 2 → Terminal 3)
 
-实现“并行加速 + 串行把关”的组合策略。
+Achieving a combination strategy of "parallel acceleration + serial quality control".
 
-#### 3) 同一种 CLI 的多模型协作（纵向）
+#### 3) Multi-Model Collaboration with Same CLI (Vertical)
 
-GitCortex 不要求“一个 CLI 只能对应一个模型”。
+GitCortex doesn't require "one CLI corresponds to one model only".
 
-你完全可以在同一个 task 里，使用**同一种 AI CLI + 不同模型**形成角色分工，例如都用 `claude-code`：
+You can use **the same AI CLI + different models** within the same task for role division, for example all using `claude-code`:
 
-| Terminal | CLI | 模型 | 典型角色 |
+| Terminal | CLI | Model | Typical Role |
 |---|---|---|---|
-| T1 | `claude-code` | `glm-4.7` | 前端实现 |
-| T2 | `claude-code` | `claude-opus-4.6` | 后端实现 |
-| T3 | `codex` | `gpt-5.3-codex-xhigh` | 代码审计/收敛 |
+| T1 | `claude-code` | `glm-4.7` | Frontend implementation |
+| T2 | `claude-code` | `claude-opus-4.6` | Backend implementation |
+| T3 | `codex` | `gpt-5.3-codex-xhigh` | Code audit/convergence |
 
-这样做的价值是：
+The value of this approach:
 
-- 保留同一 CLI 的操作习惯与上下文风格
-- 利用不同模型在代码生成、推理深度、审计能力上的差异
-- 通过 Orchestrator 保证交接顺序与状态一致性
+- Retain the same CLI's operational habits and context style
+- Leverage different models' strengths in code generation, reasoning depth, and audit capabilities
+- Ensure handoff order and state consistency through Orchestrator
 
-#### 4) cc-switch 在协作中的作用
+#### 4) cc-switch's Role in Collaboration
 
-`cc-switch` 负责把“终端实例”与“模型配置”解耦，让你在同一 CLI 生态内灵活切模型：
+`cc-switch` decouples "terminal instances" from "model configurations", allowing flexible model switching within the same CLI ecosystem:
 
-- 启动前写入目标模型配置
-- 启动后保持该终端会话的一致模型语义
-- 支持不同终端绑定不同模型，不互相污染
+- Write target model configuration before startup
+- Maintain consistent model semantics for that terminal session after startup
+- Support different terminals binding different models without mutual contamination
 
-因此 GitCortex 支持两类协作：
+Therefore GitCortex supports two types of collaboration:
 
-- **跨 CLI 协作**（Claude + Codex + Gemini）
-- **同 CLI 多模型协作**（例如多个 Claude Code 终端各自绑定不同模型）
+- **Cross-CLI collaboration** (Claude + Codex + Gemini)
+- **Same-CLI multi-model collaboration** (e.g., multiple Claude Code terminals each bound to different models)
 
-#### 5) 复杂任务是如何被稳定推进的
+#### 5) How Complex Tasks Are Stably Advanced
 
-在真实开发场景中，一个“复杂任务”通常不是一次生成，而是多轮闭环：
+In real development scenarios, a "complex task" is usually not generated in one pass, but through multiple closed loops:
 
-1. 终端 A 先实现主逻辑
-2. 终端 B 复核并补测试
-3. 终端 C 做审计与风险收敛
-4. Merge Terminal 统一合并到目标分支
+1. Terminal A implements main logic first
+2. Terminal B reviews and adds tests
+3. Terminal C performs audit and risk convergence
+4. Merge Terminal unifies merge to target branch
 
-GitCortex 的重点不是“单次回答质量”，而是让这个闭环过程可重复、可监控、可回放、可恢复。
+GitCortex's focus is not "single response quality", but making this closed-loop process repeatable, monitorable, replayable, and recoverable.
 
-换句话说，GitCortex 提供的是 **Agent 协作流水线能力**，而不仅是“调用某个模型”。
-
----
-
-## 技术栈
-
-### 后端
-
-- **语言与运行时**：Rust + Tokio
-- **Web 框架**：Axum（REST + WebSocket）
-- **数据层**：SQLx + SQLite
-- **工程结构**：Rust Workspace（`crates/server`、`crates/services`、`crates/db`、`crates/cc-switch` 等）
-
-### 前端
-
-- **框架**：React 18 + TypeScript
-- **构建工具**：Vite
-- **状态与数据**：TanStack Query + WebSocket Store
-- **终端渲染**：xterm.js（终端调试与输出展示）
-
-### 协作运行时组件（核心）
-
-- `OrchestratorRuntime`：统一调度 workflow 生命周期
-- `OrchestratorAgent`：执行编排决策与状态推进
-- `MessageBus`：跨终端/跨模块事件总线
-- `TerminalCoordinator`：终端准备与串行推进协调
-- `TerminalLauncher`：终端进程启动与生命周期管理
-- `GitWatcher`：监听 Git 提交并触发事件
-- `CCSwitchService`：CLI/模型配置切换与隔离
-
-以上组件对应源码可在 `crates/services/src/services/` 与 `crates/server/src/routes/` 中找到。
+In other words, GitCortex provides **Agent collaboration pipeline capabilities**, not just "calling a certain model".
 
 ---
 
-## 部署指南
+## Tech Stack
 
-### 部署模式
+### Backend
 
-- **开发模式（双服务）**：前端开发服务器 + 后端 API 服务分开运行
-  - 前端：`23457`
-  - 后端：`23456`
-- **生产模式（单服务）**：仅运行后端二进制，后端同时提供 `/api` 与前端静态资源
+- **Language & Runtime**: Rust + Tokio
+- **Web Framework**: Axum (REST + WebSocket)
+- **Data Layer**: SQLx + SQLite
+- **Project Structure**: Rust Workspace (`crates/server`, `crates/services`, `crates/db`, `crates/cc-switch`, etc.)
 
-### 开发模式部署（推荐本地开发）
+### Frontend
+
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **State & Data**: TanStack Query + WebSocket Store
+- **Terminal Rendering**: xterm.js (terminal debugging and output display)
+
+### Collaboration Runtime Components (Core)
+
+- `OrchestratorRuntime`: Unified workflow lifecycle scheduling
+- `OrchestratorAgent`: Execute orchestration decisions and state progression
+- `MessageBus`: Cross-terminal/cross-module event bus
+- `TerminalCoordinator`: Terminal preparation and serial progression coordination
+- `TerminalLauncher`: Terminal process startup and lifecycle management
+- `GitWatcher`: Monitor Git commits and trigger events
+- `CCSwitchService`: CLI/model configuration switching and isolation
+
+The above components can be found in `crates/services/src/services/` and `crates/server/src/routes/`.
+
+---
+
+## Deployment Guide
+
+### Deployment Modes
+
+- **Development Mode (Dual Service)**: Frontend dev server + backend API service run separately
+  - Frontend: `23457`
+  - Backend: `23456`
+- **Production Mode (Single Service)**: Run backend binary only, backend serves both `/api` and frontend static resources
+
+### Development Mode Deployment (Recommended for Local Development)
 
 ```bash
 pnpm install
 
-# 必需：设置 32 字符加密密钥
+# Required: Set 32-character encryption key
 # Windows PowerShell
 $env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 
 # Linux/macOS
 export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 
-# 按需准备 SQLx 查询缓存
+# Prepare SQLx query cache as needed
 npm run prepare-db
 
-# 启动前后端
+# Start frontend and backend
 pnpm run dev
 ```
 
-访问地址：
+Access URLs:
 
-- 前端：`http://localhost:23457`
-- 后端：`http://localhost:23456/api`
+- Frontend: `http://localhost:23457`
+- Backend: `http://localhost:23456/api`
 
-### 生产模式部署（单机）
+### Production Mode Deployment (Single Machine)
 
 ```bash
-# 1) 安装依赖
+# 1) Install dependencies
 pnpm install
 
-# 2) 构建前端（用于后端静态资源嵌入）
+# 2) Build frontend (for backend static resource embedding)
 cd frontend && pnpm install && pnpm build && cd ..
 
-# 3) 构建后端
+# 3) Build backend
 cargo build --release -p server
 
-# 4) 设置运行环境变量
+# 4) Set runtime environment variables
 # Windows PowerShell
 $env:GITCORTEX_ENCRYPTION_KEY="your-32-character-key"
-$env:BACKEND_PORT="23456"   # 可选
-$env:HOST="127.0.0.1"       # 可选，外网部署可设 0.0.0.0
+$env:BACKEND_PORT="23456"   # Optional
+$env:HOST="127.0.0.1"       # Optional, set to 0.0.0.0 for external access
 
-# 5) 启动服务
+# 5) Start service
 # Windows
 .\target\release\server.exe
 
@@ -221,288 +225,288 @@ $env:HOST="127.0.0.1"       # 可选，外网部署可设 0.0.0.0
 ./target/release/server
 ```
 
-健康检查：
+Health check:
 
 ```bash
-# 未启用 GITCORTEX_API_TOKEN 时
+# When GITCORTEX_API_TOKEN is not enabled
 curl http://127.0.0.1:23456/api/health
 
-# 启用 GITCORTEX_API_TOKEN 时（所有 /api 路由需 Bearer）
+# When GITCORTEX_API_TOKEN is enabled (all /api routes require Bearer)
 curl http://127.0.0.1:23456/api/health \
   -H "Authorization: Bearer <your-token>"
 ```
 
-> 更完整的运维、备份、升级、回滚流程，请查看：`docs/ops/runbook.md` 与 `docs/ops/troubleshooting.md`。
+> For more complete operations, backup, upgrade, and rollback procedures, see: `docs/ops/runbook.md` and `docs/ops/troubleshooting.md`.
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 前置要求
+### Prerequisites
 
-| 工具 | 版本要求 | 说明 |
-|------|----------|------|
-| **Rust** | nightly-2025-12-04 | 定义在 `rust-toolchain.toml` |
-| **Node.js** | >= 18（建议 20） | 前端运行时 |
-| **pnpm** | 10.13.1 | 包管理器 |
-| **CMake** | 最新版 | 构建工具（某些系统需要） |
-| **SQLite** | 3.x | 数据库（通常内置） |
+| Tool | Version Requirement | Description |
+|------|---------------------|-------------|
+| **Rust** | nightly-2025-12-04 | Defined in `rust-toolchain.toml` |
+| **Node.js** | >= 18 (recommend 20) | Frontend runtime |
+| **pnpm** | 10.13.1 | Package manager |
+| **CMake** | Latest | Build tool (required on some systems) |
+| **SQLite** | 3.x | Database (usually built-in) |
 
-### 安装
+### Installation
 
-#### 1. 安装 Rust 工具链
+#### 1. Install Rust Toolchain
 
 ```bash
-# 安装 Rustup
-# 下载：https://rustup.rs/ 或使用 winget
+# Install Rustup
+# Download: https://rustup.rs/ or use winget
 winget install Rustlang.Rustup
 
-# 安装项目指定版本
+# Install project-specified version
 rustup install nightly-2025-12-04
 rustup default nightly-2025-12-04
 
-# 安装 Cargo 工具
+# Install Cargo tools
 cargo install cargo-watch
 cargo install sqlx-cli --features sqlite
 
-# 验证安装
+# Verify installation
 rustc --version
-# 应输出：rustc 1.85.0-nightly (2025-12-04)
+# Should output: rustc 1.85.0-nightly (2025-12-04)
 ```
 
-#### 2. 安装 Node.js 和 pnpm
+#### 2. Install Node.js and pnpm
 
 ```bash
-# 推荐使用 nvm-windows
-# 下载：https://github.com/coreybutler/nvm-windows
+# Recommend using nvm-windows
+# Download: https://github.com/coreybutler/nvm-windows
 nvm install 20
 nvm use 20
 
-# 安装指定版本 pnpm
+# Install specified pnpm version
 npm install -g pnpm@10.13.1
 
-# 验证安装
+# Verify installation
 pnpm --version
-# 应输出：10.13.1
+# Should output: 10.13.1
 ```
 
-#### 3. 克隆并启动项目
+#### 3. Clone and Start Project
 
 ```bash
-# 克隆仓库
+# Clone repository
 git clone <your-repo-url>
 cd GitCortex
 
-# 安装依赖
+# Install dependencies
 pnpm install
 
-# 设置环境变量（必需）
+# Set environment variable (required)
 # Windows PowerShell
 $env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 
 # Linux/macOS
 export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 
-# 生成/校验 SQLx 查询缓存（按需）
+# Generate/verify SQLx query cache (as needed)
 npm run prepare-db
 
-# 构建后端（Rust）
+# Build backend (Rust)
 cargo build --release
 
-# 启动开发服务器（前后端）
+# Start development servers (frontend + backend)
 pnpm run dev
 ```
 
-访问：
-- 前端：http://localhost:23457
-- 后端 API：http://localhost:23456/api
+Access:
+- Frontend: http://localhost:23457
+- Backend API: http://localhost:23456/api
 
-**详细运维指南：** 查看 [Operations Manual](docs/ops/runbook.md) 了解生产部署、监控、升级等详细操作。
+**Detailed Operations Manual:** See [Operations Manual](docs/ops/runbook.md) for production deployment, monitoring, upgrades, and other detailed operations.
 
-### 从现有仓库恢复
+### Restore from Existing Repository
 
-如果你已经克隆过仓库，只需确保工具版本正确并重新安装依赖：
+If you've already cloned the repository, just ensure tool versions are correct and reinstall dependencies:
 
 ```bash
 cd GitCortex
 
-# 检查 Rust 版本
+# Check Rust version
 rustc --version
-# 如版本不对，运行：
+# If version is incorrect, run:
 rustup default nightly-2025-12-04
 
-# 重新安装依赖
+# Reinstall dependencies
 pnpm install
 
-# 设置环境变量并启动
+# Set environment variable and start
 $env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 pnpm run dev
 ```
 
 ---
 
-## 开发环境配置
+## Development Environment Configuration
 
-### IDE 推荐
+### IDE Recommendations
 
-- **VS Code** + 插件：
-  - `rust-analyzer`（Rust 语言服务器）
-  - `ESLint`（前端检查）
-  - `Prettier`（代码格式化）
+- **VS Code** + Extensions:
+  - `rust-analyzer` (Rust language server)
+  - `ESLint` (Frontend linting)
+  - `Prettier` (Code formatting)
 
-### 环境变量
+### Environment Variables
 
-创建 `.env` 文件或设置系统环境变量：
+Create `.env` file or set system environment variables:
 
 ```bash
-# 必需：加密密钥（32字符字符串）
+# Required: Encryption key (32-character string)
 GITCORTEX_ENCRYPTION_KEY=your-32-character-key-here
 
-# 可选
-BACKEND_PORT=23456           # 后端端口（默认）
-HOST=127.0.0.1               # 后端监听地址（默认）
-GITCORTEX_API_TOKEN=your-api-token   # 开启 API Bearer 鉴权（可选）
+# Optional
+BACKEND_PORT=23456           # Backend port (default)
+HOST=127.0.0.1               # Backend listen address (default)
+GITCORTEX_API_TOKEN=your-api-token   # Enable API Bearer auth (optional)
 ```
 
-### 数据库
+### Database
 
-项目使用 SQLite（嵌入式），无需安装数据库服务器：
-- 开发默认位置：`dev_assets/db.sqlite`
-- 迁移文件：`crates/db/migrations/`
+Project uses SQLite (embedded), no database server installation required:
+- Development default location: `dev_assets/db.sqlite`
+- Migration files: `crates/db/migrations/`
 
-### 验证安装
+### Verify Installation
 
 ```bash
-# 后端编译检查
+# Backend compilation check
 cargo check --workspace
 
-# 前端编译检查
+# Frontend compilation check
 cd frontend && npm run check && cd ..
 
-# 运行测试
+# Run tests
 cargo test --workspace
 cd frontend && npm run test:run && cd ..
 ```
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 GitCortex/
 ├── crates/                    # Rust workspace
-│   ├── db/                    # 数据库层（模型 + DAO + 迁移）
-│   ├── server/                # Axum 后端服务器
-│   ├── services/              # 业务逻辑层
-│   │   ├── orchestrator/      # 主 Agent 编排逻辑
-│   │   ├── terminal/          # 终端进程管理
-│   │   └── ...                # git_watcher.rs / cc_switch.rs 等服务
-│   └── utils/                 # 工具函数
-├── frontend/                  # React + TypeScript 前端
+│   ├── db/                    # Database layer (models + DAO + migrations)
+│   ├── server/                # Axum backend server
+│   ├── services/              # Business logic layer
+│   │   ├── orchestrator/      # Main Agent orchestration logic
+│   │   ├── terminal/          # Terminal process management
+│   │   └── ...                # git_watcher.rs / cc_switch.rs etc.
+│   └── utils/                 # Utility functions
+├── frontend/                  # React + TypeScript frontend
 │   ├── src/
-│   │   ├── components/        # UI 组件
-│   │   │   ├── workflow/      # 工作流向导组件
-│   │   │   └── terminal/      # 终端调试组件
+│   │   ├── components/        # UI components
+│   │   │   ├── workflow/      # Workflow wizard components
+│   │   │   └── terminal/      # Terminal debug components
 │   │   ├── hooks/             # React Hooks
-│   │   ├── pages/             # 页面组件
-│   │   └── i18n/              # 国际化配置
+│   │   ├── pages/             # Page components
+│   │   └── i18n/              # Internationalization config
 │   └── package.json
-├── shared/                    # 前后端共享类型（自动生成）
-├── docs/                      # 文档
-│   ├── plans/                 # 实施计划
-│   └── issue-archive/         # 问题归档
-├── Cargo.toml                 # Workspace 配置
-├── rust-toolchain.toml        # Rust 版本锁定
+├── shared/                    # Frontend-backend shared types (auto-generated)
+├── docs/                      # Documentation
+│   ├── plans/                 # Implementation plans
+│   └── issue-archive/         # Issue archive
+├── Cargo.toml                 # Workspace configuration
+├── rust-toolchain.toml        # Rust version lock
 ├── package.json               # Root package.json
-└── pnpm-workspace.yaml        # pnpm workspace 配置
+└── pnpm-workspace.yaml        # pnpm workspace config
 ```
 
 ---
 
-## 开发进度
+## Development Progress
 
-> **数据来源：** `docs/plans/TODO.md`（README 进度与其保持一致）
-> **总体状态：** 完成率 **97.3%**（**288/296**），进行中 **0**，未开始 **8**（Phase 21: 2 个，Phase 27: 6 个），可选优化 **5**。
-> **当前审计分数：** **100/100 (S级)**
-> **下一步：** Phase 27 - Docker 容器化与一键部署。
+> **Data Source:** `docs/plans/TODO.md` (README progress aligns with it)
+> **Overall Status:** Completion rate **97.3%** (**288/296**), In Progress **0**, Not Started **8** (Phase 21: 2, Phase 27: 6), Optional Optimizations **5**.
+> **Current Audit Score:** **100/100 (S-tier)**
+> **Next Step:** Phase 27 - Docker containerization and one-click deployment.
 
-| 阶段 | 状态（与 TODO 对齐） | 备注 |
-|------|----------------------|------|
-| Phase 0 - Phase 18 | ✅ 已完成 | 核心链路已打通 |
-| Phase 18.1 | ✅ 已完成 | 测试技术债务清理完成 |
-| Phase 18.5 | 🚧 进行中 | P0 已完成，P1/P2 存在延后项（含可选优化） |
-| Phase 20 | ✅ 已完成 | 自动化协调核心（自动派发） |
-| Phase 21 | ✅ 已完成（含 2 项未开始） | 21.10 延后、21.12 可选 |
-| Phase 22 | ✅ 已完成 | WebSocket 事件广播完善 |
-| Phase 23 | ✅ 已完成 | 终端进程隔离修复 |
-| Phase 24 | ✅ 已完成 | 终端自动确认与消息桥接 |
-| Phase 25 | ✅ 已完成 | 自动确认可靠性修复 |
-| Phase 26 | ✅ 已完成 | 联合审计问题全量修复 |
-| Phase 27 | 📋 待实施 | 6 项任务未开始 |
+| Phase | Status (Aligned with TODO) | Notes |
+|-------|----------------------------|-------|
+| Phase 0 - Phase 18 | ✅ Completed | Core pipeline established |
+| Phase 18.1 | ✅ Completed | Test technical debt cleanup complete |
+| Phase 18.5 | 🚧 In Progress | P0 complete, P1/P2 have deferred items (including optional optimizations) |
+| Phase 20 | ✅ Completed | Automated coordination core (auto-dispatch) |
+| Phase 21 | ✅ Completed (with 2 not started) | 21.10 deferred, 21.12 optional |
+| Phase 22 | ✅ Completed | WebSocket event broadcast improvements |
+| Phase 23 | ✅ Completed | Terminal process isolation fix |
+| Phase 24 | ✅ Completed | Terminal auto-confirm and message bridging |
+| Phase 25 | ✅ Completed | Auto-confirm reliability fix |
+| Phase 26 | ✅ Completed | Joint audit issue full fix |
+| Phase 27 | 📋 To Implement | 6 tasks not started |
 
-**总体进度：** 288/296 任务完成（97.3%，以 `docs/plans/TODO.md` 为准）
+**Overall Progress:** 288/296 tasks completed (97.3%, per `docs/plans/TODO.md`)
 
-详细进度追踪：[docs/plans/TODO.md](docs/plans/TODO.md)
+Detailed progress tracking: [docs/plans/TODO.md](docs/plans/TODO.md)
 
-**质量状态：** 以 `docs/plans/TODO.md` 为准，当前记录为 S 级（100/100）。
+**Quality Status:** Per `docs/plans/TODO.md`, currently recorded as S-tier (100/100).
 
 ---
 
-## 架构设计
+## Architecture Design
 
-### 数据模型
+### Data Model
 
-GitCortex 采用三层模型：
+GitCortex uses a three-layer model:
 
-1. **Workflow（工作流）** - 顶层容器
-   - 包含多个 Task
-   - 配置 Orchestrator（主 Agent）
-   - 配置 Merge Terminal（合并终端）
-   - 可选 Error Terminal（错误处理）
+1. **Workflow** - Top-level container
+   - Contains multiple Tasks
+   - Configures Orchestrator (main Agent)
+   - Configures Merge Terminal
+   - Optional Error Terminal
 
-2. **WorkflowTask（任务）** - 中层单元
-   - 每个 Task 对应一个 Git 分支
-   - 包含多个 Terminal
-   - 独立状态：pending → running → completed
+2. **WorkflowTask** - Mid-level unit
+   - Each Task corresponds to a Git branch
+   - Contains multiple Terminals
+   - Independent state: pending → running → completed
 
-3. **Terminal（终端）** - 底层执行单元
-   - 绑定特定 CLI 类型（Claude/Gemini/Codex）
-   - 绑定特定模型配置
-   - 串行执行：not_started → starting → waiting → working → completed（异常可到 failed/cancelled）
+3. **Terminal** - Bottom-level execution unit
+   - Bound to specific CLI type (Claude/Gemini/Codex)
+   - Bound to specific model configuration
+   - Serial execution: not_started → starting → waiting → working → completed (can reach failed/cancelled on exception)
 
-### 状态机
+### State Machine
 
-**Workflow 状态流转：**
+**Workflow State Transitions:**
 ```
 created → starting → ready → running → (paused) → merging → completed/failed
                                               ↓
                                           cancelled
 ```
 
-**Terminal 状态流转：**
+**Terminal State Transitions:**
 ```
 not_started → starting → waiting → working → completed
                                          ↓
                                       failed/cancelled
 ```
 
-### 核心服务
+### Core Services
 
-| 服务 | 职责 |
-|------|------|
-| **OrchestratorAgent** | 主 Agent，负责任务分发、进度监控、结果审核 |
-| **MessageBus** | 跨终端消息路由 |
-| **TerminalLauncher** | 终端进程启动与管理 |
-| **GitWatcher** | 监听 Git 事件（.git/refs/heads 变化） |
-| **CCSwitchService** | 模型配置切换（原子写入配置文件） |
-| **Workflow API + DB Models** | 工作流 CRUD 与状态管理（`routes/workflows.rs` + `db/models/workflow*.rs`） |
+| Service | Responsibility |
+|---------|----------------|
+| **OrchestratorAgent** | Main Agent, responsible for task distribution, progress monitoring, result review |
+| **MessageBus** | Cross-terminal message routing |
+| **TerminalLauncher** | Terminal process startup and management |
+| **GitWatcher** | Monitor Git events (.git/refs/heads changes) |
+| **CCSwitchService** | Model configuration switching (atomic config file writes) |
+| **Workflow API + DB Models** | Workflow CRUD and state management (`routes/workflows.rs` + `db/models/workflow*.rs`) |
 
 ---
 
-## 支持的 CLI
+## Supported CLIs
 
-| CLI | 名称 | 检测命令 | 配置文件路径 |
-|-----|------|----------|--------------|
+| CLI | Name | Detection Command | Config File Path |
+|-----|------|-------------------|------------------|
 | Claude Code | Claude Code | `claude --version` | `~/.claude/settings.json` |
 | Gemini CLI | Gemini | `gemini --version` | `~/.gemini/.env` |
 | Codex | Codex | `codex --version` | `~/.codex/auth.json`, `~/.codex/config.toml` |
@@ -513,97 +517,97 @@ not_started → starting → waiting → working → completed
 | Droid | Droid | `droid --version` | - |
 | Opencode | Opencode | `opencode --version` | - |
 
-### 模型切换
+### Model Switching
 
-CC-Switch 提供原子写入机制，安全切换 CLI 模型配置：
+CC-Switch provides atomic write mechanism for safe CLI model configuration switching:
 
-- ✅ 支持同时配置多个 CLI
-- ✅ 临时切换（单次工作流）
-- ✅ 永久切换（修改配置文件）
-- ✅ 自动备份原配置
-- ✅ 验证模型可用性
+- ✅ Support configuring multiple CLIs simultaneously
+- ✅ Temporary switching (single workflow)
+- ✅ Permanent switching (modify config files)
+- ✅ Automatic config backup
+- ✅ Model availability verification
 
 ---
 
-## 使用指南
+## Usage Guide
 
-### 创建工作流
+### Create Workflow
 
-1. 点击"新建工作流"
-2. 选择项目
-3. 配置基础信息
-4. 添加任务与终端
-5. 选择模型与 CLI
-6. 启动工作流
+1. Click "New Workflow"
+2. Select project
+3. Configure basic information
+4. Add tasks and terminals
+5. Select models and CLIs
+6. Start workflow
 
-### 运维操作
+### Operations
 
-对于生产环境部署、数据库管理、监控和故障排查，请参阅：
+For production deployment, database management, monitoring, and troubleshooting, see:
 
-- **运维手册：** [docs/ops/runbook.md](docs/ops/runbook.md)
-  - 启动服务器（开发/生产模式）
-  - 数据库管理（备份/恢复/迁移）
-  - 监控与性能调优
-  - 升级和回滚流程
+- **Operations Manual:** [docs/ops/runbook.md](docs/ops/runbook.md)
+  - Start server (development/production mode)
+  - Database management (backup/restore/migration)
+  - Monitoring and performance tuning
+  - Upgrade and rollback procedures
 
-- **故障排查：** [docs/ops/troubleshooting.md](docs/ops/troubleshooting.md)
-  - 服务器无法启动
-  - 工作流卡住
-  - API 密钥问题
-  - 终端无输出
-  - 数据库锁定
+- **Troubleshooting:** [docs/ops/troubleshooting.md](docs/ops/troubleshooting.md)
+  - Server won't start
+  - Workflow stuck
+  - API key issues
+  - Terminal no output
+  - Database locked
 
-### 测试与构建
+### Testing & Building
 
 ```bash
-# 运行测试
+# Run tests
 cargo test --workspace
 cd frontend && npm run test:run && cd ..
 
-# 构建生产版本（前端 + 后端）
+# Build production version (frontend + backend)
 cd frontend && npm run build && cd ..
 cargo build --release -p server
 
-# 类型生成
+# Type generation
 pnpm run generate-types
 pnpm run generate-types:check
 ```
 
 ---
 
-## 文档
+## Documentation
 
-### 实施计划
+### Implementation Plans
 
-- [总体概览](docs/plans/00-overview.md)
-- [阶段计划目录](docs/plans)
-- [最新进度追踪（以此为准）](docs/plans/TODO.md)
+- [Overall Overview](docs/plans/00-overview.md)
+- [Phase Plans Directory](docs/plans)
+- [Latest Progress Tracking (authoritative)](docs/plans/TODO.md)
 
-### 核心设计文档
+### Core Design Documents
 
-- [Orchestrator 架构设计](docs/plans/2026-01-16-orchestrator-design.md)
-- [GitCortex 详细实现计划](docs/plans/2026-01-16-gitcortex-implementation.md)
+- [Orchestrator Architecture Design](docs/plans/2026-01-16-orchestrator-design.md)
+- [GitCortex Detailed Implementation Plan](docs/plans/2026-01-16-gitcortex-implementation.md)
 
-### 进度追踪
+### Progress Tracking
 
-- [开发进度追踪表](docs/plans/TODO.md)
+- [Development Progress Tracker](docs/plans/TODO.md)
 
 ---
 
-## 常见问题
+## FAQ
 
-### Q: 编译失败，提示找不到 nightly 版本？
+### Q: Compilation fails, can't find nightly version?
 
-确保安装了正确的 Rust 版本：
+Ensure correct Rust version is installed:
 
 ```bash
 rustup install nightly-2025-12-04
 rustup default nightly-2025-12-04
 ```
 
-### Q: 创建 Workflow 失败，提示加密密钥错误？
+### Q: Workflow creation fails, encryption key error?
 
-确保设置了环境变量：
+Ensure environment variable is set:
 
 ```bash
 # Windows PowerShell
@@ -613,9 +617,9 @@ $env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
 ```
 
-### Q: CLI 检测失败，显示未安装？
+### Q: CLI detection fails, shows not installed?
 
-确保 CLI 已安装并可在 PATH 中找到：
+Ensure CLI is installed and findable in PATH:
 
 ```bash
 claude --version
@@ -623,9 +627,9 @@ gemini --version
 codex --version
 ```
 
-### Q: 测试时出现 Browserslist 警告？
+### Q: Browserslist warning during testing?
 
-更新 Browserslist 数据库：
+Update Browserslist database:
 
 ```bash
 pnpm dlx browserslist@latest --update-db
@@ -633,21 +637,21 @@ pnpm dlx browserslist@latest --update-db
 
 ---
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
-### 开发规范
+### Development Standards
 
-- **Rust 代码**：遵循 `cargo fmt` 和 `cargo clippy` 规范
-- **前端代码**：使用 ESLint + Prettier，严格模式
-- **提交信息**：使用约定式提交（Conventional Commits）
+- **Rust Code**: Follow `cargo fmt` and `cargo clippy` standards
+- **Frontend Code**: Use ESLint + Prettier, strict mode
+- **Commit Messages**: Use Conventional Commits
 
-### 代码质量标准
+### Code Quality Standards
 
-当前质量状态以 `docs/plans/TODO.md` 为准：**100/100 (S级)**。
+Current quality status per `docs/plans/TODO.md`: **100/100 (S-tier)**.
 
-建议在每次发版前执行：
+Recommended before each release:
 
 - `cargo check --workspace`
 - `cargo test --workspace`
@@ -656,28 +660,28 @@ pnpm dlx browserslist@latest --update-db
 
 ---
 
-## 致谢
+## Acknowledgments
 
-本项目基于以下优秀的开源项目：
+This project is based on the following excellent open source projects:
 
-- **[Vibe Kanban](https://github.com/BloopAI/vibe-kanban)** - AI 编码代理任务管理平台 (Apache 2.0)
-- **[CC-Switch](https://github.com/farion1231/cc-switch)** - Claude Code/Codex/Gemini CLI 配置切换工具 (MIT)
+- **[Vibe Kanban](https://github.com/BloopAI/vibe-kanban)** - AI coding agent task management platform (Apache 2.0)
+- **[CC-Switch](https://github.com/farion1231/cc-switch)** - Claude Code/Codex/Gemini CLI configuration switching tool (MIT)
 
-感谢这些项目的作者和贡献者！
+Thanks to the authors and contributors of these projects!
 
 ---
 
-## 许可证
+## License
 
-本项目遵循上游项目的开源协议：
+This project follows the open source licenses of upstream projects:
 
-- Vibe Kanban 部分：Apache License 2.0
-- CC-Switch 部分：MIT License
+- Vibe Kanban portion: Apache License 2.0
+- CC-Switch portion: MIT License
 
-详见 [LICENSE](LICENSE) 文件。
+See [LICENSE](LICENSE) file for details.
 
 ---
 
 <p align="center">
-  <em>GitCortex - 让 AI 代理协同工作</em>
+  <em>GitCortex - Making AI Agents Work Together</em>
 </p>
