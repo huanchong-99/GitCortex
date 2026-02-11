@@ -690,6 +690,15 @@ impl CCSwitchService {
                     }
                 }
 
+                // Determine API key source before moving values
+                let api_key_source = if custom_api_key.is_some() {
+                    "terminal custom_api_key"
+                } else if fallback_api_key.is_some() {
+                    "fallback (global config or orchestrator)"
+                } else {
+                    "none"
+                };
+
                 let api_key = custom_api_key.or(fallback_api_key).ok_or_else(|| {
                     if terminal.custom_base_url.is_some() {
                         anyhow::anyhow!(
@@ -701,6 +710,16 @@ impl CCSwitchService {
                         )
                     }
                 })?;
+
+                // Log API key source for debugging
+                tracing::info!(
+                    terminal_id = %terminal.id,
+                    api_key_source = api_key_source,
+                    has_custom_base_url = terminal.custom_base_url.is_some(),
+                    custom_base_url = ?terminal.custom_base_url,
+                    api_key_prefix = &api_key[..api_key.len().min(10)],
+                    "Resolved API key for Claude Code terminal"
+                );
 
                 // Create config.json to skip authentication
                 if let Err(e) = create_claude_config(&claude_home, &api_key) {
