@@ -49,3 +49,8 @@ frontend/dist/
 
 # Test data with API keys
 TEST_DATA.md
+docs/TEST_DATA.md
+
+# Personal AI local configuration
+AGENTS.md
+.claude/
