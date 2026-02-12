@@ -440,30 +440,37 @@ impl PromptWatcher {
                 0.95,
             );
 
-            state.last_detection = Some(Instant::now());
-            state.state_machine.on_prompt_detected(detected_prompt);
-            state.state_machine.on_response_sent(decision.clone());
-            state.detector.clear_buffer();
+            if !state.state_machine.should_process(&detected_prompt) {
+                tracing::debug!(
+                    terminal_id = %state.terminal_id,
+                    "Skipping duplicate chunk-level custom API key fallback injection"
+                );
+            } else {
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
 
-            let response_terminal_id = state.terminal_id.clone();
-            let response_session_id = state.session_id.clone();
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
 
-            tracing::info!(
-                terminal_id = %response_terminal_id,
-                session_id = %response_session_id,
-                "Detected custom API key selection prompt (chunk); sending ArrowUp + Enter to choose Yes"
-            );
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected custom API key selection prompt (chunk); sending ArrowUp + Enter to choose Yes"
+                );
 
-            drop(terminals);
-            self.message_bus
-                .publish_terminal_input(
-                    &response_terminal_id,
-                    &response_session_id,
-                    "\u{1b}[A\n",
-                    Some(decision),
-                )
-                .await;
-            return;
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "\u{1b}[A\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
         }
 
         // Chunk-level fallback: Codex confirmation prompt can appear inside
@@ -483,30 +490,37 @@ impl PromptWatcher {
                 0.95,
             );
 
-            state.last_detection = Some(Instant::now());
-            state.state_machine.on_prompt_detected(detected_prompt);
-            state.state_machine.on_response_sent(decision.clone());
-            state.detector.clear_buffer();
+            if !state.state_machine.should_process(&detected_prompt) {
+                tracing::debug!(
+                    terminal_id = %state.terminal_id,
+                    "Skipping duplicate chunk-level Codex confirmation fallback injection"
+                );
+            } else {
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
 
-            let response_terminal_id = state.terminal_id.clone();
-            let response_session_id = state.session_id.clone();
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
 
-            tracing::info!(
-                terminal_id = %response_terminal_id,
-                session_id = %response_session_id,
-                "Detected Codex apply_patch confirmation; sending direct auto-yes fallback"
-            );
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected Codex apply_patch confirmation; sending direct auto-yes fallback"
+                );
 
-            drop(terminals);
-            self.message_bus
-                .publish_terminal_input(
-                    &response_terminal_id,
-                    &response_session_id,
-                    "y",
-                    Some(decision),
-                )
-                .await;
-            return;
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "y",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
         }
 
         // Process each line
@@ -531,6 +545,14 @@ impl PromptWatcher {
                     normalized_line.clone(),
                     0.95,
                 );
+
+                if !state.state_machine.should_process(&detected_prompt) {
+                    tracing::debug!(
+                        terminal_id = %state.terminal_id,
+                        "Skipping duplicate line-level custom API key fallback injection"
+                    );
+                    continue;
+                }
 
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
@@ -572,6 +594,14 @@ impl PromptWatcher {
                     normalized_line.clone(),
                     0.95,
                 );
+
+                if !state.state_machine.should_process(&detected_prompt) {
+                    tracing::debug!(
+                        terminal_id = %state.terminal_id,
+                        "Skipping duplicate bypass-permissions fallback injection"
+                    );
+                    continue;
+                }
 
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
@@ -964,6 +994,111 @@ mod tests {
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_codex_apply_patch_confirmation_dedupes_consecutive_fallback() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        let prompt_text = "Confirming apply_patch approach (esc to interrupt)";
+
+        watcher.process_output("term-1", prompt_text).await;
+
+        let first_event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected first terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match first_event {
+            BusMessage::TerminalInput { input, .. } => assert_eq!(input, "y"),
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            let state = terminals.get_mut("term-1").expect("terminal state should exist");
+            state.last_detection =
+                Some(Instant::now() - Duration::from_millis(PROMPT_DEBOUNCE_MS + 1));
+        }
+
+        watcher.process_output("term-1", prompt_text).await;
+
+        let second_event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await;
+        assert!(
+            second_event.is_err(),
+            "duplicate codex fallback injection should be skipped"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_output_bypass_fallback_dedupes_consecutive_injection() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        let bypass_prompt =
+            "Interrupted: bypass permissions on (shift+tab to cycle), press ctrl-c again to exit";
+
+        watcher.process_output("term-1", bypass_prompt).await;
+
+        let first_event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected first terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match first_event {
+            BusMessage::TerminalInput { input, .. } => assert_eq!(input, "\n"),
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            let state = terminals.get_mut("term-1").expect("terminal state should exist");
+            state.last_detection =
+                Some(Instant::now() - Duration::from_millis(PROMPT_DEBOUNCE_MS + 1));
+        }
+
+        watcher.process_output("term-1", bypass_prompt).await;
+
+        let second_event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await;
+        assert!(
+            second_event.is_err(),
+            "duplicate bypass fallback injection should be skipped"
+        );
     }
 
     #[tokio::test]

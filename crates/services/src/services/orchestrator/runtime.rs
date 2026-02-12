@@ -113,7 +113,7 @@ impl OrchestratorRuntime {
     ///
     /// Returns None if:
     /// - Project not found
-    /// - Project has no default_agent_working_dir
+    /// - Project has no usable repo path
     /// - Path is not a valid git repository
     async fn try_start_git_watcher(
         &self,
@@ -135,10 +135,24 @@ impl OrchestratorRuntime {
                 }
             };
 
-        // Get repo path from project
-        let Some(repo_path) = project.default_agent_working_dir.clone() else {
+        // Resolve repo path: prefer project.default_agent_working_dir, then fallback to project repos
+        let repo_path = match project.default_agent_working_dir.clone() {
+            Some(path) if !path.trim().is_empty() => Some(path),
+            _ => {
+                db::models::project_repo::ProjectRepo::find_repos_for_project(
+                    &self.db.pool,
+                    project.id,
+                )
+                .await?
+                .into_iter()
+                .map(|repo| repo.path.to_string_lossy().into_owned())
+                .find(|path| !path.trim().is_empty())
+            }
+        };
+
+        let Some(repo_path) = repo_path else {
             warn!(
-                "Project {} has no default_agent_working_dir; git watcher disabled for workflow {}",
+                "Project {} has no usable repo path (default_agent_working_dir/project_repos); git watcher disabled for workflow {}",
                 project.id, workflow_id
             );
             return Ok(None);
@@ -725,6 +739,175 @@ mod tests {
         (runtime, workflow_id)
     }
 
+    async fn setup_runtime_for_git_watcher_path_tests() -> Arc<OrchestratorRuntime> {
+        let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        sqlx::query(
+            r#"
+            CREATE TABLE projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                default_agent_working_dir TEXT,
+                remote_project_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            CREATE TABLE repos (
+                id TEXT PRIMARY KEY,
+                path TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                setup_script TEXT,
+                cleanup_script TEXT,
+                copy_files TEXT,
+                parallel_setup_script INTEGER NOT NULL DEFAULT 0,
+                dev_server_script TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            CREATE TABLE project_repos (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                repo_id TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let db = Arc::new(DBService { pool: pool.clone() });
+        let message_bus = Arc::new(MessageBus::new(1000));
+        let config = RuntimeConfig {
+            max_concurrent_workflows: 10,
+            message_bus_capacity: 1000,
+            git_watch_poll_interval_ms: 10,
+        };
+        Arc::new(OrchestratorRuntime::with_config(db, message_bus, config))
+    }
+
+    async fn insert_project_repo_fixture(
+        pool: &sqlx::SqlitePool,
+        project_id: Uuid,
+        default_agent_working_dir: Option<&str>,
+        repo_path: &str,
+    ) {
+        let repo_id = Uuid::new_v4();
+
+        sqlx::query(
+            r#"
+            INSERT INTO projects (
+                id,
+                name,
+                default_agent_working_dir,
+                remote_project_id,
+                created_at,
+                updated_at
+            )
+            VALUES ($1, $2, $3, NULL, datetime('now'), datetime('now'))
+            "#,
+        )
+        .bind(project_id)
+        .bind(format!("Project-{project_id}"))
+        .bind(default_agent_working_dir)
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            INSERT INTO repos (
+                id,
+                path,
+                name,
+                display_name,
+                setup_script,
+                cleanup_script,
+                copy_files,
+                parallel_setup_script,
+                dev_server_script,
+                created_at,
+                updated_at
+            )
+            VALUES ($1, $2, $3, $4, NULL, NULL, NULL, 0, NULL, datetime('now'), datetime('now'))
+            "#,
+        )
+        .bind(repo_id)
+        .bind(repo_path)
+        .bind("repo")
+        .bind("Repo")
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            INSERT INTO project_repos (id, project_id, repo_id)
+            VALUES ($1, $2, $3)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(project_id)
+        .bind(repo_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    fn build_workflow_for_project(project_id: Uuid) -> Workflow {
+        Workflow {
+            id: Uuid::new_v4().to_string(),
+            project_id,
+            name: "GitWatcher Path Resolution".to_string(),
+            description: None,
+            status: WORKFLOW_STATUS_READY.to_string(),
+            use_slash_commands: false,
+            orchestrator_enabled: false,
+            orchestrator_api_type: None,
+            orchestrator_base_url: None,
+            orchestrator_api_key: None,
+            orchestrator_model: None,
+            error_terminal_enabled: false,
+            error_terminal_cli_id: None,
+            error_terminal_model_id: None,
+            merge_terminal_cli_id: "merge-cli".to_string(),
+            merge_terminal_model_id: "merge-model".to_string(),
+            target_branch: "main".to_string(),
+            ready_at: Some(Utc::now()),
+            started_at: None,
+            completed_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    async fn shutdown_git_watcher(handle: GitWatcherHandle) {
+        handle.watcher.stop();
+        let mut task_handle = handle.task_handle;
+        if timeout(Duration::from_secs(1), &mut task_handle)
+            .await
+            .is_err()
+        {
+            task_handle.abort();
+            task_handle.await.ok();
+        }
+    }
+
     #[tokio::test]
     async fn test_start_workflow_blocks_concurrent_duplicate_start() {
         let (runtime, workflow_id) = setup_runtime_with_ready_workflow().await;
@@ -840,5 +1023,76 @@ mod tests {
         );
 
         runtime.stop_workflow(&workflow_id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_try_start_git_watcher_falls_back_to_project_repo_when_default_dir_missing_or_blank(
+    ) {
+        let runtime = setup_runtime_for_git_watcher_path_tests().await;
+
+        for default_agent_working_dir in [None, Some("   ")] {
+            let repo_dir = tempfile::tempdir().unwrap();
+            std::fs::create_dir_all(repo_dir.path().join(".git")).unwrap();
+            let repo_path = repo_dir.path().to_string_lossy().into_owned();
+
+            let project_id = Uuid::new_v4();
+            insert_project_repo_fixture(
+                &runtime.db.pool,
+                project_id,
+                default_agent_working_dir,
+                repo_path.as_str(),
+            )
+            .await;
+
+            let workflow = build_workflow_for_project(project_id);
+            let watcher = runtime
+                .try_start_git_watcher(&workflow.id, &workflow)
+                .await
+                .unwrap();
+
+            assert!(
+                watcher.is_some(),
+                "GitWatcher should start using project_repos fallback when default_agent_working_dir is {:?}",
+                default_agent_working_dir
+            );
+
+            if let Some(handle) = watcher {
+                shutdown_git_watcher(handle).await;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_try_start_git_watcher_keeps_non_empty_default_dir_behavior() {
+        let runtime = setup_runtime_for_git_watcher_path_tests().await;
+
+        let fallback_repo_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(fallback_repo_dir.path().join(".git")).unwrap();
+        let fallback_repo_path = fallback_repo_dir.path().to_string_lossy().into_owned();
+
+        let invalid_default_path = std::env::temp_dir()
+            .join(format!("gitwatcher-missing-{}", Uuid::new_v4()))
+            .to_string_lossy()
+            .into_owned();
+
+        let project_id = Uuid::new_v4();
+        insert_project_repo_fixture(
+            &runtime.db.pool,
+            project_id,
+            Some(invalid_default_path.as_str()),
+            fallback_repo_path.as_str(),
+        )
+        .await;
+
+        let workflow = build_workflow_for_project(project_id);
+        let watcher = runtime
+            .try_start_git_watcher(&workflow.id, &workflow)
+            .await
+            .unwrap();
+
+        assert!(
+            watcher.is_none(),
+            "Non-empty default_agent_working_dir should remain primary and not fallback to project_repos"
+        );
     }
 }
