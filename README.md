@@ -452,6 +452,44 @@ Detailed progress tracking: [docs/plans/TODO.md](docs/plans/TODO.md)
 
 ---
 
+## Current Real-World Validation Status
+
+### Completed Development (Verified)
+
+- The main agent can orchestrate and call multiple AI CLIs in one workflow.
+- The current verified test setup uses three AI terminals:
+  - Claude Code terminal with `glm-4.7`
+  - Claude Code terminal with `claude-opus-4.6`
+  - Codex terminal with `gpt-5.3-codex-xhigh`
+
+### Not Completed / Not Fully Verified Yet
+
+1. Multi-task parallel execution has not been fully tested.
+2. Terminal count stress limit has not been tested yet (custom terminal count is supported).
+3. Frontend UI issues are known and not fixed yet.
+4. Merge terminal and error-resolution terminal flow has not been fully tested.
+5. Task completion notification has not been developed.
+6. Communication software integration has not been developed.
+7. Slash command system has not been fully tested (currently likely unavailable or unstable).
+8. Docker deployment has not been developed yet (open deployment documentation is already drafted).
+
+### Tested End-to-End Demo Task
+
+The validated demo task is a very simple local mini message board with separated frontend and backend:
+
+- Backend: Python
+- Frontend: Single HTML file
+- Behavior: users input text on the page, click save, content is written into a local `.json` file, and the saved messages are displayed in a live-updated list below.
+
+### Project Positioning and Collaboration
+
+- This demo is intentionally simple and mainly proves that the full workflow can run through end-to-end.
+- Complex tasks and long-run stability still need more validation.
+- Current codebase is fully AI-generated.
+- Community PRs are welcome. To avoid duplicated work, please open an issue before submitting a PR to claim the feature/task.
+
+---
+
 ## Architecture Design
 
 ### Data Model
