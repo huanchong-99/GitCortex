@@ -135,6 +135,7 @@ async fn test_terminal_launch_creates_session() {
         role_description: None,
         order_index: 0,
         status: "not_started".to_string(),
+        auto_confirm: true,
         process_id: None,
         pty_session_id: None,
         vk_session_id: None,

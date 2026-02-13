@@ -80,7 +80,7 @@ async fn setup_db() -> Arc<DBService> {
     Arc::new(DBService { pool })
 }
 
-async fn seed_project(db: &DBService) -> String {
+async fn seed_project(db: &DBService) -> Uuid {
     let project_id = Uuid::new_v4();
     sqlx::query("INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
         .bind(project_id)
@@ -90,7 +90,7 @@ async fn seed_project(db: &DBService) -> String {
         .execute(&db.pool)
         .await
         .unwrap();
-    project_id.to_string()
+    project_id
 }
 
 /// Assert that CLI type and model config exist in database
@@ -108,7 +108,7 @@ async fn assert_cli_model_exists(db: &DBService, cli_type_id: &str, model_config
     );
 }
 
-async fn create_ready_workflow(db: &DBService, project_id: &str) -> String {
+async fn create_ready_workflow(db: &DBService, project_id: Uuid) -> String {
     let workflow_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -200,6 +200,7 @@ async fn create_terminal(db: &DBService, task_id: &str, order_index: i32) -> Str
         role_description: None,
         order_index,
         status: "not_started".to_string(),
+        auto_confirm: true,
         process_id: None,
         pty_session_id: None,
         session_id: None,
@@ -270,7 +271,7 @@ async fn test_workflow_with_tasks_and_terminals() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Task A", 0).await;
     let terminal_id = create_terminal(&db, &task_id, 0).await;
 
@@ -369,7 +370,7 @@ async fn test_terminal_status_update_on_failure() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Task A", 0).await;
     let terminal_id = create_terminal(&db, &task_id, 0).await;
 
@@ -393,7 +394,7 @@ async fn test_multiple_terminals_in_task() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Multi-Terminal Task", 0).await;
 
     // Create 3 terminals
@@ -416,7 +417,7 @@ async fn test_workflow_task_status_transitions() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Status Test Task", 0).await;
 
     // Initial status should be pending
@@ -467,11 +468,11 @@ async fn test_workflow_find_by_project() {
     let project_id = seed_project(&db).await;
 
     // Create multiple workflows
-    let _wf1 = create_ready_workflow(&db, &project_id).await;
-    let _wf2 = create_ready_workflow(&db, &project_id).await;
+    let _wf1 = create_ready_workflow(&db, project_id).await;
+    let _wf2 = create_ready_workflow(&db, project_id).await;
 
     // Find workflows by project
-    let workflows = Workflow::find_by_project(&db.pool, &project_id)
+    let workflows = Workflow::find_by_project(&db.pool, project_id)
         .await
         .unwrap();
     assert_eq!(workflows.len(), 2);
@@ -483,7 +484,7 @@ async fn test_terminal_last_commit_update() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Commit Test Task", 0).await;
     let terminal_id = create_terminal(&db, &task_id, 0).await;
 
@@ -519,7 +520,7 @@ async fn test_terminal_recovery_marks_waiting_as_failed() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Recovery Test Task", 0).await;
     let terminal_id = create_terminal(&db, &task_id, 0).await;
 
@@ -572,7 +573,7 @@ async fn test_workflow_recovery_with_mixed_terminal_states() {
     let db = setup_db().await;
     let project_id = seed_project(&db).await;
 
-    let workflow_id = create_ready_workflow(&db, &project_id).await;
+    let workflow_id = create_ready_workflow(&db, project_id).await;
     let task_id = create_workflow_task(&db, &workflow_id, "Mixed State Task", 0).await;
 
     // Create 3 terminals with different states

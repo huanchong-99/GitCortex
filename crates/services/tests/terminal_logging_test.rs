@@ -6,7 +6,6 @@ use db::{
     models::{Terminal, terminal::TerminalLog},
 };
 use services::services::terminal::process::TerminalLogger;
-use uuid::Uuid;
 
 async fn setup_db() -> Arc<DBService> {
     use std::str::FromStr;
@@ -91,6 +90,7 @@ async fn create_terminal(db: &DBService) -> String {
         role_description: None,
         order_index: 0,
         status: "running".to_string(),
+        auto_confirm: true,
         process_id: None,
         pty_session_id: None,
         vk_session_id: None,

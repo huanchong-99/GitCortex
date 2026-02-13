@@ -4,42 +4,9 @@
 use std::time::Duration;
 
 use services::services::terminal::process::ProcessManager;
-use tokio::process::Command;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Helper function to create a long-running test process
-    fn long_running_cmd() -> Command {
-        #[cfg(unix)]
-        {
-            let mut cmd = Command::new("sleep");
-            cmd.arg("10");
-            cmd
-        }
-        #[cfg(windows)]
-        {
-            let mut cmd = Command::new("timeout");
-            cmd.args(["/t", "10"]);
-            cmd
-        }
-    }
-
-    /// Helper function to create a quick-exit test process
-    fn quick_exit_cmd() -> Command {
-        #[cfg(unix)]
-        {
-            let mut cmd = Command::new("true");
-            cmd
-        }
-        #[cfg(windows)]
-        {
-            let mut cmd = Command::new("cmd");
-            cmd.args(["/C", "exit 0"]);
-            cmd
-        }
-    }
 
     #[tokio::test]
     async fn test_terminal_timeout_cleanup() {
@@ -47,18 +14,26 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        // Spawn a quick-exit process
-        let result = manager
-            .spawn("test-terminal", quick_exit_cmd(), temp_dir.path())
-            .await;
+        #[cfg(unix)]
+        let shell = "sh";
+        #[cfg(windows)]
+        let shell = "cmd.exe";
 
-        assert!(result.is_ok(), "Spawn should succeed");
+        // Spawn a process, kill by PID, then verify cleanup removes dead tracking.
+        let handle = manager
+            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
+            .await
+            .expect("Spawn should succeed");
 
         // Verify process is tracked
         let running_before = manager.list_running().await;
         assert_eq!(running_before.len(), 1, "Process should be tracked");
 
-        // Wait for process to exit
+        manager
+            .kill(handle.pid)
+            .expect("Process kill by PID should succeed");
+
+        // Wait for process to exit after SIGTERM/taskkill
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Cleanup should remove dead processes
@@ -74,9 +49,14 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        // Spawn long-running process
-        let _ = manager
-            .spawn("long-running", long_running_cmd(), temp_dir.path())
+        #[cfg(unix)]
+        let shell = "sh";
+        #[cfg(windows)]
+        let shell = "cmd.exe";
+
+        // Spawn process
+        let _handle = manager
+            .spawn_pty("long-running", shell, temp_dir.path(), 80, 24)
             .await;
 
         // Should be running
@@ -89,8 +69,10 @@ mod tests {
             "Non-existent process should not be running"
         );
 
-        // Cleanup is not needed for long-running process
-        // It will be killed when the test completes
+        manager
+            .kill_terminal("long-running")
+            .await
+            .expect("Terminal kill should succeed");
     }
 
     #[tokio::test]
@@ -99,16 +81,19 @@ mod tests {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
 
-        // Spawn multiple quick-exit processes
+        #[cfg(unix)]
+        let shell = "sh";
+        #[cfg(windows)]
+        let shell = "cmd.exe";
+
+        let mut pids = Vec::new();
+        // Spawn multiple processes
         for i in 0..3 {
-            let result = manager
-                .spawn(
-                    &format!("terminal-{}", i),
-                    quick_exit_cmd(),
-                    temp_dir.path(),
-                )
+            let handle = manager
+                .spawn_pty(&format!("terminal-{}", i), shell, temp_dir.path(), 80, 24)
                 .await;
-            assert!(result.is_ok(), "Spawn {} should succeed", i);
+            assert!(handle.is_ok(), "Spawn {} should succeed", i);
+            pids.push(handle.unwrap().pid);
         }
 
         assert_eq!(
@@ -117,7 +102,13 @@ mod tests {
             "All processes should be tracked"
         );
 
-        // Wait for processes to exit
+        for pid in pids {
+            manager
+                .kill(pid)
+                .expect("Process kill by PID should succeed");
+        }
+
+        // Wait for processes to exit after SIGTERM/taskkill
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Cleanup should remove all dead processes
