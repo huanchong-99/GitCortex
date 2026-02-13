@@ -10,9 +10,10 @@ use axum::{
 };
 use db::models::{
     CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
-    Workflow, WorkflowCommand, WorkflowTask, project::Project,
+    Workflow, WorkflowCommand, WorkflowTask,
+    project::Project,
+    workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest},
 };
-use db::models::workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -714,6 +715,14 @@ async fn delete_workflow(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<String>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    stop_workflow_runtime_if_running(
+        &deployment,
+        &workflow_id,
+        "deleting workflow",
+        "Failed to delete workflow",
+    )
+    .await?;
+    cleanup_workflow_terminals(&deployment, &workflow_id, "deleting workflow").await?;
     Workflow::delete(&deployment.db().pool, &workflow_id).await?;
     Ok(ResponseJson(ApiResponse::success(())))
 }
@@ -1161,8 +1170,8 @@ async fn start_workflow(
     // Self-heal for restarted backend: a workflow may still be `ready` while terminals were
     // reconciled to `not_started` (missing active PTY/session). Re-prepare before starting.
     if workflow.status == "ready" || workflow.status == "paused" {
-        let terminals = db::models::Terminal::find_by_workflow(&deployment.db().pool, &workflow_id)
-            .await?;
+        let terminals =
+            db::models::Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
 
         let needs_reprepare = terminals.iter().any(|terminal| {
             terminal.status != "waiting"
@@ -1293,33 +1302,15 @@ async fn stop_workflow(
         )));
     }
 
-    // Stop the orchestrator runtime if it's active
-    let runtime = deployment.orchestrator_runtime();
-    if runtime.is_running(&workflow_id).await {
-        runtime.stop_workflow(&workflow_id).await.map_err(|e| {
-            tracing::error!("Failed to stop workflow {}: {:?}", workflow_id, e);
-            ApiError::Internal("Failed to stop workflow".to_string())
-        })?;
-    }
-
-    // Stop all terminal process chains and cleanup prompt watcher registrations.
-    let terminals = Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
-    for terminal in &terminals {
-        if let Err(e) = deployment
-            .process_manager()
-            .kill_terminal(&terminal.id)
-            .await
-        {
-            tracing::warn!(
-                terminal_id = %terminal.id,
-                workflow_id = %workflow_id,
-                error = %e,
-                "Failed to kill terminal process while stopping workflow"
-            );
-        }
-
-        deployment.prompt_watcher().unregister(&terminal.id).await;
-    }
+    stop_workflow_runtime_if_running(
+        &deployment,
+        &workflow_id,
+        "stopping workflow",
+        "Failed to stop workflow",
+    )
+    .await?;
+    let terminals =
+        cleanup_workflow_terminals(&deployment, &workflow_id, "stopping workflow").await?;
 
     // Mark workflow as cancelled
     Workflow::update_status(&deployment.db().pool, &workflow_id, "cancelled").await?;
@@ -1332,7 +1323,7 @@ async fn stop_workflow(
         }
     }
 
-    // Mark all terminals as cancelled and clear process binding
+    // Mark all terminals as cancelled
     for terminal in &terminals {
         if terminal.status != "completed" {
             Terminal::update_status(&deployment.db().pool, &terminal.id, "cancelled").await?;
@@ -1346,6 +1337,55 @@ async fn stop_workflow(
     );
 
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+async fn stop_workflow_runtime_if_running(
+    deployment: &DeploymentImpl,
+    workflow_id: &str,
+    action: &str,
+    internal_error_message: &str,
+) -> Result<(), ApiError> {
+    let runtime = deployment.orchestrator_runtime();
+    if runtime.is_running(workflow_id).await {
+        runtime.stop_workflow(workflow_id).await.map_err(|e| {
+            tracing::error!(
+                workflow_id = %workflow_id,
+                action = action,
+                error = ?e,
+                "Failed to stop workflow runtime"
+            );
+            ApiError::Internal(internal_error_message.to_string())
+        })?;
+    }
+    Ok(())
+}
+
+async fn cleanup_workflow_terminals(
+    deployment: &DeploymentImpl,
+    workflow_id: &str,
+    action: &str,
+) -> Result<Vec<Terminal>, ApiError> {
+    let pool = &deployment.db().pool;
+    let terminals = Terminal::find_by_workflow(pool, workflow_id).await?;
+    for terminal in &terminals {
+        if let Err(e) = deployment
+            .process_manager()
+            .kill_terminal(&terminal.id)
+            .await
+        {
+            tracing::warn!(
+                terminal_id = %terminal.id,
+                workflow_id = %workflow_id,
+                action = action,
+                error = %e,
+                "Failed to kill terminal process during workflow cleanup"
+            );
+        }
+
+        deployment.prompt_watcher().unregister(&terminal.id).await;
+    }
+
+    Ok(terminals)
 }
 
 /// POST /api/workflows/recover

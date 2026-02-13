@@ -240,6 +240,13 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         return;
       }
 
+      if (startingTerminalIdsRef.current.has(selectedTerminalId)) {
+        console.info(
+          `Skip auto-restart for terminal ${selectedTerminalId} because restart is already in progress`
+        );
+        return;
+      }
+
       const attempts = restartAttemptsRef.current.get(selectedTerminalId) || 0;
       if (attempts >= MAX_RESTART_ATTEMPTS) {
         console.error(`Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for terminal ${selectedTerminalId}`);

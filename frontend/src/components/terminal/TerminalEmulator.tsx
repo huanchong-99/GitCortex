@@ -15,6 +15,8 @@ const logInfo = (...args: unknown[]) => {
 };
 
 const DISCONNECTED_HINT = 'Disconnected from terminal stream. Click Restart to reconnect.';
+const AUTO_RECONNECT_MAX_ATTEMPTS = 5;
+const AUTO_RECONNECT_BASE_DELAY_MS = 1000;
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
@@ -43,6 +45,10 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     const wsRef = useRef<WebSocket | null>(null);
     const pendingInputRef = useRef<string[]>([]);
     const terminalReadyRef = useRef(false);
+    const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const reconnectAttemptsRef = useRef(0);
+    const skipNextAutoReconnectRef = useRef(false);
+    const hasReportedTransportErrorRef = useRef(false);
     const [wsKey, setWsKey] = useState(0);
     const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
     const [disconnectHint, setDisconnectHint] = useState<string | null>(null);
@@ -57,6 +63,40 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       setDisconnectHint(hint ?? DISCONNECTED_HINT);
     }, []);
 
+    const clearReconnectTimer = useCallback(() => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    }, []);
+
+    const scheduleAutoReconnect = useCallback(() => {
+      if (!wsUrl || skipNextAutoReconnectRef.current) {
+        return;
+      }
+
+      if (reconnectTimerRef.current) {
+        return;
+      }
+
+      if (reconnectAttemptsRef.current >= AUTO_RECONNECT_MAX_ATTEMPTS) {
+        return;
+      }
+
+      const attempt = reconnectAttemptsRef.current + 1;
+      reconnectAttemptsRef.current = attempt;
+      const delay = AUTO_RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (!wsUrl) {
+          return;
+        }
+        markConnecting();
+        setWsKey((k) => k + 1);
+      }, delay);
+    }, [markConnecting, wsUrl]);
+
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
@@ -67,6 +107,10 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       },
       reconnect: () => {
         // Close existing connection and trigger reconnect
+        skipNextAutoReconnectRef.current = true;
+        reconnectAttemptsRef.current = 0;
+        hasReportedTransportErrorRef.current = false;
+        clearReconnectTimer();
         if (wsUrl) {
           markConnecting();
         } else {
@@ -79,7 +123,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         }
         setWsKey((k) => k + 1);
       },
-    }));
+    }), [clearReconnectTimer, markConnecting, wsUrl]);
 
     // Stable handlers
     const handleData = useCallback((data: string) => {
@@ -157,12 +201,17 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     // WebSocket connection
     useEffect(() => {
       if (!wsUrl || !terminalReadyRef.current) {
+        clearReconnectTimer();
+        reconnectAttemptsRef.current = 0;
+        hasReportedTransportErrorRef.current = false;
+        skipNextAutoReconnectRef.current = false;
         setConnectionState('idle');
         setDisconnectHint(null);
         return;
       }
 
       markConnecting();
+      skipNextAutoReconnectRef.current = false;
 
       // Basic validation
       if (!terminalId || !TERMINAL_ID_REGEX.test(terminalId)) {
@@ -176,6 +225,10 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
 
       ws.onopen = () => {
         if (!isActive) return;
+        clearReconnectTimer();
+        reconnectAttemptsRef.current = 0;
+        hasReportedTransportErrorRef.current = false;
+        skipNextAutoReconnectRef.current = false;
         setConnectionState('connected');
         setDisconnectHint(null);
         logInfo('Terminal WebSocket connected');
@@ -216,18 +269,28 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       ws.onerror = (error) => {
         if (isActive) {
           markDisconnected();
+          scheduleAutoReconnect();
         }
-        notifyError('Terminal WebSocket error', error);
+        if (!hasReportedTransportErrorRef.current) {
+          hasReportedTransportErrorRef.current = true;
+          notifyError('Terminal WebSocket error', error);
+        }
       };
 
       ws.onclose = (event?: CloseEvent) => {
+        const code = event?.code;
+        const isExpectedClose = code === 1000 || code === 1005;
+
         if (isActive) {
           const reason = event?.reason?.trim();
-          const code = event?.code;
           const showCode = typeof code === 'number' && code !== 1000 && code !== 1005;
           const detail = reason ? reason : showCode ? `code ${code}` : '';
           markDisconnected(detail ? `${DISCONNECTED_HINT} (${detail})` : DISCONNECTED_HINT);
+          if (!isExpectedClose && !skipNextAutoReconnectRef.current) {
+            scheduleAutoReconnect();
+          }
         }
+        skipNextAutoReconnectRef.current = false;
         logInfo('Terminal WebSocket closed');
       };
 
@@ -235,12 +298,22 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
 
       return () => {
         isActive = false;
+        clearReconnectTimer();
         if (wsRef.current === ws) {
           wsRef.current = null;
         }
         ws.close();
       };
-    }, [wsUrl, terminalId, notifyError, markConnecting, markDisconnected, wsKey]);
+    }, [
+      wsUrl,
+      terminalId,
+      notifyError,
+      markConnecting,
+      markDisconnected,
+      clearReconnectTimer,
+      scheduleAutoReconnect,
+      wsKey,
+    ]);
 
     const showConnectingHint = Boolean(wsUrl && connectionState === 'connecting');
 

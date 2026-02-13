@@ -7,7 +7,10 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -48,6 +51,10 @@ const READER_SHUTDOWN_TIMEOUT_SECS: u64 = 1;
 
 /// Graceful shutdown timeout for terminal logger task
 const LOGGER_SHUTDOWN_TIMEOUT_SECS: u64 = 2;
+/// Logger task timeout needs to include flush worker shutdown + final flush.
+const LOGGER_TASK_SHUTDOWN_TIMEOUT_SECS: u64 = LOGGER_SHUTDOWN_TIMEOUT_SECS * 2;
+/// SQLite error code for FOREIGN KEY constraint failed.
+const SQLITE_FOREIGN_KEY_CONSTRAINT_CODE: &str = "787";
 
 // ============================================================================
 // Spawn Configuration (Process Isolation)
@@ -376,8 +383,11 @@ impl ProcessManager {
             return;
         };
 
-        match tokio::time::timeout(Duration::from_secs(LOGGER_SHUTDOWN_TIMEOUT_SECS), &mut task)
-            .await
+        match tokio::time::timeout(
+            Duration::from_secs(LOGGER_TASK_SHUTDOWN_TIMEOUT_SECS),
+            &mut task,
+        )
+        .await
         {
             Ok(join_result) => {
                 if let Err(e) = join_result {
@@ -392,7 +402,7 @@ impl ProcessManager {
                 task.abort();
                 tracing::warn!(
                     terminal_id = %terminal_id,
-                    timeout_secs = LOGGER_SHUTDOWN_TIMEOUT_SECS,
+                    timeout_secs = LOGGER_TASK_SHUTDOWN_TIMEOUT_SECS,
                     "Terminal logger task graceful shutdown timed out, aborted"
                 );
             }
@@ -1172,6 +1182,7 @@ impl ProcessManager {
                 }
             }
 
+            logger_for_shutdown.stop_flush_task().await;
             if let Err(e) = logger_for_shutdown.flush().await {
                 tracing::warn!(
                     terminal_id = %terminal_id_owned,
@@ -1181,23 +1192,28 @@ impl ProcessManager {
             }
         });
 
-        let mut processes = self.processes.write().await;
-        let tracked = match processes.get_mut(terminal_id) {
-            Some(tracked) => tracked,
-            None => {
-                let _ = shutdown_tx.send(());
-                logger_task.abort();
-                return Err(anyhow::anyhow!("Terminal not found: {terminal_id}"));
-            }
+        let (existing_shutdown, existing_task) = {
+            let mut processes = self.processes.write().await;
+            let tracked = match processes.get_mut(terminal_id) {
+                Some(tracked) => tracked,
+                None => {
+                    drop(processes);
+                    Self::stop_logger_task_gracefully(
+                        terminal_id,
+                        Some(shutdown_tx),
+                        Some(logger_task),
+                    )
+                    .await;
+                    return Err(anyhow::anyhow!("Terminal not found: {terminal_id}"));
+                }
+            };
+            let existing_shutdown = tracked.logger_shutdown_tx.take();
+            let existing_task = tracked.logger_task.take();
+            tracked.logger_shutdown_tx = Some(shutdown_tx);
+            tracked.logger_task = Some(logger_task);
+            (existing_shutdown, existing_task)
         };
-        if let Some(existing_shutdown) = tracked.logger_shutdown_tx.take() {
-            let _ = existing_shutdown.send(());
-        }
-        if let Some(existing_task) = tracked.logger_task.take() {
-            existing_task.abort();
-        }
-        tracked.logger_shutdown_tx = Some(shutdown_tx);
-        tracked.logger_task = Some(logger_task);
+        Self::stop_logger_task_gracefully(terminal_id, existing_shutdown, existing_task).await;
         tracing::debug!(terminal_id = %terminal_id, log_type = %log_type, "Attached terminal logger to output fanout");
         Ok(())
     }
@@ -1226,6 +1242,9 @@ pub struct TerminalLogger {
     db: Arc<DBService>,
     terminal_id: String,
     log_type: String,
+    flush_task: Arc<Mutex<Option<JoinHandle<()>>>>,
+    flush_shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+    persistence_disabled: Arc<AtomicBool>,
 }
 
 impl Clone for TerminalLogger {
@@ -1238,6 +1257,33 @@ impl Clone for TerminalLogger {
             db: Arc::clone(&self.db),
             terminal_id: self.terminal_id.clone(),
             log_type: self.log_type.clone(),
+            flush_task: Arc::clone(&self.flush_task),
+            flush_shutdown_tx: Arc::clone(&self.flush_shutdown_tx),
+            persistence_disabled: Arc::clone(&self.persistence_disabled),
+        }
+    }
+}
+
+impl Drop for TerminalLogger {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.flush_shutdown_tx) != 1 {
+            return;
+        }
+
+        match self.flush_shutdown_tx.lock() {
+            Ok(mut shutdown_tx) => {
+                if let Some(tx) = shutdown_tx.take() {
+                    let _ = tx.send(());
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %self.terminal_id,
+                    log_type = %self.log_type,
+                    error = %e,
+                    "Terminal logger flush shutdown lock poisoned on drop"
+                );
+            }
         }
     }
 }
@@ -1273,6 +1319,9 @@ impl TerminalLogger {
             db,
             terminal_id: terminal_id.into(),
             log_type: log_type.into(),
+            flush_task: Arc::new(Mutex::new(None)),
+            flush_shutdown_tx: Arc::new(Mutex::new(None)),
+            persistence_disabled: Arc::new(AtomicBool::new(false)),
         }
         .start_flush_task()
     }
@@ -1313,8 +1362,15 @@ impl TerminalLogger {
         db: &DBService,
         terminal_id: &str,
         log_type: &str,
+        persistence_disabled: &Arc<AtomicBool>,
     ) -> anyhow::Result<()> {
         let _flush_guard = flush_lock.lock().await;
+
+        if persistence_disabled.load(Ordering::Relaxed) {
+            let mut buffer = buffer.write().await;
+            buffer.clear();
+            return Ok(());
+        }
 
         let entries = {
             let buffer = buffer.read().await;
@@ -1324,7 +1380,31 @@ impl TerminalLogger {
             buffer.clone()
         };
 
-        Self::persist_entries(db, terminal_id, log_type, &entries).await?;
+        if let Err(error) = Self::persist_entries(db, terminal_id, log_type, &entries).await {
+            if Self::is_sqlite_foreign_key_violation(&error) {
+                let dropped_entries = {
+                    let mut buffer = buffer.write().await;
+                    let dropped = entries.len().min(buffer.len());
+                    if dropped > 0 {
+                        buffer.drain(..dropped);
+                    }
+                    dropped
+                };
+
+                let first_disable = !persistence_disabled.swap(true, Ordering::Relaxed);
+                if first_disable {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        log_type = %log_type,
+                        dropped_entries = dropped_entries,
+                        error = %error,
+                        "Terminal logger disabled after foreign-key violation (SQLite code 787)"
+                    );
+                }
+                return Ok(());
+            }
+            return Err(error);
+        }
 
         let mut buffer = buffer.write().await;
         let drained = entries.len().min(buffer.len());
@@ -1342,29 +1422,140 @@ impl TerminalLogger {
         let db = Arc::clone(&self.db);
         let terminal_id = self.terminal_id.clone();
         let log_type = self.log_type.clone();
-
-        tokio::spawn(async move {
+        let persistence_disabled = Arc::clone(&self.persistence_disabled);
+        let (flush_shutdown_tx, mut flush_shutdown_rx) = oneshot::channel::<()>();
+        let flush_task = tokio::spawn(async move {
             let mut interval =
                 tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
             loop {
-                interval.tick().await;
-                if let Err(e) =
-                    Self::flush_buffer(&buffer, &flush_lock, &db, &terminal_id, &log_type).await
-                {
-                    tracing::error!(
-                        terminal_id = %terminal_id,
-                        log_type = %log_type,
-                        error = %e,
-                        "Failed to persist terminal logs in flush task"
-                    );
+                tokio::select! {
+                    _ = &mut flush_shutdown_rx => {
+                        if let Err(e) =
+                            Self::flush_buffer(&buffer, &flush_lock, &db, &terminal_id, &log_type, &persistence_disabled).await
+                        {
+                            tracing::warn!(
+                                terminal_id = %terminal_id,
+                                log_type = %log_type,
+                                error = %e,
+                                "Failed to persist terminal logs during flush task shutdown"
+                            );
+                        }
+                        tracing::debug!(
+                            terminal_id = %terminal_id,
+                            log_type = %log_type,
+                            "Terminal logger flush task received shutdown signal"
+                        );
+                        break;
+                    }
+                    _ = interval.tick() => {
+                        if let Err(e) =
+                            Self::flush_buffer(&buffer, &flush_lock, &db, &terminal_id, &log_type, &persistence_disabled).await
+                        {
+                            tracing::error!(
+                                terminal_id = %terminal_id,
+                                log_type = %log_type,
+                                error = %e,
+                                "Failed to persist terminal logs in flush task"
+                            );
+                        }
+                    }
                 }
             }
         });
+        match self.flush_shutdown_tx.lock() {
+            Ok(mut shutdown_tx) => {
+                *shutdown_tx = Some(flush_shutdown_tx);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %self.terminal_id,
+                    log_type = %self.log_type,
+                    error = %e,
+                    "Terminal logger flush shutdown slot lock poisoned"
+                );
+            }
+        }
+        match self.flush_task.lock() {
+            Ok(mut task) => {
+                *task = Some(flush_task);
+            }
+            Err(e) => {
+                flush_task.abort();
+                tracing::warn!(
+                    terminal_id = %self.terminal_id,
+                    log_type = %self.log_type,
+                    error = %e,
+                    "Terminal logger flush task slot lock poisoned; task aborted"
+                );
+            }
+        }
 
         self
     }
 
+    async fn stop_flush_task(&self) {
+        match self.flush_shutdown_tx.lock() {
+            Ok(mut shutdown_tx) => {
+                if let Some(tx) = shutdown_tx.take() {
+                    let _ = tx.send(());
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %self.terminal_id,
+                    log_type = %self.log_type,
+                    error = %e,
+                    "Terminal logger flush shutdown slot lock poisoned"
+                );
+            }
+        }
+
+        let task = match self.flush_task.lock() {
+            Ok(mut task) => task.take(),
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %self.terminal_id,
+                    log_type = %self.log_type,
+                    error = %e,
+                    "Terminal logger flush task slot lock poisoned"
+                );
+                None
+            }
+        };
+        let Some(mut task) = task else {
+            return;
+        };
+
+        match tokio::time::timeout(Duration::from_secs(LOGGER_SHUTDOWN_TIMEOUT_SECS), &mut task)
+            .await
+        {
+            Ok(join_result) => {
+                if let Err(e) = join_result {
+                    tracing::warn!(
+                        terminal_id = %self.terminal_id,
+                        log_type = %self.log_type,
+                        error = %e,
+                        "Terminal logger flush task finished with join error"
+                    );
+                }
+            }
+            Err(_) => {
+                task.abort();
+                tracing::warn!(
+                    terminal_id = %self.terminal_id,
+                    log_type = %self.log_type,
+                    timeout_secs = LOGGER_SHUTDOWN_TIMEOUT_SECS,
+                    "Terminal logger flush task graceful shutdown timed out, aborted"
+                );
+            }
+        }
+    }
+
     pub async fn append(&self, line: &str) {
+        if self.persistence_disabled.load(Ordering::Relaxed) {
+            return;
+        }
+
         let should_flush = {
             let mut buffer = self.buffer.write().await;
             buffer.push(line.to_string());
@@ -1381,6 +1572,7 @@ impl TerminalLogger {
             &self.db,
             &self.terminal_id,
             &self.log_type,
+            &self.persistence_disabled,
         )
         .await
         {
@@ -1400,8 +1592,27 @@ impl TerminalLogger {
             &self.db,
             &self.terminal_id,
             &self.log_type,
+            &self.persistence_disabled,
         )
         .await
+    }
+
+    fn is_sqlite_foreign_key_violation(error: &anyhow::Error) -> bool {
+        error.chain().any(|cause| {
+            let Some(sqlx_error) = cause.downcast_ref::<sqlx::Error>() else {
+                return false;
+            };
+            match sqlx_error {
+                sqlx::Error::Database(db_error) => {
+                    db_error.code().as_deref() == Some(SQLITE_FOREIGN_KEY_CONSTRAINT_CODE)
+                        || db_error
+                            .message()
+                            .to_ascii_lowercase()
+                            .contains("foreign key constraint failed")
+                }
+                _ => false,
+            }
+        })
     }
 }
 
@@ -1433,6 +1644,47 @@ mod tests {
             "CREATE TABLE terminal_log (
                 id TEXT PRIMARY KEY,
                 terminal_id TEXT NOT NULL,
+                log_type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        db
+    }
+
+    async fn setup_logger_test_db_with_fk_constraint() -> Arc<DBService> {
+        use std::str::FromStr;
+
+        use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+
+        let options = SqliteConnectOptions::from_str(":memory:")
+            .unwrap()
+            .pragma("foreign_keys", "ON");
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+
+        let db = Arc::new(DBService { pool });
+
+        sqlx::query(
+            "CREATE TABLE terminal (
+                id TEXT PRIMARY KEY
+            )",
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "CREATE TABLE terminal_log (
+                id TEXT PRIMARY KEY,
+                terminal_id TEXT NOT NULL REFERENCES terminal(id) ON DELETE CASCADE,
                 log_type TEXT NOT NULL,
                 content TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -1594,6 +1846,75 @@ mod tests {
         .unwrap();
 
         assert!(rows.iter().any(|row| row == "limit-triggered-line"));
+    }
+
+    #[tokio::test]
+    async fn test_terminal_logger_stop_flush_task_clears_worker_handle() {
+        let terminal_id = Uuid::new_v4().to_string();
+        let db = setup_logger_test_db_with_terminal(&terminal_id).await;
+
+        let logger = TerminalLogger::with_max_buffer_size(
+            Arc::clone(&db),
+            terminal_id.clone(),
+            "stdout",
+            60,
+            100,
+        );
+
+        logger.append("stoppable-line").await;
+        logger.stop_flush_task().await;
+        logger.flush().await.unwrap();
+
+        let rows: Vec<String> = sqlx::query_scalar(
+            "SELECT content FROM terminal_log WHERE terminal_id = ? ORDER BY created_at ASC",
+        )
+        .bind(&terminal_id)
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+
+        assert!(rows.iter().any(|row| row == "stoppable-line"));
+        assert!(logger.flush_task.lock().unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_terminal_logger_fk_787_disables_persistence_and_clears_buffer() {
+        let terminal_id = Uuid::new_v4().to_string();
+        let db = setup_logger_test_db_with_fk_constraint().await;
+
+        let logger = TerminalLogger::with_max_buffer_size(
+            Arc::clone(&db),
+            terminal_id.clone(),
+            "stdout",
+            60,
+            100,
+        );
+
+        logger.append("line-before-fk").await;
+        logger.flush().await.unwrap();
+
+        assert!(logger.persistence_disabled.load(Ordering::Relaxed));
+        assert!(logger.buffer.read().await.is_empty());
+
+        let row_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM terminal_log WHERE terminal_id = ?")
+                .bind(&terminal_id)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(row_count, 0);
+
+        logger.append("line-after-disabled").await;
+        logger.flush().await.unwrap();
+        assert!(logger.buffer.read().await.is_empty());
+
+        let row_count_after_disabled: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM terminal_log WHERE terminal_id = ?")
+                .bind(&terminal_id)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(row_count_after_disabled, 0);
     }
 
     #[tokio::test]
