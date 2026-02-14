@@ -17,7 +17,7 @@ function resolveNpmCommand(args) {
 }
 
 function main() {
-  const port = String(process.env.FRONTEND_PORT || "3000");
+  const port = String(process.env.FRONTEND_PORT || "23457");
   const env = {
     ...process.env,
     FRONTEND_PORT: port,
