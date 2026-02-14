@@ -2,7 +2,11 @@
 //!
 //! Provides WebSocket-based terminal I/O using portable-pty for cross-platform support.
 
-use std::time::Duration;
+use std::{
+    error::Error as StdError,
+    io::ErrorKind,
+    time::Duration,
+};
 
 use axum::{
     Router,
@@ -21,7 +25,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::mpsc,
-    time::{Instant, timeout},
+    time::Instant,
 };
 use ts_rs::TS;
 
@@ -78,6 +82,32 @@ pub enum WsMessage {
     Resize { cols: u16, rows: u16 },
     /// Error message
     Error { message: String },
+}
+
+fn is_benign_ws_disconnect(error: &axum::Error) -> bool {
+    fn has_benign_io_kind(err: &(dyn StdError + 'static)) -> bool {
+        if let Some(io_err) = err.downcast_ref::<std::io::Error>() {
+            return matches!(
+                io_err.kind(),
+                ErrorKind::ConnectionAborted
+                    | ErrorKind::ConnectionReset
+                    | ErrorKind::BrokenPipe
+                    | ErrorKind::UnexpectedEof
+            );
+        }
+
+        err.source().is_some_and(has_benign_io_kind)
+    }
+
+    if has_benign_io_kind(error) {
+        return true;
+    }
+
+    let message = error.to_string().to_ascii_lowercase();
+    message.contains("connection aborted")
+        || message.contains("connection reset")
+        || message.contains("broken pipe")
+        || message.contains("without closing handshake")
 }
 
 // ============================================================================
@@ -406,7 +436,19 @@ async fn handle_terminal_socket(
                             }
                         },
                         Err(e) => {
-                            tracing::error!("WebSocket error: {}", e);
+                            if is_benign_ws_disconnect(&e) {
+                                tracing::debug!(
+                                    terminal_id = %terminal_id_recv,
+                                    error = %e,
+                                    "WebSocket disconnected"
+                                );
+                            } else {
+                                tracing::error!(
+                                    terminal_id = %terminal_id_recv,
+                                    error = %e,
+                                    "WebSocket error"
+                                );
+                            }
                             break;
                         }
                     }

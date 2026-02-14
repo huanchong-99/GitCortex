@@ -7,6 +7,7 @@ import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 const terminalEmulatorPropsSpy = vi.fn();
+const terminalEmulatorWsCreateSpy = vi.fn();
 const fetchMock = vi.fn();
 
 const createFetchOkResponse = () =>
@@ -17,8 +18,11 @@ const createFetchOkResponse = () =>
   }) as Response;
 
 vi.mock('./TerminalEmulator', () => ({
-  TerminalEmulator: forwardRef((props: { terminalId: string }, _ref) => {
+  TerminalEmulator: forwardRef((props: { terminalId: string; wsUrl?: string }, _ref) => {
     terminalEmulatorPropsSpy(props);
+    if (props.wsUrl) {
+      terminalEmulatorWsCreateSpy(props.terminalId);
+    }
     return <div data-testid="terminal-emulator" data-terminal-id={props.terminalId} />;
   }),
 }));
@@ -114,6 +118,7 @@ describe('TerminalDebugView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     terminalEmulatorPropsSpy.mockClear();
+    terminalEmulatorWsCreateSpy.mockClear();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(createFetchOkResponse());
     vi.stubGlobal('fetch', fetchMock);
@@ -309,6 +314,65 @@ describe('TerminalDebugView', () => {
         expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-2');
         expect(screen.queryByText(i18n.t('workflow:terminalDebug.starting'))).not.toBeInTheDocument();
       });
+    });
+
+    it('should not create TerminalEmulator or websocket before ready, then create both after ready', async () => {
+      let resolveStartRequest: ((value: Response) => void) | null = null;
+      fetchMock.mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveStartRequest = resolve;
+          })
+      );
+
+      const pendingTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
+        {
+          ...mockTasks[0],
+          terminals: [
+            {
+              ...mockTasks[0].terminals[0],
+              status: 'not_started',
+            },
+          ],
+        },
+      ];
+
+      renderWithI18n(<TerminalDebugView tasks={pendingTasks} wsUrl="ws://localhost:8080" />);
+
+      const devButton = screen.getByText('Developer').closest('button');
+      if (!devButton) {
+        throw new Error('Expected terminal button to be rendered.');
+      }
+
+      fireEvent.click(devButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(i18n.t('workflow:terminalDebug.starting'))).toBeInTheDocument();
+        expect(screen.queryByTestId('terminal-emulator')).not.toBeInTheDocument();
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith('/api/terminals/term-1/start', { method: 'POST' });
+      expect(terminalEmulatorPropsSpy).not.toHaveBeenCalled();
+      expect(terminalEmulatorWsCreateSpy).not.toHaveBeenCalled();
+
+      if (!resolveStartRequest) {
+        throw new Error('Expected terminal start request to be pending.');
+      }
+
+      resolveStartRequest(createFetchOkResponse());
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-1');
+      });
+
+      expect(terminalEmulatorPropsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          terminalId: 'term-1',
+          wsUrl: 'ws://localhost:8080',
+        })
+      );
+      expect(terminalEmulatorWsCreateSpy).toHaveBeenCalledWith('term-1');
     });
 
     it('should not auto-restart completed terminal on process-not-running error', async () => {

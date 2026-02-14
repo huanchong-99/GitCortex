@@ -86,13 +86,17 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         return false;
       }
 
+      if (startingTerminalIdsRef.current.has(terminal.id)) {
+        return false;
+      }
+
       if (readyTerminalIdsRef.current.has(terminal.id)) {
         return true;
       }
 
       return (
         !['failed', 'not_started'].includes(terminal.status) &&
-        ['starting', 'waiting', 'working', 'running', 'active'].includes(terminal.status)
+        ['working', 'running', 'active'].includes(terminal.status)
       );
     },
     [isHistoricalTerminalStatus]

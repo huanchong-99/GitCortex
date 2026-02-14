@@ -64,3 +64,39 @@
 2. workflow 级联删除可使 terminal 行消失。
 3. flush 任务失败不退出且失败数据不清空，导致 FK 787 持续重试。
 4. flush worker 未纳入 `TrackedProcess` 停止管理，放大持续报错概率。
+
+## 2026-02-14 补充：ECONNABORTED 根因收敛与落地修复
+
+### 新增已证实结论（仅基于真实代码）
+1. 前端存在“终端未 ready 即提前创建 WS”的时序窗口。  
+`TerminalDebugView` 在 `starting/waiting` 状态也会渲染 live terminal，触发 `TerminalEmulator` 立即执行 `new WebSocket(...)`。在 `start` 请求尚未完成、后端还未稳定可接入时，这个提前连接会落在 Vite `/api` WS 代理层并报 `write ECONNABORTED`。  
+证据：`frontend/src/components/terminal/TerminalDebugView.tsx:75`、`frontend/src/components/terminal/TerminalDebugView.tsx:398`、`frontend/src/components/terminal/TerminalEmulator.tsx:224`。
+
+2. 后端确实存在主动关闭 WS 的硬路径（该点是“现象可解释链路”，不是本次主修复点）。  
+当 `get_handle` 为空、`writer` 不可用、`subscribe_output` 失败时，`terminal_ws` 会发送 error 并立即 close。  
+证据：`crates/server/src/routes/terminal_ws.rs:123`、`crates/server/src/routes/terminal_ws.rs:156`、`crates/server/src/routes/terminal_ws.rs:169`。
+
+3. workflow 停止/删除生命周期清理链路本身是统一的。  
+`stop_workflow` 与 `delete_workflow` 都会进入 terminal 清理（kill PTY + unregister watcher），因此“清理遗漏导致 WS 长期残留”不是本次主因。  
+证据：`crates/server/src/routes/workflows.rs:725`、`crates/server/src/routes/workflows.rs:1313`、`crates/server/src/routes/workflows.rs:1363`。
+
+### 本次修复（最小改动）
+1. 收紧 live terminal 渲染门槛，避免 start 进行中或 `starting/waiting` 早连 WS。  
+- 新增：`startingTerminalIdsRef` 命中时强制不渲染 `TerminalEmulator`。  
+- 调整：fallback 可直连状态从 `starting/waiting/working/running/active` 收敛为 `working/running/active`。  
+变更：`frontend/src/components/terminal/TerminalDebugView.tsx`。
+
+2. 新增回归测试，锁定“未 ready 不建 WS、ready 后才建 WS”行为。  
+变更：`frontend/src/components/terminal/TerminalDebugView.test.tsx`。
+
+3. 后端 WS 断连日志降噪（非功能修复）：将常见连接中断类错误降级为 debug，避免误导排查。  
+变更：`crates/server/src/routes/terminal_ws.rs`。
+
+### 验证结果
+1. 前端定向测试通过：  
+`npm --prefix frontend run test:run -- src/components/terminal/TerminalDebugView.test.tsx`  
+结果：`17 passed`。
+
+2. 后端编译检查通过：  
+`cargo check -p server --bin server`  
+结果：通过（仅有仓库既有 warnings）。
