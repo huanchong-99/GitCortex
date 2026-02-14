@@ -1056,7 +1056,9 @@ mod tests {
     use std::sync::Arc;
 
     use db::DBService;
+    use serde_json::Value;
     use sqlx::sqlite::SqlitePoolOptions;
+    use tempfile::tempdir;
 
     use super::*;
 
@@ -1099,5 +1101,62 @@ mod tests {
 
         // Verify method exists (compile-time check)
         let _ = service.detect_cli("cursor").await;
+    }
+
+    #[test]
+    fn test_create_claude_config_updates_primary_api_key_and_preserves_other_fields() {
+        let dir = tempdir().expect("failed to create temp dir");
+        let claude_home = dir.path();
+        std::fs::create_dir_all(claude_home).expect("failed to create claude home");
+
+        let config_path = claude_home.join("config.json");
+        std::fs::write(
+            &config_path,
+            r#"{"foo":"bar","primaryApiKey":"old-key","nested":{"a":1}}"#,
+        )
+        .expect("failed to seed config.json");
+
+        create_claude_config(claude_home, "new-key").expect("create_claude_config should succeed");
+
+        let updated: Value = serde_json::from_str(
+            &std::fs::read_to_string(config_path).expect("failed to read updated config.json"),
+        )
+        .expect("config.json should be valid JSON");
+
+        assert_eq!(updated["primaryApiKey"], "new-key");
+        assert_eq!(updated["foo"], "bar");
+        assert_eq!(updated["nested"]["a"], 1);
+    }
+
+    #[test]
+    fn test_create_claude_settings_writes_expected_env_and_base_url() {
+        let dir = tempdir().expect("failed to create temp dir");
+        let claude_home = dir.path();
+        std::fs::create_dir_all(claude_home).expect("failed to create claude home");
+
+        let settings_path = create_claude_settings(
+            claude_home,
+            "sk-ant-test",
+            Some("https://api.example.com/v1"),
+            "claude-sonnet-4-20250514",
+        )
+        .expect("create_claude_settings should succeed");
+
+        let settings: Value = serde_json::from_str(
+            &std::fs::read_to_string(settings_path).expect("failed to read settings.json"),
+        )
+        .expect("settings.json should be valid JSON");
+
+        assert_eq!(settings["primaryApiKey"], "sk-ant-test");
+        assert_eq!(settings["env"]["ANTHROPIC_AUTH_TOKEN"], "sk-ant-test");
+        assert_eq!(settings["env"]["ANTHROPIC_API_KEY"], "sk-ant-test");
+        assert_eq!(
+            settings["env"]["ANTHROPIC_MODEL"],
+            "claude-sonnet-4-20250514"
+        );
+        assert_eq!(
+            settings["env"]["ANTHROPIC_BASE_URL"],
+            "https://api.example.com/v1"
+        );
     }
 }
