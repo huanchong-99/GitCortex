@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { TerminalEmulator, TerminalEmulatorRef } from './TerminalEmulator';
 
 const VALID_TERMINAL_ID = '123e4567-e89b-12d3-a456-426614174000';
+const KEEPALIVE_INPUT_MESSAGE = JSON.stringify({ type: 'heartbeat' });
 
 // Mock xterm
 vi.mock('@xterm/xterm', () => {
@@ -32,10 +33,15 @@ vi.mock('@xterm/addon-fit', () => {
 class MockWebSocket {
   static instances: MockWebSocket[] = [];
   static autoOpen = true;
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
 
   url = '';
-  readyState = 0;
+  readyState = MockWebSocket.CONNECTING;
   lastSent: string | null = null;
+  sentMessages: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
   onerror: ((error: Event) => void) | null = null;
@@ -46,7 +52,7 @@ class MockWebSocket {
     MockWebSocket.instances.push(this);
     if (MockWebSocket.autoOpen) {
       setTimeout(() => {
-        this.readyState = 1; // OPEN
+        this.readyState = MockWebSocket.OPEN;
         this.onopen?.();
       }, 0);
     }
@@ -54,20 +60,21 @@ class MockWebSocket {
 
   send(data: string) {
     this.lastSent = data;
+    this.sentMessages.push(data);
   }
 
   close() {
-    this.readyState = 3; // CLOSED
+    this.readyState = MockWebSocket.CLOSED;
     this.onclose?.({ code: 1000, reason: '' } as CloseEvent);
   }
 
   simulateOpen() {
-    this.readyState = 1;
+    this.readyState = MockWebSocket.OPEN;
     this.onopen?.();
   }
 
   simulateUnexpectedClose(reason = 'network drop') {
-    this.readyState = 3;
+    this.readyState = MockWebSocket.CLOSED;
     this.onclose?.({ code: 1006, reason } as CloseEvent);
   }
 
@@ -83,6 +90,10 @@ describe('TerminalEmulator', () => {
     vi.clearAllMocks();
     MockWebSocket.instances = [];
     MockWebSocket.autoOpen = false;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Rendering', () => {
@@ -264,6 +275,80 @@ describe('TerminalEmulator', () => {
       expect(() => {
         // The handleData callback checks readyState before sending
       }).not.toThrow();
+    });
+  });
+
+  describe('WebSocket Keepalive', () => {
+    it('should send keepalive messages only after websocket is open', () => {
+      vi.useFakeTimers();
+
+      render(
+        <TerminalEmulator
+          terminalId={VALID_TERMINAL_ID}
+          wsUrl="ws://localhost:8080"
+        />
+      );
+
+      expect(MockWebSocket.instances).toHaveLength(1);
+      const socket = MockWebSocket.instances[0];
+
+      act(() => {
+        vi.advanceTimersByTime(180_000);
+      });
+
+      expect(
+        socket.sentMessages.filter((payload) => payload === KEEPALIVE_INPUT_MESSAGE)
+      ).toHaveLength(0);
+
+      act(() => {
+        socket.simulateOpen();
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+
+      expect(
+        socket.sentMessages.filter((payload) => payload === KEEPALIVE_INPUT_MESSAGE)
+      ).toHaveLength(1);
+    });
+
+    it('should stop keepalive messages after websocket closes', () => {
+      vi.useFakeTimers();
+
+      render(
+        <TerminalEmulator
+          terminalId={VALID_TERMINAL_ID}
+          wsUrl="ws://localhost:8080"
+        />
+      );
+
+      expect(MockWebSocket.instances).toHaveLength(1);
+      const socket = MockWebSocket.instances[0];
+
+      act(() => {
+        socket.simulateOpen();
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+
+      expect(
+        socket.sentMessages.filter((payload) => payload === KEEPALIVE_INPUT_MESSAGE)
+      ).toHaveLength(1);
+
+      act(() => {
+        socket.simulateUnexpectedClose('network');
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(180_000);
+      });
+
+      expect(
+        socket.sentMessages.filter((payload) => payload === KEEPALIVE_INPUT_MESSAGE)
+      ).toHaveLength(1);
     });
   });
 

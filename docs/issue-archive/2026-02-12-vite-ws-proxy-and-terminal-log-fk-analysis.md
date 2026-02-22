@@ -130,3 +130,39 @@
 ### 噪声放大点（当前代码已证实）
 - 前端 WS handler/解析异常会直接 `console.error`，会按消息频率放大日志：`frontend/src/stores/wsStore.ts:931`、`frontend/src/stores/wsStore.ts:944`、`frontend/src/stores/wsStore.ts:952`
 - WS transport error 也直接 `console.error`：`frontend/src/stores/wsStore.ts:1102`
+
+## 2026-02-22 补充（二）：JSON Patch WS 清理时序根因与修复策略（本轮新增）
+
+### 已证实根因（仅代码证据）
+1. `useJsonPatchWsStream` 的 `onclose` 分支会对“非 finished 且非 clean close”执行重连调度。  
+- 证据：`frontend/src/hooks/useJsonPatchWsStream.ts:185`、`frontend/src/hooks/useJsonPatchWsStream.ts:190`、`frontend/src/hooks/useJsonPatchWsStream.ts:195`
+
+2. 同一个 hook 在“禁用/无 endpoint”与“effect cleanup”两条路径都会执行 socket 清理；该清理如果不与 `onclose` 重连逻辑隔离，会把主动清理误判为异常断连。  
+- 证据：`frontend/src/hooks/useJsonPatchWsStream.ts:88`、`frontend/src/hooks/useJsonPatchWsStream.ts:91`、`frontend/src/hooks/useJsonPatchWsStream.ts:202`、`frontend/src/hooks/useJsonPatchWsStream.ts:203`
+
+3. 该 hook 明确考虑了 StrictMode/dev 双挂载下 cleanup 发生在 `CONNECTING` 的场景，说明“连接尚未完成时的清理时序”是实际处理对象。  
+- 证据：`frontend/src/hooks/useJsonPatchWsStream.ts:70`、`frontend/src/hooks/useJsonPatchWsStream.ts:72`
+
+### 本轮修复动作（已落地）
+1. 新增统一清理函数 `teardownSocket`，先解绑所有事件处理器，阻断 cleanup 触发重连回路。  
+- 动作与证据：`frontend/src/hooks/useJsonPatchWsStream.ts:63`、`frontend/src/hooks/useJsonPatchWsStream.ts:64`、`frontend/src/hooks/useJsonPatchWsStream.ts:68`
+
+2. 对 `CONNECTING` 态改为“等 `open` 后再 `close(1000, 'cleanup')`”，避免连接未建立即关闭带来的浏览器告警与额外噪声。  
+- 动作与证据：`frontend/src/hooks/useJsonPatchWsStream.ts:72`、`frontend/src/hooks/useJsonPatchWsStream.ts:74`、`frontend/src/hooks/useJsonPatchWsStream.ts:76`
+
+3. 将两条清理入口统一切换为 `teardownSocket`，替换直接 `ws.close()`，减少重复回连抖动。  
+- 动作与证据：`frontend/src/hooks/useJsonPatchWsStream.ts:91`、`frontend/src/hooks/useJsonPatchWsStream.ts:92`、`frontend/src/hooks/useJsonPatchWsStream.ts:203`、`frontend/src/hooks/useJsonPatchWsStream.ts:204`
+
+4. 修复影响面覆盖所有复用该 hook 的 WS 流页面，不局限于单一页面。  
+- 证据：`frontend/src/hooks/useProjects.ts:23`、`frontend/src/hooks/useProjectTasks.ts:55`、`frontend/src/hooks/useExecutionProcesses.ts:48`、`frontend/src/components/ui-new/hooks/useWorkspaces.ts:134`
+
+### 验证建议（面向回归）
+1. 在 React StrictMode 的 dev 环境反复挂载/卸载使用该 hook 的页面（projects/tasks/workspaces），确认不会出现 cleanup 触发的重连风暴。  
+- 重点观察：浏览器 Network 中同一 stream endpoint 不应短时间内持续新建 WS。
+
+2. 重点检查浏览器控制台不再出现“连接建立前关闭”类告警，并确认异常断连时仍保留 backoff 重连能力（非 clean close 才重连）。  
+- 关联逻辑：`frontend/src/hooks/useJsonPatchWsStream.ts:72`、`frontend/src/hooks/useJsonPatchWsStream.ts:190`、`frontend/src/hooks/useJsonPatchWsStream.ts:195`
+
+3. 维持页面级自动化回归，避免 `/board` 侧修复回退。  
+- 现有用例：`frontend/src/pages/Board.test.tsx:74`
+- 建议命令：`npm --prefix frontend run test:run -- src/pages/Board.test.tsx`

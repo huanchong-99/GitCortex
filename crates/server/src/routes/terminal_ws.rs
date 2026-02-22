@@ -5,6 +5,7 @@
 use std::{
     error::Error as StdError,
     io::ErrorKind,
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 
@@ -80,6 +81,8 @@ pub enum WsMessage {
     Output { data: String },
     /// Terminal resize request
     Resize { cols: u16, rows: u16 },
+    /// Heartbeat from client for keep-alive
+    Heartbeat,
     /// Error message
     Error { message: String },
 }
@@ -231,74 +234,109 @@ async fn handle_terminal_socket(
     let last_activity_heartbeat = last_activity.clone();
 
     let terminal_id_resize = terminal_id.clone();
+    let idle_timeout_notifier = std::sync::Arc::new(tokio::sync::Notify::new());
+    let idle_timeout_triggered = std::sync::Arc::new(AtomicBool::new(false));
 
     // Spawn output subscription task (fanout -> WebSocket)
     // Replaces old PTY reader/send task pipeline with shared fanout + replay support
     // Note: PromptWatcher now subscribes directly to fanout, no need to feed it here
     let output_task = {
         let last_activity_clone = last_activity.clone();
+        let idle_timeout_notifier = idle_timeout_notifier.clone();
+        let idle_timeout_triggered = idle_timeout_triggered.clone();
         tokio::spawn(async move {
             loop {
-                match output_subscription.recv().await {
-                    Ok(chunk) => {
-                        // Update last activity
-                        *last_activity_clone.write().await = Instant::now();
+                tokio::select! {
+                    _ = idle_timeout_notifier.notified() => {
+                        if idle_timeout_triggered.load(Ordering::Acquire) {
+                            tracing::info!(
+                                terminal_id = %terminal_id_output,
+                                "Closing terminal WebSocket gracefully due to idle timeout"
+                            );
 
-                        if !chunk.text.is_empty() {
-                            let msg = WsMessage::Output { data: chunk.text };
-                            match serde_json::to_string(&msg) {
-                                Ok(json) => {
-                                    if let Err(e) = ws_sender.send(Message::Text(json.into())).await
-                                    {
+                            if let Err(e) = ws_sender.send(Message::Close(None)).await {
+                                if is_benign_ws_disconnect(&e) {
+                                    tracing::debug!(
+                                        terminal_id = %terminal_id_output,
+                                        error = %e,
+                                        "WebSocket already disconnected while sending idle-timeout close frame"
+                                    );
+                                } else {
+                                    tracing::warn!(
+                                        terminal_id = %terminal_id_output,
+                                        error = %e,
+                                        "Failed to send idle-timeout close frame"
+                                    );
+                                }
+                            }
+
+                            let _ = ws_sender.close().await;
+                        }
+                        break;
+                    }
+                    recv_result = output_subscription.recv() => {
+                        match recv_result {
+                            Ok(chunk) => {
+                                // Update last activity
+                                *last_activity_clone.write().await = Instant::now();
+
+                                if !chunk.text.is_empty() {
+                                    let msg = WsMessage::Output { data: chunk.text };
+                                    match serde_json::to_string(&msg) {
+                                        Ok(json) => {
+                                            if let Err(e) = ws_sender.send(Message::Text(json.into())).await
+                                            {
+                                                tracing::debug!(
+                                                    terminal_id = %terminal_id_output,
+                                                    error = %e,
+                                                    "Failed to send output to WebSocket"
+                                                );
+                                                break;
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!(
+                                                terminal_id = %terminal_id_output,
+                                                error = %e,
+                                                "Failed to serialize terminal output message"
+                                            );
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Log dropped bytes if any
+                                if chunk.dropped_invalid_bytes > 0 {
+                                    tracing::warn!(
+                                        terminal_id = %terminal_id_output,
+                                        seq = chunk.seq,
+                                        dropped_bytes = chunk.dropped_invalid_bytes,
+                                        "Dropped invalid UTF-8 bytes in terminal output"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                use tokio::sync::broadcast::error::RecvError;
+                                match e {
+                                    RecvError::Lagged(skipped) => {
+                                        // Recoverable: output burst exceeded channel capacity
+                                        // Log and continue receiving from current position
+                                        tracing::warn!(
+                                            terminal_id = %terminal_id_output,
+                                            skipped_messages = skipped,
+                                            "Output subscription lagged, skipped messages"
+                                        );
+                                        continue;
+                                    }
+                                    RecvError::Closed => {
+                                        // Terminal output stream closed
                                         tracing::debug!(
                                             terminal_id = %terminal_id_output,
-                                            error = %e,
-                                            "Failed to send output to WebSocket"
+                                            "Output subscription closed"
                                         );
                                         break;
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!(
-                                        terminal_id = %terminal_id_output,
-                                        error = %e,
-                                        "Failed to serialize terminal output message"
-                                    );
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Log dropped bytes if any
-                        if chunk.dropped_invalid_bytes > 0 {
-                            tracing::warn!(
-                                terminal_id = %terminal_id_output,
-                                seq = chunk.seq,
-                                dropped_bytes = chunk.dropped_invalid_bytes,
-                                "Dropped invalid UTF-8 bytes in terminal output"
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        use tokio::sync::broadcast::error::RecvError;
-                        match e {
-                            RecvError::Lagged(skipped) => {
-                                // Recoverable: output burst exceeded channel capacity
-                                // Log and continue receiving from current position
-                                tracing::warn!(
-                                    terminal_id = %terminal_id_output,
-                                    skipped_messages = skipped,
-                                    "Output subscription lagged, skipped messages"
-                                );
-                                continue;
-                            }
-                            RecvError::Closed => {
-                                // Terminal output stream closed
-                                tracing::debug!(
-                                    terminal_id = %terminal_id_output,
-                                    "Output subscription closed"
-                                );
-                                break;
                             }
                         }
                     }
@@ -340,30 +378,37 @@ async fn handle_terminal_socket(
     };
 
     // Spawn heartbeat task
-    let heartbeat_task = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
-        loop {
-            interval.tick().await;
+    let heartbeat_task = {
+        let idle_timeout_notifier = idle_timeout_notifier.clone();
+        let idle_timeout_triggered = idle_timeout_triggered.clone();
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+            loop {
+                interval.tick().await;
 
-            let last = *last_activity_heartbeat.read().await;
-            let idle_duration = last.elapsed();
+                let last = *last_activity_heartbeat.read().await;
+                let idle_duration = last.elapsed();
 
-            if idle_duration > Duration::from_secs(WS_IDLE_TIMEOUT_SECS) {
-                tracing::warn!(
-                    "Terminal {} idle timeout after {}s",
+                if idle_duration > Duration::from_secs(WS_IDLE_TIMEOUT_SECS) {
+                    tracing::warn!(
+                        "Terminal {} idle timeout after {}s",
+                        terminal_id_heartbeat,
+                        idle_duration.as_secs()
+                    );
+                    idle_timeout_triggered.store(true, Ordering::Release);
+                    idle_timeout_notifier.notify_one();
+                    return true;
+                }
+
+                tracing::trace!(
+                    "Terminal {} heartbeat check, idle for {}s",
                     terminal_id_heartbeat,
                     idle_duration.as_secs()
                 );
-                break;
             }
-
-            tracing::trace!(
-                "Terminal {} heartbeat check, idle for {}s",
-                terminal_id_heartbeat,
-                idle_duration.as_secs()
-            );
-        }
-    });
+        })
+    };
 
     // Spawn WebSocket receive task (WebSocket input -> PTY)
     let recv_task = tokio::spawn(async move {
@@ -406,6 +451,9 @@ async fn handle_terminal_socket(
                                                     rows
                                                 );
                                             }
+                                        }
+                                        WsMessage::Heartbeat => {
+                                            tracing::trace!("Received client heartbeat");
                                         }
                                         WsMessage::Output { .. } => {
                                             tracing::warn!("Client sent unexpected Output message");
@@ -468,6 +516,7 @@ async fn handle_terminal_socket(
     let mut recv_task = recv_task;
     let mut heartbeat_task = heartbeat_task;
     let mut writer_task = writer_task;
+    let mut terminated_by_idle_timeout = false;
 
     tokio::select! {
         _ = &mut output_task => {
@@ -476,8 +525,26 @@ async fn handle_terminal_socket(
         _ = &mut recv_task => {
             tracing::debug!("Receive task completed for terminal {}", terminal_id);
         }
-        _ = &mut heartbeat_task => {
-            tracing::debug!("Heartbeat task completed (idle timeout) for terminal {}", terminal_id);
+        heartbeat_result = &mut heartbeat_task => {
+            match heartbeat_result {
+                Ok(true) => {
+                    terminated_by_idle_timeout = true;
+                    tracing::debug!(
+                        "Heartbeat task completed (idle timeout) for terminal {}",
+                        terminal_id
+                    );
+                }
+                Ok(false) => {
+                    tracing::debug!("Heartbeat task completed for terminal {}", terminal_id);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        error = %e,
+                        "Heartbeat task join failed"
+                    );
+                }
+            }
         }
         _ = async {
             if let Some(task) = &mut writer_task {
@@ -485,6 +552,26 @@ async fn handle_terminal_socket(
             }
         }, if writer_task_active => {
             tracing::debug!("PTY writer task completed for terminal {}", terminal_id);
+        }
+    }
+
+    if terminated_by_idle_timeout {
+        let graceful_shutdown_timeout = Duration::from_secs(2);
+
+        if let Err(_elapsed) = tokio::time::timeout(graceful_shutdown_timeout, &mut output_task).await
+        {
+            tracing::debug!(
+                terminal_id = %terminal_id,
+                "Timed out waiting for output task to finish graceful idle-timeout close"
+            );
+        }
+
+        if let Err(_elapsed) = tokio::time::timeout(graceful_shutdown_timeout, &mut recv_task).await
+        {
+            tracing::debug!(
+                terminal_id = %terminal_id,
+                "Timed out waiting for receive task to finish graceful idle-timeout close"
+            );
         }
     }
 
@@ -636,6 +723,11 @@ mod tests {
         let json = serde_json::to_string(&error).unwrap();
         assert!(json.contains("error"));
         assert!(json.contains("Test error"));
+
+        // Test Heartbeat message
+        let heartbeat = WsMessage::Heartbeat;
+        let json = serde_json::to_string(&heartbeat).unwrap();
+        assert!(json.contains("heartbeat"));
     }
 
     #[test]
@@ -660,6 +752,11 @@ mod tests {
             }
             _ => panic!("Expected Resize message"),
         }
+
+        // Test Heartbeat message
+        let json = r#"{"type":"heartbeat"}"#;
+        let msg: WsMessage = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, WsMessage::Heartbeat));
     }
 
     #[test]

@@ -17,6 +17,8 @@ const logInfo = (...args: unknown[]) => {
 const DISCONNECTED_HINT = 'Disconnected from terminal stream. Click Restart to reconnect.';
 const AUTO_RECONNECT_MAX_ATTEMPTS = 5;
 const AUTO_RECONNECT_BASE_DELAY_MS = 1000;
+const WS_KEEPALIVE_INTERVAL_MS = 60_000;
+const WS_KEEPALIVE_MESSAGE = JSON.stringify({ type: 'heartbeat' });
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
@@ -46,6 +48,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     const pendingInputRef = useRef<string[]>([]);
     const terminalReadyRef = useRef(false);
     const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const keepAliveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const reconnectAttemptsRef = useRef(0);
     const skipNextAutoReconnectRef = useRef(false);
     const hasReportedTransportErrorRef = useRef(false);
@@ -67,6 +70,13 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
+      }
+    }, []);
+
+    const clearKeepAliveTimer = useCallback(() => {
+      if (keepAliveTimerRef.current) {
+        window.clearInterval(keepAliveTimerRef.current);
+        keepAliveTimerRef.current = null;
       }
     }, []);
 
@@ -111,6 +121,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         reconnectAttemptsRef.current = 0;
         hasReportedTransportErrorRef.current = false;
         clearReconnectTimer();
+        clearKeepAliveTimer();
         if (wsUrl) {
           markConnecting();
         } else {
@@ -123,7 +134,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         }
         setWsKey((k) => k + 1);
       },
-    }), [clearReconnectTimer, markConnecting, wsUrl]);
+    }), [clearKeepAliveTimer, clearReconnectTimer, markConnecting, wsUrl]);
 
     // Stable handlers
     const handleData = useCallback((data: string) => {
@@ -202,6 +213,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
     useEffect(() => {
       if (!wsUrl || !terminalReadyRef.current) {
         clearReconnectTimer();
+        clearKeepAliveTimer();
         reconnectAttemptsRef.current = 0;
         hasReportedTransportErrorRef.current = false;
         skipNextAutoReconnectRef.current = false;
@@ -211,6 +223,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       }
 
       markConnecting();
+      clearKeepAliveTimer();
       skipNextAutoReconnectRef.current = false;
 
       // Basic validation
@@ -232,6 +245,13 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         setConnectionState('connected');
         setDisconnectHint(null);
         logInfo('Terminal WebSocket connected');
+
+        clearKeepAliveTimer();
+        keepAliveTimerRef.current = window.setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(WS_KEEPALIVE_MESSAGE);
+          }
+        }, WS_KEEPALIVE_INTERVAL_MS);
 
         if (pendingInputRef.current.length > 0) {
           const pending = pendingInputRef.current.splice(0, pendingInputRef.current.length);
@@ -280,6 +300,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       ws.onclose = (event?: CloseEvent) => {
         const code = event?.code;
         const isExpectedClose = code === 1000 || code === 1005;
+        clearKeepAliveTimer();
 
         if (isActive) {
           const reason = event?.reason?.trim();
@@ -298,6 +319,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
 
       return () => {
         isActive = false;
+        clearKeepAliveTimer();
         clearReconnectTimer();
         if (wsRef.current === ws) {
           wsRef.current = null;
@@ -311,6 +333,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       markConnecting,
       markDisconnected,
       clearReconnectTimer,
+      clearKeepAliveTimer,
       scheduleAutoReconnect,
       wsKey,
     ]);

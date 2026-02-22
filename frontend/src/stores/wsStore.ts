@@ -911,10 +911,6 @@ export const useWsStore = create<WsState>((set, get) => ({
 
         try {
           const message = JSON.parse(event.data as string) as WsMessage;
-          const normalizedPayload = normalizeWorkflowEventPayload(
-            message.type,
-            message.payload
-          );
           const currentStateForMessage = get();
           const globalHandlers = currentStateForMessage._handlers.get(
             message.type
@@ -922,6 +918,15 @@ export const useWsStore = create<WsState>((set, get) => ({
           const scopedHandlers = currentStateForMessage._workflowHandlers
             .get(targetWorkflowId)
             ?.get(message.type);
+
+          if (!globalHandlers && !scopedHandlers) {
+            return;
+          }
+
+          const normalizedPayload = normalizeWorkflowEventPayload(
+            message.type,
+            message.payload
+          );
 
           if (globalHandlers) {
             globalHandlers.forEach((handler) => {
