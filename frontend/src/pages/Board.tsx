@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { WorkflowSidebar } from '@/components/board/WorkflowSidebar';
 import { WorkflowKanbanBoard } from '@/components/board/WorkflowKanbanBoard';
@@ -14,38 +14,25 @@ export function Board() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  useWorkflowEvents(selectedWorkflowId, {
-    onWorkflowStatusChanged: () => {
-      if (!selectedWorkflowId) return;
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.byId(selectedWorkflowId),
-      });
-    },
-    onTaskStatusChanged: () => {
-      if (!selectedWorkflowId) return;
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.byId(selectedWorkflowId),
-      });
-    },
-    onTerminalStatusChanged: () => {
-      if (!selectedWorkflowId) return;
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.byId(selectedWorkflowId),
-      });
-    },
-    onTerminalCompleted: () => {
-      if (!selectedWorkflowId) return;
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.byId(selectedWorkflowId),
-      });
-    },
-    onGitCommitDetected: () => {
-      if (!selectedWorkflowId) return;
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.byId(selectedWorkflowId),
-      });
-    },
-  });
+  const handleRealtimeWorkflowSignal = useCallback(() => {
+    if (!selectedWorkflowId) return;
+    queryClient.invalidateQueries({
+      queryKey: workflowKeys.byId(selectedWorkflowId),
+    });
+  }, [queryClient, selectedWorkflowId]);
+
+  const workflowEventHandlers = useMemo(
+    () => ({
+      onWorkflowStatusChanged: handleRealtimeWorkflowSignal,
+      onTaskStatusChanged: handleRealtimeWorkflowSignal,
+      onTerminalStatusChanged: handleRealtimeWorkflowSignal,
+      onTerminalCompleted: handleRealtimeWorkflowSignal,
+      onGitCommitDetected: handleRealtimeWorkflowSignal,
+    }),
+    [handleRealtimeWorkflowSignal]
+  );
+
+  useWorkflowEvents(selectedWorkflowId, workflowEventHandlers);
 
   return (
     <div className="app-canvas flex h-full min-h-0 w-full">

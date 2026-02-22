@@ -100,3 +100,33 @@
 2. 后端编译检查通过：  
 `cargo check -p server --bin server`  
 结果：通过（仅有仓库既有 warnings）。
+
+## 2026-02-22 补充：/board WS 噪声根因与修复策略（本轮）
+
+### 已证实根因（仅代码证据）
+1. `/board` 在选中 workflow 后会建立 workflow-scoped WS 连接。
+- `Board` 调用 `useWorkflowEvents(selectedWorkflowId, workflowEventHandlers)`：`frontend/src/pages/Board.tsx:35`
+- WS URL 固定为 `/api/ws/workflow/{id}/events`：`frontend/src/stores/wsStore.ts:563`、`frontend/src/stores/wsStore.ts:566`
+- Vite `/api` 代理开启 `ws: true`：`frontend/vite.config.ts:82`、`frontend/vite.config.ts:86`
+
+2. `useWorkflowEvents` 的订阅 effect 显式依赖 `handlers` 引用；引用变化会触发一次“清理 + 重新订阅”。
+- 依赖数组包含 `handlers`：`frontend/src/stores/wsStore.ts:1541`
+- effect 内按事件类型逐个 `subscribeToWorkflow`：`frontend/src/stores/wsStore.ts:1458`、`frontend/src/stores/wsStore.ts:1530`
+- cleanup 会逐个 `unsub`：`frontend/src/stores/wsStore.ts:1538`、`frontend/src/stores/wsStore.ts:1539`
+
+3. 本轮修复点与上述机制一一对应：`Board` 将 WS handlers 稳定化为 `useCallback + useMemo`，以避免渲染期订阅抖动。
+- 稳定化回调：`frontend/src/pages/Board.tsx:17`
+- 稳定化 handlers 对象：`frontend/src/pages/Board.tsx:24`
+- 将稳定引用传入 hook：`frontend/src/pages/Board.tsx:35`
+
+### 本轮修复策略（已落地）
+1. 在 `/board` 页面固定 WS handlers 引用，降低订阅抖动导致的噪声。
+- 代码：`frontend/src/pages/Board.tsx:1`、`frontend/src/pages/Board.tsx:24`、`frontend/src/pages/Board.tsx:35`
+
+2. 增加页面级回归测试，覆盖 `useWorkflowEvents` 入参与 workflow 选择时序，防止回退到抖动模式。
+- 测试用例：`frontend/src/pages/Board.test.tsx:74`
+- 关键断言（先 `null`，后 `wf-selected`）：`frontend/src/pages/Board.test.tsx:80`、`frontend/src/pages/Board.test.tsx:103`
+
+### 噪声放大点（当前代码已证实）
+- 前端 WS handler/解析异常会直接 `console.error`，会按消息频率放大日志：`frontend/src/stores/wsStore.ts:931`、`frontend/src/stores/wsStore.ts:944`、`frontend/src/stores/wsStore.ts:952`
+- WS transport error 也直接 `console.error`：`frontend/src/stores/wsStore.ts:1102`

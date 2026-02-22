@@ -60,11 +60,36 @@ export const useJsonPatchWsStream = <T extends object>(
     }, delay);
   }
 
+  function teardownSocket(ws: WebSocket) {
+    // Detach handlers first so intentional cleanup never schedules reconnect.
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onerror = null;
+    ws.onclose = null;
+
+    // In StrictMode/dev double-mount, cleanup can happen while CONNECTING.
+    // Avoid closing in CONNECTING state to prevent browser warning.
+    if (ws.readyState === WebSocket.CONNECTING) {
+      ws.addEventListener(
+        'open',
+        () => {
+          ws.close(1000, 'cleanup');
+        },
+        { once: true }
+      );
+      return;
+    }
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1000, 'cleanup');
+    }
+  }
+
   useEffect(() => {
     if (!enabled || !endpoint) {
       // Close connection and reset state
       if (wsRef.current) {
-        wsRef.current.close();
+        teardownSocket(wsRef.current);
         wsRef.current = null;
       }
       if (retryTimerRef.current) {
@@ -176,16 +201,7 @@ export const useJsonPatchWsStream = <T extends object>(
 
     return () => {
       if (wsRef.current) {
-        const ws = wsRef.current;
-
-        // Clear all event handlers first to prevent callbacks after cleanup
-        ws.onopen = null;
-        ws.onmessage = null;
-        ws.onerror = null;
-        ws.onclose = null;
-
-        // Close regardless of state
-        ws.close();
+        teardownSocket(wsRef.current);
         wsRef.current = null;
       }
       if (retryTimerRef.current) {
