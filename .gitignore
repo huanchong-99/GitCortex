@@ -58,6 +58,7 @@ playwright-report/
 coverage/
 *.trace
 *.trace.log
+.runtime_monitor/
 
 # Personal AI local configuration
 AGENTS.md
