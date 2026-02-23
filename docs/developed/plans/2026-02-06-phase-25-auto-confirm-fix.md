@@ -210,7 +210,7 @@
 - `crates/services/src/services/terminal/prompt_watcher.rs`
 - `crates/services/src/services/orchestrator/prompt_handler.rs`
 - `crates/server/src/routes/workflow_events.rs`
-- `docs/archive/pending/plans/TODO.md`
+- `docs/undeveloped/current/TODO.md`
 
 **具体步骤**
 1. 统一链路日志字段：workflow_id/terminal_id/session_id/prompt_kind/decision

@@ -422,7 +422,7 @@ export GITCORTEX_WS_TIMEOUT_SECONDS=300
 
 ## Support Resources
 
-- Documentation: `README.md`, `docs/archive/pending/plans/`
-- Troubleshooting: `docs/ops/troubleshooting.md`
+- Documentation: `README.md`, `docs/developed/plans/`
+- Troubleshooting: `docs/developed/ops/troubleshooting.md`
 - Issues: GitHub Issues
-- Architecture: `docs/archive/pending/plans/2026-01-16-orchestrator-design.md`
+- Architecture: `docs/developed/plans/2026-01-16-orchestrator-design.md`

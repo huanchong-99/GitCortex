@@ -236,7 +236,7 @@ curl http://127.0.0.1:23456/api/health \
   -H "Authorization: Bearer <your-token>"
 ```
 
-> 更完整的运维、备份、升级、回滚流程，请查看：`docs/ops/runbook.md` 与 `docs/ops/troubleshooting.md`。
+> 更完整的运维、备份、升级、回滚流程，请查看：`docs/developed/ops/runbook.md` 与 `docs/developed/ops/troubleshooting.md`。
 
 ---
 
@@ -321,7 +321,7 @@ pnpm run dev
 - 前端：http://localhost:23457
 - 后端 API：http://localhost:23456/api
 
-**详细运维指南：** 查看 [Operations Manual](docs/ops/runbook.md) 了解生产部署、监控、升级等详细操作。
+**详细运维指南：** 查看 [Operations Manual](docs/developed/ops/runbook.md) 了解生产部署、监控、升级等详细操作。
 
 ### 从现有仓库恢复
 
@@ -413,8 +413,8 @@ GitCortex/
 │   └── package.json
 ├── shared/                    # 前后端共享类型（自动生成）
 ├── docs/                      # 文档
-│   ├── plans/                 # 实施计划
-│   └── issue-archive/         # 问题归档
+│   ├── 已开发/                # 已开发完成文档
+│   └── 未开发/                # 未开发/进行中文档
 ├── Cargo.toml                 # Workspace 配置
 ├── rust-toolchain.toml        # Rust 版本锁定
 ├── package.json               # Root package.json
@@ -425,7 +425,7 @@ GitCortex/
 
 ## 开发进度
 
-> **数据来源：** `docs/archive/pending/plans/TODO.md`（README 进度与其保持一致）
+> **数据来源：** `docs/undeveloped/current/TODO.md`（README 进度与其保持一致）
 > **总体状态：** 完成率 **97.3%**（**288/296**），进行中 **0**，未开始 **8**（Phase 21: 2 个，Phase 27: 6 个），可选优化 **5**。
 > **当前审计分数：** **100/100 (S级)**
 > **下一步：** Phase 27 - Docker 容器化与一键部署。
@@ -444,11 +444,11 @@ GitCortex/
 | Phase 26 | ✅ 已完成 | 联合审计问题全量修复 |
 | Phase 27 | 📋 待实施 | 6 项任务未开始 |
 
-**总体进度：** 288/296 任务完成（97.3%，以 `docs/archive/pending/plans/TODO.md` 为准）
+**总体进度：** 288/296 任务完成（97.3%，以 `docs/undeveloped/current/TODO.md` 为准）
 
-详细进度追踪：[docs/archive/pending/plans/TODO.md](docs/archive/pending/plans/TODO.md)
+详细进度追踪：[docs/undeveloped/current/TODO.md](docs/undeveloped/current/TODO.md)
 
-**质量状态：** 以 `docs/archive/pending/plans/TODO.md` 为准，当前记录为 S 级（100/100）。
+**质量状态：** 以 `docs/undeveloped/current/TODO.md` 为准，当前记录为 S 级（100/100）。
 
 ---
 
@@ -582,13 +582,13 @@ CC-Switch 提供原子写入机制，安全切换 CLI 模型配置：
 
 对于生产环境部署、数据库管理、监控和故障排查，请参阅：
 
-- **运维手册：** [docs/ops/runbook.md](docs/ops/runbook.md)
+- **运维手册：** [docs/developed/ops/runbook.md](docs/developed/ops/runbook.md)
   - 启动服务器（开发/生产模式）
   - 数据库管理（备份/恢复/迁移）
   - 监控与性能调优
   - 升级和回滚流程
 
-- **故障排查：** [docs/ops/troubleshooting.md](docs/ops/troubleshooting.md)
+- **故障排查：** [docs/developed/ops/troubleshooting.md](docs/developed/ops/troubleshooting.md)
   - 服务器无法启动
   - 工作流卡住
   - API 密钥问题
@@ -617,18 +617,18 @@ pnpm run generate-types:check
 
 ### 实施计划
 
-- [总体概览](docs/archive/pending/plans/00-overview.md)
-- [阶段计划目录](docs/archive)
-- [最新进度追踪（以此为准）](docs/archive/pending/plans/TODO.md)
+- [总体概览](docs/developed/plans/00-overview.md)
+- [未开发目录](docs/未开发)
+- [最新进度追踪（以此为准）](docs/undeveloped/current/TODO.md)
 
 ### 核心设计文档
 
-- [Orchestrator 架构设计](docs/archive/pending/plans/2026-01-16-orchestrator-design.md)
-- [GitCortex 详细实现计划](docs/archive/pending/plans/2026-01-16-gitcortex-implementation.md)
+- [Orchestrator 架构设计](docs/developed/plans/2026-01-16-orchestrator-design.md)
+- [GitCortex 详细实现计划](docs/developed/plans/2026-01-16-gitcortex-implementation.md)
 
 ### 进度追踪
 
-- [开发进度追踪表](docs/archive/pending/plans/TODO.md)
+- [开发进度追踪表](docs/undeveloped/current/TODO.md)
 
 ---
 
@@ -687,7 +687,7 @@ pnpm dlx browserslist@latest --update-db
 
 ### 代码质量标准
 
-当前质量状态以 `docs/archive/pending/plans/TODO.md` 为准：**100/100 (S级)**。
+当前质量状态以 `docs/undeveloped/current/TODO.md` 为准：**100/100 (S级)**。
 
 建议在每次发版前执行：
 

@@ -145,7 +145,7 @@ interface WorkflowListItemDto {
 - `tests/e2e/workflow_create_integration_test.rs` - Integration test
 
 ### Documentation
-- `docs/archive/pending/plans/2026-01-24-phase-13-implementation-plan.md` - Implementation plan
+- `docs/developed/plans/2026-01-24-phase-13-implementation-plan.md` - Implementation plan
 
 ## Merge Readiness
 

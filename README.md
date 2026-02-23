@@ -236,7 +236,7 @@ curl http://127.0.0.1:23456/api/health \
   -H "Authorization: Bearer <your-token>"
 ```
 
-> For more complete operations, backup, upgrade, and rollback procedures, see: `docs/ops/runbook.md` and `docs/ops/troubleshooting.md`.
+> For more complete operations, backup, upgrade, and rollback procedures, see: `docs/developed/ops/runbook.md` and `docs/developed/ops/troubleshooting.md`.
 
 ---
 
@@ -321,7 +321,7 @@ Access:
 - Frontend: http://localhost:23457
 - Backend API: http://localhost:23456/api
 
-**Detailed Operations Manual:** See [Operations Manual](docs/ops/runbook.md) for production deployment, monitoring, upgrades, and other detailed operations.
+**Detailed Operations Manual:** See [Operations Manual](docs/developed/ops/runbook.md) for production deployment, monitoring, upgrades, and other detailed operations.
 
 ### Restore from Existing Repository
 
@@ -413,8 +413,8 @@ GitCortex/
 │   └── package.json
 ├── shared/                    # Frontend-backend shared types (auto-generated)
 ├── docs/                      # Documentation
-│   ├── plans/                 # Implementation plans
-│   └── issue-archive/         # Issue archive
+│   ├── 已开发/                # Completed and stable documentation
+│   └── 未开发/                # Pending and in-progress documentation
 ├── Cargo.toml                 # Workspace configuration
 ├── rust-toolchain.toml        # Rust version lock
 ├── package.json               # Root package.json
@@ -425,7 +425,7 @@ GitCortex/
 
 ## Development Progress
 
-> **Data Source:** `docs/archive/pending/plans/TODO.md` (README progress aligns with it)
+> **Data Source:** `docs/undeveloped/current/TODO.md` (README progress aligns with it)
 > **Overall Status:** Completion rate **97.3%** (**288/296**), In Progress **0**, Not Started **8** (Phase 21: 2, Phase 27: 6), Optional Optimizations **5**.
 > **Current Audit Score:** **100/100 (S-tier)**
 > **Next Step:** Phase 27 - Docker containerization and one-click deployment.
@@ -444,11 +444,11 @@ GitCortex/
 | Phase 26 | ✅ Completed | Joint audit issue full fix |
 | Phase 27 | 📋 To Implement | 6 tasks not started |
 
-**Overall Progress:** 288/296 tasks completed (97.3%, per `docs/archive/pending/plans/TODO.md`)
+**Overall Progress:** 288/296 tasks completed (97.3%, per `docs/undeveloped/current/TODO.md`)
 
-Detailed progress tracking: [docs/archive/pending/plans/TODO.md](docs/archive/pending/plans/TODO.md)
+Detailed progress tracking: [docs/undeveloped/current/TODO.md](docs/undeveloped/current/TODO.md)
 
-**Quality Status:** Per `docs/archive/pending/plans/TODO.md`, currently recorded as S-tier (100/100).
+**Quality Status:** Per `docs/undeveloped/current/TODO.md`, currently recorded as S-tier (100/100).
 
 ---
 
@@ -582,13 +582,13 @@ CC-Switch provides atomic write mechanism for safe CLI model configuration switc
 
 For production deployment, database management, monitoring, and troubleshooting, see:
 
-- **Operations Manual:** [docs/ops/runbook.md](docs/ops/runbook.md)
+- **Operations Manual:** [docs/developed/ops/runbook.md](docs/developed/ops/runbook.md)
   - Start server (development/production mode)
   - Database management (backup/restore/migration)
   - Monitoring and performance tuning
   - Upgrade and rollback procedures
 
-- **Troubleshooting:** [docs/ops/troubleshooting.md](docs/ops/troubleshooting.md)
+- **Troubleshooting:** [docs/developed/ops/troubleshooting.md](docs/developed/ops/troubleshooting.md)
   - Server won't start
   - Workflow stuck
   - API key issues
@@ -617,18 +617,18 @@ pnpm run generate-types:check
 
 ### Implementation Plans
 
-- [Overall Overview](docs/archive/pending/plans/00-overview.md)
-- [Phase Plans Directory](docs/archive)
-- [Latest Progress Tracking (authoritative)](docs/archive/pending/plans/TODO.md)
+- [Overall Overview](docs/developed/plans/00-overview.md)
+- [未开发目录](docs/未开发)
+- [Latest Progress Tracking (authoritative)](docs/undeveloped/current/TODO.md)
 
 ### Core Design Documents
 
-- [Orchestrator Architecture Design](docs/archive/pending/plans/2026-01-16-orchestrator-design.md)
-- [GitCortex Detailed Implementation Plan](docs/archive/pending/plans/2026-01-16-gitcortex-implementation.md)
+- [Orchestrator Architecture Design](docs/developed/plans/2026-01-16-orchestrator-design.md)
+- [GitCortex Detailed Implementation Plan](docs/developed/plans/2026-01-16-gitcortex-implementation.md)
 
 ### Progress Tracking
 
-- [Development Progress Tracker](docs/archive/pending/plans/TODO.md)
+- [Development Progress Tracker](docs/undeveloped/current/TODO.md)
 
 ---
 
@@ -687,7 +687,7 @@ Issues and Pull Requests are welcome!
 
 ### Code Quality Standards
 
-Current quality status per `docs/archive/pending/plans/TODO.md`: **100/100 (S-tier)**.
+Current quality status per `docs/undeveloped/current/TODO.md`: **100/100 (S-tier)**.
 
 Recommended before each release:
 

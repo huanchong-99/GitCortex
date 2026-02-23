@@ -497,8 +497,8 @@ Before seeking help, collect the following:
 
 - **Documentation:**
   - README.md
-  - Operations Manual: `docs/ops/runbook.md`
-  - Architecture Design: `docs/archive/pending/plans/2026-01-16-orchestrator-design.md`
+  - Operations Manual: `docs/developed/ops/runbook.md`
+  - Architecture Design: `docs/developed/plans/2026-01-16-orchestrator-design.md`
 
 - **GitHub Issues:**
   - Search existing issues first

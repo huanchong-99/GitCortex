@@ -11,7 +11,7 @@
 
 ### 1.1 背景
 
-根据设计文档 `docs/archive/pending/plans/2026-01-16-orchestrator-design.md`，Orchestrator 应该在 workflow 进入 `running` 状态后自动向终端派发任务。但当前实现存在以下问题：
+根据设计文档 `docs/developed/plans/2026-01-16-orchestrator-design.md`，Orchestrator 应该在 workflow 进入 `running` 状态后自动向终端派发任务。但当前实现存在以下问题：
 
 - `execute_instruction` 只处理 `SendToTerminal/CompleteWorkflow/FailWorkflow`，**未处理 `StartTask`**
 - `execute_slash_commands` 只记录对话，不会下发指令到终端
@@ -134,5 +134,5 @@
 
 ## 6. 参考文档
 
-- 设计文档: `docs/archive/pending/plans/2026-01-16-orchestrator-design.md` 第 6 节
+- 设计文档: `docs/developed/plans/2026-01-16-orchestrator-design.md` 第 6 节
 - 相关代码: `crates/services/src/services/orchestrator/`

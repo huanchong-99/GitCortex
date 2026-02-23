@@ -3,8 +3,8 @@
 > 创建日期：2026-02-08  
 > 状态：📋 待实施  
 > 优先级：🔴 最高  
-> 对应 TODO：`docs/archive/pending/plans/TODO.md` Phase 26  
-> 审计来源：`docs/archive/pending/plans/codex和Claudecode联合分析_三文件增量合并.md`
+> 对应 TODO：`docs/undeveloped/current/TODO.md` Phase 26  
+> 审计来源：`docs/developed/plans/codex和Claudecode联合分析_三文件增量合并.md`
 
 ---
 

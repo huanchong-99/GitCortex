@@ -11,7 +11,7 @@
 ### Task 0: Audit existing Phase 9 changes and baseline failures
 
 **Files:**
-- Modify: `docs/archive/pending/plans/2026-01-19-phase-9-s-tier-quality.md` (update notes if needed)
+- Modify: `docs/developed/plans/2026-01-19-phase-9-s-tier-quality.md` (update notes if needed)
 
 **Step 1: Review current branch changes**
 Run (from repo root): `git status -sb`
@@ -776,7 +776,7 @@ No new changes; ensure working tree is clean.
 
 ---
 
-Plan complete and saved to `docs/archive/pending/plans/2026-01-19-phase-9-s-tier-quality.md`. Two execution options:
+Plan complete and saved to `docs/developed/plans/2026-01-19-phase-9-s-tier-quality.md`. Two execution options:
 
 1. Subagent-Driven (this session) - I dispatch a fresh subagent per task, review between tasks, fast iteration
 2. Parallel Session (separate) - Open new session with executing-plans, batch execution with checkpoints

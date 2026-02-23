@@ -60,8 +60,8 @@ cargo bench --package server
 
 - [ ] README.md 更新
 - [ ] CHANGELOG.md 更新
-- [ ] USER_GUIDE.md 更新
-- [ ] OPERATIONS_MANUAL.md 更新
+- [ ] docs/developed/misc/USER_GUIDE.md 更新
+- [ ] docs/developed/misc/OPERATIONS_MANUAL.md 更新
 - [ ] API 文档更新
 
 ### 5. 版本号管理
