@@ -200,6 +200,12 @@ fn validate_task_workflow_scope(task: &WorkflowTask, workflow_id: &str) -> Resul
     Ok(())
 }
 
+fn should_auto_complete_workflow(workflow_status: &str, tasks: &[WorkflowTask]) -> bool {
+    workflow_status == "running"
+        && !tasks.is_empty()
+        && tasks.iter().all(|task| task.status == "completed")
+}
+
 // ============================================================================
 // Route Handlers
 // ============================================================================
@@ -1443,7 +1449,7 @@ async fn update_task_status(
     Json(req): Json<UpdateTaskStatusRequest>,
 ) -> Result<ResponseJson<ApiResponse<WorkflowTask>>, ApiError> {
     // Verify workflow exists
-    let _workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
 
@@ -1472,6 +1478,16 @@ async fn update_task_status(
 
     // Update task status
     WorkflowTask::update_status(&deployment.db().pool, &task_id, &req.status).await?;
+
+    // Auto-sync workflow status: when all tasks are completed, mark running workflow as completed.
+    let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
+    if should_auto_complete_workflow(&workflow.status, &tasks) {
+        Workflow::update_status(&deployment.db().pool, &workflow_id, "completed").await?;
+        tracing::info!(
+            workflow_id = %workflow_id,
+            "Workflow auto-synced to completed after all tasks completed"
+        );
+    }
 
     // Fetch updated task
     let updated_task = WorkflowTask::find_by_id(&deployment.db().pool, &task_id)
@@ -1790,7 +1806,7 @@ mod workflow_guard_tests {
 
     use super::*;
 
-    fn build_task_with_workflow(workflow_id: &str) -> WorkflowTask {
+    fn build_task_with_status(workflow_id: &str, status: &str) -> WorkflowTask {
         WorkflowTask {
             id: "task-test".to_string(),
             workflow_id: workflow_id.to_string(),
@@ -1798,13 +1814,17 @@ mod workflow_guard_tests {
             name: "Task".to_string(),
             description: None,
             branch: "workflow/test/task".to_string(),
-            status: "pending".to_string(),
+            status: status.to_string(),
             order_index: 0,
             started_at: None,
             completed_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+    }
+
+    fn build_task_with_workflow(workflow_id: &str) -> WorkflowTask {
+        build_task_with_status(workflow_id, "pending")
     }
 
     #[test]
@@ -1895,6 +1915,26 @@ mod workflow_guard_tests {
             validate_task_workflow_scope(&task, "wf-2"),
             Err(ApiError::BadRequest(_))
         ));
+    }
+
+    #[test]
+    fn auto_complete_guard_requires_running_status_and_all_tasks_completed() {
+        let completed_tasks = vec![
+            build_task_with_status("wf-1", "completed"),
+            build_task_with_status("wf-1", "completed"),
+        ];
+        assert!(should_auto_complete_workflow("running", &completed_tasks));
+        assert!(!should_auto_complete_workflow("paused", &completed_tasks));
+    }
+
+    #[test]
+    fn auto_complete_guard_rejects_incomplete_or_empty_tasks() {
+        let mixed_tasks = vec![
+            build_task_with_status("wf-1", "completed"),
+            build_task_with_status("wf-1", "pending"),
+        ];
+        assert!(!should_auto_complete_workflow("running", &mixed_tasks));
+        assert!(!should_auto_complete_workflow("running", &[]));
     }
 }
 
