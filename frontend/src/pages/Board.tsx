@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { WorkflowSidebar } from '@/components/board/WorkflowSidebar';
 import { WorkflowKanbanBoard } from '@/components/board/WorkflowKanbanBoard';
@@ -8,11 +8,35 @@ import { ViewHeader } from '@/components/ui-new/primitives/ViewHeader';
 import { useWorkflowEvents } from '@/stores/wsStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { workflowKeys } from '@/hooks/useWorkflows';
+import { useSearchParams } from 'react-router-dom';
 
 export function Board() {
   const { t } = useTranslation('workflow');
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const workflowIdFromUrl = searchParams.get('workflowId');
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
+    workflowIdFromUrl
+  );
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (selectedWorkflowId === workflowIdFromUrl) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (selectedWorkflowId) {
+      nextSearchParams.set('workflowId', selectedWorkflowId);
+    } else {
+      nextSearchParams.delete('workflowId');
+    }
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [
+    searchParams,
+    selectedWorkflowId,
+    setSearchParams,
+    workflowIdFromUrl,
+  ]);
 
   const handleRealtimeWorkflowSignal = useCallback(() => {
     if (!selectedWorkflowId) return;

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Board } from './Board';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useWorkflowEvents } from '@/stores/wsStore';
+import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -46,7 +47,9 @@ describe('Board', () => {
     const queryClient = new QueryClient();
     return render(
       <QueryClientProvider client={queryClient}>
-        <Board />
+        <MemoryRouter initialEntries={['/board']}>
+          <Board />
+        </MemoryRouter>
       </QueryClientProvider>
     );
   };

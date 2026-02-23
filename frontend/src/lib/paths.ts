@@ -1,6 +1,8 @@
 export const paths = {
   // GitCortex paths
   board: () => '/board',
+  wizard: () => '/wizard',
+  workflows: () => '/workflows',
   pipeline: (workflowId: string) => `/pipeline/${workflowId}`,
   debug: (workflowId: string) => `/debug/${workflowId}`,
 
@@ -9,6 +11,7 @@ export const paths = {
 
   // Workspaces paths
   workspaces: (page?: string) => (page ? `/workspaces/${page}` : '/workspaces'),
+  workspacesCreate: () => '/workspaces/create',
 
   // Task paths
   task: (projectId: string, taskId: string) => `/projects/${projectId}/tasks/${taskId}`,

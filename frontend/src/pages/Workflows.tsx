@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -117,6 +117,7 @@ export function Workflows() {
   const { t } = useTranslation('workflow');
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [showWizard, setShowWizard] = useState(false);
@@ -894,10 +895,15 @@ export function Workflows() {
             </Button>
           </div>
         </div>
-        <Button onClick={() => setShowWizard(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Workflow
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate('/workspaces/create')}>
+            Create Workspace
+          </Button>
+          <Button onClick={() => setShowWizard(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Workflow
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

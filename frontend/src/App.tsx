@@ -162,6 +162,10 @@ function AppContent() {
                 path="/mcp-servers"
                 element={<Navigate to="/settings/mcp" replace />}
               />
+              <Route
+                path="/projects"
+                element={<Navigate to="/board" replace />}
+              />
             </Route>
 
             {/* ========== NEW DESIGN ROUTES (Workspaces) ========== */}

@@ -991,6 +991,7 @@ export const NavbarActionGroups = {
     Actions.TogglePreviewMode,
     Actions.ToggleRightSidebar,
     NavbarDivider,
+    Actions.NewWorkspace,
     Actions.OpenCommandBar,
     Actions.Feedback,
     Actions.WorkspacesGuide,

@@ -1,4 +1,10 @@
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { LayoutGrid, GitBranch, Bug, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -24,21 +30,24 @@ const VIEW_OPTIONS: ViewOption[] = [
     id: 'kanban',
     labelKey: 'viewSwitcher.kanban',
     icon: LayoutGrid,
-    path: () => '/board',
+    path: (workflowId) =>
+      workflowId ? `/board?workflowId=${encodeURIComponent(workflowId)}` : '/board',
     requiresWorkflow: false,
   },
   {
     id: 'pipeline',
     labelKey: 'viewSwitcher.pipeline',
     icon: GitBranch,
-    path: (workflowId) => workflowId ? `/pipeline/${workflowId}` : '/board',
+    path: (workflowId) =>
+      workflowId ? `/pipeline/${encodeURIComponent(workflowId)}` : '/board',
     requiresWorkflow: true,
   },
   {
     id: 'debug',
     labelKey: 'viewSwitcher.debug',
     icon: Bug,
-    path: (workflowId) => workflowId ? `/debug/${workflowId}` : '/board',
+    path: (workflowId) =>
+      workflowId ? `/debug/${encodeURIComponent(workflowId)}` : '/board',
     requiresWorkflow: true,
   },
 ];
@@ -56,7 +65,10 @@ export function NewDesignLayout() {
   const { t } = useTranslation('workflow');
   const location = useLocation();
   const navigate = useNavigate();
-  const { workflowId } = useParams<{ workflowId?: string }>();
+  const [searchParams] = useSearchParams();
+  const { workflowId: routeWorkflowId } = useParams<{ workflowId?: string }>();
+  const boardWorkflowId = searchParams.get('workflowId') ?? undefined;
+  const workflowId = routeWorkflowId ?? boardWorkflowId;
 
   const currentView = getCurrentView(location.pathname);
 
@@ -105,15 +117,33 @@ export function NewDesignLayout() {
               );
             })}
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/settings')}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
-            aria-label={t('viewSwitcher.settings')}
-            title={t('viewSwitcher.settings')}
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => navigate('/wizard')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
+              title={t('viewSwitcher.workflowManagement', { defaultValue: 'Workflow Management' })}
+            >
+              {t('viewSwitcher.workflowManagement', { defaultValue: 'Workflow Management' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/workspaces/create')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
+              title={t('viewSwitcher.createWorkspace', { defaultValue: 'Create Workspace' })}
+            >
+              {t('viewSwitcher.createWorkspace', { defaultValue: 'Create Workspace' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
+              aria-label={t('viewSwitcher.settings')}
+              title={t('viewSwitcher.settings')}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

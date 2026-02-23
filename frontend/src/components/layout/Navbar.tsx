@@ -40,7 +40,7 @@ import { useUserSystem } from '@/components/ConfigProvider';
 import { oauthApi } from '@/lib/api';
 
 const INTERNAL_NAV = [
-  { label: 'Projects', icon: FolderOpen, to: '/projects' },
+  { label: 'Projects', icon: FolderOpen, to: '/board' },
   { label: 'Slash Commands', icon: Terminal, to: '/commands' },
 ];
 
@@ -140,7 +140,7 @@ export function Navbar() {
       <div className="w-full px-3">
         <div className="flex items-center h-12 py-2">
           <div className="flex-1 flex items-center">
-            <Link to="/projects">
+            <Link to="/board">
               <Logo />
             </Link>
           </div>
@@ -205,13 +205,13 @@ export function Navbar() {
               </>
             ) : null}
 
-            {/* <Button variant="ghost" size="sm" className="h-9 gap-1.5" asChild>
-              <Link to="/workspaces">
-                <Sparkles className="h-4 w-4" />
-                {t('common:navbar.tryNewUI')}
+            <Button variant="ghost" size="sm" className="h-9 gap-1.5" asChild>
+              <Link to="/workspaces/create">
+                <FolderOpen className="h-4 w-4" />
+                Workspaces
               </Link>
             </Button>
-            <NavDivider /> */}
+            <NavDivider />
 
             <div className="flex items-center gap-1">
               <Button
