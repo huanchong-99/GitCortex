@@ -1,0 +1,9 @@
+target/
+node_modules/
+.git
+.git/
+dev_assets/
+.worktrees/
+*.log
+.tmp/
+tmp/
