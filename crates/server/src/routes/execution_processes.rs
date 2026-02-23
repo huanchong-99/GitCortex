@@ -3,7 +3,7 @@ use axum::{
     Extension, Router,
     extract::{
         Path, Query, State,
-        ws::{WebSocket, WebSocketUpgrade},
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     middleware::from_fn_with_state,
     response::{IntoResponse, Json as ResponseJson},
@@ -21,6 +21,8 @@ use utils::{log_msg::LogMsg, response::ApiResponse};
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError, middleware::load_execution_process_middleware};
+
+const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 #[derive(Debug, Deserialize)]
 pub struct SessionExecutionProcessQuery {
@@ -102,24 +104,62 @@ async fn handle_raw_logs_ws(
 
     // Split socket into sender and receiver
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
 
-    // Drain (and ignore) any client->server messages so pings/pongs work
-    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
-
-    // Forward server messages
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(msg) => {
-                if sender.send(msg).await.is_err() {
-                    break; // client disconnected
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!(execution_process_id = %exec_id, "raw logs WS heartbeat send failed; closing");
+                    break;
                 }
             }
-            Err(e) => {
-                tracing::error!("stream error: {}", e);
-                break;
+            item = stream.next() => {
+                match item {
+                    Some(Ok(msg)) => {
+                        if sender.send(msg).await.is_err() {
+                            tracing::debug!(execution_process_id = %exec_id, "raw logs WS send failed; client disconnected");
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!(execution_process_id = %exec_id, "raw logs stream error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!(execution_process_id = %exec_id, "raw logs WS client requested close");
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!(execution_process_id = %exec_id, "raw logs WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!(execution_process_id = %exec_id, error = %e, "raw logs WS receive error");
+                        break;
+                    }
+                    None => {
+                        tracing::debug!(execution_process_id = %exec_id, "raw logs WS receiver closed");
+                        break;
+                    }
+                }
             }
         }
     }
+
+    let _ = sender.send(Message::Close(None)).await;
+    let _ = sender.close().await;
+
     Ok(())
 }
 
@@ -152,20 +192,62 @@ async fn handle_normalized_logs_ws(
 ) -> anyhow::Result<()> {
     let mut stream = stream.map_ok(|msg| msg.to_ws_message_unchecked());
     let (mut sender, mut receiver) = socket.split();
-    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(msg) => {
-                if sender.send(msg).await.is_err() {
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!("normalized logs WS heartbeat send failed; closing");
                     break;
                 }
             }
-            Err(e) => {
-                tracing::error!("stream error: {}", e);
-                break;
+            item = stream.next() => {
+                match item {
+                    Some(Ok(msg)) => {
+                        if sender.send(msg).await.is_err() {
+                            tracing::debug!("normalized logs WS send failed; client disconnected");
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!("normalized logs stream error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!("normalized logs WS client requested close");
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!("normalized logs WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!("normalized logs WS receive error: {}", e);
+                        break;
+                    }
+                    None => {
+                        tracing::debug!("normalized logs WS receiver closed");
+                        break;
+                    }
+                }
             }
         }
     }
+
+    let _ = sender.send(Message::Close(None)).await;
+    let _ = sender.close().await;
+
     Ok(())
 }
 
@@ -215,24 +297,62 @@ async fn handle_execution_processes_by_session_ws(
 
     // Split socket into sender and receiver
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
 
-    // Drain (and ignore) any client->server messages so pings/pongs work
-    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
-
-    // Forward server messages
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(msg) => {
-                if sender.send(msg).await.is_err() {
-                    break; // client disconnected
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!(session_id = %session_id, "execution processes WS heartbeat send failed; closing");
+                    break;
                 }
             }
-            Err(e) => {
-                tracing::error!("stream error: {}", e);
-                break;
+            item = stream.next() => {
+                match item {
+                    Some(Ok(msg)) => {
+                        if sender.send(msg).await.is_err() {
+                            tracing::debug!(session_id = %session_id, "execution processes WS send failed; client disconnected");
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!(session_id = %session_id, "execution processes stream error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!(session_id = %session_id, "execution processes WS client requested close");
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!(session_id = %session_id, "execution processes WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!(session_id = %session_id, error = %e, "execution processes WS receive error");
+                        break;
+                    }
+                    None => {
+                        tracing::debug!(session_id = %session_id, "execution processes WS receiver closed");
+                        break;
+                    }
+                }
             }
         }
     }
+
+    let _ = sender.send(Message::Close(None)).await;
+    let _ = sender.close().await;
+
     Ok(())
 }
 

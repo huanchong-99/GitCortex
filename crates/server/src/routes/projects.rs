@@ -5,7 +5,7 @@ use axum::{
     Extension, Json, Router,
     extract::{
         Path, Query, State,
-        ws::{WebSocket, WebSocketUpgrade},
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     middleware::from_fn_with_state,
@@ -29,6 +29,8 @@ use utils::{
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError, middleware::load_project_middleware};
+
+const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 #[derive(Deserialize, TS)]
 pub struct LinkToExistingRequest {
@@ -80,24 +82,69 @@ async fn handle_projects_ws(socket: WebSocket, deployment: DeploymentImpl) -> an
 
     // Split socket into sender and receiver
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+    let mut client_closed = false;
 
-    // Drain (and ignore) any client->server messages so pings/pongs work
-    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
-
-    // Forward server messages
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(msg) => {
-                if sender.send(msg).await.is_err() {
-                    break; // client disconnected
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!("projects WS heartbeat send failed; closing");
+                    client_closed = true;
+                    break;
                 }
             }
-            Err(e) => {
-                tracing::error!("stream error: {}", e);
-                break;
+            item = stream.next() => {
+                match item {
+                    Some(Ok(msg)) => {
+                        if sender.send(msg).await.is_err() {
+                            tracing::debug!("projects WS send failed; client disconnected");
+                            client_closed = true;
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!("projects stream error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!("projects WS client requested close");
+                        client_closed = true;
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!("projects WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!("projects WS receive error: {}", e);
+                        client_closed = true;
+                        break;
+                    }
+                    None => {
+                        tracing::debug!("projects WS receiver closed");
+                        client_closed = true;
+                        break;
+                    }
+                }
             }
         }
     }
+
+    if !client_closed {
+        let _ = sender.send(Message::Close(None)).await;
+    }
+    let _ = sender.close().await;
 
     Ok(())
 }

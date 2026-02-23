@@ -2,7 +2,7 @@ use axum::{
     Json, Router,
     extract::{
         Path, State,
-        ws::{WebSocket, WebSocketUpgrade},
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::{IntoResponse, Json as ResponseJson},
     routing::get,
@@ -15,6 +15,8 @@ use utils::response::ApiResponse;
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
+
+const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 /// Path parameters for scratch routes with composite key
 #[derive(Deserialize)]
@@ -125,22 +127,70 @@ async fn handle_scratch_ws(
         .map_ok(|msg| msg.to_ws_message_unchecked());
 
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+    let mut client_closed = false;
 
-    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
-
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(msg) => {
-                if sender.send(msg).await.is_err() {
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!(scratch_id = %id, scratch_type = ?scratch_type, "scratch WS heartbeat send failed; closing");
+                    client_closed = true;
                     break;
                 }
             }
-            Err(e) => {
-                tracing::error!("scratch stream error: {}", e);
-                break;
+            item = stream.next() => {
+                match item {
+                    Some(Ok(msg)) => {
+                        if sender.send(msg).await.is_err() {
+                            tracing::debug!(scratch_id = %id, scratch_type = ?scratch_type, "scratch WS send failed; client disconnected");
+                            client_closed = true;
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!(scratch_id = %id, scratch_type = ?scratch_type, "scratch stream error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!(scratch_id = %id, scratch_type = ?scratch_type, "scratch WS client requested close");
+                        client_closed = true;
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!(scratch_id = %id, scratch_type = ?scratch_type, "scratch WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!(scratch_id = %id, scratch_type = ?scratch_type, error = %e, "scratch WS receive error");
+                        client_closed = true;
+                        break;
+                    }
+                    None => {
+                        tracing::debug!(scratch_id = %id, scratch_type = ?scratch_type, "scratch WS receiver closed");
+                        client_closed = true;
+                        break;
+                    }
+                }
             }
         }
     }
+
+    if !client_closed {
+        let _ = sender.send(Message::Close(None)).await;
+    }
+    let _ = sender.close().await;
+
     Ok(())
 }
 

@@ -49,6 +49,11 @@ export default schemas;
   };
 }
 
+function isBenignWsProxyError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === "ECONNRESET" || code === "ECONNABORTED" || code === "EPIPE";
+}
+
 export default defineConfig({
   plugins: [
     react({
@@ -84,6 +89,24 @@ export default defineConfig({
         target: `http://localhost:${process.env.BACKEND_PORT || "23456"}`,
         changeOrigin: true,
         ws: true,
+        configure: (proxy) => {
+          const existingErrorListeners = proxy.listeners("error");
+          proxy.removeAllListeners("error");
+          proxy.on("error", (error, req, res, target) => {
+            const isWsRequest =
+              req?.headers?.upgrade?.toLowerCase?.() === "websocket";
+
+            if (isWsRequest && isBenignWsProxyError(error)) {
+              // Ignore noisy WS close races (client-side reconnect/close)
+              // to keep dev logs focused on actionable failures.
+              return;
+            }
+
+            for (const listener of existingErrorListeners) {
+              listener.call(proxy, error, req, res, target);
+            }
+          });
+        },
       }
     },
     fs: {

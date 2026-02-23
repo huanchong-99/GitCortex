@@ -15,7 +15,7 @@ use axum::{
     Extension, Json, Router,
     extract::{
         Query, State,
-        ws::{WebSocket, WebSocketUpgrade},
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     middleware::from_fn_with_state,
@@ -96,6 +96,8 @@ pub struct WorkspaceStreamQuery {
     pub archived: Option<bool>,
     pub limit: Option<i64>,
 }
+
+const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 #[derive(Debug, Deserialize, TS)]
 pub struct UpdateWorkspace {
@@ -315,14 +317,26 @@ async fn handle_task_attempt_diff_ws(
     let mut stream = stream.map_ok(|msg: LogMsg| msg.to_ws_message_unchecked());
 
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+    let mut client_closed = false;
 
     loop {
         tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!(workspace_id = %workspace.id, "diff WS heartbeat send failed; closing");
+                    client_closed = true;
+                    break;
+                }
+            }
             // Wait for next stream item
             item = stream.next() => {
                 match item {
                     Some(Ok(msg)) => {
                         if sender.send(msg).await.is_err() {
+                            tracing::debug!(workspace_id = %workspace.id, "diff WS send failed; client disconnected");
+                            client_closed = true;
                             break;
                         }
                     }
@@ -335,12 +349,40 @@ async fn handle_task_attempt_diff_ws(
             }
             // Detect client disconnection
             msg = receiver.next() => {
-                if msg.is_none() {
-                    break;
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!(workspace_id = %workspace.id, "diff WS client requested close");
+                        client_closed = true;
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!(workspace_id = %workspace.id, "diff WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!(workspace_id = %workspace.id, error = %e, "diff WS receive error");
+                        client_closed = true;
+                        break;
+                    }
+                    None => {
+                        tracing::debug!(workspace_id = %workspace.id, "diff WS receiver closed");
+                        client_closed = true;
+                        break;
+                    }
                 }
             }
         }
     }
+
+    if !client_closed {
+        let _ = sender.send(Message::Close(None)).await;
+    }
+    let _ = sender.close().await;
+
     Ok(())
 }
 
@@ -372,13 +414,25 @@ async fn handle_workspaces_ws(
         .map_ok(|msg| msg.to_ws_message_unchecked());
 
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
+    let mut client_closed = false;
 
     loop {
         tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!("workspaces WS heartbeat send failed; closing");
+                    client_closed = true;
+                    break;
+                }
+            }
             item = stream.next() => {
                 match item {
                     Some(Ok(msg)) => {
                         if sender.send(msg).await.is_err() {
+                            tracing::debug!("workspaces WS send failed; client disconnected");
+                            client_closed = true;
                             break;
                         }
                     }
@@ -390,12 +444,40 @@ async fn handle_workspaces_ws(
                 }
             }
             msg = receiver.next() => {
-                if msg.is_none() {
-                    break;
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!("workspaces WS client requested close");
+                        client_closed = true;
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!("workspaces WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!("workspaces WS receive error: {}", e);
+                        client_closed = true;
+                        break;
+                    }
+                    None => {
+                        tracing::debug!("workspaces WS receiver closed");
+                        client_closed = true;
+                        break;
+                    }
                 }
             }
         }
     }
+
+    if !client_closed {
+        let _ = sender.send(Message::Close(None)).await;
+    }
+    let _ = sender.close().await;
+
     Ok(())
 }
 

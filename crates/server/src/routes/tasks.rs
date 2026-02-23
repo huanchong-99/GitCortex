@@ -5,7 +5,7 @@ use axum::{
     Extension, Json, Router,
     extract::{
         Query, State,
-        ws::{WebSocket, WebSocketUpgrade},
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     middleware::from_fn_with_state,
@@ -33,6 +33,8 @@ use crate::{
     DeploymentImpl, error::ApiError, middleware::load_task_middleware,
     routes::task_attempts::WorkspaceRepoInput,
 };
+
+const WS_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TaskQuery {
@@ -76,24 +78,62 @@ async fn handle_tasks_ws(
 
     // Split socket into sender and receiver
     let (mut sender, mut receiver) = socket.split();
+    let mut heartbeat =
+        tokio::time::interval(tokio::time::Duration::from_secs(WS_HEARTBEAT_INTERVAL_SECS));
 
-    // Drain (and ignore) any client->server messages so pings/pongs work
-    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
-
-    // Forward server messages
-    while let Some(item) = stream.next().await {
-        match item {
-            Ok(msg) => {
-                if sender.send(msg).await.is_err() {
-                    break; // client disconnected
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    tracing::debug!("tasks WS heartbeat send failed; closing");
+                    break;
                 }
             }
-            Err(e) => {
-                tracing::error!("stream error: {}", e);
-                break;
+            item = stream.next() => {
+                match item {
+                    Some(Ok(msg)) => {
+                        if sender.send(msg).await.is_err() {
+                            tracing::debug!("tasks WS send failed; client disconnected");
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!("tasks stream error: {}", e);
+                        break;
+                    }
+                    None => break,
+                }
+            }
+            msg = receiver.next() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) => {
+                        tracing::debug!("tasks WS client requested close");
+                        break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            tracing::debug!("tasks WS failed to respond pong");
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {}
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        tracing::debug!("tasks WS receive error: {}", e);
+                        break;
+                    }
+                    None => {
+                        tracing::debug!("tasks WS receiver closed");
+                        break;
+                    }
+                }
             }
         }
     }
+
+    let _ = sender.send(Message::Close(None)).await;
+    let _ = sender.close().await;
+
     Ok(())
 }
 
