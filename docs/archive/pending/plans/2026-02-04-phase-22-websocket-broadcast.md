@@ -11,7 +11,7 @@
 
 ### 1.1 背景
 
-根据设计文档 `docs/plans/2026-01-16-orchestrator-design.md` 第 13 节，系统应支持完整的 WebSocket 事件推送：
+根据设计文档 `docs/archive/pending/plans/2026-01-16-orchestrator-design.md` 第 13 节，系统应支持完整的 WebSocket 事件推送：
 
 | 类别 | 事件 | 说明 |
 |------|------|------|
@@ -209,6 +209,6 @@ type WsEventType =
 
 ## 7. 参考文档
 
-- 设计文档: `docs/plans/2026-01-16-orchestrator-design.md` 第 13 节
+- 设计文档: `docs/archive/pending/plans/2026-01-16-orchestrator-design.md` 第 13 节
 - 相关代码: `crates/server/src/routes/terminal_ws.rs`
 - 前端参考: `frontend/src/stores/wsStore.ts`

@@ -1,4 +1,4 @@
-﻿# GitCortex 开发进度追踪
+# GitCortex 开发进度追踪
 
 > **自动化说明:** 此文件由 `superpowers-automation` skill 自动更新。
 > 每完成一个任务，对应行的状态会从 `⬜` 更新为 `✅` 并记录完成时间。
@@ -381,7 +381,7 @@
 | 16.5 | 启动/暂停/停止控制与权限提示 | ✅ | 2026-01-25 |
 | 16.6 | i18n/错误态/空态完善 | ✅ | 2026-01-25 |
 
-> **完成说明:** 前端完全迁移到真实 API DTO 数据，实现实时终端调试、工作流控制（启动/暂停/停止）、Wizard 提交对齐、完整 i18n 覆盖。共 7 个 commits，+986/-130 行代码变更。269 个测试全部通过。详见 `docs/plans/2026-01-25-phase-16-implementation.md`。
+> **完成说明:** 前端完全迁移到真实 API DTO 数据，实现实时终端调试、工作流控制（启动/暂停/停止）、Wizard 提交对齐、完整 i18n 覆盖。共 7 个 commits，+986/-130 行代码变更。269 个测试全部通过。详见 `docs/archive/pending/plans/2026-01-25-phase-16-implementation.md`。
 
 ---
 
@@ -397,7 +397,7 @@
 | 17.4 | Orchestrator 提示词渲染与命令执行 | ✅ | 2026-01-25 |
 | 17.5 | 命令系统测试与回归 | ✅ | 2026-01-25 |
 
-> **完成说明:** 实现了完整的斜杠命令系统，包括 CRUD API、前端管理界面、自定义参数编辑、Handlebars 模板渲染、Orchestrator 集成。共 6 个提交，+2206/-87 行代码变更。详见 `docs/plans/2026-01-25-phase-17-slash-commands-implementation.md`。
+> **完成说明:** 实现了完整的斜杠命令系统，包括 CRUD API、前端管理界面、自定义参数编辑、Handlebars 模板渲染、Orchestrator 集成。共 6 个提交，+2206/-87 行代码变更。详见 `docs/archive/pending/plans/2026-01-25-phase-17-slash-commands-implementation.md`。
 
 ---
 
@@ -409,7 +409,7 @@
 > - ✅ 修复20个编译错误，建立干净测试基线
 > - ✅ 零编译错误达成，20个警告（可接受）
 > - ✅ CI/CD 保护就位（GitHub Actions + Pre-commit hooks）
-> - ✅ 完整文档：`docs/plans/2026-01-28-baseline-fix-summary.md`
+> - ✅ 完整文档：`docs/archive/completed/plans/2026-01-28-baseline-fix-summary.md`
 > - ✅ 提交历史：16个提交，全部合并到主分支
 >
 > **修复详情:**

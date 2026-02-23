@@ -425,7 +425,7 @@ GitCortex/
 
 ## 开发进度
 
-> **数据来源：** `docs/plans/TODO.md`（README 进度与其保持一致）
+> **数据来源：** `docs/archive/pending/plans/TODO.md`（README 进度与其保持一致）
 > **总体状态：** 完成率 **97.3%**（**288/296**），进行中 **0**，未开始 **8**（Phase 21: 2 个，Phase 27: 6 个），可选优化 **5**。
 > **当前审计分数：** **100/100 (S级)**
 > **下一步：** Phase 27 - Docker 容器化与一键部署。
@@ -444,11 +444,11 @@ GitCortex/
 | Phase 26 | ✅ 已完成 | 联合审计问题全量修复 |
 | Phase 27 | 📋 待实施 | 6 项任务未开始 |
 
-**总体进度：** 288/296 任务完成（97.3%，以 `docs/plans/TODO.md` 为准）
+**总体进度：** 288/296 任务完成（97.3%，以 `docs/archive/pending/plans/TODO.md` 为准）
 
-详细进度追踪：[docs/plans/TODO.md](docs/plans/TODO.md)
+详细进度追踪：[docs/archive/pending/plans/TODO.md](docs/archive/pending/plans/TODO.md)
 
-**质量状态：** 以 `docs/plans/TODO.md` 为准，当前记录为 S 级（100/100）。
+**质量状态：** 以 `docs/archive/pending/plans/TODO.md` 为准，当前记录为 S 级（100/100）。
 
 ---
 
@@ -617,18 +617,18 @@ pnpm run generate-types:check
 
 ### 实施计划
 
-- [总体概览](docs/plans/00-overview.md)
-- [阶段计划目录](docs/plans)
-- [最新进度追踪（以此为准）](docs/plans/TODO.md)
+- [总体概览](docs/archive/pending/plans/00-overview.md)
+- [阶段计划目录](docs/archive)
+- [最新进度追踪（以此为准）](docs/archive/pending/plans/TODO.md)
 
 ### 核心设计文档
 
-- [Orchestrator 架构设计](docs/plans/2026-01-16-orchestrator-design.md)
-- [GitCortex 详细实现计划](docs/plans/2026-01-16-gitcortex-implementation.md)
+- [Orchestrator 架构设计](docs/archive/pending/plans/2026-01-16-orchestrator-design.md)
+- [GitCortex 详细实现计划](docs/archive/pending/plans/2026-01-16-gitcortex-implementation.md)
 
 ### 进度追踪
 
-- [开发进度追踪表](docs/plans/TODO.md)
+- [开发进度追踪表](docs/archive/pending/plans/TODO.md)
 
 ---
 
@@ -687,7 +687,7 @@ pnpm dlx browserslist@latest --update-db
 
 ### 代码质量标准
 
-当前质量状态以 `docs/plans/TODO.md` 为准：**100/100 (S级)**。
+当前质量状态以 `docs/archive/pending/plans/TODO.md` 为准：**100/100 (S级)**。
 
 建议在每次发版前执行：
 

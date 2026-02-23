@@ -425,7 +425,7 @@ GitCortex/
 
 ## Development Progress
 
-> **Data Source:** `docs/plans/TODO.md` (README progress aligns with it)
+> **Data Source:** `docs/archive/pending/plans/TODO.md` (README progress aligns with it)
 > **Overall Status:** Completion rate **97.3%** (**288/296**), In Progress **0**, Not Started **8** (Phase 21: 2, Phase 27: 6), Optional Optimizations **5**.
 > **Current Audit Score:** **100/100 (S-tier)**
 > **Next Step:** Phase 27 - Docker containerization and one-click deployment.
@@ -444,11 +444,11 @@ GitCortex/
 | Phase 26 | ✅ Completed | Joint audit issue full fix |
 | Phase 27 | 📋 To Implement | 6 tasks not started |
 
-**Overall Progress:** 288/296 tasks completed (97.3%, per `docs/plans/TODO.md`)
+**Overall Progress:** 288/296 tasks completed (97.3%, per `docs/archive/pending/plans/TODO.md`)
 
-Detailed progress tracking: [docs/plans/TODO.md](docs/plans/TODO.md)
+Detailed progress tracking: [docs/archive/pending/plans/TODO.md](docs/archive/pending/plans/TODO.md)
 
-**Quality Status:** Per `docs/plans/TODO.md`, currently recorded as S-tier (100/100).
+**Quality Status:** Per `docs/archive/pending/plans/TODO.md`, currently recorded as S-tier (100/100).
 
 ---
 
@@ -617,18 +617,18 @@ pnpm run generate-types:check
 
 ### Implementation Plans
 
-- [Overall Overview](docs/plans/00-overview.md)
-- [Phase Plans Directory](docs/plans)
-- [Latest Progress Tracking (authoritative)](docs/plans/TODO.md)
+- [Overall Overview](docs/archive/pending/plans/00-overview.md)
+- [Phase Plans Directory](docs/archive)
+- [Latest Progress Tracking (authoritative)](docs/archive/pending/plans/TODO.md)
 
 ### Core Design Documents
 
-- [Orchestrator Architecture Design](docs/plans/2026-01-16-orchestrator-design.md)
-- [GitCortex Detailed Implementation Plan](docs/plans/2026-01-16-gitcortex-implementation.md)
+- [Orchestrator Architecture Design](docs/archive/pending/plans/2026-01-16-orchestrator-design.md)
+- [GitCortex Detailed Implementation Plan](docs/archive/pending/plans/2026-01-16-gitcortex-implementation.md)
 
 ### Progress Tracking
 
-- [Development Progress Tracker](docs/plans/TODO.md)
+- [Development Progress Tracker](docs/archive/pending/plans/TODO.md)
 
 ---
 
@@ -687,7 +687,7 @@ Issues and Pull Requests are welcome!
 
 ### Code Quality Standards
 
-Current quality status per `docs/plans/TODO.md`: **100/100 (S-tier)**.
+Current quality status per `docs/archive/pending/plans/TODO.md`: **100/100 (S-tier)**.
 
 Recommended before each release:
 

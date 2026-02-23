@@ -369,7 +369,7 @@ Created:
   crates/services/src/services/terminal/utf8_decoder.rs (253 lines)
   scripts/migrate_auto_confirm.sh (163 lines)
   scripts/migrate_auto_confirm.sql (38 lines)
-  docs/plans/2026-02-07-phase-25-implementation.md (743 lines)
+  docs/archive/pending/plans/2026-02-07-phase-25-implementation.md (743 lines)
 
 Modified:
   crates/db/src/models/terminal.rs (45 lines changed)

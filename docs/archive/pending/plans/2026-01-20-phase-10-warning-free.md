@@ -551,7 +551,7 @@ No new changes; ensure working tree is clean.
 
 ---
 
-Plan complete and saved to `docs/plans/2026-01-20-phase-10-warning-free.md`. Two execution options:
+Plan complete and saved to `docs/archive/pending/plans/2026-01-20-phase-10-warning-free.md`. Two execution options:
 
 1. Subagent-Driven (this session) - I dispatch a fresh subagent per task, review between tasks, fast iteration
 2. Parallel Session (separate) - Open new session with executing-plans, batch execution with checkpoints

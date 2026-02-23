@@ -11,7 +11,7 @@
 
 ### 1.1 背景
 
-根据设计文档 `docs/plans/2026-01-16-orchestrator-design.md` 第 6 节，系统应采用事件驱动模式：
+根据设计文档 `docs/archive/pending/plans/2026-01-16-orchestrator-design.md` 第 6 节，系统应采用事件驱动模式：
 
 ```
 ✗ 错误方式 (轮询):
@@ -190,6 +190,6 @@ next_action: {continue|retry|merge}
 
 ## 7. 参考文档
 
-- 设计文档: `docs/plans/2026-01-16-orchestrator-design.md` 第 6 节
+- 设计文档: `docs/archive/pending/plans/2026-01-16-orchestrator-design.md` 第 6 节
 - 相关代码: `crates/services/src/services/git_watcher.rs`
 - 测试参考: `crates/services/tests/git_watcher_integration_test.rs`
