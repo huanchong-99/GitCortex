@@ -40,6 +40,8 @@ pub mod workflows;
 pub mod workflows_dto;
 
 pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub) -> IntoMakeService<Router> {
+    let outer_deployment = deployment.clone();
+
     // Create routers with different middleware layers
     let base_routes = Router::new()
         .route("/health", get(health::health_check))
@@ -73,8 +75,11 @@ pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub) -> IntoMak
         .with_state(deployment);
 
     Router::new()
+        .route("/healthz", get(health::healthz))
+        .route("/readyz", get(health::readyz))
         .route("/", get(frontend::serve_frontend_root))
         .route("/{*path}", get(frontend::serve_frontend))
         .nest("/api", base_routes)
+        .with_state(outer_deployment)
         .into_make_service()
 }
