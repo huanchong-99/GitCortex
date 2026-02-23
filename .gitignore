@@ -13,6 +13,8 @@ frontend/node_modules/
 
 # Logs & local data
 logs/
+tmp/
+.tmp/
 *.log
 dev_assets/
 *.sqlite
