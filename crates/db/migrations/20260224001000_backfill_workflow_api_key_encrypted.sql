@@ -6,6 +6,8 @@
 -- 2) We mirror those encrypted payloads into `orchestrator_api_key_encrypted` so future
 --    readers can switch columns safely without data loss.
 
+ALTER TABLE workflow ADD COLUMN orchestrator_api_key_encrypted TEXT;
+
 -- Backfill existing rows once.
 UPDATE workflow
 SET orchestrator_api_key_encrypted = orchestrator_api_key
