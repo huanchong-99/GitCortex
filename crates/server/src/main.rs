@@ -149,7 +149,13 @@ async fn main() -> Result<(), GitCortexError> {
             23456
         }); // Default port: 23456 (chosen to avoid common dev ports and system ranges)
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let host = std::env::var("HOST").unwrap_or_else(|_| {
+        if std::path::Path::new("/.dockerenv").exists() {
+            "0.0.0.0".to_string()
+        } else {
+            "127.0.0.1".to_string()
+        }
+    });
     let listener = tokio::net::TcpListener::bind(format!("{host}:{port}")).await?;
     let actual_port = listener.local_addr()?.port(); // get → 53427 (example)
 
@@ -160,7 +166,7 @@ async fn main() -> Result<(), GitCortexError> {
 
     tracing::info!("Server running on http://{host}:{actual_port}");
 
-    if !cfg!(debug_assertions) {
+    if !cfg!(debug_assertions) && !std::path::Path::new("/.dockerenv").exists() {
         tracing::info!("Opening browser...");
         tokio::spawn(async move {
             if let Err(e) = open_browser(&format!("http://127.0.0.1:{actual_port}")) {

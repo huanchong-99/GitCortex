@@ -100,6 +100,10 @@ pub fn normalize_macos_private_alias<P: AsRef<Path>>(p: P) -> PathBuf {
 }
 
 pub fn get_gitcortex_temp_dir() -> std::path::PathBuf {
+    if let Ok(d) = std::env::var("GITCORTEX_TEMP_DIR") {
+        return std::path::PathBuf::from(d);
+    }
+
     let dir_name = if cfg!(debug_assertions) {
         "gitcortex-dev"
     } else {
@@ -169,5 +173,14 @@ mod tests {
             make_path_relative(&path_under_var, &worktree_private),
             "hello-world.txt"
         );
+    }
+
+    #[test]
+    fn test_get_gitcortex_temp_dir_env_override() {
+        let dir = std::path::PathBuf::from("/custom/temp/gitcortex");
+        unsafe { std::env::set_var("GITCORTEX_TEMP_DIR", &dir) };
+        let result = get_gitcortex_temp_dir();
+        assert_eq!(result, dir);
+        unsafe { std::env::remove_var("GITCORTEX_TEMP_DIR") };
     }
 }
