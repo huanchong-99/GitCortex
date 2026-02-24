@@ -120,6 +120,15 @@ impl OrchestratorRuntime {
         workflow_id: &str,
         workflow: &db::models::Workflow,
     ) -> Result<Option<GitWatcherHandle>> {
+        // Check workflow-level git watcher toggle
+        if !workflow.git_watcher_enabled {
+            info!(
+                "Git watcher disabled for workflow {} (git_watcher_enabled=false)",
+                workflow_id
+            );
+            return Ok(None);
+        }
+
         // Get project to find repo path
         let project =
             match db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id)
