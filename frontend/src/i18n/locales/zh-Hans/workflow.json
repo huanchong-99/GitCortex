@@ -295,6 +295,10 @@
       "label": "目标分支",
       "placeholder": "例如：main"
     },
+    "gitWatcher": {
+      "enableLabel": "启用 Git 监控",
+      "description": "自动监控 Git 提交事件并触发 Orchestrator 响应"
+    },
     "gitCommit": {
       "title": "Git 提交格式（系统强制执行）",
       "description": "所有提交将遵循以下格式，由系统自动生成"
