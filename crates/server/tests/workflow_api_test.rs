@@ -143,6 +143,7 @@ async fn create_minimal_workflow(
         merge_terminal_cli_id: request.merge_terminal_config.cli_type_id,
         merge_terminal_model_id: request.merge_terminal_config.model_config_id,
         target_branch: "main".to_string(),
+        git_watcher_enabled: true,
         ready_at: None,
         started_at: None,
         completed_at: None,

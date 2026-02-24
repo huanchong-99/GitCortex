@@ -154,6 +154,10 @@ pub struct Workflow {
     /// Target branch
     pub target_branch: String,
 
+    /// Enable git watcher for this workflow
+    #[serde(default = "default_true")]
+    pub git_watcher_enabled: bool,
+
     /// All terminals ready timestamp
     pub ready_at: Option<DateTime<Utc>>,
 
@@ -385,6 +389,11 @@ fn default_auto_confirm_true() -> bool {
     true
 }
 
+/// Default function for git_watcher_enabled - defaults to true
+fn default_true() -> bool {
+    true
+}
+
 /// Create Terminal Request
 #[derive(Debug, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -436,6 +445,8 @@ pub struct CreateWorkflowRequest {
     pub merge_terminal_config: TerminalConfig,
     /// Target branch
     pub target_branch: Option<String>,
+    /// Enable git watcher (default true)
+    pub git_watcher_enabled: Option<bool>,
 
     // ========== 新增字段 ==========
     /// Workflow tasks with terminals
@@ -489,8 +500,8 @@ impl Workflow {
                 orchestrator_api_key, orchestrator_model,
                 error_terminal_enabled, error_terminal_cli_id, error_terminal_model_id,
                 merge_terminal_cli_id, merge_terminal_model_id,
-                target_branch, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+                target_branch, git_watcher_enabled, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
             RETURNING *
             "
         )
@@ -511,6 +522,7 @@ impl Workflow {
         .bind(&workflow.merge_terminal_cli_id)
         .bind(&workflow.merge_terminal_model_id)
         .bind(&workflow.target_branch)
+        .bind(workflow.git_watcher_enabled)
         .bind(workflow.created_at)
         .bind(workflow.updated_at)
         .fetch_one(pool)
@@ -705,8 +717,8 @@ impl Workflow {
                 orchestrator_api_key, orchestrator_model,
                 error_terminal_enabled, error_terminal_cli_id, error_terminal_model_id,
                 merge_terminal_cli_id, merge_terminal_model_id,
-                target_branch, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+                target_branch, git_watcher_enabled, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
             "
         )
         .bind(&workflow.id)
@@ -726,6 +738,7 @@ impl Workflow {
         .bind(&workflow.merge_terminal_cli_id)
         .bind(&workflow.merge_terminal_model_id)
         .bind(&workflow.target_branch)
+        .bind(workflow.git_watcher_enabled)
         .bind(workflow.created_at)
         .bind(workflow.updated_at)
         .execute(&mut *tx)
@@ -1062,6 +1075,7 @@ mod encryption_tests {
                     merge_terminal_cli_id: "merge-cli".to_string(),
                     merge_terminal_model_id: "merge-model".to_string(),
                     target_branch: "main".to_string(),
+                    git_watcher_enabled: true,
                     ready_at: None,
                     started_at: None,
                     completed_at: None,
@@ -1109,6 +1123,7 @@ mod encryption_tests {
                 merge_terminal_cli_id: "merge-cli".to_string(),
                 merge_terminal_model_id: "merge-model".to_string(),
                 target_branch: "main".to_string(),
+                git_watcher_enabled: true,
                 ready_at: None,
                 started_at: None,
                 completed_at: None,
@@ -1150,6 +1165,7 @@ mod encryption_tests {
                 merge_terminal_cli_id: "merge-cli".to_string(),
                 merge_terminal_model_id: "merge-model".to_string(),
                 target_branch: "main".to_string(),
+                git_watcher_enabled: true,
                 ready_at: None,
                 started_at: None,
                 completed_at: None,
@@ -1188,6 +1204,7 @@ mod encryption_tests {
                     merge_terminal_cli_id: "merge-cli".to_string(),
                     merge_terminal_model_id: "merge-model".to_string(),
                     target_branch: "main".to_string(),
+                    git_watcher_enabled: true,
                     ready_at: None,
                     started_at: None,
                     completed_at: None,
@@ -1226,6 +1243,7 @@ mod encryption_tests {
                     merge_terminal_cli_id: "merge-cli".to_string(),
                     merge_terminal_model_id: "merge-model".to_string(),
                     target_branch: "main".to_string(),
+                    git_watcher_enabled: true,
                     ready_at: None,
                     started_at: None,
                     completed_at: None,
