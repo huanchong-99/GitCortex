@@ -1,22 +1,48 @@
 use axum::{
+    Router,
     body::Body,
-    http::{Method, Request, StatusCode},
+    http::{Request, StatusCode},
 };
-use serde_json::json;
-use server::create_app;
+use server::{Deployment, DeploymentImpl};
 use tower::ServiceExt;
+use uuid::Uuid;
 
 #[tokio::test]
-async fn test_stop_terminal_endpoint() {
-    // TODO: Implement stop endpoint test
-    // This test will verify that POST /api/terminals/:id/stop:
-    // 1. Stops a running terminal
-    // 2. Returns 200 OK with the stopped terminal state
-    // 3. Returns 404 if terminal doesn't exist
-    // 4. Returns 409 if terminal is already stopped
+async fn test_stop_terminal_returns_not_found_for_unknown_terminal() {
+    let deployment = DeploymentImpl::new()
+        .await
+        .expect("Failed to create deployment");
+    let app = Router::new()
+        .nest("/api/terminals", server::routes::terminals::terminal_routes())
+        .with_state(deployment);
 
-    let app = create_app().await;
+    let terminal_id = Uuid::new_v4().to_string();
+    let request = Request::builder()
+        .method("POST")
+        .uri(format!("/api/terminals/{terminal_id}/stop"))
+        .body(Body::empty())
+        .expect("Failed to build request");
 
-    // Placeholder assertion
-    assert!(true, "Test not yet implemented");
+    let response = app.oneshot(request).await.expect("Failed to stop terminal");
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_stop_terminal_rejects_get_method() {
+    let deployment = DeploymentImpl::new()
+        .await
+        .expect("Failed to create deployment");
+    let app = Router::new()
+        .nest("/api/terminals", server::routes::terminals::terminal_routes())
+        .with_state(deployment);
+
+    let terminal_id = Uuid::new_v4().to_string();
+    let request = Request::builder()
+        .method("GET")
+        .uri(format!("/api/terminals/{terminal_id}/stop"))
+        .body(Body::empty())
+        .expect("Failed to build request");
+
+    let response = app.oneshot(request).await.expect("Failed to query endpoint");
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }

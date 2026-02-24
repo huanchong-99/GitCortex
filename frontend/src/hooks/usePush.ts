@@ -25,7 +25,9 @@ export function usePush(
 
   return useMutation<void, unknown, PushTaskAttemptRequest>({
     mutationFn: async (params: PushTaskAttemptRequest) => {
-      if (!attemptId) return;
+      if (!attemptId) {
+        throw new Error('Attempt id is not set');
+      }
       const result = await attemptsApi.push(attemptId, params);
       if (!result.success) {
         throw new PushErrorWithData(

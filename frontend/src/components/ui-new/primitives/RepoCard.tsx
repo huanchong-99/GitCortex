@@ -98,6 +98,13 @@ export function RepoCard({
   const { t: tCommon } = useTranslation('common');
   const [selectedAction, setSelectedAction] = useRepoAction(repoId);
 
+  const openExternalLink = (url: string) => {
+    const popup = window.open(url, '_blank', 'noopener,noreferrer');
+    if (popup) {
+      popup.opener = null;
+    }
+  };
+
   // Hide "Open pull request" option when PR is already open
   const hasPrOpen = prStatus === 'open';
   const availableActionOptions = useMemo(
@@ -216,7 +223,7 @@ export function RepoCard({
           {prStatus === 'merged' ? (
             prUrl ? (
               <button
-                onClick={() => window.open(prUrl, '_blank')}
+                onClick={() => openExternalLink(prUrl)}
                 className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-success hover:bg-tertiary text-sm font-medium transition-colors"
               >
                 <CheckCircleIcon className="size-icon-xs" weight="fill" />
@@ -231,7 +238,7 @@ export function RepoCard({
             )
           ) : prUrl ? (
             <button
-              onClick={() => window.open(prUrl, '_blank')}
+              onClick={() => openExternalLink(prUrl)}
               className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-normal hover:bg-tertiary text-sm font-medium transition-colors"
             >
               <GitPullRequestIcon className="size-icon-xs" weight="fill" />

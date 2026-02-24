@@ -49,18 +49,25 @@ export function useWorkspaceSessions(
   // This replaces two separate effects that had a race condition where the reset
   // effect would fire after auto-select when sessions were cached, undoing the selection.
   useEffect(() => {
-    if (sessions.length > 0) {
+    setSelection((prev) => {
+      if (prev?.mode === 'new') return prev;
+
+      if (sessions.length === 0) {
+        // No sessions - reset selection (handles workspace change before fetch completes)
+        return undefined;
+      }
+
+      if (
+        prev?.mode === 'existing' &&
+        sessions.some((session) => session.id === prev.sessionId)
+      ) {
+        // Keep user's current selection when it is still available.
+        return prev;
+      }
+
       // Sessions are ordered by most recently used, so first is the most recently used
-      // Always select first session when sessions are available for this workspace
-      // Only auto-select if not in new session mode
-      setSelection((prev) => {
-        if (prev?.mode === 'new') return prev;
-        return { mode: 'existing', sessionId: sessions[0].id };
-      });
-    } else {
-      // No sessions - reset selection (handles workspace change before fetch completes)
-      setSelection(undefined);
-    }
+      return { mode: 'existing', sessionId: sessions[0].id };
+    });
   }, [workspaceId, sessions]);
 
   // Derived values from selection state

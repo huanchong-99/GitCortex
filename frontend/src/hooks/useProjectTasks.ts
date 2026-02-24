@@ -45,8 +45,15 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
   const { isSignedIn } = useAuth();
   const { remoteFeaturesEnabled } = useUserSystem();
   const remoteProjectId = project?.remoteProjectId;
+  // Remote shared-task APIs are currently disabled server-side; keep this feature
+  // behind an explicit opt-in so clients don't subscribe to a removed shape.
+  const sharedTasksFeatureEnabled =
+    import.meta.env.VITE_ENABLE_SHARED_TASKS === 'true';
   const sharedTasksEnabled =
-    remoteFeaturesEnabled && Boolean(remoteProjectId) && isSignedIn;
+    sharedTasksFeatureEnabled &&
+    remoteFeaturesEnabled &&
+    Boolean(remoteProjectId) &&
+    isSignedIn;
 
   const endpoint = `/api/tasks/stream/ws?project_id=${encodeURIComponent(projectId)}`;
 

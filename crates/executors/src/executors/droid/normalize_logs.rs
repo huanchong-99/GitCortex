@@ -702,12 +702,11 @@ fn normalize_stderr_logs(msg_store: Arc<MsgStore>, entry_index_provider: EntryIn
 /// Extract path from ApplyPatch input format
 fn extract_path_from_patch(input: &str) -> String {
     for line in input.lines() {
-        if line.starts_with("*** Update File:") || line.starts_with("*** Add File:") {
-            return line
-                .split(':')
-                .nth(1)
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default();
+        if let Some(path) = line.strip_prefix("*** Update File:") {
+            return path.trim().to_string();
+        }
+        if let Some(path) = line.strip_prefix("*** Add File:") {
+            return path.trim().to_string();
         }
     }
     String::new()
@@ -1248,5 +1247,24 @@ impl ToolCallStates {
             pending_fifo: VecDeque::new(),
             model_reported: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_path_from_patch;
+
+    #[test]
+    fn test_extract_path_from_patch_handles_windows_drive_letter() {
+        let input = "*** Update File: C:\\repo\\project\\main.rs\n@@";
+        let path = extract_path_from_patch(input);
+        assert_eq!(path, "C:\\repo\\project\\main.rs");
+    }
+
+    #[test]
+    fn test_extract_path_from_patch_handles_unix_path() {
+        let input = "*** Add File: crates/executors/src/new_file.rs\n+content";
+        let path = extract_path_from_patch(input);
+        assert_eq!(path, "crates/executors/src/new_file.rs");
     }
 }

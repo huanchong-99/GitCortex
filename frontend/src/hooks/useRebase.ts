@@ -21,7 +21,13 @@ export function useRebase(
   return useMutation<void, Result<void, GitOperationError>, RebaseMutationArgs>(
     {
       mutationFn: (args) => {
-        if (!attemptId) return Promise.resolve();
+        if (!attemptId) {
+          return Promise.reject({
+            success: false as const,
+            error: undefined,
+            message: 'Attempt id is not set',
+          });
+        }
         const { repoId, newBaseBranch, oldBaseBranch } = args ?? {};
 
         const data: RebaseTaskAttemptRequest = {
@@ -65,9 +71,11 @@ export function useRebase(
       onError: (err: Result<void, GitOperationError>) => {
         console.error('Failed to rebase:', err);
         // Even on failure (likely conflicts), re-fetch branch status immediately to show rebase-in-progress
-        queryClient.invalidateQueries({
-          queryKey: ['branchStatus', attemptId],
-        });
+        if (attemptId) {
+          queryClient.invalidateQueries({
+            queryKey: ['branchStatus', attemptId],
+          });
+        }
         onError?.(err);
       },
     }

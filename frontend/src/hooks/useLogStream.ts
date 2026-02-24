@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import type { PatchType } from 'shared/types';
 
 type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
+const MAX_LOG_ENTRIES = 5000;
 
 interface UseLogStreamResult {
   logs: LogEntry[];
@@ -58,7 +59,13 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
         if (currentProcessIdRef.current !== capturedProcessId) {
           return;
         }
-        setLogs((prev) => [...prev, entry]);
+        setLogs((prev) => {
+          const next = [...prev, entry];
+          if (next.length <= MAX_LOG_ENTRIES) {
+            return next;
+          }
+          return next.slice(next.length - MAX_LOG_ENTRIES);
+        });
       };
 
       // Handle WebSocket messages

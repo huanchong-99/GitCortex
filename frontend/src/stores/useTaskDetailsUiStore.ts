@@ -19,33 +19,36 @@ interface TaskDetailsUiStore {
   clearUiState: (taskId: string) => void;
 }
 
-const defaultUiState: TaskUiState = {
+const createDefaultUiState = (): TaskUiState => ({
   loading: false,
   isStopping: false,
   deletingFiles: new Set(),
   fileToDelete: null,
-};
+});
 
 const useTaskDetailsUiStore = create<TaskDetailsUiStore>((set, get) => ({
   ui: {},
 
   getUiState: (taskId: string) => {
-    return get().ui[taskId] ?? defaultUiState;
+    return get().ui[taskId] ?? createDefaultUiState();
   },
 
   setUiState: (taskId: string, partial: Partial<TaskUiState>) => {
     set((state) => ({
       ui: {
         ...state.ui,
-        [taskId]: {
-          ...defaultUiState,
-          ...state.ui[taskId],
-          ...partial,
-          // Handle Set immutability for deletingFiles
-          deletingFiles: partial.deletingFiles
-            ? new Set(partial.deletingFiles)
-            : (state.ui[taskId]?.deletingFiles ?? new Set()),
-        },
+        [taskId]: (() => {
+          const previousState = state.ui[taskId] ?? createDefaultUiState();
+          return {
+            ...createDefaultUiState(),
+            ...previousState,
+            ...partial,
+            // Ensure each task always has its own Set instance.
+            deletingFiles: partial.deletingFiles
+              ? new Set(partial.deletingFiles)
+              : new Set(previousState.deletingFiles),
+          };
+        })(),
       },
     }));
   },
@@ -61,9 +64,7 @@ const useTaskDetailsUiStore = create<TaskDetailsUiStore>((set, get) => ({
 
 export const useTaskStopping = (taskId?: string) => {
   const { getUiState, setUiState } = useTaskDetailsUiStore();
-  const { isStopping } = taskId
-    ? getUiState(taskId)
-    : { isStopping: false };
+  const { isStopping } = taskId ? getUiState(taskId) : { isStopping: false };
 
   return {
     isStopping,

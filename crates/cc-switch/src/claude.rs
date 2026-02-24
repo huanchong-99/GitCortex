@@ -114,6 +114,7 @@ pub async fn update_claude_model(base_url: Option<&str>, api_key: &str, model: &
 
     config.env.base_url = base_url.map(ToString::to_string);
     config.env.auth_token = Some(api_key.to_string());
+    config.env.api_key = Some(api_key.to_string());
     config.env.model = Some(model.to_string());
 
     write_claude_config(&config).await
