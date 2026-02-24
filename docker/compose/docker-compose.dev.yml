@@ -1,0 +1,21 @@
+services:
+  gitcortex:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "23456:23456"
+    volumes:
+      - gitcortex-dev-data:/var/lib/gitcortex
+    environment:
+      - GITCORTEX_ASSET_DIR=/var/lib/gitcortex/assets
+      - GITCORTEX_TEMP_DIR=/var/lib/gitcortex
+      - HOST=0.0.0.0
+      - PORT=23456
+      - RUST_LOG=debug
+      - GITCORTEX_ENCRYPTION_KEY=12345678901234567890123456789012
+    env_file:
+      - .env
+
+volumes:
+  gitcortex-dev-data:
