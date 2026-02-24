@@ -763,6 +763,13 @@ impl OrchestratorAgent {
             }
         }
 
+        // Persist git event to DB with 'pending' status
+        let git_event = db::models::git_event::GitEvent::new_pending(workflow_id, commit_hash, branch, message);
+        let event_id = git_event.id.clone();
+        if let Err(e) = db::models::git_event::GitEvent::insert(&self.db.pool, &git_event).await {
+            tracing::warn!("Failed to persist git_event: {}", e);
+        }
+
         // 1. Try to parse commit metadata
         let metadata = match crate::services::git_watcher::parse_commit_metadata(message) {
             Ok(m) => m,
@@ -777,7 +784,7 @@ impl OrchestratorAgent {
                     let mut state = self.state.write().await;
                     state.processed_commits.insert(commit_hash.to_string());
                 }
-                self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message)
+                self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message, &event_id)
                     .await?;
                 return Ok(());
             }
@@ -799,6 +806,16 @@ impl OrchestratorAgent {
             let mut state = self.state.write().await;
             state.processed_commits.insert(commit_hash.to_string());
         }
+
+        // Update git_event with parsed metadata and set status to 'processing'
+        let metadata_json = serde_json::to_string(&metadata).ok();
+        let _ = db::models::git_event::GitEvent::update_metadata(
+            &self.db.pool,
+            &event_id,
+            &metadata.terminal_id,
+            metadata_json.as_deref(),
+        )
+        .await;
 
         // 3. Route to handler based on status
         match metadata.status.as_str() {
@@ -851,8 +868,16 @@ impl OrchestratorAgent {
             }
             _ => {
                 tracing::warn!("Unknown status in commit: {}", metadata.status);
+                let _ = db::models::git_event::GitEvent::update_status(
+                    &self.db.pool, &event_id, "failed", None,
+                ).await;
             }
         }
+
+        // Mark git_event as processed after successful handling
+        let _ = db::models::git_event::GitEvent::update_status(
+            &self.db.pool, &event_id, "processed", None,
+        ).await;
 
         Ok(())
     }
@@ -871,7 +896,13 @@ impl OrchestratorAgent {
         commit_hash: &str,
         branch: &str,
         message: &str,
+        event_id: &str,
     ) -> anyhow::Result<()> {
+        // Update git_event status to processing
+        let _ = db::models::git_event::GitEvent::update_status(
+            &self.db.pool, event_id, "processing", None,
+        ).await;
+
         // Add to conversation history for context
         {
             let mut state = self.state.write().await;
@@ -889,6 +920,11 @@ impl OrchestratorAgent {
 
         // Wake up orchestrator to decide next action
         self.awaken().await;
+
+        // Mark git_event as processed
+        let _ = db::models::git_event::GitEvent::update_status(
+            &self.db.pool, event_id, "processed", None,
+        ).await;
 
         tracing::info!(
             "Orchestrator awakened for commit {} on workflow {}",

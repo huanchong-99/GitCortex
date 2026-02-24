@@ -104,6 +104,15 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
     });
   };
 
+  const handleGitWatcherEnabledChange = (gitWatcherEnabled: boolean) => {
+    onUpdate({
+      advanced: {
+        ...advancedConfig,
+        gitWatcherEnabled,
+      },
+    });
+  };
+
   return (
     <div className="flex flex-col gap-base">
       <Field>
@@ -289,6 +298,26 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
               </span>
             </label>
           </div>
+        </div>
+      </Field>
+
+      <Field>
+        <div className="flex items-center gap-base mb-half">
+          <input
+            type="checkbox"
+            id="gitWatcherEnabled"
+            checked={advancedConfig.gitWatcherEnabled}
+            onChange={(e) => {
+              handleGitWatcherEnabledChange(e.target.checked);
+            }}
+            className="size-icon-sm accent-brand"
+          />
+          <FieldLabel htmlFor="gitWatcherEnabled" className="mb-0">
+            {t('step6.gitWatcher.enableLabel')}
+          </FieldLabel>
+        </div>
+        <div className="text-sm text-low">
+          {t('step6.gitWatcher.description')}
         </div>
       </Field>
 

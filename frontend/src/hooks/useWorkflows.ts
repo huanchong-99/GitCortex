@@ -174,6 +174,7 @@ export interface CreateWorkflowRequest {
     customApiKey?: string | null;
   };
   targetBranch?: string;
+  gitWatcherEnabled?: boolean;
   tasks?: Array<{
     id?: string;
     name: string;

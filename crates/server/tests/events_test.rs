@@ -60,6 +60,7 @@ async fn create_minimal_workflow(deployment: &DeploymentImpl, project_id: Uuid) 
         merge_terminal_cli_id: "cli-codex".to_string(),
         merge_terminal_model_id: "model-codex-gpt4o".to_string(),
         target_branch: "main".to_string(),
+        git_watcher_enabled: true,
         ready_at: Some(chrono::Utc::now()),
         started_at: None,
         completed_at: None,

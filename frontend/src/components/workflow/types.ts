@@ -137,6 +137,7 @@ export interface AdvancedConfig {
     pauseOnConflict: boolean;
   };
   targetBranch: string;
+  gitWatcherEnabled: boolean;
 }
 
 /** 完整的向导配置 */
@@ -187,6 +188,7 @@ export function getDefaultWizardConfig(): WizardConfig {
         pauseOnConflict: true,
       },
       targetBranch: 'main',
+      gitWatcherEnabled: true,
     },
   };
 }
@@ -253,6 +255,7 @@ export function wizardConfigToCreateRequest(
       customApiKey: null,
     },
     targetBranch: config.advanced.targetBranch,
+    gitWatcherEnabled: config.advanced.gitWatcherEnabled,
     tasks: config.tasks.map((task, taskIndex) => {
         // Find terminals for this task
         const taskTerminals = config.terminals

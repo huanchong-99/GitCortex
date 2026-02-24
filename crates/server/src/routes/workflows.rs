@@ -495,6 +495,7 @@ async fn create_workflow(
         merge_terminal_cli_id: req.merge_terminal_config.cli_type_id.clone(),
         merge_terminal_model_id: req.merge_terminal_config.model_config_id.clone(),
         target_branch: req.target_branch.unwrap_or_else(|| "main".to_string()),
+        git_watcher_enabled: req.git_watcher_enabled.unwrap_or(true),
         ready_at: None,
         started_at: None,
         completed_at: None,

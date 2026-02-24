@@ -120,6 +120,15 @@ impl OrchestratorRuntime {
         workflow_id: &str,
         workflow: &db::models::Workflow,
     ) -> Result<Option<GitWatcherHandle>> {
+        // Check workflow-level git watcher toggle
+        if !workflow.git_watcher_enabled {
+            info!(
+                "Git watcher disabled for workflow {} (git_watcher_enabled=false)",
+                workflow_id
+            );
+            return Ok(None);
+        }
+
         // Get project to find repo path
         let project =
             match db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id)
@@ -693,6 +702,7 @@ mod tests {
                 merge_terminal_cli_id TEXT NOT NULL,
                 merge_terminal_model_id TEXT NOT NULL,
                 target_branch TEXT NOT NULL,
+                git_watcher_enabled INTEGER NOT NULL DEFAULT 1,
                 ready_at TEXT,
                 started_at TEXT,
                 completed_at TEXT,
@@ -728,6 +738,7 @@ mod tests {
             merge_terminal_cli_id: "merge-cli".to_string(),
             merge_terminal_model_id: "merge-model".to_string(),
             target_branch: "main".to_string(),
+            git_watcher_enabled: true,
             ready_at: Some(Utc::now()),
             started_at: None,
             completed_at: None,
@@ -888,6 +899,7 @@ mod tests {
             merge_terminal_cli_id: "merge-cli".to_string(),
             merge_terminal_model_id: "merge-model".to_string(),
             target_branch: "main".to_string(),
+            git_watcher_enabled: true,
             ready_at: Some(Utc::now()),
             started_at: None,
             completed_at: None,

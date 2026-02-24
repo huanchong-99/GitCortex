@@ -296,6 +296,10 @@
       "label": "Target branch",
       "placeholder": "e.g. main"
     },
+    "gitWatcher": {
+      "enableLabel": "Enable Git monitoring",
+      "description": "Automatically monitor Git commit events and trigger Orchestrator responses"
+    },
     "gitCommit": {
       "title": "Git commit format (enforced)",
       "description": "All commits will follow this format and are generated automatically"
