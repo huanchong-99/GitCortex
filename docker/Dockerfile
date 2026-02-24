@@ -13,13 +13,14 @@ RUN cd frontend && pnpm build
 # ============================================================
 # Stage 2: Rust build
 # ============================================================
-FROM rust:nightly-slim AS rust-builder
+FROM rust:slim AS rust-builder
 RUN apt-get update && apt-get install -y \
     pkg-config libsqlite3-dev libgit2-dev zlib1g-dev \
     cmake ninja-build clang libclang-dev perl nasm libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+RUN rustup toolchain install nightly-2025-12-04 && rustup default nightly-2025-12-04
 COPY crates/ crates/
 COPY assets/ assets/
 COPY shared/ shared/
