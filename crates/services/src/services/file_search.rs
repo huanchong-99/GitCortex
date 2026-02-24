@@ -13,7 +13,7 @@ use fst::{Map, MapBuilder};
 use ignore::WalkBuilder;
 use moka::future::Cache;
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{DebounceEventResult, new_debouncer};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, FileIdMap, new_debouncer};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
@@ -96,7 +96,7 @@ pub struct FileSearchCache {
     git_service: GitService,
     file_ranker: FileRanker,
     build_queue: mpsc::UnboundedSender<PathBuf>,
-    watchers: DashMap<PathBuf, RecommendedWatcher>,
+    watchers: DashMap<PathBuf, Debouncer<RecommendedWatcher, FileIdMap>>,
 }
 
 impl FileSearchCache {
@@ -654,6 +654,9 @@ impl FileSearchCache {
                 }
             }
         });
+
+        // Keep debouncer alive for the lifetime of the watcher registration.
+        self.watchers.insert(repo_path_buf, debouncer);
 
         info!("Setup file watcher for repo: {:?}", repo_path);
         Ok(())

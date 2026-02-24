@@ -54,7 +54,7 @@ export function useAgentAvailability(
     };
 
     checkAvailability();
-  }, [agent]);
+  }, [agent, notifyError]);
 
   return availability;
 }

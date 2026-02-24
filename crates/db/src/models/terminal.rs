@@ -167,47 +167,6 @@ pub struct TerminalLog {
     pub created_at: DateTime<Utc>,
 }
 
-/// Git Event
-///
-/// Corresponds to database table: git_event
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct GitEvent {
-    /// Primary key ID
-    pub id: String,
-
-    /// Associated workflow ID
-    pub workflow_id: String,
-
-    /// Associated terminal ID (optional)
-    pub terminal_id: Option<String>,
-
-    /// Git commit hash
-    pub commit_hash: String,
-
-    /// Git branch
-    pub branch: String,
-
-    /// Commit message
-    pub commit_message: String,
-
-    /// Parsed metadata (JSON format)
-    pub metadata: Option<String>,
-
-    /// Processing status
-    pub process_status: String,
-
-    /// Main Agent response (JSON format)
-    pub agent_response: Option<String>,
-
-    /// Created timestamp
-    pub created_at: DateTime<Utc>,
-
-    /// Processed timestamp
-    pub processed_at: Option<DateTime<Utc>>,
-}
-
 /// Terminal Detail (includes associated CLI and model info)
 ///
 /// For API response with complete terminal information
@@ -1194,78 +1153,5 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(cancelled_stays, "cancelled");
-    }
-}
-
-impl GitEvent {
-    /// Create git event
-    pub async fn create(
-        pool: &SqlitePool,
-        workflow_id: &str,
-        terminal_id: Option<&str>,
-        commit_hash: &str,
-        branch: &str,
-        commit_message: &str,
-        metadata: Option<&str>,
-    ) -> sqlx::Result<Self> {
-        let id = Uuid::new_v4().to_string();
-        let now = Utc::now();
-        sqlx::query_as::<_, GitEvent>(
-            r"
-            INSERT INTO git_event (
-                id, workflow_id, terminal_id, commit_hash, branch,
-                commit_message, metadata, process_status, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)
-            RETURNING *
-            ",
-        )
-        .bind(&id)
-        .bind(workflow_id)
-        .bind(terminal_id)
-        .bind(commit_hash)
-        .bind(branch)
-        .bind(commit_message)
-        .bind(metadata)
-        .bind(now)
-        .fetch_one(pool)
-        .await
-    }
-
-    /// Find pending git events
-    pub async fn find_pending(pool: &SqlitePool, workflow_id: &str) -> sqlx::Result<Vec<Self>> {
-        sqlx::query_as::<_, GitEvent>(
-            r"
-            SELECT * FROM git_event
-            WHERE workflow_id = ? AND process_status = 'pending'
-            ORDER BY created_at ASC
-            ",
-        )
-        .bind(workflow_id)
-        .fetch_all(pool)
-        .await
-    }
-
-    /// Update git event processing status
-    pub async fn update_status(
-        pool: &SqlitePool,
-        id: &str,
-        status: &str,
-        agent_response: Option<&str>,
-    ) -> sqlx::Result<()> {
-        let now = Utc::now();
-        sqlx::query(
-            r"
-            UPDATE git_event
-            SET process_status = ?, agent_response = ?, processed_at = ?
-            WHERE id = ?
-            ",
-        )
-        .bind(status)
-        .bind(agent_response)
-        .bind(now)
-        .bind(id)
-        .execute(pool)
-        .await?;
-        Ok(())
     }
 }

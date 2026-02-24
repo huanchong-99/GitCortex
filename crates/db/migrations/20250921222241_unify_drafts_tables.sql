@@ -31,6 +31,24 @@ CREATE INDEX IF NOT EXISTS idx_drafts_draft_type
 CREATE INDEX IF NOT EXISTS idx_drafts_queued_sending
     ON drafts(queued, sending) WHERE queued = 1;
 
+-- Compatibility shim: some databases may not have retry_drafts.
+-- Create an empty table with the expected shape so migration SQL is always runnable.
+CREATE TABLE IF NOT EXISTS retry_drafts (
+    id               TEXT PRIMARY KEY,
+    task_attempt_id  TEXT NOT NULL,
+    retry_process_id TEXT NULL,
+    prompt           TEXT NOT NULL DEFAULT '',
+    queued           INTEGER NOT NULL DEFAULT 0,
+    sending          INTEGER NOT NULL DEFAULT 0,
+    version          INTEGER NOT NULL DEFAULT 0,
+    variant          TEXT NULL,
+    image_ids        TEXT NULL, -- JSON array of UUID strings
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(task_attempt_id) REFERENCES task_attempts(id) ON DELETE CASCADE,
+    FOREIGN KEY(retry_process_id) REFERENCES execution_processes(id) ON DELETE CASCADE
+);
+
 -- Migrate existing follow_up_drafts
 INSERT INTO drafts (
     id, task_attempt_id, draft_type, retry_process_id, prompt,
@@ -41,8 +59,24 @@ SELECT
     queued, sending, version, variant, image_ids, created_at, updated_at
 FROM follow_up_drafts;
 
+-- Migrate existing retry_drafts
+INSERT INTO drafts (
+    id, task_attempt_id, draft_type, retry_process_id, prompt,
+    queued, sending, version, variant, image_ids, created_at, updated_at
+)
+SELECT
+    id, task_attempt_id, 'retry', retry_process_id, prompt,
+    queued, sending, version, variant, image_ids, created_at, updated_at
+FROM retry_drafts rd
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM drafts d
+    WHERE d.id = rd.id
+);
+
 -- Drop old tables
 DROP TABLE IF EXISTS follow_up_drafts;
+DROP TABLE IF EXISTS retry_drafts;
 
 -- Create trigger to keep updated_at current
 CREATE TRIGGER IF NOT EXISTS trg_drafts_updated_at

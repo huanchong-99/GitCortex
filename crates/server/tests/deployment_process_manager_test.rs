@@ -4,6 +4,8 @@
 //! through the Deployment trait, which is required for terminal_ws.rs
 //! to manage terminal processes.
 
+use std::sync::Arc;
+
 use deployment::Deployment;
 use local_deployment::LocalDeployment;
 
@@ -21,7 +23,7 @@ async fn test_deployment_exposes_process_manager() {
     // The ProcessManager should be accessible and we should be able to call methods on it
     // We're just verifying the reference is valid here
     assert_eq!(
-        std::sync::Arc::strong_count(process_manager),
+        Arc::strong_count(process_manager),
         1,
         "ProcessManager should have exactly one strong reference from LocalDeployment"
     );

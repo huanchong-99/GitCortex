@@ -1,8 +1,53 @@
 PRAGMA foreign_keys = ON;
 
--- Clear existing execution_processes records since we can't meaningfully migrate them
--- (old records lack the actual script content and prompts needed for ExecutorActions)
-DELETE FROM execution_processes;
-
 -- Add executor_action column to execution_processes table for storing full ExecutorActions JSON
-ALTER TABLE execution_processes ADD COLUMN executor_action TEXT NOT NULL DEFAULT '';
+ALTER TABLE execution_processes ADD COLUMN executor_action TEXT NOT NULL DEFAULT '{}';
+
+-- Backfill legacy rows with placeholder-but-valid ExecutorAction JSON to preserve
+-- execution history and avoid cascading deletes in related tables.
+UPDATE execution_processes
+SET executor_action = CASE process_type
+    WHEN 'codingagent' THEN json_object(
+        'typ', json_object(
+            'type', 'CodingAgentInitialRequest',
+            'prompt', '[legacy execution process migrated without original prompt]',
+            'executor_profile_id', json_object(
+                'executor', COALESCE(NULLIF(upper(replace(executor_type, '-', '_')), ''), 'CLAUDE_CODE'),
+                'variant', NULL
+            ),
+            'working_dir', NULL
+        ),
+        'next_action', NULL
+    )
+    WHEN 'cleanupscript' THEN json_object(
+        'typ', json_object(
+            'type', 'ScriptRequest',
+            'script', '',
+            'language', 'Bash',
+            'context', 'CleanupScript',
+            'working_dir', NULL
+        ),
+        'next_action', NULL
+    )
+    WHEN 'devserver' THEN json_object(
+        'typ', json_object(
+            'type', 'ScriptRequest',
+            'script', '',
+            'language', 'Bash',
+            'context', 'DevServer',
+            'working_dir', NULL
+        ),
+        'next_action', NULL
+    )
+    ELSE json_object(
+        'typ', json_object(
+            'type', 'ScriptRequest',
+            'script', '',
+            'language', 'Bash',
+            'context', 'SetupScript',
+            'working_dir', NULL
+        ),
+        'next_action', NULL
+    )
+END
+WHERE executor_action = '{}' OR executor_action = '' OR executor_action IS NULL;

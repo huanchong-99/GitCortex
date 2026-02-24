@@ -310,17 +310,8 @@ export function TaskFollowUpSection({
     // Refresh when a new process starts (could be queued message consumption or follow-up)
     if (processes.length > prevCount) {
       refreshQueueStatus();
-      // Re-sync local message from current scratch state
-      // If scratch was deleted, scratchData will be undefined, so localMessage becomes ''
-      setLocalMessage(scratchData?.message ?? '');
     }
-  }, [
-    isAttemptRunning,
-    workspaceId,
-    processes.length,
-    refreshQueueStatus,
-    scratchData?.message,
-  ]);
+  }, [isAttemptRunning, workspaceId, processes.length, refreshQueueStatus]);
 
   // When queued, display the queued message content so user can edit it
   const displayMessage =

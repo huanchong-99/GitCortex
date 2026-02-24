@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 
 interface ClickableCodePluginProps {
@@ -23,41 +23,50 @@ export function ClickableCodePlugin({
   onCodeClick,
 }: ClickableCodePluginProps) {
   const [editor] = useLexicalComposerContext();
-  const processedElementsRef = useRef<WeakSet<Element>>(new WeakSet());
 
   useEffect(() => {
     const root = editor.getRootElement();
     if (!root) return;
+    const clickHandlers = new Map<HTMLElement, EventListener>();
 
     // Process a single code element
     const processCodeElement = (element: Element) => {
-      // Skip if already processed
-      if (processedElementsRef.current.has(element)) return;
+      const htmlElement = element as HTMLElement;
+
+      // Remove previously attached listener before rebinding.
+      const existingHandler = clickHandlers.get(htmlElement);
+      if (existingHandler) {
+        htmlElement.removeEventListener('click', existingHandler);
+        clickHandlers.delete(htmlElement);
+      }
 
       const text = element.textContent?.trim() ?? '';
 
       // Check if this matches a diff path (supports fuzzy right-hand match)
       const matchedPath = findMatchingDiffPath(text);
-      if (!matchedPath) return;
-
-      // Mark as processed
-      processedElementsRef.current.add(element);
+      if (!matchedPath) {
+        htmlElement.style.cursor = '';
+        htmlElement.classList.remove('clickable-code');
+        delete htmlElement.dataset.clickableCode;
+        return;
+      }
 
       // Add clickable styling
-      (element as HTMLElement).style.cursor = 'pointer';
+      htmlElement.style.cursor = 'pointer';
       element.classList.add('clickable-code');
 
       // Add click handler - use the full matched path for navigation
-      const handleClick = (e: Event) => {
+      const handleClick: EventListener = (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
         onCodeClick(matchedPath);
       };
 
-      element.addEventListener('click', handleClick);
+      htmlElement.addEventListener('click', handleClick);
+      clickHandlers.set(htmlElement, handleClick);
 
       // Store cleanup function on the element
-      (element as HTMLElement).dataset.clickableCode = 'true';
+      htmlElement.dataset.clickableCode = 'true';
     };
 
     // Process all existing code elements
@@ -102,14 +111,14 @@ export function ClickableCodePlugin({
 
     return () => {
       observer.disconnect();
-      // Clean up click handlers
-      const clickableElements = root.querySelectorAll('[data-clickable-code]');
-      clickableElements.forEach((el) => {
-        (el as HTMLElement).style.cursor = '';
-        el.classList.remove('clickable-code');
-        delete (el as HTMLElement).dataset.clickableCode;
+      // Clean up click handlers and element styles.
+      clickHandlers.forEach((handler, element) => {
+        element.removeEventListener('click', handler);
+        element.style.cursor = '';
+        element.classList.remove('clickable-code');
+        delete element.dataset.clickableCode;
       });
-      processedElementsRef.current = new WeakSet();
+      clickHandlers.clear();
     };
   }, [editor, findMatchingDiffPath, onCodeClick]);
 

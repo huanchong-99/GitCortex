@@ -81,6 +81,34 @@ function releaseDevLock() {
   }
 }
 
+function envFlag(name, defaultValue = false) {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return defaultValue;
+  return /^(1|true|yes|on)$/i.test(raw.trim());
+}
+
+function windowsPortCleanupMode() {
+  const raw = (process.env.DEV_WINDOWS_PORT_CLEANUP_MODE ?? "off")
+    .trim()
+    .toLowerCase();
+  if (raw === "off" || raw === "none") return "off";
+  if (raw === "force") return "force";
+  return "graceful";
+}
+
+function taskkillPidWindows(pid, { force = false } = {}) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  const args = ["/pid", String(pid)];
+  if (envFlag("DEV_WINDOWS_TASKKILL_TREE", false)) {
+    args.push("/t");
+  }
+  if (force) {
+    args.push("/f");
+  }
+  const result = spawnSync("taskkill", args, { stdio: "ignore" });
+  return result.status === 0;
+}
+
 /**
  * Stop all child processes and exit
  */
@@ -92,9 +120,11 @@ function stop(code) {
 
   for (const child of children) {
     if (!child.killed) {
-      // Windows doesn't support SIGTERM, use 'taskkill' or just kill()
       if (process.platform === "win32") {
-        spawn("taskkill", ["/pid", child.pid, "/f", "/t"]);
+        // Default to non-forceful shutdown; allow force fallback via env.
+        taskkillPidWindows(child.pid, {
+          force: envFlag("DEV_WINDOWS_FORCE_KILL_ON_STOP", false),
+        });
       } else {
         child.kill("SIGTERM");
       }
@@ -306,29 +336,44 @@ async function ensurePortAvailable(port, label) {
     throw new Error(`${label} port ${port} is already in use.`);
   }
 
-  const pids = findListeningPidsWindows(port);
+  const pids = findListeningPidsWindows(port).filter((pid) => pid !== process.pid);
   if (!pids.length) {
     throw new Error(
       `${label} port ${port} is already in use. Could not resolve owning PID.`
     );
   }
 
+  const cleanupMode = windowsPortCleanupMode();
+  if (cleanupMode === "off") {
+    throw new Error(
+      `${label} port ${port} is occupied by PID(s): ${pids.join(", ")}. Auto cleanup is disabled (DEV_WINDOWS_PORT_CLEANUP_MODE=off).`
+    );
+  }
+
   console.warn(
-    `[dev] ${label} port ${port} is occupied by PID(s): ${pids.join(", ")}. Attempting cleanup...`
+    `[dev] ${label} port ${port} is occupied by PID(s): ${pids.join(", ")}. Attempting ${cleanupMode} cleanup...`
   );
 
   for (const pid of pids) {
-    spawnSync("taskkill", ["/pid", String(pid), "/f", "/t"], {
-      stdio: "ignore",
-    });
+    taskkillPidWindows(pid);
   }
 
   // Give Windows a short moment to release sockets.
   await new Promise((resolve) => setTimeout(resolve, 800));
 
+  if (!(await canBindPort(port)) && cleanupMode === "force") {
+    console.warn(
+      `[dev] ${label} port ${port} still in use. Escalating to force cleanup...`
+    );
+    for (const pid of pids) {
+      taskkillPidWindows(pid, { force: true });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+
   if (!(await canBindPort(port))) {
     throw new Error(
-      `${label} port ${port} is still in use after cleanup attempt.`
+      `${label} port ${port} is still in use after cleanup attempt. Set DEV_WINDOWS_PORT_CLEANUP_MODE=force for legacy behavior.`
     );
   }
 }

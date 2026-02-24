@@ -13,7 +13,7 @@ services:
       - HOST=0.0.0.0
       - PORT=23456
       - RUST_LOG=debug
-      - GITCORTEX_ENCRYPTION_KEY=12345678901234567890123456789012
+      - GITCORTEX_ENCRYPTION_KEY=${GITCORTEX_ENCRYPTION_KEY:?Set GITCORTEX_ENCRYPTION_KEY in docker/compose/.env}
     env_file:
       - .env
 

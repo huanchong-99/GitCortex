@@ -15,7 +15,9 @@ export function useMerge(
 
   return useMutation<void, unknown, MergeParams>({
     mutationFn: (params: MergeParams) => {
-      if (!attemptId) return Promise.resolve();
+      if (!attemptId) {
+        throw new Error('Attempt id is not set');
+      }
       return attemptsApi.merge(attemptId, {
         repo_id: params.repoId,
       });

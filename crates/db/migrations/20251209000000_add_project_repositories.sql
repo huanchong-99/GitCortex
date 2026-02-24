@@ -101,17 +101,47 @@ JOIN repos r ON r.id = pr.repo_id;
 
 -- Step 8: Backfill merges.repo_id from attempt_repos
 UPDATE merges
-SET repo_id = (
-    SELECT ar.repo_id
-    FROM attempt_repos ar
-    WHERE ar.attempt_id = merges.task_attempt_id
-    LIMIT 1
+SET repo_id = COALESCE(
+    (
+        SELECT ar.repo_id
+        FROM attempt_repos ar
+        WHERE ar.attempt_id = merges.task_attempt_id
+        LIMIT 1
+    ),
+    (
+        -- Fallback for legacy rows where attempt_repos was not populated:
+        -- derive repo from task_attempt -> task -> project_repos.
+        SELECT pr.repo_id
+        FROM task_attempts ta
+        JOIN tasks t ON t.id = ta.task_id
+        JOIN project_repos pr ON pr.project_id = t.project_id
+        WHERE ta.id = merges.task_attempt_id
+        ORDER BY pr.rowid ASC
+        LIMIT 1
+    )
 );
 
 -- Step 9: Make merges.repo_id NOT NULL
 DROP INDEX idx_merges_repo_id;
 ALTER TABLE merges ADD COLUMN repo_id_new BLOB NOT NULL DEFAULT X'00';
-UPDATE merges SET repo_id_new = repo_id;
+UPDATE merges
+SET repo_id_new = COALESCE(
+    repo_id,
+    (
+        SELECT pr.repo_id
+        FROM task_attempts ta
+        JOIN tasks t ON t.id = ta.task_id
+        JOIN project_repos pr ON pr.project_id = t.project_id
+        WHERE ta.id = merges.task_attempt_id
+        ORDER BY pr.rowid ASC
+        LIMIT 1
+    ),
+    (
+        -- Last-resort sentinel to keep migration forward-only.
+        -- Orphan rows should be corrected by follow-up data fix tooling.
+        X'00'
+    )
+);
 ALTER TABLE merges DROP COLUMN repo_id;
 ALTER TABLE merges RENAME COLUMN repo_id_new TO repo_id;
 CREATE INDEX idx_merges_repo_id ON merges(repo_id);

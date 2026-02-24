@@ -14,7 +14,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use ts_rs::TS;
-use workspace_utils::msg_store::MsgStore;
+use workspace_utils::{msg_store::MsgStore, shell::get_shell_command};
 
 use crate::{
     env::ExecutionEnv,
@@ -53,16 +53,12 @@ impl StandardCodingAgentExecutor for QaMockExecutor {
             .await
             .map_err(|e| ExecutorError::Io(std::io::Error::other(e)))?;
 
-        // 3. Create shell script that reads file and outputs with delays
-        // Using IFS= read -r to preserve exact content (no word splitting, no backslash interpretation)
-        let script = format!(
-            r#"while IFS= read -r line; do echo "$line"; sleep 1; done < "{}"; rm -f "{}""#,
-            log_file.display(),
-            log_file.display()
-        );
+        // 3. Replay logs with delay using the current platform shell.
+        let script = build_log_replay_script(&log_file);
+        let (shell_cmd, shell_arg) = get_shell_command();
 
-        let mut cmd = tokio::process::Command::new("sh");
-        cmd.arg("-c")
+        let mut cmd = tokio::process::Command::new(shell_cmd);
+        cmd.arg(shell_arg)
             .arg(&script)
             .current_dir(current_dir)
             .stdout(Stdio::piped())
@@ -98,6 +94,31 @@ impl StandardCodingAgentExecutor for QaMockExecutor {
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         None // QA mock doesn't need MCP config
     }
+}
+
+fn build_log_replay_script(log_file: &Path) -> String {
+    #[cfg(windows)]
+    {
+        let path = escape_cmd_double_quoted(log_file);
+        return format!(
+            r#"for /f "usebackq delims=" %l in ("{path}") do (@echo %l & timeout /t 1 /nobreak >nul) & del /f /q "{path}""#
+        );
+    }
+
+    #[cfg(not(windows))]
+    {
+        let quoted_path = shlex::try_quote(log_file.to_string_lossy().as_ref())
+            .map(|quoted| quoted.to_string())
+            .unwrap_or_else(|_| format!("\"{}\"", log_file.display()));
+        format!(
+            "while IFS= read -r line; do printf '%s\\n' \"$line\"; sleep 1; done < {quoted_path}; rm -f {quoted_path}"
+        )
+    }
+}
+
+#[cfg(windows)]
+fn escape_cmd_double_quoted(path: &Path) -> String {
+    path.to_string_lossy().replace('"', "\"\"")
 }
 
 /// Perform random file operations in the worktree

@@ -28,8 +28,7 @@ export const useTodos = (entries: PatchTypeWithKey[]): UseTodosResult => {
         ) {
           const actionType = normalizedEntry.entry_type.action_type;
           const partialTodos = actionType.todos || [];
-          const currentTimestamp =
-            normalizedEntry.timestamp || new Date().toISOString();
+          const currentTimestamp = normalizedEntry.timestamp;
 
           // Only update latestTodos if we have meaningful content OR this is our first entry
           const hasMeaningfulTodos =
@@ -39,7 +38,8 @@ export const useTodos = (entries: PatchTypeWithKey[]): UseTodosResult => {
                 todo.content && todo.content.trim().length > 0 && todo.status
             );
           const isNewerThanLatest =
-            !lastUpdatedTime || currentTimestamp >= lastUpdatedTime;
+            !lastUpdatedTime ||
+            (!!currentTimestamp && currentTimestamp >= lastUpdatedTime);
 
           if (
             hasMeaningfulTodos ||
