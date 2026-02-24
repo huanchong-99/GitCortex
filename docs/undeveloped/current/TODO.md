@@ -1,13 +1,13 @@
 # GitCortex TODO 索引（拆分版）
 
-> **更新时间:** 2026-02-23  
-> **目的:** 将任务按“已完成/未完成”拆分，减少单文件上下文噪音。
+> **更新时间:** 2026-02-24
+> **目的:** 将任务按"已完成/未完成"拆分，减少单文件上下文噪音。
 
 ## 当前主线
 
 - Phase 19 ✅ 已完成（PR #1, 2026-02-24）
-- Phase 19 总体方案：`docs/undeveloped/current/2026-01-27-phase-19-docker-deployment.md`
-- 任务追踪：`docs/undeveloped/current/TODO-pending.md`
+- Phase 19 总体方案：`docs/developed/plans/2026-01-27-phase-19-docker-deployment.md`
+- 未完成任务：`docs/undeveloped/current/TODO-pending.md`
 
 ## 文件入口
 
