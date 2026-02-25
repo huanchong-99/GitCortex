@@ -370,6 +370,32 @@ impl Terminal {
         Ok(())
     }
 
+    /// Fully reset runtime-related state so a terminal can be safely restarted.
+    pub async fn reset_for_restart(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+        let now = Utc::now();
+        sqlx::query(
+            r"
+            UPDATE terminal
+            SET status = 'not_started',
+                process_id = NULL,
+                pty_session_id = NULL,
+                session_id = NULL,
+                execution_process_id = NULL,
+                started_at = NULL,
+                completed_at = NULL,
+                last_commit_hash = NULL,
+                last_commit_message = NULL,
+                updated_at = ?
+            WHERE id = ?
+            ",
+        )
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
     /// Compare-and-set terminal status.
     ///
     /// Returns `Ok(true)` when the transition succeeds, `Ok(false)` when the

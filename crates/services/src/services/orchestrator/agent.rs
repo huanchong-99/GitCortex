@@ -2,11 +2,12 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-#[cfg(unix)]
-use nix::unistd::Pid;
-
 use anyhow::anyhow;
 use db::DBService;
+#[cfg(unix)]
+use nix::unistd::Pid;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use tokio::{
     sync::RwLock,
     time::{Duration, sleep},
@@ -15,10 +16,9 @@ use tokio::{
 use super::{
     config::OrchestratorConfig,
     constants::{
-        GIT_COMMIT_METADATA_SEPARATOR,
-        TERMINAL_STATUS_COMPLETED, TERMINAL_STATUS_FAILED, TERMINAL_STATUS_REVIEW_PASSED,
-        TERMINAL_STATUS_REVIEW_REJECTED, WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
-        WORKFLOW_STATUS_MERGING, WORKFLOW_TOPIC_PREFIX,
+        GIT_COMMIT_METADATA_SEPARATOR, TERMINAL_STATUS_COMPLETED, TERMINAL_STATUS_FAILED,
+        TERMINAL_STATUS_REVIEW_PASSED, TERMINAL_STATUS_REVIEW_REJECTED, WORKFLOW_STATUS_COMPLETED,
+        WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_MERGING, WORKFLOW_TOPIC_PREFIX,
     },
     llm::{LLMClient, build_terminal_completion_prompt, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
@@ -43,6 +43,19 @@ pub struct OrchestratorAgent {
     db: Arc<DBService>,
     error_handler: ErrorHandler,
     prompt_handler: PromptHandler,
+}
+
+static TASK_HINT_FROM_COMMIT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\btask(?:[_\s-]*id)?[_\s:=-]*([0-9a-f][0-9a-f-]{7,35})\b")
+        .expect("task hint regex must be valid")
+});
+
+#[derive(Debug, Clone)]
+struct InferredNoMetadataCompletion {
+    task_id: String,
+    terminal_id: String,
+    terminal_index: usize,
+    total_terminals: usize,
 }
 
 impl OrchestratorAgent {
@@ -109,7 +122,7 @@ impl OrchestratorAgent {
             .await;
         tracing::info!("Orchestrator started for workflow: {}", workflow_id);
 
-        // 初始化系统消息
+        // Initialize system prompt and state before processing events.
         {
             let mut state = self.state.write().await;
             state.add_message("system", &self.config.system_prompt, &self.config);
@@ -128,7 +141,7 @@ impl OrchestratorAgent {
             // Don't fail the workflow, just log the error
         }
 
-        // 事件循环
+        // 濞存粌顑勫▎銏狀嚗椤忓棗绠?
         while let Some(message) = rx.recv().await {
             let should_stop = self.handle_message(message).await?;
             if should_stop {
@@ -206,7 +219,8 @@ impl OrchestratorAgent {
             };
 
             if let Some(index) = next_index {
-                let terminals = db::models::Terminal::find_by_task(&self.db.pool, &event.task_id).await?;
+                let terminals =
+                    db::models::Terminal::find_by_task(&self.db.pool, &event.task_id).await?;
                 terminals.get(index).map(|terminal| terminal.id.clone())
             } else {
                 None
@@ -464,7 +478,12 @@ impl OrchestratorAgent {
                 db::models::WorkflowTask::update_status(&self.db.pool, &event.task_id, task_status)
                     .await
             {
-                tracing::error!("Failed to mark task {} {}: {}", event.task_id, task_status, e);
+                tracing::error!(
+                    "Failed to mark task {} {}: {}",
+                    event.task_id,
+                    task_status,
+                    e
+                );
             }
 
             let _ = self
@@ -480,7 +499,7 @@ impl OrchestratorAgent {
                 .await;
         }
 
-        // 构建提示并调用 LLM
+        // 闁哄瀚紓鎾诲箵閹邦喓浠涙鐐村劶閻ㄧ喖鏁?LLM
         let should_run_completion_llm = !(success && has_next && !task_failed);
         let mut completion_response: Option<String> = None;
         if should_run_completion_llm {
@@ -488,7 +507,7 @@ impl OrchestratorAgent {
             completion_response = Some(self.call_llm(&prompt).await?);
         }
 
-        // 解析并执行指令
+        // Parse and execute orchestrator instructions from completion response.
         if let Some(response) = completion_response.as_deref() {
             self.execute_instruction(response).await?;
         }
@@ -506,7 +525,7 @@ impl OrchestratorAgent {
             }
         }
 
-        // 恢复空闲状态
+        // Restore idle state before returning.
         {
             let mut state = self.state.write().await;
             state.run_state = OrchestratorRunState::Idle;
@@ -764,7 +783,8 @@ impl OrchestratorAgent {
         }
 
         // Persist git event to DB with 'pending' status
-        let git_event = db::models::git_event::GitEvent::new_pending(workflow_id, commit_hash, branch, message);
+        let git_event =
+            db::models::git_event::GitEvent::new_pending(workflow_id, commit_hash, branch, message);
         let event_id = git_event.id.clone();
         if let Err(e) = db::models::git_event::GitEvent::insert(&self.db.pool, &git_event).await {
             tracing::warn!("Failed to persist git_event: {}", e);
@@ -779,13 +799,14 @@ impl OrchestratorAgent {
                     "Commit {} has no METADATA, waking orchestrator for decision",
                     commit_hash
                 );
-                // Mark commit as processed to avoid repeated wake-ups
-                {
-                    let mut state = self.state.write().await;
-                    state.processed_commits.insert(commit_hash.to_string());
-                }
-                self.handle_git_event_no_metadata(workflow_id, commit_hash, branch, message, &event_id)
-                    .await?;
+                self.handle_git_event_no_metadata(
+                    workflow_id,
+                    commit_hash,
+                    branch,
+                    message,
+                    &event_id,
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -869,15 +890,23 @@ impl OrchestratorAgent {
             _ => {
                 tracing::warn!("Unknown status in commit: {}", metadata.status);
                 let _ = db::models::git_event::GitEvent::update_status(
-                    &self.db.pool, &event_id, "failed", None,
-                ).await;
+                    &self.db.pool,
+                    &event_id,
+                    "failed",
+                    None,
+                )
+                .await;
             }
         }
 
         // Mark git_event as processed after successful handling
         let _ = db::models::git_event::GitEvent::update_status(
-            &self.db.pool, &event_id, "processed", None,
-        ).await;
+            &self.db.pool,
+            &event_id,
+            "processed",
+            None,
+        )
+        .await;
 
         Ok(())
     }
@@ -900,8 +929,12 @@ impl OrchestratorAgent {
     ) -> anyhow::Result<()> {
         // Update git_event status to processing
         let _ = db::models::git_event::GitEvent::update_status(
-            &self.db.pool, event_id, "processing", None,
-        ).await;
+            &self.db.pool,
+            event_id,
+            "processing",
+            None,
+        )
+        .await;
 
         // Add to conversation history for context
         {
@@ -918,21 +951,233 @@ impl OrchestratorAgent {
             );
         }
 
-        // Wake up orchestrator to decide next action
-        self.awaken().await;
+        let inferred = self
+            .infer_no_metadata_completion(workflow_id, branch, message)
+            .await?;
 
-        // Mark git_event as processed
+        let Some(inferred) = inferred else {
+            let reason = "Unable to infer task/terminal from no-metadata commit; manual intervention required";
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                commit_hash = %commit_hash,
+                branch = %branch,
+                commit_message = %message,
+                reason,
+                "Skipping no-metadata commit because inference was ambiguous"
+            );
+            let _ = db::models::git_event::GitEvent::update_status(
+                &self.db.pool,
+                event_id,
+                "failed",
+                Some(reason),
+            )
+            .await;
+            return Ok(());
+        };
+
+        // Align in-memory progress cursor with the inferred terminal before completion handling.
+        self.align_task_state_for_no_metadata_completion(
+            &inferred.task_id,
+            inferred.terminal_index,
+            inferred.total_terminals,
+        )
+        .await;
+
+        if let Err(err) = self
+            .handle_git_terminal_completed(
+                &inferred.terminal_id,
+                &inferred.task_id,
+                commit_hash,
+                message,
+            )
+            .await
+        {
+            let reason = format!(
+                "Failed to process inferred no-metadata completion for terminal {}: {}",
+                inferred.terminal_id, err
+            );
+            tracing::error!(
+                workflow_id = %workflow_id,
+                task_id = %inferred.task_id,
+                terminal_id = %inferred.terminal_id,
+                commit_hash = %commit_hash,
+                error = %err,
+                "Failed to handle no-metadata commit"
+            );
+            let _ = db::models::git_event::GitEvent::update_status(
+                &self.db.pool,
+                event_id,
+                "failed",
+                Some(&reason),
+            )
+            .await;
+            return Ok(());
+        }
+
+        {
+            let mut state = self.state.write().await;
+            state.processed_commits.insert(commit_hash.to_string());
+        }
+
         let _ = db::models::git_event::GitEvent::update_status(
-            &self.db.pool, event_id, "processed", None,
-        ).await;
+            &self.db.pool,
+            event_id,
+            "processed",
+            Some("Inferred terminal completion from no-metadata commit"),
+        )
+        .await;
 
         tracing::info!(
-            "Orchestrator awakened for commit {} on workflow {}",
-            commit_hash,
-            workflow_id
+            workflow_id = %workflow_id,
+            task_id = %inferred.task_id,
+            terminal_id = %inferred.terminal_id,
+            commit_hash = %commit_hash,
+            "Processed no-metadata commit via inferred terminal completion"
         );
 
         Ok(())
+    }
+
+    fn extract_task_hint_from_commit_message(message: &str) -> Option<String> {
+        TASK_HINT_FROM_COMMIT_RE
+            .captures(message)
+            .and_then(|caps| caps.get(1))
+            .map(|m| m.as_str().to_ascii_lowercase())
+    }
+
+    fn looks_like_noop_handoff_commit(message: &str) -> bool {
+        let normalized = message.to_ascii_lowercase();
+        normalized.contains("empty commit")
+            || normalized.contains("no changes needed")
+            || normalized.contains("advance orchestrator")
+            || (normalized.contains("handoff") && normalized.contains("orchestrator"))
+    }
+
+    async fn infer_no_metadata_completion(
+        &self,
+        workflow_id: &str,
+        branch: &str,
+        message: &str,
+    ) -> anyhow::Result<Option<InferredNoMetadataCompletion>> {
+        let task_hint = Self::extract_task_hint_from_commit_message(message);
+        let all_tasks = db::models::WorkflowTask::find_by_workflow(&self.db.pool, workflow_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to load workflow tasks for inference: {e}"))?;
+
+        let mut candidate_tasks = all_tasks;
+        if let Some(ref hint) = task_hint {
+            candidate_tasks.retain(|task| task.id.to_ascii_lowercase().starts_with(hint));
+        }
+
+        let branch_name = branch.trim();
+        if !branch_name.is_empty() {
+            let branch_matched_tasks: Vec<_> = candidate_tasks
+                .iter()
+                .filter(|task| task.branch.eq_ignore_ascii_case(branch_name))
+                .cloned()
+                .collect();
+            if !branch_matched_tasks.is_empty() {
+                candidate_tasks = branch_matched_tasks;
+            }
+        }
+
+        let mut inferred_candidates: Vec<(i32, i32, InferredNoMetadataCompletion)> = Vec::new();
+
+        for task in candidate_tasks {
+            let terminals = db::models::Terminal::find_by_task(&self.db.pool, &task.id)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to load terminals for task {}: {e}", task.id))?;
+
+            let working_terminals: Vec<_> = terminals
+                .iter()
+                .enumerate()
+                .filter(|(_, terminal)| terminal.status == "working")
+                .collect();
+
+            if working_terminals.len() > 1 {
+                tracing::warn!(
+                    workflow_id = %workflow_id,
+                    task_id = %task.id,
+                    working_count = working_terminals.len(),
+                    "Skipping task during no-metadata inference because multiple terminals are working"
+                );
+                continue;
+            }
+
+            if let Some((terminal_index, terminal)) = working_terminals.into_iter().next() {
+                inferred_candidates.push((
+                    task.order_index,
+                    terminal.order_index,
+                    InferredNoMetadataCompletion {
+                        task_id: task.id.clone(),
+                        terminal_id: terminal.id.clone(),
+                        terminal_index,
+                        total_terminals: terminals.len(),
+                    },
+                ));
+            }
+        }
+
+        if inferred_candidates.len() == 1 {
+            let (_, _, inferred) = inferred_candidates
+                .into_iter()
+                .next()
+                .expect("inferred candidate length checked");
+            return Ok(Some(inferred));
+        }
+
+        if inferred_candidates.len() > 1 && task_hint.is_none() {
+            let candidate_count = inferred_candidates.len();
+            inferred_candidates.sort_by(|lhs, rhs| {
+                lhs.0
+                    .cmp(&rhs.0)
+                    .then(lhs.1.cmp(&rhs.1))
+                    .then(lhs.2.terminal_id.cmp(&rhs.2.terminal_id))
+            });
+            let (_, _, inferred) = inferred_candidates
+                .into_iter()
+                .next()
+                .expect("inferred candidate length checked");
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                branch = %branch_name,
+                candidate_count,
+                noop_handoff_pattern = Self::looks_like_noop_handoff_commit(message),
+                "Ambiguous no-metadata commit without task hint; selecting deterministic candidate to avoid orchestrator stall"
+            );
+            return Ok(Some(inferred));
+        }
+
+        tracing::warn!(
+            workflow_id = %workflow_id,
+            branch = %branch_name,
+            task_hint = ?task_hint,
+            candidate_count = inferred_candidates.len(),
+            noop_handoff_pattern = Self::looks_like_noop_handoff_commit(message),
+            "Cannot infer unique task/terminal from no-metadata commit"
+        );
+        Ok(None)
+    }
+
+    async fn align_task_state_for_no_metadata_completion(
+        &self,
+        task_id: &str,
+        terminal_index: usize,
+        total_terminals: usize,
+    ) {
+        let mut state = self.state.write().await;
+        let safe_total = total_terminals.max(1);
+        if !state.task_states.contains_key(task_id) {
+            state.init_task(task_id.to_string(), safe_total);
+        }
+
+        if let Some(task_state) = state.task_states.get_mut(task_id) {
+            task_state.total_terminals = safe_total;
+            task_state.current_terminal_index = terminal_index.min(safe_total.saturating_sub(1));
+            if task_state.is_completed {
+                task_state.is_completed = false;
+            }
+        }
     }
 
     /// Handle terminal completed status from git event
@@ -1128,7 +1373,7 @@ impl OrchestratorAgent {
 
     /// Executes orchestrator instructions returned by the LLM.
     pub async fn execute_instruction(&self, response: &str) -> anyhow::Result<()> {
-        // 尝试解析 JSON 指令
+        // Try parsing JSON instruction.
         if let Ok(instruction) = serde_json::from_str::<OrchestratorInstruction>(response) {
             match instruction {
                 OrchestratorInstruction::SendToTerminal {
@@ -1142,13 +1387,7 @@ impl OrchestratorAgent {
                         .await
                         .map_err(|e| anyhow::anyhow!("Failed to get terminal: {e}"))?
                         .ok_or_else(|| anyhow::anyhow!("Terminal {terminal_id} not found"))?;
-
-                    // 2. Get PTY session ID
-                    let pty_session_id = terminal.pty_session_id.clone().ok_or_else(|| {
-                        anyhow::anyhow!("Terminal {terminal_id} has no PTY session")
-                    })?;
-
-                    // 防止在串行链路中向已完成/等待中的终端再次注入消息，避免并发执行错位。
+                    // Skip stale send instructions for terminals that are no longer active.
                     if terminal.status != "working" {
                         tracing::info!(
                             terminal_id = %terminal.id,
@@ -1157,6 +1396,20 @@ impl OrchestratorAgent {
                         );
                         return Ok(());
                     }
+
+                    // 2. Get PTY session ID. Missing PTY can happen after process teardown;
+                    // skip this advisory message instead of crashing the orchestrator runtime.
+                    let pty_session_id = match terminal.pty_session_id.clone() {
+                        Some(session_id) => session_id,
+                        None => {
+                            tracing::warn!(
+                                terminal_id = %terminal.id,
+                                status = %terminal.status,
+                                "Skipping SendToTerminal instruction because terminal has no PTY session"
+                            );
+                            return Ok(());
+                        }
+                    };
 
                     // 3. Send message via message bus
                     self.message_bus
@@ -1171,8 +1424,9 @@ impl OrchestratorAgent {
 
                     // Fallback submit keystroke: some terminal TUIs keep pasted text in composer
                     // until an additional Enter is sent.
-                    for (attempt, delay_ms) in
-                        Self::submit_keystroke_schedule_ms(&terminal).iter().enumerate()
+                    for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(&terminal)
+                        .iter()
+                        .enumerate()
                     {
                         sleep(Duration::from_millis(*delay_ms)).await;
                         self.message_bus
@@ -1526,7 +1780,10 @@ impl OrchestratorAgent {
                 )
                 .await;
 
-            let _ = self.message_bus.publish(session_id, BusMessage::Shutdown).await;
+            let _ = self
+                .message_bus
+                .publish(session_id, BusMessage::Shutdown)
+                .await;
             tracing::info!(
                 terminal_id = %terminal.id,
                 workflow_id = %workflow_id,
@@ -1554,7 +1811,9 @@ impl OrchestratorAgent {
             }
         }
 
-        if let Err(e) = db::models::Terminal::update_process(&self.db.pool, &terminal.id, None, None).await {
+        if let Err(e) =
+            db::models::Terminal::update_process(&self.db.pool, &terminal.id, None, None).await
+        {
             tracing::warn!(
                 terminal_id = %terminal.id,
                 workflow_id = %workflow_id,
@@ -1563,7 +1822,9 @@ impl OrchestratorAgent {
             );
         }
 
-        if let Err(e) = db::models::Terminal::update_session(&self.db.pool, &terminal.id, None, None).await {
+        if let Err(e) =
+            db::models::Terminal::update_session(&self.db.pool, &terminal.id, None, None).await
+        {
             tracing::warn!(
                 terminal_id = %terminal.id,
                 workflow_id = %workflow_id,
@@ -1644,10 +1905,7 @@ impl OrchestratorAgent {
         let mut parts = vec![format!("Start task: {} ({})", task.name, task.id)];
 
         if let Some(description) = &task.description {
-            let normalized = description
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ");
+            let normalized = description.split_whitespace().collect::<Vec<_>>().join(" ");
             if !normalized.is_empty() {
                 if total_terminals > 1 {
                     let summary = Self::truncate_instruction_text(&normalized, 200);
@@ -1685,8 +1943,7 @@ impl OrchestratorAgent {
                     .to_string(),
             );
             parts.push(
-                "When finished, leave concise handoff notes for the next terminal."
-                    .to_string(),
+                "When finished, leave concise handoff notes for the next terminal.".to_string(),
             );
         }
 
@@ -1726,7 +1983,7 @@ impl OrchestratorAgent {
         }
 
         let truncated: String = input.chars().take(max_chars).collect();
-        format!("{truncated}…")
+        format!("{truncated}...")
     }
 
     /// Auto-dispatches the first terminal for each task when workflow starts.
@@ -2368,15 +2625,17 @@ mod tests {
         let input = "a".repeat(260);
         let result = OrchestratorAgent::truncate_instruction_text(&input, 200);
 
-        assert_eq!(result.chars().count(), 201);
-        assert!(result.ends_with('…'));
+        assert_eq!(result.chars().count(), 203);
+        assert!(result.ends_with("..."));
     }
 
     #[test]
     fn should_skip_completed_handoff_for_continue_and_retry() {
         assert!(OrchestratorAgent::should_skip_completed_handoff("continue"));
         assert!(OrchestratorAgent::should_skip_completed_handoff("retry"));
-        assert!(OrchestratorAgent::should_skip_completed_handoff(" Continue "));
+        assert!(OrchestratorAgent::should_skip_completed_handoff(
+            " Continue "
+        ));
         assert!(!OrchestratorAgent::should_skip_completed_handoff("handoff"));
         assert!(!OrchestratorAgent::should_skip_completed_handoff(""));
     }

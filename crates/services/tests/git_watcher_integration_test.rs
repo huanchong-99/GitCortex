@@ -17,9 +17,14 @@ fn create_test_commit_message(
     terminal_id: &str,
     status: &str,
 ) -> String {
+    let next_action = if status.eq_ignore_ascii_case("failed") {
+        "retry"
+    } else {
+        "handoff"
+    };
     format!(
-        "Complete feature implementation\n\n---METADATA---\nworkflow_id: {}\ntask_id: {}\nterminal_id: {}\nstatus: {}",
-        workflow_id, task_id, terminal_id, status
+        "Complete feature implementation\n\n---METADATA---\nworkflow_id: {}\ntask_id: {}\nterminal_id: {}\nstatus: {}\nnext_action: {}",
+        workflow_id, task_id, terminal_id, status, next_action
     )
 }
 
@@ -353,6 +358,62 @@ mod git_watcher_tests {
         );
 
         // Cleanup
+        watcher_handle.abort();
+    }
+
+    #[tokio::test]
+    async fn test_handle_multiple_commits_in_single_poll_window() {
+        let (_temp_dir, repo_path) = create_test_repo();
+        let message_bus = MessageBus::new(100);
+
+        let config = GitWatcherConfig {
+            repo_path: repo_path.clone(),
+            poll_interval_ms: 300,
+        };
+
+        let mut receiver = message_bus.subscribe_broadcast();
+        let mut watcher =
+            GitWatcher::new(config, message_bus).expect("Failed to create GitWatcher");
+
+        let watcher_handle = tokio::spawn(async move {
+            watcher.watch().await.unwrap();
+        });
+
+        // Ensure watcher is initialized and baseline HEAD is recorded.
+        tokio::time::sleep(Duration::from_millis(120)).await;
+
+        // Create two commits back-to-back without waiting for another poll tick.
+        for i in 0..2 {
+            let commit_msg = create_test_commit_message(
+                "wf-burst",
+                &format!("task-burst-{}", i),
+                &format!("terminal-burst-{}", i),
+                "completed",
+            );
+            create_commit(&repo_path, &commit_msg);
+        }
+
+        // Collect two TerminalCompleted events.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(4);
+        let mut terminal_ids = Vec::new();
+        while terminal_ids.len() < 2 && tokio::time::Instant::now() < deadline {
+            match timeout(Duration::from_millis(800), receiver.recv()).await {
+                Ok(Ok(BusMessage::TerminalCompleted(event))) => {
+                    terminal_ids.push(event.terminal_id);
+                }
+                Ok(Ok(_)) => {}
+                Ok(Err(_)) | Err(_) => {}
+            }
+        }
+
+        assert_eq!(
+            terminal_ids.len(),
+            2,
+            "Watcher should consume all commits created within one poll window"
+        );
+        assert!(terminal_ids.contains(&"terminal-burst-0".to_string()));
+        assert!(terminal_ids.contains(&"terminal-burst-1".to_string()));
+
         watcher_handle.abort();
     }
 

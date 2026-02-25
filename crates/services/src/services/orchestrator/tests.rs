@@ -1350,7 +1350,9 @@ mod orchestrator_tests {
         )
         .unwrap();
 
-        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{}", workflow_id)).await;
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{}", workflow_id))
+            .await;
         let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
 
         let instruction_json = format!(
@@ -1359,7 +1361,10 @@ mod orchestrator_tests {
         );
 
         let result = agent.execute_instruction(&instruction_json).await;
-        assert!(result.is_ok(), "StartTask should skip safely when terminal is not waiting");
+        assert!(
+            result.is_ok(),
+            "StartTask should skip safely when terminal is not waiting"
+        );
 
         let timeout =
             tokio::time::timeout(tokio::time::Duration::from_millis(250), terminal_rx.recv()).await;
@@ -1430,20 +1435,28 @@ mod orchestrator_tests {
         );
 
         let result = agent.execute_instruction(&instruction_json).await;
-        assert!(result.is_ok(), "StartTask should succeed with refreshed PTY binding");
+        assert!(
+            result.is_ok(),
+            "StartTask should succeed with refreshed PTY binding"
+        );
 
-        let old_timeout =
-            tokio::time::timeout(tokio::time::Duration::from_millis(250), old_session_rx.recv()).await;
+        let old_timeout = tokio::time::timeout(
+            tokio::time::Duration::from_millis(250),
+            old_session_rx.recv(),
+        )
+        .await;
         assert!(
             old_timeout.is_err(),
             "Legacy PTY topic should not receive dispatch after metadata refresh"
         );
 
-        let new_msg =
-            tokio::time::timeout(tokio::time::Duration::from_millis(500), new_session_rx.recv())
-                .await
-                .expect("Expected message on refreshed PTY topic")
-                .expect("PTY subscriber should remain active");
+        let new_msg = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500),
+            new_session_rx.recv(),
+        )
+        .await
+        .expect("Expected message on refreshed PTY topic")
+        .expect("PTY subscriber should remain active");
 
         match new_msg {
             BusMessage::TerminalMessage { message } => {
@@ -1491,7 +1504,9 @@ mod orchestrator_tests {
         .unwrap();
 
         let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
-        let mut workflow_rx = message_bus.subscribe(&format!("workflow:{}", workflow.id)).await;
+        let mut workflow_rx = message_bus
+            .subscribe(&format!("workflow:{}", workflow.id))
+            .await;
 
         let instruction_json = format!(
             r#"{{"type":"send_to_terminal","terminal_id":"{}","message":"echo gated"}}"#,
@@ -1576,6 +1591,58 @@ mod orchestrator_tests {
     }
 
     #[tokio::test]
+    async fn test_execute_instruction_send_to_terminal_skips_non_working_without_pty() {
+        use db::models::Terminal;
+
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        // Simulate a completed terminal after teardown: status is non-working and PTY is gone.
+        sqlx::query("UPDATE terminal SET status = 'completed', pty_session_id = NULL WHERE id = ?")
+            .bind(&terminal.id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient::new());
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus,
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let instruction_json = format!(
+            r#"{{"type":"send_to_terminal","terminal_id":"{}","message":"echo should-skip"}}"#,
+            terminal.id
+        );
+
+        let result = agent.execute_instruction(&instruction_json).await;
+        assert!(
+            result.is_ok(),
+            "SendToTerminal should skip non-working terminal even when PTY is missing"
+        );
+
+        let terminal_after = Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal_after.status, "completed");
+        assert!(terminal_after.pty_session_id.is_none());
+    }
+
+    #[tokio::test]
     async fn test_execute_instruction_start_task_codex_uses_terminal_input_with_submit() {
         use db::models::Terminal;
 
@@ -1619,7 +1686,10 @@ mod orchestrator_tests {
         );
 
         let result = agent.execute_instruction(&instruction_json).await;
-        assert!(result.is_ok(), "StartTask should succeed for codex terminal");
+        assert!(
+            result.is_ok(),
+            "StartTask should succeed for codex terminal"
+        );
 
         let first = tokio::time::timeout(tokio::time::Duration::from_millis(700), input_rx.recv())
             .await
@@ -2023,8 +2093,8 @@ next_action: handoff"#,
     }
 
     #[tokio::test]
-    async fn test_handle_git_event_terminal_completed_race_keeps_terminal_unfinished_within_quiet_window(
-    ) {
+    async fn test_handle_git_event_terminal_completed_race_keeps_terminal_unfinished_within_quiet_window()
+     {
         let (db, workflow, terminal) = setup_test_workflow().await;
 
         sqlx::query(
@@ -2098,8 +2168,14 @@ next_action: handoff"#,
         );
 
         let (first_result, second_result) = tokio::join!(first_call, second_call);
-        assert!(first_result.is_ok(), "First completion event should be handled safely");
-        assert!(second_result.is_ok(), "Second completion event should be handled safely");
+        assert!(
+            first_result.is_ok(),
+            "First completion event should be handled safely"
+        );
+        assert!(
+            second_result.is_ok(),
+            "Second completion event should be handled safely"
+        );
 
         let updated_terminal = db::models::Terminal::find_by_id(&db.pool, &terminal.id)
             .await
@@ -2610,8 +2686,27 @@ next_action: handoff"#,
     }
 
     #[tokio::test]
-    async fn test_handle_git_event_no_metadata() {
-        let (db, workflow, _terminal) = setup_test_workflow().await;
+    async fn test_handle_git_event_no_metadata_infers_task_and_advances_handoff() {
+        use db::models::Terminal;
+
+        let (db, workflow_id, task_id, terminals) = setup_workflow_with_terminals(2, true).await;
+        let (first_terminal_id, _) = terminals[0].clone();
+        let (second_terminal_id, second_pty_session_id) = terminals[1].clone();
+        let second_pty_session_id = second_pty_session_id.expect("Second terminal should have PTY");
+
+        // Mark first terminal as actively working and old enough to pass quiet-window checks.
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'working', started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now() - chrono::Duration::seconds(90))
+        .bind(&first_terminal_id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
 
         let config = OrchestratorConfig {
             api_type: "openai".to_string(),
@@ -2633,28 +2728,289 @@ next_action: handoff"#,
         });
 
         let agent = OrchestratorAgent::with_llm_client(
-            config.clone(),
-            workflow.id.clone(),
+            config,
+            workflow_id.clone(),
             message_bus.clone(),
             db.clone(),
             mock_llm,
         )
         .unwrap();
 
-        // Commit message without METADATA section
-        let commit_message = "feat: add new feature without metadata";
+        let mut second_terminal_rx = message_bus.subscribe(&second_pty_session_id).await;
+        let task_prefix = task_id
+            .split('-')
+            .next()
+            .expect("Task ID should have prefix");
+        let commit_message = format!("chore: no-op advance for task {task_prefix}");
 
-        // Should succeed and trigger awakening logic
         let result = agent
             .handle_git_event(
-                &workflow.id,
+                &workflow_id,
                 "no_metadata_commit_456",
-                "feature/branch",
+                "main",
+                &commit_message,
+            )
+            .await;
+        assert!(result.is_ok(), "No-metadata commit should be handled");
+
+        let first_terminal = Terminal::find_by_id(&db.pool, &first_terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let second_terminal = Terminal::find_by_id(&db.pool, &second_terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(first_terminal.status, "completed");
+        assert_eq!(second_terminal.status, "working");
+
+        let dispatched = tokio::time::timeout(
+            tokio::time::Duration::from_millis(500),
+            second_terminal_rx.recv(),
+        )
+        .await;
+        assert!(
+            dispatched.is_ok(),
+            "Second terminal should receive dispatch message after inferred handoff"
+        );
+
+        let git_events = db::models::git_event::GitEvent::find_by_workflow(&db.pool, &workflow_id)
+            .await
+            .unwrap();
+        let event = git_events
+            .iter()
+            .find(|event| event.commit_hash == "no_metadata_commit_456")
+            .expect("Git event should be persisted");
+        assert_eq!(event.process_status, "processed");
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_no_metadata_no_hint_commits_do_not_stall_parallel_tasks() {
+        use db::models::{Terminal, WorkflowTask};
+        use uuid::Uuid;
+
+        let (db, workflow, first_terminal) = setup_test_workflow().await;
+
+        let second_task_id = Uuid::new_v4().to_string();
+        let second_terminal_id = Uuid::new_v4().to_string();
+        let second_pty_session_id = Uuid::new_v4().to_string();
+        let started_at = chrono::Utc::now() - chrono::Duration::seconds(90);
+
+        sqlx::query(
+            r#"
+            INSERT INTO workflow_task (
+                id, workflow_id, name, branch, order_index,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#,
+        )
+        .bind(&second_task_id)
+        .bind(&workflow.id)
+        .bind("parallel-task")
+        .bind("feature/parallel")
+        .bind(1)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            INSERT INTO terminal (
+                id, workflow_task_id, cli_type_id, model_config_id,
+                order_index, status, pty_session_id, started_at, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            "#,
+        )
+        .bind(&second_terminal_id)
+        .bind(&second_task_id)
+        .bind("cli-claude-code")
+        .bind("model-claude-sonnet")
+        .bind(0)
+        .bind("working")
+        .bind(&second_pty_session_id)
+        .bind(started_at)
+        .bind(chrono::Utc::now())
+        .bind(chrono::Utc::now())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'working', started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(started_at)
+        .bind(&first_terminal.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus,
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let commit_message = "chore: advance orchestrator (no changes needed)";
+        let first_result = agent
+            .handle_git_event(
+                &workflow.id,
+                "no_metadata_parallel_commit_1",
+                "main",
                 commit_message,
             )
             .await;
+        assert!(first_result.is_ok(), "First no-metadata commit should be handled");
 
-        assert!(result.is_ok(), "Should handle commit without metadata");
+        let second_result = agent
+            .handle_git_event(
+                &workflow.id,
+                "no_metadata_parallel_commit_2",
+                "main",
+                commit_message,
+            )
+            .await;
+        assert!(second_result.is_ok(), "Second no-metadata commit should be handled");
+
+        let first_terminal_after = Terminal::find_by_id(&db.pool, &first_terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+        let second_terminal_after = Terminal::find_by_id(&db.pool, &second_terminal_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(first_terminal_after.status, "completed");
+        assert_eq!(second_terminal_after.status, "completed");
+
+        let first_task_after = WorkflowTask::find_by_id(&db.pool, &first_terminal.workflow_task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let second_task_after = WorkflowTask::find_by_id(&db.pool, &second_task_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(first_task_after.status, "completed");
+        assert_eq!(second_task_after.status, "completed");
+
+        let git_events = db::models::git_event::GitEvent::find_by_workflow(&db.pool, &workflow.id)
+            .await
+            .unwrap();
+        let first_event = git_events
+            .iter()
+            .find(|event| event.commit_hash == "no_metadata_parallel_commit_1")
+            .expect("First git event should be persisted");
+        let second_event = git_events
+            .iter()
+            .find(|event| event.commit_hash == "no_metadata_parallel_commit_2")
+            .expect("Second git event should be persisted");
+        assert_eq!(first_event.process_status, "processed");
+        assert_eq!(second_event.process_status, "processed");
+    }
+
+    #[tokio::test]
+    async fn test_handle_git_event_no_metadata_marks_failed_when_task_cannot_be_inferred() {
+        let (db, workflow, terminal) = setup_test_workflow().await;
+
+        sqlx::query(
+            r#"
+            UPDATE terminal
+            SET status = 'working', started_at = ?1, updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(chrono::Utc::now() - chrono::Duration::seconds(90))
+        .bind(&terminal.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let config = OrchestratorConfig {
+            api_type: "openai".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-4".to_string(),
+            max_retries: 3,
+            timeout_secs: 120,
+            retry_delay_ms: 1000,
+            rate_limit_requests_per_second: DEFAULT_LLM_RATE_LIMIT_PER_SECOND,
+            max_conversation_history: 50,
+            system_prompt: String::new(),
+        };
+
+        let message_bus = Arc::new(MessageBus::new(100));
+        let mock_llm = Box::new(MockLLMClient {
+            should_fail: false,
+            response_content: String::new(),
+        });
+
+        let agent = OrchestratorAgent::with_llm_client(
+            config,
+            workflow.id.clone(),
+            message_bus,
+            db.clone(),
+            mock_llm,
+        )
+        .unwrap();
+
+        let commit_message = "chore: no-op advance for task deadbeef";
+        let result = agent
+            .handle_git_event(
+                &workflow.id,
+                "no_metadata_commit_789",
+                "main",
+                commit_message,
+            )
+            .await;
+        assert!(
+            result.is_ok(),
+            "No-metadata inference failure should not crash agent"
+        );
+
+        let refreshed_terminal = db::models::Terminal::find_by_id(&db.pool, &terminal.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(refreshed_terminal.status, "working");
+
+        let git_events = db::models::git_event::GitEvent::find_by_workflow(&db.pool, &workflow.id)
+            .await
+            .unwrap();
+        let event = git_events
+            .iter()
+            .find(|event| event.commit_hash == "no_metadata_commit_789")
+            .expect("Git event should be persisted");
+        assert_eq!(event.process_status, "failed");
     }
 
     #[tokio::test]

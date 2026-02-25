@@ -561,9 +561,8 @@ pub async fn stop_terminal(
     // Ensure prompt watcher state/task is cleaned up for this terminal
     deployment.prompt_watcher().unregister(&id).await;
 
-    // Reset terminal status for restart (not_started allows re-starting)
-    Terminal::update_status(&deployment.db().pool, &id, "not_started").await?;
-    Terminal::update_process(&deployment.db().pool, &id, None, None).await?;
+    // Reset terminal runtime/completion fields so next workflow round can run cleanly.
+    Terminal::reset_for_restart(&deployment.db().pool, &id).await?;
     if let Err(e) = broadcast_terminal_status(&deployment, &terminal, "not_started").await {
         tracing::warn!(
             terminal_id = %id,

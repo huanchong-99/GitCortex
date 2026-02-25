@@ -259,28 +259,33 @@ impl GitWatcher {
         while self.is_running.load(Ordering::SeqCst) {
             tokio::time::sleep(poll_interval).await;
 
-            // Check for new commits
-            if let Ok(latest_commit) = self.get_latest_commit(&repo_path).await {
-                // Check if this is a new commit
-                let new_hash = latest_commit.hash.clone();
-                let should_process = {
-                    let mut last_hash = self.last_commit_hash.lock().await;
-                    let should = match last_hash.as_ref() {
-                        Some(last) => *last != new_hash,
-                        None => true,
-                    };
-                    if should {
-                        *last_hash = Some(new_hash.clone());
+            let last_seen = { self.last_commit_hash.lock().await.clone() };
+            let new_commits = match self
+                .get_new_commits_since(&repo_path, last_seen.as_deref())
+                .await
+            {
+                Ok(commits) => commits,
+                Err(e) => {
+                    tracing::error!("Error checking new commits: {}", e);
+                    continue;
+                }
+            };
+
+            for commit in new_commits {
+                tracing::info!("New commit detected: {}", commit.hash);
+
+                match self.handle_new_commit(commit.clone()).await {
+                    Ok(_) => {
+                        let mut last_hash = self.last_commit_hash.lock().await;
+                        *last_hash = Some(commit.hash.clone());
                     }
-                    should
-                };
-
-                if should_process {
-                    tracing::info!("New commit detected: {}", latest_commit.hash);
-
-                    // Process the new commit
-                    if let Err(e) = self.handle_new_commit(latest_commit).await {
-                        tracing::error!("Error handling new commit: {}", e);
+                    Err(e) => {
+                        tracing::error!(
+                            commit_hash = %commit.hash,
+                            error = %e,
+                            "Error handling commit; keeping cursor unchanged for retry"
+                        );
+                        break;
                     }
                 }
             }
@@ -298,22 +303,71 @@ impl GitWatcher {
 
     /// Get the latest commit from the repository
     async fn get_latest_commit(&self, repo_path: &Path) -> Result<ParsedCommit> {
+        self.get_commit_by_hash(repo_path, "HEAD").await
+    }
+
+    async fn get_new_commits_since(
+        &self,
+        repo_path: &Path,
+        last_seen: Option<&str>,
+    ) -> Result<Vec<ParsedCommit>> {
         use tokio::process::Command;
 
-        // Get commit hash and message
+        let mut cmd = Command::new("git");
+        cmd.current_dir(repo_path)
+            .args(["log", "--format=%H", "--reverse"]);
+
+        if let Some(last_hash) = last_seen {
+            cmd.arg(format!("{last_hash}..HEAD"));
+        } else {
+            cmd.args(["-1"]);
+        }
+
+        let output = cmd.output().await.context(format!(
+            "Failed to list commits from {}",
+            self.config.repo_path.display()
+        ))?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "git log for new commits failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        let hashes: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(ToString::to_string)
+            .collect();
+
+        let mut commits = Vec::with_capacity(hashes.len());
+        for hash in hashes {
+            commits.push(self.get_commit_by_hash(repo_path, &hash).await?);
+        }
+
+        Ok(commits)
+    }
+
+    async fn get_commit_by_hash(&self, repo_path: &Path, revision: &str) -> Result<ParsedCommit> {
+        use tokio::process::Command;
+
+        // Get commit hash and subject
         let output = Command::new("git")
             .current_dir(repo_path)
-            .args(["log", "-1", "--format=%H|%s"])
+            .args(["show", "-s", "--format=%H|%s", revision])
             .output()
             .await
             .context(format!(
-                "Failed to get latest commit from {}",
+                "Failed to read commit {} from {}",
+                revision,
                 self.config.repo_path.display()
             ))?;
 
         if !output.status.success() {
             anyhow::bail!(
-                "git log failed: {}",
+                "git show failed: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
         }
@@ -355,13 +409,21 @@ impl GitWatcher {
         // Get full message body for metadata parsing
         let full_output = Command::new("git")
             .current_dir(repo_path)
-            .args(["log", "-1", "--format=%B"])
+            .args(["show", "-s", "--format=%B", revision])
             .output()
             .await
             .context(format!(
-                "Failed to get commit body from {}",
+                "Failed to get commit body {} from {}",
+                revision,
                 self.config.repo_path.display()
             ))?;
+
+        if !full_output.status.success() {
+            anyhow::bail!(
+                "git show body failed: {}",
+                String::from_utf8_lossy(&full_output.stderr)
+            );
+        }
 
         let full_message = String::from_utf8_lossy(&full_output.stdout).to_string();
         let metadata = CommitMetadata::parse(&full_message);
@@ -470,7 +532,9 @@ impl GitWatcher {
         Ok(())
     }
 
-    fn completion_status_from_metadata(metadata: &CommitMetadata) -> Option<TerminalCompletionStatus> {
+    fn completion_status_from_metadata(
+        metadata: &CommitMetadata,
+    ) -> Option<TerminalCompletionStatus> {
         let status = metadata.status.trim().to_ascii_lowercase();
         let next_action = metadata.next_action.trim().to_ascii_lowercase();
 
@@ -506,8 +570,9 @@ pub fn parse_commit_metadata(message: &str) -> Result<CommitMetadata> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
 
     #[test]
     fn test_parse_commit_metadata_basic() {
@@ -746,7 +811,8 @@ next_action: continue"#;
             std::process::id(),
             unique
         ));
-        std::fs::create_dir_all(repo_path.join(".git")).expect("create mock git repo should succeed");
+        std::fs::create_dir_all(repo_path.join(".git"))
+            .expect("create mock git repo should succeed");
 
         let message_bus = MessageBus::new(16);
         let mut watcher = GitWatcher::new(
