@@ -28,6 +28,8 @@ use super::{
     process::{DEFAULT_COLS, DEFAULT_ROWS, ProcessHandle, ProcessManager},
     prompt_watcher::PromptWatcher,
 };
+#[cfg(test)]
+use super::process::SpawnCommand;
 use crate::services::{
     cc_switch::CCSwitchService,
     orchestrator::{BusMessage, SharedMessageBus, constants::WORKFLOW_TOPIC_PREFIX},
@@ -962,25 +964,37 @@ mod tests {
 
         let temp_dir = tempfile::tempdir().unwrap();
         #[cfg(windows)]
-        let shell = "cmd.exe";
+        let spawn_config = SpawnCommand::new("powershell", temp_dir.path()).with_args([
+            "-NoLogo",
+            "-NoProfile",
+            "-Command",
+            "Start-Sleep -Seconds 120",
+        ]);
         #[cfg(unix)]
-        let shell = "sh";
+        let spawn_config = SpawnCommand::new("sleep", temp_dir.path()).with_arg("120");
 
-        launcher
-            .process_manager
-            .spawn_pty(
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            launcher.process_manager.spawn_pty_with_config(
                 terminal_id,
-                shell,
-                temp_dir.path(),
+                &spawn_config,
                 DEFAULT_COLS,
                 DEFAULT_ROWS,
-            )
-            .await
-            .unwrap();
+            ),
+        )
+        .await
+        .expect("spawn_pty_with_config should not hang")
+        .unwrap();
 
         assert!(launcher.process_manager.is_running(terminal_id).await);
 
-        launcher.stop_all(&workflow_id).await.unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            launcher.stop_all(&workflow_id),
+        )
+        .await
+        .expect("stop_all should not hang")
+        .unwrap();
 
         assert!(
             !launcher.process_manager.is_running(terminal_id).await,
