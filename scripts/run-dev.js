@@ -423,7 +423,7 @@ async function main() {
     run(
       "backend",
       "cargo",
-      ["watch", "-w", "crates", "-x", "run --bin server"],
+      ["watch", "-w", "crates", "--", "cargo", "run", "--bin", "server"],
       { env }
     );
 

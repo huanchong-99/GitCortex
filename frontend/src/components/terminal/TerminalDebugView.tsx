@@ -78,11 +78,18 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         return false;
       }
 
-      if (needsRestartRef.current.has(terminal.id)) {
+      if (isHistoricalTerminalStatus(terminal.status)) {
         return false;
       }
 
-      if (isHistoricalTerminalStatus(terminal.status)) {
+      // Backend "waiting" means process is ready and can be attached directly.
+      // Trust backend status over local transient flags to avoid getting stuck
+      // in a perpetual "starting" placeholder after refresh/reconnect.
+      if (terminal.status === 'waiting') {
+        return true;
+      }
+
+      if (needsRestartRef.current.has(terminal.id)) {
         return false;
       }
 
@@ -96,7 +103,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
 
       return (
         !['failed', 'not_started'].includes(terminal.status) &&
-        ['working', 'running', 'active'].includes(terminal.status)
+        ['waiting', 'working', 'running', 'active'].includes(terminal.status)
       );
     },
     [isHistoricalTerminalStatus]

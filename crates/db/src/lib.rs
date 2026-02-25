@@ -30,15 +30,9 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), Error> {
         match migrator.run(pool).await {
             Ok(()) => return Ok(()),
             Err(MigrateError::VersionMismatch(version)) => {
-                if cfg!(debug_assertions) {
-                    // return the error in debug mode to catch migration issues early
-                    return Err(sqlx::Error::Migrate(Box::new(
-                        MigrateError::VersionMismatch(version),
-                    )));
-                }
-
                 if !cfg!(windows) {
-                    // On non-Windows platforms, we do not attempt to auto-fix checksum mismatches
+                    // On non-Windows platforms, we do not attempt to auto-fix checksum mismatches.
+                    // This keeps checksum drift visible in development and CI.
                     return Err(sqlx::Error::Migrate(Box::new(
                         MigrateError::VersionMismatch(version),
                     )));

@@ -221,6 +221,31 @@ describe('TerminalDebugView', () => {
       });
     });
 
+    it('should render TerminalEmulator for waiting terminal without auto-start request', async () => {
+      const waitingTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
+        {
+          ...mockTasks[0],
+          terminals: mockTasks[0].terminals.map((terminal) =>
+            terminal.id === 'term-2' ? { ...terminal, status: 'waiting' } : terminal
+          ),
+        },
+      ];
+
+      renderWithI18n(<TerminalDebugView tasks={waitingTasks} wsUrl="ws://localhost:8080" />);
+
+      const reviewerButton = screen.getByText('Reviewer').closest('button');
+      if (!reviewerButton) {
+        throw new Error('Expected terminal button to be rendered.');
+      }
+      fireEvent.click(reviewerButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-emulator')).toHaveAttribute('data-terminal-id', 'term-2');
+      });
+
+      expect(fetchMock).not.toHaveBeenCalledWith('/api/terminals/term-2/start', { method: 'POST' });
+    });
+
     it('should rebuild terminal emulator when switching terminals', async () => {
       const switchableTasks: (WorkflowTask & { terminals: Terminal[] })[] = [
         {
