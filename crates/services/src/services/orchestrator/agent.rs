@@ -61,6 +61,7 @@ struct InferredNoMetadataCompletion {
 impl OrchestratorAgent {
     const NEXT_TERMINAL_WAIT_RETRY_ATTEMPTS: usize = 20;
     const NEXT_TERMINAL_WAIT_RETRY_INTERVAL: Duration = Duration::from_millis(500);
+    const INITIAL_DISPATCH_DELAY: Duration = Duration::from_millis(2000);
 
     /// Builds a new orchestrator agent with a configured LLM client.
     pub fn new(
@@ -134,6 +135,10 @@ impl OrchestratorAgent {
             tracing::error!("Failed to execute slash commands: {}", e);
             // Don't fail the workflow, just log the error
         }
+
+        // Give freshly started PTY terminals a short warm-up window before first dispatch.
+        // Some CLIs (notably Claude) may drop/garble the first prompt if input arrives too early.
+        sleep(Self::INITIAL_DISPATCH_DELAY).await;
 
         // Auto-dispatch initial terminals for all tasks
         if let Err(e) = self.auto_dispatch_initial_tasks().await {
@@ -211,6 +216,9 @@ impl OrchestratorAgent {
             event.status,
             TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
         );
+
+        self.ensure_task_state_initialized_for_completion(&event.task_id)
+            .await?;
 
         let expected_terminal_id = {
             let next_index = {
@@ -525,10 +533,73 @@ impl OrchestratorAgent {
             }
         }
 
+        self.auto_sync_workflow_completion(&workflow_id).await?;
+
         // Restore idle state before returning.
         {
             let mut state = self.state.write().await;
             state.run_state = OrchestratorRunState::Idle;
+        }
+
+        Ok(())
+    }
+
+    async fn ensure_task_state_initialized_for_completion(
+        &self,
+        task_id: &str,
+    ) -> anyhow::Result<()> {
+        {
+            let state = self.state.read().await;
+            if state.task_states.contains_key(task_id) {
+                return Ok(());
+            }
+        }
+
+        let terminals = db::models::Terminal::find_by_task(&self.db.pool, task_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to load terminals for task {task_id}: {e}"))?;
+
+        if terminals.is_empty() {
+            return Ok(());
+        }
+
+        let total_terminals = terminals.len();
+        let mut current_terminal_index = 0usize;
+        let mut found_active_terminal = false;
+        let mut completed_terminals = Vec::new();
+        let mut failed_terminals = Vec::new();
+
+        for (index, terminal) in terminals.iter().enumerate() {
+            match terminal.status.as_str() {
+                "completed" => completed_terminals.push(terminal.id.clone()),
+                "failed" | "cancelled" => failed_terminals.push(terminal.id.clone()),
+                _ => {
+                    if !found_active_terminal {
+                        current_terminal_index = index;
+                        found_active_terminal = true;
+                    }
+                }
+            }
+        }
+
+        if !found_active_terminal {
+            current_terminal_index = total_terminals.saturating_sub(1);
+        }
+
+        let mut state = self.state.write().await;
+        if state.task_states.contains_key(task_id) {
+            return Ok(());
+        }
+
+        state.init_task(task_id.to_string(), total_terminals);
+
+        if let Some(task_state) = state.task_states.get_mut(task_id) {
+            task_state.current_terminal_index = current_terminal_index;
+            task_state.completed_terminals = completed_terminals;
+            task_state.failed_terminals = failed_terminals;
+            task_state.is_completed = task_state.completed_terminals.len()
+                + task_state.failed_terminals.len()
+                >= task_state.total_terminals;
         }
 
         Ok(())
@@ -952,7 +1023,7 @@ impl OrchestratorAgent {
         }
 
         let inferred = self
-            .infer_no_metadata_completion(workflow_id, branch, message)
+            .infer_no_metadata_completion(workflow_id, commit_hash, branch, message)
             .await?;
 
         let Some(inferred) = inferred else {
@@ -1056,6 +1127,7 @@ impl OrchestratorAgent {
     async fn infer_no_metadata_completion(
         &self,
         workflow_id: &str,
+        commit_hash: &str,
         branch: &str,
         message: &str,
     ) -> anyhow::Result<Option<InferredNoMetadataCompletion>> {
@@ -1086,7 +1158,9 @@ impl OrchestratorAgent {
         for task in candidate_tasks {
             let terminals = db::models::Terminal::find_by_task(&self.db.pool, &task.id)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to load terminals for task {}: {e}", task.id))?;
+                .map_err(|e| {
+                    anyhow::anyhow!("Failed to load terminals for task {}: {e}", task.id)
+                })?;
 
             let working_terminals: Vec<_> = terminals
                 .iter()
@@ -1126,6 +1200,45 @@ impl OrchestratorAgent {
             return Ok(Some(inferred));
         }
 
+        // Secondary disambiguation for concurrent working terminals:
+        // if a candidate terminal's recent logs contain this commit hash
+        // (usually shown by the CLI right after commit), prefer that terminal.
+        if inferred_candidates.len() > 1 {
+            let mut hash_matched_candidates: Vec<(i32, i32, InferredNoMetadataCompletion)> =
+                Vec::new();
+            for (task_order, terminal_order, inferred) in &inferred_candidates {
+                if self
+                    .terminal_recent_logs_contain_commit_hash(&inferred.terminal_id, commit_hash)
+                    .await
+                {
+                    hash_matched_candidates.push((
+                        *task_order,
+                        *terminal_order,
+                        inferred.clone(),
+                    ));
+                }
+            }
+
+            if hash_matched_candidates.len() == 1 {
+                let (_, _, inferred) = hash_matched_candidates
+                    .into_iter()
+                    .next()
+                    .expect("hash-matched candidate length checked");
+                tracing::info!(
+                    workflow_id = %workflow_id,
+                    commit_hash = %commit_hash,
+                    task_id = %inferred.task_id,
+                    terminal_id = %inferred.terminal_id,
+                    "Resolved ambiguous no-metadata commit via terminal log hash hint"
+                );
+                return Ok(Some(inferred));
+            }
+
+            if hash_matched_candidates.len() > 1 {
+                inferred_candidates = hash_matched_candidates;
+            }
+        }
+
         if inferred_candidates.len() > 1 && task_hint.is_none() {
             let candidate_count = inferred_candidates.len();
             inferred_candidates.sort_by(|lhs, rhs| {
@@ -1150,6 +1263,7 @@ impl OrchestratorAgent {
 
         tracing::warn!(
             workflow_id = %workflow_id,
+            commit_hash = %commit_hash,
             branch = %branch_name,
             task_hint = ?task_hint,
             candidate_count = inferred_candidates.len(),
@@ -1157,6 +1271,41 @@ impl OrchestratorAgent {
             "Cannot infer unique task/terminal from no-metadata commit"
         );
         Ok(None)
+    }
+
+    async fn terminal_recent_logs_contain_commit_hash(
+        &self,
+        terminal_id: &str,
+        commit_hash: &str,
+    ) -> bool {
+        if commit_hash.trim().is_empty() {
+            return false;
+        }
+
+        let short_hash: String = commit_hash.chars().take(8).collect::<String>().to_ascii_lowercase();
+        let full_hash = commit_hash.to_ascii_lowercase();
+
+        let recent_logs =
+            match db::models::terminal::TerminalLog::find_by_terminal(&self.db.pool, terminal_id, Some(240))
+                .await
+            {
+                Ok(logs) => logs,
+                Err(error) => {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        commit_hash = %commit_hash,
+                        error = %error,
+                        "Failed to load terminal logs while resolving no-metadata commit"
+                    );
+                    return false;
+                }
+            };
+
+        recent_logs.iter().any(|log| {
+            let content = log.content.to_ascii_lowercase();
+            content.contains(&full_hash)
+                || (!short_hash.is_empty() && content.contains(&short_hash))
+        })
     }
 
     async fn align_task_state_for_no_metadata_completion(
@@ -1424,7 +1573,8 @@ impl OrchestratorAgent {
 
                     // Fallback submit keystroke: some terminal TUIs keep pasted text in composer
                     // until an additional Enter is sent.
-                    for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(&terminal)
+                    for (attempt, delay_ms) in
+                        Self::submit_keystroke_schedule_ms(&terminal, false)
                         .iter()
                         .enumerate()
                     {
@@ -1727,7 +1877,7 @@ impl OrchestratorAgent {
 
         // Fallback submit keystroke: some terminal TUIs keep pasted text in composer
         // until an additional Enter is sent.
-        for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(&active_terminal)
+        for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(&active_terminal, true)
             .iter()
             .enumerate()
         {
@@ -1887,11 +2037,28 @@ impl OrchestratorAgent {
         terminal.cli_type_id.to_ascii_lowercase().contains("codex")
     }
 
-    fn submit_keystroke_schedule_ms(terminal: &db::models::Terminal) -> &'static [u64] {
+    fn is_claude_code_cli(terminal: &db::models::Terminal) -> bool {
+        terminal
+            .cli_type_id
+            .to_ascii_lowercase()
+            .contains("claude-code")
+    }
+
+    fn submit_keystroke_schedule_ms(
+        terminal: &db::models::Terminal,
+        is_initial_dispatch: bool,
+    ) -> &'static [u64] {
         if Self::needs_explicit_submit(terminal) {
             &[120, 360, 900]
+        } else if is_initial_dispatch && Self::is_claude_code_cli(terminal) {
+            // Claude Code occasionally leaves the first pasted prompt in composer without
+            // submission on cold start; send one delayed Enter only for initial dispatch.
+            &[420]
         } else {
-            &[220]
+            // Non-Codex CLIs receive the instruction as a single message payload that already
+            // includes a submit key. Extra synthetic Enter keystrokes can race startup TUIs and
+            // accidentally submit partial/empty prompts.
+            &[]
         }
     }
 
@@ -2175,6 +2342,46 @@ impl OrchestratorAgent {
             .await?;
 
         tracing::debug!("Broadcast task status: {} -> {}", task_id, status);
+
+        Ok(())
+    }
+
+    async fn auto_sync_workflow_completion(&self, workflow_id: &str) -> anyhow::Result<()> {
+        let Some(workflow) = db::models::Workflow::find_by_id(&self.db.pool, workflow_id).await?
+        else {
+            return Ok(());
+        };
+
+        if matches!(
+            workflow.status.as_str(),
+            WORKFLOW_STATUS_COMPLETED | WORKFLOW_STATUS_FAILED
+        ) {
+            return Ok(());
+        }
+
+        let tasks = db::models::WorkflowTask::find_by_workflow(&self.db.pool, workflow_id).await?;
+        if tasks.is_empty() || tasks.iter().any(|task| task.status != "completed") {
+            return Ok(());
+        }
+
+        db::models::Workflow::update_status(&self.db.pool, workflow_id, WORKFLOW_STATUS_COMPLETED)
+            .await?;
+
+        let _ = self
+            .message_bus
+            .publish_workflow_event(
+                workflow_id,
+                BusMessage::StatusUpdate {
+                    workflow_id: workflow_id.to_string(),
+                    status: WORKFLOW_STATUS_COMPLETED.to_string(),
+                },
+            )
+            .await;
+
+        tracing::info!(
+            workflow_id = %workflow_id,
+            "Workflow auto-synced to completed after all tasks completed"
+        );
 
         Ok(())
     }

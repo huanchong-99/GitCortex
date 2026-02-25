@@ -328,6 +328,68 @@ impl ProcessManager {
         }
     }
 
+    /// Attempt to terminate the child process for a tracked terminal.
+    ///
+    /// Returns `Ok(())` when termination succeeded or the process already exited.
+    fn terminate_tracked_child(
+        &self,
+        terminal_id: &str,
+        tracked: &mut TrackedProcess,
+    ) -> anyhow::Result<()> {
+        let kill_result = match tracked.child.process_id() {
+            Some(pid) if pid > 0 => self.kill(pid),
+            _ => tracked
+                .child
+                .kill()
+                .map_err(|e| anyhow::anyhow!("Failed to kill terminal {terminal_id}: {e}")),
+        };
+
+        match kill_result {
+            Ok(()) => Ok(()),
+            Err(kill_error) => {
+                let exited_already = matches!(tracked.child.try_wait(), Ok(Some(_)));
+                if exited_already {
+                    tracing::debug!(
+                        terminal_id = %terminal_id,
+                        "Child process already exited before kill"
+                    );
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Failed to kill terminal {terminal_id}: {kill_error}"
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Remove an existing terminal with the same ID before spawning a new one.
+    ///
+    /// This prevents stale subprocesses/tasks from leaking across workflow rounds.
+    async fn evict_existing_terminal(&self, terminal_id: &str) -> anyhow::Result<()> {
+        let tracked = {
+            let mut processes = self.processes.write().await;
+            let Some(existing) = processes.get_mut(terminal_id) else {
+                return Ok(());
+            };
+
+            self.terminate_tracked_child(terminal_id, existing)
+                .map_err(|e| anyhow::anyhow!("Failed to evict existing terminal {terminal_id}: {e}"))?;
+
+            processes.remove(terminal_id)
+        };
+
+        if let Some(tracked) = tracked {
+            self.finalize_terminated_process(terminal_id, tracked).await;
+            tracing::info!(
+                terminal_id = %terminal_id,
+                "Evicted existing terminal before spawn"
+            );
+        }
+
+        Ok(())
+    }
+
     async fn finalize_terminated_process(&self, terminal_id: &str, mut tracked: TrackedProcess) {
         Self::stop_reader_task_gracefully(terminal_id, tracked.reader_task.take()).await;
         Self::stop_logger_task_gracefully(
@@ -489,6 +551,8 @@ impl ProcessManager {
         cols: u16,
         rows: u16,
     ) -> anyhow::Result<ProcessHandle> {
+        self.evict_existing_terminal(terminal_id).await?;
+
         // Capture CODEX_HOME for cleanup on process exit (and on early failures via guard)
         let codex_home = config.env.set.get("CODEX_HOME").and_then(|value| {
             let trimmed = value.trim();
@@ -700,6 +764,8 @@ impl ProcessManager {
         cols: u16,
         rows: u16,
     ) -> anyhow::Result<ProcessHandle> {
+        self.evict_existing_terminal(terminal_id).await?;
+
         // Create PTY system
         let pty_system = native_pty_system();
 
@@ -885,7 +951,7 @@ impl ProcessManager {
         #[cfg(windows)]
         {
             let output = std::process::Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/F"])
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output()
                 .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {e}"))?;
 
@@ -900,42 +966,19 @@ impl ProcessManager {
 
     /// Kill terminal by terminal ID
     pub async fn kill_terminal(&self, terminal_id: &str) -> anyhow::Result<()> {
-        {
+        let tracked = {
             let mut processes = self.processes.write().await;
             let tracked = processes
                 .get_mut(terminal_id)
                 .ok_or_else(|| anyhow::anyhow!("Terminal not found: {terminal_id}"))?;
 
-            match tracked.child.kill() {
-                Ok(()) => {}
-                Err(kill_error) => {
-                    let exited_already = matches!(tracked.child.try_wait(), Ok(Some(_)));
-                    if !exited_already {
-                        return Err(anyhow::anyhow!(
-                            "Failed to kill terminal {terminal_id}: {kill_error}"
-                        ));
-                    }
-                    tracing::debug!(
-                        terminal_id = %terminal_id,
-                        "Child process already exited before kill"
-                    );
-                }
-            }
-        }
-
-        let tracked = {
-            let mut processes = self.processes.write().await;
-            processes.remove(terminal_id)
+            self.terminate_tracked_child(terminal_id, tracked)?;
+            processes
+                .remove(terminal_id)
+                .ok_or_else(|| anyhow::anyhow!("Terminal not found after kill: {terminal_id}"))?
         };
 
-        if let Some(tracked) = tracked {
-            self.finalize_terminated_process(terminal_id, tracked).await;
-        } else {
-            tracing::debug!(
-                terminal_id = %terminal_id,
-                "Terminal tracking already removed after kill"
-            );
-        }
+        self.finalize_terminated_process(terminal_id, tracked).await;
 
         tracing::info!(terminal_id = %terminal_id, "Terminal killed");
         Ok(())

@@ -46,6 +46,17 @@ const PROMPT_STATE_TIMEOUT_SECS: i64 = 30;
 /// Minimum confidence threshold for publishing prompt events
 const MIN_CONFIDENCE_THRESHOLD: f32 = 0.7;
 
+/// Auto-reply used when Codex asks whether to continue after detecting
+/// "unexpected changes I didn't make" in the working tree.
+const UNEXPECTED_CHANGES_CONTINUE_RESPONSE: &str =
+    "Continue with the current workspace state and proceed to complete the task and commit; do not wait for additional confirmation.\n";
+
+/// Max age for line-by-line unexpected-changes follow-up context.
+const UNEXPECTED_CHANGES_CONTEXT_MAX_AGE_SECS: u64 = 12;
+
+/// Max age for line-by-line Claude bypass prompt context.
+const CLAUDE_BYPASS_CONTEXT_MAX_AGE_SECS: u64 = 8;
+
 /// Legacy bypass-permissions toggle prompt (Codex-style TUI).
 /// Example: "bypass permissions on (shift+tab to cycle)"
 static BYPASS_PERMISSIONS_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
@@ -70,8 +81,25 @@ static CLAUDE_CUSTOM_API_KEY_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
         .expect("CLAUDE_CUSTOM_API_KEY_PROMPT_RE must compile")
 });
 
+/// Notepad launch/open prompt seen in headless Codex flows on Windows.
+/// Example: "Open in Notepad? (y/N)"
+static NOTEPAD_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)\bnotepad\b.{0,200}(\[[^\]]*y\s*/\s*n[^\]]*\]|\([^\)]*y\s*/\s*n[^\)]*\)|\by\s*/\s*n\b|\byes\s*/\s*no\b)",
+    )
+    .expect("NOTEPAD_PROMPT_RE must compile")
+});
+
 fn is_bypass_permissions_prompt(line: &str) -> bool {
     BYPASS_PERMISSIONS_PROMPT_RE.is_match(line)
+}
+
+fn is_bypass_permissions_enter_confirm_context(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("interrupted")
+        || lower.contains("press ctrl-c again to exit")
+        || lower.contains("enter to confirm")
+        || (lower.contains("press enter") && lower.contains("confirm"))
 }
 
 fn is_codex_apply_patch_confirmation(text: &str) -> bool {
@@ -82,13 +110,71 @@ fn is_claude_custom_api_key_prompt(text: &str) -> bool {
     CLAUDE_CUSTOM_API_KEY_PROMPT_RE.is_match(text)
 }
 
+fn is_notepad_prompt(text: &str) -> bool {
+    if NOTEPAD_PROMPT_RE.is_match(text) {
+        return true;
+    }
+
+    let lower = text.to_ascii_lowercase();
+    let has_notepad = lower.contains("notepad");
+    if !has_notepad {
+        return false;
+    }
+
+    // Fallback for prompts split across lines/chunks where y/n tokens may
+    // arrive separately: "Open in Notepad?"
+    let has_action = lower.contains("open") || lower.contains("launch") || lower.contains("use");
+    has_action && lower.contains('?')
+}
+
+fn is_unexpected_changes_followup_prompt(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+
+    let has_cn_change_marker = text.contains("未发起的变更")
+        || text.contains("未执行的变更")
+        || text.contains("外部变更");
+    let has_cn_followup = has_cn_change_marker
+        && (text.contains("请确认我是否可以")
+            || text.contains("请确认是否继续")
+            || text.contains("是否继续")
+            || text.contains("继续实现任务")
+            || text.contains("继续实现并提交")
+            || text.contains("你希望我"));
+
+    let has_en_change_marker = lower.contains("changes i didn't make")
+        || lower.contains("changes i did not make")
+        || lower.contains("unexpected changes");
+    let has_en_followup = has_en_change_marker
+        && (lower.contains("should i continue")
+            || lower.contains("continue implementing")
+            || lower.contains("wait for you")
+            || lower.contains("proceed"));
+
+    has_cn_followup || has_en_followup
+}
+
+fn has_claude_bypass_mode_text(lower: &str) -> bool {
+    lower.contains("bypass permissions mode")
+}
+
+fn has_claude_bypass_no_exit_text(lower: &str) -> bool {
+    lower.contains("no, exit") || lower.contains("no exit")
+}
+
+fn has_claude_bypass_yes_accept_text(lower: &str) -> bool {
+    lower.contains("yes, i accept") || lower.contains("yes i accept")
+}
+
+fn has_claude_bypass_confirm_hint_text(lower: &str) -> bool {
+    lower.contains("enter to confirm") || (lower.contains("enter") && lower.contains("confirm"))
+}
+
 fn is_claude_bypass_accept_prompt(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
-    let has_mode = lower.contains("bypass permissions mode");
-    let has_no_exit = lower.contains("no, exit") || lower.contains("no exit");
-    let has_yes_accept = lower.contains("yes, i accept") || lower.contains("yes i accept");
-    let has_confirm_hint =
-        lower.contains("enter to confirm") || (lower.contains("enter") && lower.contains("confirm"));
+    let has_mode = has_claude_bypass_mode_text(&lower);
+    let has_no_exit = has_claude_bypass_no_exit_text(&lower);
+    let has_yes_accept = has_claude_bypass_yes_accept_text(&lower);
+    let has_confirm_hint = has_claude_bypass_confirm_hint_text(&lower);
 
     has_mode && has_no_exit && has_yes_accept && has_confirm_hint
 }
@@ -96,6 +182,126 @@ fn is_claude_bypass_accept_prompt(text: &str) -> bool {
 // ============================================================================
 // Terminal Watch State
 // ============================================================================
+
+#[derive(Debug, Default)]
+struct ClaudeBypassContext {
+    saw_mode: bool,
+    saw_no_exit: bool,
+    saw_yes_accept: bool,
+    saw_confirm_hint: bool,
+    last_updated: Option<Instant>,
+}
+
+impl ClaudeBypassContext {
+    fn observe(&mut self, lower_text: &str) {
+        let mut touched = false;
+
+        if has_claude_bypass_mode_text(lower_text) && !self.saw_mode {
+            self.saw_mode = true;
+            touched = true;
+        }
+
+        if has_claude_bypass_no_exit_text(lower_text) && !self.saw_no_exit {
+            self.saw_no_exit = true;
+            touched = true;
+        }
+
+        if has_claude_bypass_yes_accept_text(lower_text) && !self.saw_yes_accept {
+            self.saw_yes_accept = true;
+            touched = true;
+        }
+
+        if has_claude_bypass_confirm_hint_text(lower_text) && !self.saw_confirm_hint {
+            self.saw_confirm_hint = true;
+            touched = true;
+        }
+
+        if touched {
+            self.last_updated = Some(Instant::now());
+        }
+    }
+
+    fn is_complete_and_recent(&self) -> bool {
+        if !(self.saw_mode && self.saw_no_exit && self.saw_yes_accept && self.saw_confirm_hint) {
+            return false;
+        }
+
+        self.last_updated
+            .is_some_and(|ts| ts.elapsed() <= Duration::from_secs(CLAUDE_BYPASS_CONTEXT_MAX_AGE_SECS))
+    }
+
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
+
+#[derive(Debug, Default)]
+struct UnexpectedChangesContext {
+    saw_change_marker: bool,
+    saw_pause_marker: bool,
+    saw_followup_marker: bool,
+    last_updated: Option<Instant>,
+}
+
+impl UnexpectedChangesContext {
+    fn observe(&mut self, text: &str) {
+        let lower = text.to_ascii_lowercase();
+        let mut touched = false;
+
+        let has_change_marker = text.contains("未发起的变更")
+            || text.contains("未执行的变更")
+            || text.contains("外部变更")
+            || lower.contains("changes i didn't make")
+            || lower.contains("changes i did not make")
+            || lower.contains("unexpected changes");
+        if has_change_marker && !self.saw_change_marker {
+            self.saw_change_marker = true;
+            touched = true;
+        }
+
+        let has_pause_marker = text.contains("需要先暂停")
+            || text.contains("先暂停")
+            || lower.contains("need to pause")
+            || lower.contains("must pause");
+        if has_pause_marker && !self.saw_pause_marker {
+            self.saw_pause_marker = true;
+            touched = true;
+        }
+
+        let has_followup_marker = text.contains("请确认我是否可以")
+            || text.contains("请确认是否继续")
+            || text.contains("是否继续")
+            || text.contains("继续实现任务")
+            || text.contains("继续实现并提交")
+            || text.contains("你希望我")
+            || lower.contains("should i continue")
+            || lower.contains("continue implementing")
+            || lower.contains("wait for you")
+            || lower.contains("proceed");
+        if has_followup_marker && !self.saw_followup_marker {
+            self.saw_followup_marker = true;
+            touched = true;
+        }
+
+        if touched {
+            self.last_updated = Some(Instant::now());
+        }
+    }
+
+    fn is_complete_and_recent(&self) -> bool {
+        if !(self.saw_change_marker && (self.saw_followup_marker || self.saw_pause_marker)) {
+            return false;
+        }
+
+        self.last_updated.is_some_and(|ts| {
+            ts.elapsed() <= Duration::from_secs(UNEXPECTED_CHANGES_CONTEXT_MAX_AGE_SECS)
+        })
+    }
+
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
 
 /// State for a single watched terminal
 #[derive(Debug)]
@@ -116,6 +322,10 @@ struct TerminalWatchState {
     state_machine: TerminalPromptStateMachine,
     /// Last detection timestamp (for debouncing)
     last_detection: Option<Instant>,
+    /// Rolling context for line-by-line Claude bypass prompt rendering.
+    claude_bypass_context: ClaudeBypassContext,
+    /// Rolling context for line-by-line unexpected-changes follow-up prompts.
+    unexpected_changes_context: UnexpectedChangesContext,
 }
 
 impl TerminalWatchState {
@@ -135,6 +345,8 @@ impl TerminalWatchState {
             detector: PromptDetector::new(),
             state_machine: TerminalPromptStateMachine::new(),
             last_detection: None,
+            claude_bypass_context: ClaudeBypassContext::default(),
+            unexpected_changes_context: UnexpectedChangesContext::default(),
         }
     }
 
@@ -180,7 +392,33 @@ impl TerminalWatchState {
         if self.state_machine.is_stale(timeout) {
             self.state_machine.reset();
             self.detector.clear_buffer();
+            self.claude_bypass_context.clear();
+            self.unexpected_changes_context.clear();
         }
+    }
+
+    fn observe_claude_bypass_context(&mut self, text: &str) {
+        self.claude_bypass_context.observe(text);
+    }
+
+    fn has_recent_claude_bypass_accept_context(&self) -> bool {
+        self.claude_bypass_context.is_complete_and_recent()
+    }
+
+    fn clear_claude_bypass_context(&mut self) {
+        self.claude_bypass_context.clear();
+    }
+
+    fn observe_unexpected_changes_context(&mut self, text: &str) {
+        self.unexpected_changes_context.observe(text);
+    }
+
+    fn has_recent_unexpected_changes_context(&self) -> bool {
+        self.unexpected_changes_context.is_complete_and_recent()
+    }
+
+    fn clear_unexpected_changes_context(&mut self) {
+        self.unexpected_changes_context.clear();
     }
 }
 
@@ -431,12 +669,17 @@ impl PromptWatcher {
         // to choose "Yes".
         let normalized_output = normalize_text_for_detection(output);
         let normalized_output_lower = normalized_output.to_ascii_lowercase();
+        state.observe_claude_bypass_context(&normalized_output_lower);
+        state.observe_unexpected_changes_context(&normalized_output);
         let bypass_needs_enter_context = normalized_output_lower.contains("interrupted")
             || normalized_output_lower.contains("press ctrl-c again to exit");
-        let has_claude_bypass_accept_context =
-            is_claude_bypass_accept_prompt(&normalized_output);
+        let has_claude_bypass_accept_context = is_claude_bypass_accept_prompt(&normalized_output)
+            || state.has_recent_claude_bypass_accept_context();
         let has_claude_custom_api_key_context =
             is_claude_custom_api_key_prompt(&normalized_output);
+        let has_unexpected_changes_followup_context =
+            is_unexpected_changes_followup_prompt(&normalized_output)
+                || state.has_recent_unexpected_changes_context();
 
         // Chunk-level fallback: Claude bypass-permissions acceptance prompt.
         // Select "Yes, I accept" via numeric shortcut "2" + Enter.
@@ -467,6 +710,7 @@ impl PromptWatcher {
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
                 state.detector.clear_buffer();
+                state.clear_claude_bypass_context();
 
                 let response_terminal_id = state.terminal_id.clone();
                 let response_session_id = state.session_id.clone();
@@ -539,6 +783,151 @@ impl PromptWatcher {
             }
         }
 
+        // Chunk-level fallback for bypass-permissions toggle prompt.
+        // Some terminal frames are emitted as dense ANSI chunks without stable
+        // line boundaries, so line-based detection can miss this interaction.
+        if state.auto_confirm
+            && !state.should_debounce()
+            && is_bypass_permissions_prompt(&normalized_output)
+            && is_bypass_permissions_enter_confirm_context(&normalized_output)
+        {
+            let decision = PromptDecision::auto_enter();
+            let detected_prompt = DetectedPrompt::new(
+                PromptKind::EnterConfirm,
+                normalized_output.clone(),
+                0.95,
+            );
+
+            if !state.state_machine.should_process(&detected_prompt) {
+                tracing::debug!(
+                    terminal_id = %state.terminal_id,
+                    "Skipping duplicate chunk-level bypass-permissions fallback injection"
+                );
+            } else {
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected bypass permissions prompt (chunk); sending direct auto-enter fallback"
+                );
+
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+        }
+
+        // Chunk-level fallback: decline Notepad prompts to avoid blocking
+        // headless workflow execution in Windows environments.
+        if state.auto_confirm
+            && !state.should_debounce()
+            && is_notepad_prompt(&normalized_output)
+        {
+            let decision = PromptDecision::llm_yes_no(
+                false,
+                "Auto-decline Notepad prompt to keep workflow non-blocking".to_string(),
+            );
+            let detected_prompt = DetectedPrompt::new(
+                PromptKind::YesNo,
+                normalized_output.clone(),
+                0.95,
+            );
+
+            if !state.state_machine.should_process(&detected_prompt) {
+                tracing::debug!(
+                    terminal_id = %state.terminal_id,
+                    "Skipping duplicate chunk-level Notepad fallback injection"
+                );
+            } else {
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected Notepad prompt (chunk); sending 'n'+Enter fallback"
+                );
+
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "n\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+        }
+
+        // Chunk-level fallback: Codex can ask whether it should continue after
+        // seeing "unexpected changes I didn't make". Auto-answer this to keep
+        // orchestrated workflows non-blocking.
+        if !state.should_debounce() && has_unexpected_changes_followup_context {
+            let decision = PromptDecision::LLMDecision {
+                response: UNEXPECTED_CHANGES_CONTINUE_RESPONSE.to_string(),
+                reasoning:
+                    "Auto-continue when Codex asks for confirmation about unexpected workspace changes"
+                        .to_string(),
+                target_index: None,
+            };
+            let detected_prompt =
+                DetectedPrompt::new(PromptKind::Input, normalized_output.clone(), 0.95);
+
+            if !state.state_machine.should_process(&detected_prompt) {
+                tracing::debug!(
+                    terminal_id = %state.terminal_id,
+                    "Skipping duplicate chunk-level unexpected-changes fallback injection"
+                );
+            } else {
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+                state.clear_unexpected_changes_context();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected unexpected-changes follow-up prompt (chunk); sending auto-continue response"
+                );
+
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        UNEXPECTED_CHANGES_CONTINUE_RESPONSE,
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+        }
+
         // Chunk-level fallback: Codex confirmation prompt can appear inside
         // heavily ANSI-rendered TUI frames without clean newline boundaries.
         // Detect directly from normalized chunk and auto-reply with "y".
@@ -592,6 +981,7 @@ impl PromptWatcher {
         // Process each line
         for line in output.lines() {
             let normalized_line = normalize_text_for_detection(line);
+            state.observe_unexpected_changes_context(&normalized_line);
 
             // Claude custom API key prompt fallback:
             // force "Yes" selection via ArrowUp + Enter.
@@ -647,12 +1037,11 @@ impl PromptWatcher {
                 return;
             }
 
-            // 兜底逻辑：对 bypass permissions 提示直接回车，避免 workflow 卡死。
-            // 该提示在真实终端里常带 ANSI/控制序列，需先清洗再匹配。
+            // Fallback for bypass-permissions prompts only when explicit confirmation context appears.
             if state.auto_confirm
                 && !state.should_debounce()
                 && is_bypass_permissions_prompt(&normalized_line)
-                && bypass_needs_enter_context
+                && is_bypass_permissions_enter_confirm_context(&normalized_line)
             {
                 let decision = PromptDecision::auto_enter();
                 let detected_prompt = DetectedPrompt::new(
@@ -690,6 +1079,106 @@ impl PromptWatcher {
                         &response_terminal_id,
                         &response_session_id,
                         "\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+
+            // Notepad fallback in line-by-line mode.
+            if state.auto_confirm
+                && !state.should_debounce()
+                && is_notepad_prompt(&normalized_line)
+            {
+                let decision = PromptDecision::llm_yes_no(
+                    false,
+                    "Auto-decline Notepad prompt to keep workflow non-blocking".to_string(),
+                );
+                let detected_prompt = DetectedPrompt::new(
+                    PromptKind::YesNo,
+                    normalized_line.clone(),
+                    0.95,
+                );
+
+                if !state.state_machine.should_process(&detected_prompt) {
+                    tracing::debug!(
+                        terminal_id = %state.terminal_id,
+                        "Skipping duplicate line-level Notepad fallback injection"
+                    );
+                    continue;
+                }
+
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected Notepad prompt; sending 'n'+Enter fallback"
+                );
+
+                // Publish input (drop lock first to avoid deadlock)
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "n\n",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+
+            // Line-level fallback for Codex unexpected-changes follow-up prompt.
+            let has_unexpected_changes_line_context =
+                is_unexpected_changes_followup_prompt(&normalized_line)
+                    || state.has_recent_unexpected_changes_context();
+            if !state.should_debounce() && has_unexpected_changes_line_context {
+                let decision = PromptDecision::LLMDecision {
+                    response: UNEXPECTED_CHANGES_CONTINUE_RESPONSE.to_string(),
+                    reasoning:
+                        "Auto-continue when Codex asks for confirmation about unexpected workspace changes"
+                            .to_string(),
+                    target_index: None,
+                };
+                let detected_prompt =
+                    DetectedPrompt::new(PromptKind::Input, normalized_line.clone(), 0.95);
+
+                if !state.state_machine.should_process(&detected_prompt) {
+                    tracing::debug!(
+                        terminal_id = %state.terminal_id,
+                        "Skipping duplicate line-level unexpected-changes fallback injection"
+                    );
+                    continue;
+                }
+
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+                state.clear_unexpected_changes_context();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected unexpected-changes follow-up prompt; sending auto-continue response"
+                );
+
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        UNEXPECTED_CHANGES_CONTINUE_RESPONSE,
                         Some(decision),
                     )
                     .await;
@@ -810,6 +1299,7 @@ impl PromptWatcher {
         if let Some(state) = terminals.get_mut(terminal_id) {
             state.state_machine.on_response_sent(decision);
             state.detector.clear_buffer();
+            state.clear_claude_bypass_context();
         }
     }
 
@@ -831,6 +1321,7 @@ impl PromptWatcher {
         if let Some(state) = terminals.get_mut(terminal_id) {
             state.state_machine.reset();
             state.detector.clear_buffer();
+            state.clear_claude_bypass_context();
         }
     }
 
@@ -978,10 +1469,61 @@ mod tests {
             );
         }
 
-        let bypass_line =
-            "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions on (shift+tab to cycle)\u{1b}[0m";
+        let bypass_line = "\u{1b}[2mInterrupted\u{1b}[0m bypass permissions on (shift+tab to cycle) Press Ctrl-C again to exit";
 
         watcher.process_output("term-1", bypass_line).await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "\n");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_bypass_prompt_chunk_level_auto_confirms_with_terminal_input() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        // Simulate an ANSI-heavy chunk where prompt text may not be split cleanly by lines.
+        let bypass_chunk = "\u{1b}[2mInterrupted: bypass permissions on (shift+tab to cycle)\u{1b}[0m press ctrl-c again to exit";
+
+        watcher.process_output("term-1", bypass_chunk).await;
 
         let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
             .await
@@ -1034,7 +1576,7 @@ mod tests {
 WARNING: Claude Code running in Bypass Permissions mode
 1. No, exit
 2. Yes, I accept
-Enter to confirm · Esc to cancel
+Enter to confirm 路 Esc to cancel
 "#;
 
         watcher.process_output("term-1", prompt).await;
@@ -1054,6 +1596,340 @@ Enter to confirm · Esc to cancel
                 assert_eq!(terminal_id, "term-1");
                 assert_eq!(session_id, "session-1");
                 assert_eq!(input, "2\r");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_claude_bypass_permissions_prompt_line_by_line_auto_selects_yes_accept(
+    ) {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        // Simulate line-by-line rendering where each frame only contains one line.
+        let lines = [
+            "\u{1b}[33mWARNING: Claude Code running in Bypass Permissions mode\u{1b}[0m",
+            "1. No, exit",
+            "2. Yes, I accept",
+            "Enter to confirm 路 Esc to cancel",
+        ];
+
+        for line in lines {
+            watcher.process_output("term-1", line).await;
+        }
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "2\r");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_notepad_prompt_auto_declines_with_terminal_input() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        watcher.process_output("term-1", "Open in Notepad? (y/N)").await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "n\n");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_notepad_prompt_chunk_level_auto_declines_with_terminal_input() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        let notepad_chunk =
+            "\u{1b}[2mOpen in Notepad?\u{1b}[0m \u{1b}[38;5;6m[y/N]\u{1b}[0m\u{1b}[?2026l";
+
+        watcher.process_output("term-1", notepad_chunk).await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "n\n");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_unexpected_changes_followup_auto_continues() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        watcher
+            .process_output(
+                "term-1",
+                "I detected changes I didn't make. Should I continue implementing and commit, or wait for you to handle those changes first?",
+            )
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, UNEXPECTED_CHANGES_CONTINUE_RESPONSE);
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_unexpected_changes_followup_auto_continues_when_auto_confirm_disabled(
+    ) {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    false,
+                ),
+            );
+        }
+
+        watcher
+            .process_output(
+                "term-1",
+                "I detected changes I didn't make. Should I continue implementing and commit, or wait for you to handle those changes first?",
+            )
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, UNEXPECTED_CHANGES_CONTINUE_RESPONSE);
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_unexpected_changes_followup_cn_split_lines_auto_continue() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    false,
+                ),
+            );
+        }
+
+        watcher
+            .process_output(
+                "term-1",
+                "检测到工作区出现了我未发起的变更：backend.py 已变为已修改状态，并新增了 __pycache__/。",
+            )
+            .await;
+
+        let first_poll = tokio::time::timeout(Duration::from_millis(80), broadcast_rx.recv()).await;
+        assert!(first_poll.is_err(), "first fragment should not auto-send yet");
+
+        watcher
+            .process_output(
+                "term-1",
+                "按照协作约束我需要先暂停。请确认我是否可以基于当前最新文件继续实现任务 B（我会只做增量修改并避免回退他人改动）。",
+            )
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, UNEXPECTED_CHANGES_CONTINUE_RESPONSE);
                 assert!(matches!(
                     decision,
                     Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
@@ -1089,7 +1965,7 @@ Enter to confirm · Esc to cancel
         watcher
             .process_output(
                 "term-1",
-                "Confirming apply_patch approach (1m 32s • esc to interrupt)",
+                "Confirming apply_patch approach (1m 32s 鈥?esc to interrupt)",
             )
             .await;
 
@@ -1221,6 +2097,41 @@ Enter to confirm · Esc to cancel
         assert!(
             second_event.is_err(),
             "duplicate bypass fallback injection should be skipped"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_output_bypass_status_line_does_not_auto_enter() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        watcher
+            .process_output(
+                "term-1",
+                "bypass permissions on (shift+tab to cycle) ctrl+g to edit in Notepad",
+            )
+            .await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv()).await;
+        assert!(
+            event.is_err(),
+            "status-line bypass indicator should not inject Enter without confirmation context"
         );
     }
 

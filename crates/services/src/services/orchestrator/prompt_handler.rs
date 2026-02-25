@@ -83,6 +83,18 @@ pub struct PromptHandler {
 }
 
 impl PromptHandler {
+    fn is_codex_composer_like_input(prompt_text: &str) -> bool {
+        let normalized = prompt_text.to_ascii_lowercase();
+
+        let has_codex_chrome = normalized.contains("for shortcuts")
+            && (normalized.contains("context left")
+                || normalized.contains("stopping due to unexpected changes"));
+
+        has_codex_chrome
+            || normalized.contains("stopping due to unexpected changes")
+            || normalized.contains("use /skills to list available skills")
+    }
+
     /// Create a new prompt handler
     pub fn new(message_bus: SharedMessageBus) -> Self {
         Self {
@@ -321,6 +333,14 @@ impl PromptHandler {
             }
 
             PromptKind::Input => {
+                if Self::is_codex_composer_like_input(&prompt.raw_text) {
+                    tracing::info!(
+                        raw_text = %prompt.raw_text,
+                        "Input prompt looks like Codex composer/status line; auto-submitting Enter"
+                    );
+                    return PromptDecision::auto_enter();
+                }
+
                 // Input prompts should ask user - we can't guess free-form input
                 tracing::info!(
                     raw_text = %prompt.raw_text,
@@ -601,6 +621,25 @@ mod tests {
         match decision {
             PromptDecision::AskUser { .. } => {}
             _ => panic!("Expected AskUser decision for Input prompt"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_codex_composer_like_input_auto_confirms() {
+        let handler = create_test_handler();
+        let prompt = create_test_prompt(
+            PromptKind::Input,
+            "Stopping due to unexpected changes ... ? for shortcuts 98% context left",
+            0.80,
+        );
+
+        let decision = handler.make_decision(&prompt, true).await;
+
+        match decision {
+            PromptDecision::AutoConfirm { response, .. } => {
+                assert_eq!(response, "\n");
+            }
+            _ => panic!("Expected AutoConfirm decision for Codex composer-like Input prompt"),
         }
     }
 

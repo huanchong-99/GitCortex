@@ -1,4 +1,4 @@
-//! Terminal Prompt Detection Module
+﻿//! Terminal Prompt Detection Module
 //!
 //! Detects and classifies interactive prompts from PTY output.
 //! Supports 6 prompt types with priority-based detection.
@@ -214,7 +214,7 @@ static PASSWORD_RE: Lazy<Option<Regex>> = Lazy::new(|| {
 /// Input field detection (free-form text input)
 static INPUT_FIELD_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     compile_regex(
-        r"(?i)(enter|provide|input|type|specify)\s+.{0,30}(:|>\s*$)",
+        r"(?i)\b(enter|provide|input|type|specify)\b\s+.{0,30}(:|>\s*$)",
         "INPUT_FIELD_RE",
     )
 });
@@ -222,7 +222,7 @@ static INPUT_FIELD_RE: Lazy<Option<Regex>> = Lazy::new(|| {
 /// Arrow key hint detection
 static ARROW_HINT_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     compile_regex(
-        r"(?i)(use|press)\s+(arrow\s*keys?|↑|↓|up/down)",
+        r"(?i)(use|press)\s+(arrow\s*keys?|鈫憒鈫搢up/down)",
         "ARROW_HINT_RE",
     )
 });
@@ -230,14 +230,14 @@ static ARROW_HINT_RE: Lazy<Option<Regex>> = Lazy::new(|| {
 /// Arrow select marker detection (line-by-line)
 static SELECT_MARKER_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     compile_regex(
-        r"^[\s]*(?P<mark>>|\*|❯|▸|→|\[x\]|\[\s\]|\(x\)|\(\s\)|●|○)\s+(?P<label>.+)$",
+        r"^[\s]*(?P<mark>>|\*|\[x\]|\[\s\]|\(x\)|\(\s\)|•|○)\s+(?P<label>.+)$",
         "SELECT_MARKER_RE",
     )
 });
 
 /// Selected marker patterns (indicates current selection)
 static SELECTED_MARKER_RE: Lazy<Option<Regex>> =
-    Lazy::new(|| compile_regex(r"^[\s]*(>|\*|❯|▸|→|\[x\]|\(x\)|●)", "SELECTED_MARKER_RE"));
+    Lazy::new(|| compile_regex(r"^[\s]*(>|\*|\[x\]|\(x\)|•)", "SELECTED_MARKER_RE"));
 
 /// Choice detection (single-line options with multiple choices)
 static CHOICE_RE: Lazy<Option<Regex>> = Lazy::new(|| {
@@ -264,7 +264,7 @@ static YES_NO_RE: Lazy<Option<Regex>> = Lazy::new(|| {
 });
 
 /// Codex interactive confirmation prompt (requires y/n)
-/// Example: "Confirming apply_patch approach (1m 32s • esc to interrupt)"
+/// Example: "Confirming apply_patch approach (1m 32s 鈥?esc to interrupt)"
 static CODEX_CONFIRM_APPROACH_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     compile_regex(
         r"(?i)\bconfirming\s+apply_patch\s+approach\b",
@@ -275,7 +275,7 @@ static CODEX_CONFIRM_APPROACH_RE: Lazy<Option<Regex>> = Lazy::new(|| {
 /// Enter confirmation detection
 static ENTER_CONFIRM_RE: Lazy<Option<Regex>> = Lazy::new(|| {
     compile_regex(
-        r"(?i)(press|hit|tap)\s+(the\s+)?(enter|return)\b|\[enter\]|\benter\s+to\s+(continue|proceed|resume|exit|confirm)\b|\bpress\s+any\s+key\b|\bcontinue\?\s*$|\bbypass\s+permissions\s+(on|off)\b.*\(shift\+tab\s+to\s+cycle\)",
+        r"(?i)(press|hit|tap)\s+(the\s+)?(enter|return)\b|\[enter\]|\benter\s+to\s+(continue|proceed|resume|exit|confirm)\b|\bpress\s+any\s+key\b|\bcontinue\?\s*$",
         "ENTER_CONFIRM_RE",
     )
 });
@@ -614,7 +614,7 @@ mod tests {
 
         // Codex interactive confirmation prompt should also be treated as yes/no
         let codex_prompt = detector
-            .detect("Confirming apply_patch approach (1m 32s • esc to interrupt)")
+            .detect("Confirming apply_patch approach (1m 32s 鈥?esc to interrupt)")
             .unwrap();
         assert_eq!(codex_prompt.kind, PromptKind::YesNo);
     }
@@ -663,6 +663,16 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_input_ignores_html_doctype_noise() {
+        let detector = PromptDetector::new();
+
+        assert!(
+            detector.detect("<!DOCTYPE html>").is_none(),
+            "DOCTYPE lines should not be misclassified as Input prompts"
+        );
+    }
+
+    #[test]
     fn test_detect_arrow_select() {
         let mut detector = PromptDetector::new();
 
@@ -689,9 +699,9 @@ mod tests {
     fn test_detect_arrow_select_ignores_non_distinct_spinner_like_options() {
         let mut detector = PromptDetector::new();
 
-        detector.process_line("* Brewing…");
-        detector.process_line("* Brewing…");
-        let result = detector.process_line("* Brewing…");
+        detector.process_line("* Brewing...");
+        detector.process_line("* Brewing...");
+        let result = detector.process_line("* Brewing...");
 
         assert!(
             result.is_none(),
@@ -771,28 +781,30 @@ mod tests {
 
     #[test]
     fn test_normalize_text_for_detection_strips_ansi_sequences() {
-        let input = "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions on (shift+tab to cycle)\u{1b}[0m";
+        let input = "\u{1b}[2m\u{1b}[38;5;6m鈴碘彽\u{1b}[0m bypass permissions on (shift+tab to cycle)\u{1b}[0m";
         let normalized = normalize_text_for_detection(input);
-        assert_eq!(normalized, "⏵⏵ bypass permissions on (shift+tab to cycle)");
+        assert_eq!(normalized, "鈴碘彽 bypass permissions on (shift+tab to cycle)");
     }
 
     #[test]
-    fn test_detect_bypass_permissions_prompt_with_ansi() {
+    fn test_detect_bypass_permissions_status_line_with_ansi_is_ignored() {
         let detector = PromptDetector::new();
         let text = "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions on (shift+tab to cycle)";
-        let prompt = detector
-            .detect(text)
-            .expect("bypass permissions prompt should be detected");
-        assert_eq!(prompt.kind, PromptKind::EnterConfirm);
+        let prompt = detector.detect(text);
+        assert!(
+            prompt.is_none(),
+            "status-line bypass indicator should not be treated as EnterConfirm"
+        );
     }
 
     #[test]
-    fn test_process_line_detects_bypass_permissions_prompt_with_ansi() {
+    fn test_process_line_ignores_bypass_permissions_status_line_with_ansi() {
         let mut detector = PromptDetector::new();
         let text = "\u{1b}[2m\u{1b}[38;5;6m⏵⏵\u{1b}[0m bypass permissions off (shift+tab to cycle)";
-        let prompt = detector
-            .process_line(text)
-            .expect("ANSI prompt should be detected in streaming line processing");
-        assert_eq!(prompt.kind, PromptKind::EnterConfirm);
+        let prompt = detector.process_line(text);
+        assert!(
+            prompt.is_none(),
+            "streaming status-line bypass indicator should be ignored"
+        );
     }
 }
