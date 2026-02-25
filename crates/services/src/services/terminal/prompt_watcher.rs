@@ -46,7 +46,8 @@ const PROMPT_STATE_TIMEOUT_SECS: i64 = 30;
 /// Minimum confidence threshold for publishing prompt events
 const MIN_CONFIDENCE_THRESHOLD: f32 = 0.7;
 
-/// Claude/Codex TUI bypass 权限提示（需按 Enter 继续）
+/// Legacy bypass-permissions toggle prompt (Codex-style TUI).
+/// Example: "bypass permissions on (shift+tab to cycle)"
 static BYPASS_PERMISSIONS_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)\bbypass\s+permissions\s+(on|off)\b.*\(shift\+tab\s+to\s+cycle\)")
         .expect("BYPASS_PERMISSIONS_PROMPT_RE must compile")
@@ -79,6 +80,17 @@ fn is_codex_apply_patch_confirmation(text: &str) -> bool {
 
 fn is_claude_custom_api_key_prompt(text: &str) -> bool {
     CLAUDE_CUSTOM_API_KEY_PROMPT_RE.is_match(text)
+}
+
+fn is_claude_bypass_accept_prompt(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    let has_mode = lower.contains("bypass permissions mode");
+    let has_no_exit = lower.contains("no, exit") || lower.contains("no exit");
+    let has_yes_accept = lower.contains("yes, i accept") || lower.contains("yes i accept");
+    let has_confirm_hint =
+        lower.contains("enter to confirm") || (lower.contains("enter") && lower.contains("confirm"));
+
+    has_mode && has_no_exit && has_yes_accept && has_confirm_hint
 }
 
 // ============================================================================
@@ -421,8 +433,62 @@ impl PromptWatcher {
         let normalized_output_lower = normalized_output.to_ascii_lowercase();
         let bypass_needs_enter_context = normalized_output_lower.contains("interrupted")
             || normalized_output_lower.contains("press ctrl-c again to exit");
+        let has_claude_bypass_accept_context =
+            is_claude_bypass_accept_prompt(&normalized_output);
         let has_claude_custom_api_key_context =
             is_claude_custom_api_key_prompt(&normalized_output);
+
+        // Chunk-level fallback: Claude bypass-permissions acceptance prompt.
+        // Select "Yes, I accept" via numeric shortcut "2" + Enter.
+        // This is more stable than ArrowDown in fast ANSI frame updates.
+        if state.auto_confirm
+            && !state.should_debounce()
+            && has_claude_bypass_accept_context
+        {
+            let decision = PromptDecision::LLMDecision {
+                response: "2\r".to_string(),
+                reasoning: "Auto-select 'Yes, I accept' for Claude bypass permissions prompt via '2'+CR"
+                    .to_string(),
+                target_index: Some(1),
+            };
+            let detected_prompt = DetectedPrompt::new(
+                PromptKind::ArrowSelect,
+                normalized_output.clone(),
+                0.95,
+            );
+
+            if !state.state_machine.should_process(&detected_prompt) {
+                tracing::debug!(
+                    terminal_id = %state.terminal_id,
+                    "Skipping duplicate chunk-level Claude bypass accept fallback injection"
+                );
+            } else {
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    "Detected Claude bypass permissions prompt (chunk); sending '2'+Enter to choose 'Yes, I accept'"
+                );
+
+                drop(terminals);
+                self.message_bus
+                    .publish_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        "2\r",
+                        Some(decision),
+                    )
+                    .await;
+                return;
+            }
+        }
 
         if state.auto_confirm
             && !state.should_debounce()
@@ -635,6 +701,7 @@ impl PromptWatcher {
                 // This keeps terminals responsive even when Orchestrator is not running
                 // (e.g. workflow in ready/prepare stage).
                 let skip_enter_confirm_fallback = has_claude_custom_api_key_context
+                    || has_claude_bypass_accept_context
                     || bypass_needs_enter_context
                     || normalized_output_lower.contains("interrupted")
                     || normalized_output_lower.contains("custom api key");
@@ -934,6 +1001,62 @@ mod tests {
                 assert!(matches!(
                     decision,
                     Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm {
+                        ..
+                    })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_claude_bypass_permissions_prompt_auto_selects_yes_accept() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        let prompt = r#"
+WARNING: Claude Code running in Bypass Permissions mode
+1. No, exit
+2. Yes, I accept
+Enter to confirm · Esc to cancel
+"#;
+
+        watcher.process_output("term-1", prompt).await;
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "2\r");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
                         ..
                     })
                 ));
