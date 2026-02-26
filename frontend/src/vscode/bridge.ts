@@ -348,57 +348,15 @@ export function installVSCodeIframeKeyboardBridge() {
   const onKeyDown = async (e: KeyboardEvent) => {
     // Handle clipboard combos locally so OS shortcuts work inside the iframe
     if (isCopy(e)) {
-      const text = getSelectedText();
-      if (text) {
-        e.preventDefault();
-        e.stopPropagation();
-        const ok = await writeClipboardText(text);
-        if (!ok) parentClipboardWrite(text);
-        return;
-      }
+      if (await handleCopyShortcut(e)) return;
     } else if (isCut(e)) {
-      const el = activeEditable() as
-        | HTMLInputElement
-        | HTMLTextAreaElement
-        | null;
-      if (el) {
-        e.preventDefault();
-        e.stopPropagation();
-        cutFromInput(el);
-        return;
-      }
+      if (handleCutShortcut(e)) return;
     } else if (isUndo(e)) {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        document.execCommand('undo');
-      } catch (error) {
-        console.debug('Undo command failed', error);
-      }
-      return;
+      if (handleUndoShortcut(e)) return;
     } else if (isRedo(e)) {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        document.execCommand('redo');
-      } catch (error) {
-        console.debug('Redo command failed', error);
-      }
-      return;
+      if (handleRedoShortcut(e)) return;
     } else if (isPaste(e)) {
-      const el = activeEditable() as
-        | HTMLInputElement
-        | HTMLTextAreaElement
-        | (HTMLElement & { isContentEditable: boolean })
-        | null;
-      if (el) {
-        e.preventDefault();
-        e.stopPropagation();
-        let text = await readClipboardText();
-        if (!text) text = await parentClipboardRead();
-        insertTextAtCaretGeneric(text);
-        return;
-      }
+      if (await handlePasteShortcut(e)) return;
     }
     // Forward everything else so VS Code can handle global shortcuts
     forward('vscode-iframe-keydown', e);
@@ -414,6 +372,70 @@ export function installVSCodeIframeKeyboardBridge() {
   document.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('keyup', onKeyUp, true);
   document.addEventListener('keypress', onKeyPress, true);
+}
+
+// Helper to handle copy shortcut
+async function handleCopyShortcut(e: KeyboardEvent): Promise<boolean> {
+  const text = getSelectedText();
+  if (!text) return false;
+
+  e.preventDefault();
+  e.stopPropagation();
+  const ok = await writeClipboardText(text);
+  if (!ok) parentClipboardWrite(text);
+  return true;
+}
+
+// Helper to handle cut shortcut
+function handleCutShortcut(e: KeyboardEvent): boolean {
+  const el = activeEditable() as HTMLInputElement | HTMLTextAreaElement | null;
+  if (!el) return false;
+
+  e.preventDefault();
+  e.stopPropagation();
+  cutFromInput(el);
+  return true;
+}
+
+// Helper to handle undo shortcut
+function handleUndoShortcut(e: KeyboardEvent): boolean {
+  e.preventDefault();
+  e.stopPropagation();
+  try {
+    document.execCommand('undo');
+  } catch (error) {
+    console.debug('Undo command failed', error);
+  }
+  return true;
+}
+
+// Helper to handle redo shortcut
+function handleRedoShortcut(e: KeyboardEvent): boolean {
+  e.preventDefault();
+  e.stopPropagation();
+  try {
+    document.execCommand('redo');
+  } catch (error) {
+    console.debug('Redo command failed', error);
+  }
+  return true;
+}
+
+// Helper to handle paste shortcut
+async function handlePasteShortcut(e: KeyboardEvent): Promise<boolean> {
+  const el = activeEditable() as
+    | HTMLInputElement
+    | HTMLTextAreaElement
+    | (HTMLElement & { isContentEditable: boolean })
+    | null;
+  if (!el) return false;
+
+  e.preventDefault();
+  e.stopPropagation();
+  let text = await readClipboardText();
+  if (!text) text = await parentClipboardRead();
+  insertTextAtCaretGeneric(text);
+  return true;
 }
 
 /** Copy helper that prefers navigator.clipboard and falls back to the bridge. */

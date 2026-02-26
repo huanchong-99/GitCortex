@@ -14357,7 +14357,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 323.21 Refactor this function to reduce its Cognitive Complexity from 21 to the 15 allowed.
+### 323.21 Refactor this function to reduce its Cognitive Complexity from 21 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn3`
 - **项目**: huanchong-99
