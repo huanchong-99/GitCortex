@@ -1667,6 +1667,22 @@ impl TerminalLogger {
 mod tests {
     use super::*;
 
+    fn build_test_spawn_command(working_dir: &Path) -> SpawnCommand {
+        #[cfg(windows)]
+        {
+            SpawnCommand::new("powershell", working_dir).with_args([
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                "Start-Sleep -Seconds 120",
+            ])
+        }
+        #[cfg(unix)]
+        {
+            SpawnCommand::new("sleep", working_dir).with_arg("120")
+        }
+    }
+
     async fn setup_logger_test_db_with_terminal(_terminal_id: &str) -> Arc<DBService> {
         use std::str::FromStr;
 
@@ -1758,16 +1774,14 @@ mod tests {
     async fn test_spawn_pty_creates_process() {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
+        let spawn_config = build_test_spawn_command(temp_dir.path());
 
-        // Use platform-specific shell
-        #[cfg(windows)]
-        let shell = "cmd.exe";
-        #[cfg(unix)]
-        let shell = "sh";
-
-        let result = manager
-            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
-            .await;
+        let result = tokio::time::timeout(
+            Duration::from_secs(10),
+            manager.spawn_pty_with_config("test-terminal", &spawn_config, 80, 24),
+        )
+        .await
+        .expect("spawn_pty_with_config should not hang");
 
         assert!(result.is_ok(), "Spawn should succeed: {:?}", result.err());
         let handle = result.unwrap();
@@ -1775,22 +1789,23 @@ mod tests {
         assert!(!handle.session_id.is_empty());
 
         // Cleanup
-        let _ = manager.kill_terminal("test-terminal").await;
+        let _ = tokio::time::timeout(Duration::from_secs(10), manager.kill_terminal("test-terminal"))
+            .await;
     }
 
     #[tokio::test]
     async fn test_get_handle_returns_pty_handles() {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
+        let spawn_config = build_test_spawn_command(temp_dir.path());
 
-        #[cfg(windows)]
-        let shell = "cmd.exe";
-        #[cfg(unix)]
-        let shell = "sh";
-
-        let _ = manager
-            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
-            .await;
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            manager.spawn_pty_with_config("test-terminal", &spawn_config, 80, 24),
+        )
+        .await
+        .expect("spawn_pty_with_config should not hang")
+        .unwrap();
 
         // In new architecture, reader is owned by background fanout task
         // get_handle() returns reader: None, writer: Some
@@ -1834,7 +1849,8 @@ mod tests {
         );
 
         // Cleanup
-        let _ = manager.kill_terminal("test-terminal").await;
+        let _ = tokio::time::timeout(Duration::from_secs(10), manager.kill_terminal("test-terminal"))
+            .await;
     }
 
     #[tokio::test]
@@ -1971,22 +1987,23 @@ mod tests {
     async fn test_resize_pty() {
         let manager = ProcessManager::new();
         let temp_dir = tempfile::tempdir().unwrap();
+        let spawn_config = build_test_spawn_command(temp_dir.path());
 
-        #[cfg(windows)]
-        let shell = "cmd.exe";
-        #[cfg(unix)]
-        let shell = "sh";
-
-        let _ = manager
-            .spawn_pty("test-terminal", shell, temp_dir.path(), 80, 24)
-            .await;
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            manager.spawn_pty_with_config("test-terminal", &spawn_config, 80, 24),
+        )
+        .await
+        .expect("spawn_pty_with_config should not hang")
+        .unwrap();
 
         // Resize should succeed
         let result = manager.resize("test-terminal", 120, 40).await;
         assert!(result.is_ok());
 
         // Cleanup
-        let _ = manager.kill_terminal("test-terminal").await;
+        let _ = tokio::time::timeout(Duration::from_secs(10), manager.kill_terminal("test-terminal"))
+            .await;
     }
 
     #[tokio::test]
