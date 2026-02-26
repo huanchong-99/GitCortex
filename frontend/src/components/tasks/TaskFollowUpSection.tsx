@@ -47,7 +47,6 @@ import WYSIWYGEditor from '@/components/ui/wysiwyg';
 import { useRetryUi } from '@/contexts/RetryUiContext';
 import { useFollowUpSend } from '@/hooks/useFollowUpSend';
 import { useVariant } from '@/hooks/useVariant';
-import type { DraftFollowUpData, ExecutorProfileId } from 'shared/types';
 import { extractProfileFromAction } from '@/utils/executor';
 import { buildResolveConflictsInstructions } from '@/lib/conflicts';
 import { useTranslation } from 'react-i18next';
