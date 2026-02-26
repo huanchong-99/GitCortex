@@ -5288,7 +5288,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 134.1 `ACTIVE_STATUSES` should be a `Set`, and use `ACTIVE_STATUSES.has()` to check existence or non-existence.
+### 134.1 `ACTIVE_STATUSES` should be a `Set`, and use `ACTIVE_STATUSES.has()` to check existence or non-existence. ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGiv`
 - **项目**: huanchong-99
