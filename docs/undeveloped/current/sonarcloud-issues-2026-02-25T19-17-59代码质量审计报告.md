@@ -11018,7 +11018,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 263.2 'attemptId' PropType is defined but prop is never used
+### 263.2 'attemptId' PropType is defined but prop is never used ✅ 已修复
 
 - **问题ID**: `AZyVwe0oZ9DOUQdEsGnQ`
 - **项目**: huanchong-99
