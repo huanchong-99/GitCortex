@@ -519,7 +519,7 @@ export function AgentSettings() {
                 const selectedProfile =
                   profiles?.[currentProfileVariant?.executor || ''];
                 const hasVariants =
-                  selectedProfile && Object.keys(selectedProfile).length > 0;
+                  !!selectedProfile && Object.keys(selectedProfile).length > 0;
 
                 if (hasVariants) {
                   return (

@@ -372,7 +372,7 @@ export function ClickedElementsProvider({
 
     setElements((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.dedupeKey === dedupeKey) {
+      if (last?.dedupeKey === dedupeKey) {
         return prev; // Skip consecutive duplicate
       }
       const newEntry: ClickedEntry = {

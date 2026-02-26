@@ -643,7 +643,7 @@ function aggregateLastHeartbeat(
       !lastHeartbeat ||
       (connection.lastHeartbeat && connection.lastHeartbeat > lastHeartbeat)
     ) {
-      lastHeartbeat = connection.lastHeartbeat;
+      lastHeartbeat = connection.lastHeartbeat ?? null;
     }
   }
 
@@ -798,7 +798,7 @@ export const useWsStore = create<WsState>((set, get) => ({
     }
 
     const currentWorkflowId =
-      state.currentWorkflowId && nextConnections.has(state.currentWorkflowId)
+      nextConnections.has(state.currentWorkflowId ?? '')
         ? state.currentWorkflowId
         : (nextConnections.keys().next().value ?? null);
     const activeConnection = currentWorkflowId
