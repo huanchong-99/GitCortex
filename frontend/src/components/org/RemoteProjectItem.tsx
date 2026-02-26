@@ -38,7 +38,7 @@ export function RemoteProjectItem({
   const handleUnlinkClick = () => {
     if (!linkedLocalProject || disabled) return;
 
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       `Are you sure you want to unlink "${linkedLocalProject.name}"? The local project will remain, but it will no longer be linked to this remote project.`
     );
     if (confirmed) {

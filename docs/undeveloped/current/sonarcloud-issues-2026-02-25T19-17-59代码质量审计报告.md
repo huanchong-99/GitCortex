@@ -978,7 +978,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 24.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 24.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeJ`
 - **项目**: huanchong-99
@@ -991,7 +991,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 24.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 24.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeK`
 - **项目**: huanchong-99
@@ -1140,7 +1140,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 25.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 25.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweYOZ9DOUQdEsGea`
 - **项目**: huanchong-99
@@ -1198,7 +1198,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 26.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 26.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweYXZ9DOUQdEsGee`
 - **项目**: huanchong-99
@@ -1609,7 +1609,7 @@
 - **创建时间**: 26 days ago
 - **标签**: confusing
 
-### 34.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 34.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGew`
 - **项目**: huanchong-99
@@ -1622,7 +1622,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 34.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 34.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGex`
 - **项目**: huanchong-99
@@ -1948,7 +1948,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 43.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 43.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh4`
 - **项目**: huanchong-99
@@ -1961,7 +1961,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 43.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 43.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh5`
 - **项目**: huanchong-99
@@ -1974,7 +1974,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 43.6 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 43.6 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh6`
 - **项目**: huanchong-99
@@ -1987,7 +1987,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 43.7 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 43.7 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh7`
 - **项目**: huanchong-99
@@ -2405,7 +2405,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 52.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 52.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwejeZ9DOUQdEsGht`
 - **项目**: huanchong-99
@@ -2858,7 +2858,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 69.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 69.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwefZZ9DOUQdEsGgn`
 - **项目**: huanchong-99
@@ -3570,7 +3570,7 @@
 - **创建时间**: 27 days ago
 - **标签**: react, type-dependent
 
-### 88.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 88.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwefHZ9DOUQdEsGgh`
 - **项目**: huanchong-99
@@ -3795,7 +3795,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 93.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 93.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweOZZ9DOUQdEsGa1`
 - **项目**: huanchong-99
@@ -3917,7 +3917,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 96.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 96.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweNzZ9DOUQdEsGap`
 - **项目**: huanchong-99
@@ -3930,7 +3930,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 96.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 96.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweNzZ9DOUQdEsGaq`
 - **项目**: huanchong-99
@@ -3943,7 +3943,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 96.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 96.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweNzZ9DOUQdEsGar`
 - **项目**: huanchong-99
@@ -3956,7 +3956,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 96.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 96.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweNzZ9DOUQdEsGas`
 - **项目**: huanchong-99
@@ -4327,7 +4327,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 108.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 108.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwebcZ9DOUQdEsGfp`
 - **项目**: huanchong-99
@@ -4340,7 +4340,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 108.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 108.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwebcZ9DOUQdEsGfq`
 - **项目**: huanchong-99
@@ -4398,7 +4398,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 109.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 109.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwecUZ9DOUQdEsGf6`
 - **项目**: huanchong-99
@@ -4430,7 +4430,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 110.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 110.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweb2Z9DOUQdEsGfu`
 - **项目**: huanchong-99
@@ -4443,7 +4443,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 110.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 110.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweb2Z9DOUQdEsGfv`
 - **项目**: huanchong-99
@@ -4456,7 +4456,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 110.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 110.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweb2Z9DOUQdEsGfw`
 - **项目**: huanchong-99
@@ -4469,7 +4469,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 110.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 110.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweb2Z9DOUQdEsGfx`
 - **项目**: huanchong-99
@@ -4578,7 +4578,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 113.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 113.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwebLZ9DOUQdEsGfi`
 - **项目**: huanchong-99
@@ -4655,7 +4655,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 115.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 115.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwea8Z9DOUQdEsGfd`
 - **项目**: huanchong-99
@@ -4674,7 +4674,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 116.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 116.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweb9Z9DOUQdEsGfy`
 - **项目**: huanchong-99
@@ -4700,7 +4700,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 116.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 116.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweb9Z9DOUQdEsGf0`
 - **项目**: huanchong-99
@@ -4764,7 +4764,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 118.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 118.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwebUZ9DOUQdEsGfl`
 - **项目**: huanchong-99
@@ -4777,7 +4777,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 118.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 118.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwebUZ9DOUQdEsGfm`
 - **项目**: huanchong-99
@@ -5173,7 +5173,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 130.3 Prefer `globalThis` over `window`.
+### 130.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepIZ9DOUQdEsGjX`
 - **项目**: huanchong-99
@@ -5186,7 +5186,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 130.4 Prefer `globalThis` over `window`.
+### 130.4 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepIZ9DOUQdEsGjY`
 - **项目**: huanchong-99
@@ -5218,7 +5218,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 131.1 Prefer `globalThis` over `window`.
+### 131.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwem7Z9DOUQdEsGit`
 - **项目**: huanchong-99
@@ -5957,7 +5957,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 148.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 148.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcv`
 - **项目**: huanchong-99
@@ -5970,7 +5970,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 148.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 148.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcw`
 - **项目**: huanchong-99
@@ -6060,7 +6060,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 150.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 150.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcl`
 - **项目**: huanchong-99
@@ -6073,7 +6073,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.2 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 150.2 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcm`
 - **项目**: huanchong-99
@@ -6086,7 +6086,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 150.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcn`
 - **项目**: huanchong-99
@@ -6099,7 +6099,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 150.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGco`
 - **项目**: huanchong-99
@@ -6112,7 +6112,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 150.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcp`
 - **项目**: huanchong-99
@@ -6125,7 +6125,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 150.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcq`
 - **项目**: huanchong-99
@@ -6859,7 +6859,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 162.1 Prefer `globalThis` over `window`.
+### 162.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweq8Z9DOUQdEsGkI`
 - **项目**: huanchong-99
@@ -7018,7 +7018,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 169.2 Prefer `globalThis` over `window`.
+### 169.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepdZ9DOUQdEsGjd`
 - **项目**: huanchong-99
@@ -7050,7 +7050,7 @@
 - **创建时间**: 17 days ago
 - **标签**: react, type-dependent
 
-### 170.2 Prefer `globalThis` over `window`.
+### 170.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepSZ9DOUQdEsGjb`
 - **项目**: huanchong-99
@@ -8686,7 +8686,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 203.3 Prefer `globalThis` over `window`.
+### 203.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwempZ9DOUQdEsGip`
 - **项目**: huanchong-99
@@ -9430,7 +9430,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 223.1 Prefer `globalThis` over `window`.
+### 223.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweQHZ9DOUQdEsGbb`
 - **项目**: huanchong-99
@@ -10436,7 +10436,7 @@
 - **创建时间**: 25 days ago
 - **标签**: cwe, error-handling, ...
 
-### 244.3 Prefer `globalThis` over `window`.
+### 244.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweVzZ9DOUQdEsGdb`
 - **项目**: huanchong-99
@@ -11408,7 +11408,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 272.3 Prefer `globalThis` over `window`.
+### 272.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwewEZ9DOUQdEsGlt`
 - **项目**: huanchong-99
@@ -11479,7 +11479,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 273.4 Prefer `globalThis` over `window`.
+### 273.4 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwexlZ9DOUQdEsGmU`
 - **项目**: huanchong-99
@@ -11517,7 +11517,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 275.1 Prefer `globalThis` over `window`.
+### 275.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevTZ9DOUQdEsGlX`
 - **项目**: huanchong-99
@@ -11530,7 +11530,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 275.2 Prefer `globalThis` over `window`.
+### 275.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevTZ9DOUQdEsGlY`
 - **项目**: huanchong-99
@@ -11627,7 +11627,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 276.3 Prefer `globalThis` over `window`.
+### 276.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmI`
 - **项目**: huanchong-99
@@ -11653,7 +11653,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 276.5 Prefer `globalThis` over `window`.
+### 276.5 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmK`
 - **项目**: huanchong-99
@@ -11755,7 +11755,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 280.1 Prefer `globalThis` over `window`.
+### 280.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevbZ9DOUQdEsGld`
 - **项目**: huanchong-99
@@ -11787,7 +11787,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: es2020, portability
 
-### 281.2 Prefer `globalThis` over `window`.
+### 281.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevjZ9DOUQdEsGlg`
 - **项目**: huanchong-99
@@ -11800,7 +11800,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: es2020, portability
 
-### 281.3 Prefer `globalThis` over `window`.
+### 281.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevjZ9DOUQdEsGlh`
 - **项目**: huanchong-99
@@ -12537,7 +12537,7 @@
 - **创建时间**: 21 days ago
 - **标签**: react, type-dependent
 
-### 298.4 Prefer `globalThis` over `window`.
+### 298.4 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweu8Z9DOUQdEsGlU`
 - **项目**: huanchong-99
@@ -12569,7 +12569,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 299.1 Prefer `globalThis` over `window`.
+### 299.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweufZ9DOUQdEsGlF`
 - **项目**: huanchong-99
@@ -12582,7 +12582,7 @@
 - **创建时间**: 25 days ago
 - **标签**: es2020, portability
 
-### 299.2 Prefer `globalThis` over `window`.
+### 299.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweufZ9DOUQdEsGlG`
 - **项目**: huanchong-99
@@ -13042,7 +13042,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 305.5 Prefer `globalThis` over `window`.
+### 305.5 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk1`
 - **项目**: huanchong-99
@@ -13055,7 +13055,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 305.6 Prefer `globalThis` over `window`.
+### 305.6 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk2`
 - **项目**: huanchong-99
@@ -13481,7 +13481,7 @@
 - **创建时间**: 17 days ago
 - **标签**: confusing
 
-### 311.6 Prefer `globalThis` over `window`.
+### 311.6 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoQ`
 - **项目**: huanchong-99
@@ -13494,7 +13494,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2020, portability
 
-### 311.7 Prefer `globalThis` over `window`.
+### 311.7 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoR`
 - **项目**: huanchong-99
@@ -13905,7 +13905,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 321.1 Prefer `globalThis` over `window`.
+### 321.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe1nZ9DOUQdEsGng`
 - **项目**: huanchong-99
@@ -13950,7 +13950,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 322.3 Prefer `globalThis` over `window`.
+### 322.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGn_`
 - **项目**: huanchong-99
@@ -14229,7 +14229,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 323.11 Prefer `globalThis` over `window`.
+### 323.11 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGns`
 - **项目**: huanchong-99
@@ -14242,7 +14242,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.12 Prefer `globalThis` over `window`.
+### 323.12 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnt`
 - **项目**: huanchong-99
@@ -14255,7 +14255,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.13 Prefer `globalThis` over `window`.
+### 323.13 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnu`
 - **项目**: huanchong-99
@@ -14396,7 +14396,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 323.24 Prefer `globalThis` over `window`.
+### 323.24 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn6`
 - **项目**: huanchong-99
@@ -14409,7 +14409,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.25 Prefer `globalThis` over `window`.
+### 323.25 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn7`
 - **项目**: huanchong-99
@@ -14422,7 +14422,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.26 Prefer `globalThis` over `window`.
+### 323.26 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn8`
 - **项目**: huanchong-99
@@ -14557,7 +14557,7 @@
 - **创建时间**: 28 days ago
 - **标签**: best-practice, clarity, ...
 
-### 326.4 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 326.4 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7ZZ9DOUQdEsGp-`
 - **项目**: huanchong-99
@@ -14570,7 +14570,7 @@
 - **创建时间**: 28 days ago
 - **标签**: bash, best-practices, ...
 
-### 326.5 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 326.5 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7ZZ9DOUQdEsGp_`
 - **项目**: huanchong-99
@@ -14583,7 +14583,7 @@
 - **创建时间**: 28 days ago
 - **标签**: bash, best-practices, ...
 
-### 326.6 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 326.6 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7ZZ9DOUQdEsGqA`
 - **项目**: huanchong-99
@@ -14596,7 +14596,7 @@
 - **创建时间**: 28 days ago
 - **标签**: bash, best-practices, ...
 
-### 326.7 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 326.7 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7ZZ9DOUQdEsGqB`
 - **项目**: huanchong-99
@@ -14609,7 +14609,7 @@
 - **创建时间**: 28 days ago
 - **标签**: bash, best-practices, ...
 
-### 326.8 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 326.8 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7ZZ9DOUQdEsGqC`
 - **项目**: huanchong-99
@@ -14622,7 +14622,7 @@
 - **创建时间**: 28 days ago
 - **标签**: bash, best-practices, ...
 
-### 326.9 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 326.9 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7ZZ9DOUQdEsGqD`
 - **项目**: huanchong-99
@@ -14654,7 +14654,7 @@
 - **创建时间**: 1 month ago
 - **标签**: best-practice, clarity, ...
 
-### 327.2 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.2 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqI`
 - **项目**: huanchong-99
@@ -14667,7 +14667,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.3 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.3 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqJ`
 - **项目**: huanchong-99
@@ -14680,7 +14680,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.4 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.4 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqK`
 - **项目**: huanchong-99
@@ -14693,7 +14693,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.5 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.5 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqL`
 - **项目**: huanchong-99
@@ -14706,7 +14706,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.6 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.6 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqM`
 - **项目**: huanchong-99
@@ -14719,7 +14719,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.7 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.7 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqN`
 - **项目**: huanchong-99
@@ -14732,7 +14732,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.8 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.8 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqO`
 - **项目**: huanchong-99
@@ -14745,7 +14745,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.9 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.9 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqP`
 - **项目**: huanchong-99
@@ -14758,7 +14758,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.10 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.10 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqQ`
 - **项目**: huanchong-99
@@ -14771,7 +14771,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.11 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.11 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqR`
 - **项目**: huanchong-99
@@ -14784,7 +14784,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.12 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.12 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqS`
 - **项目**: huanchong-99
@@ -14797,7 +14797,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.13 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 327.13 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqT`
 - **项目**: huanchong-99
@@ -14855,7 +14855,7 @@
 - **创建时间**: 1 day ago
 - **标签**: best-practice, clarity, ...
 
-### 328.2 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 328.2 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGpp`
 - **项目**: huanchong-99
@@ -14868,7 +14868,7 @@
 - **创建时间**: 1 day ago
 - **标签**: bash, best-practices, ...
 
-### 328.3 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 328.3 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGpq`
 - **项目**: huanchong-99
@@ -14881,7 +14881,7 @@
 - **创建时间**: 1 day ago
 - **标签**: bash, best-practices, ...
 
-### 328.4 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 328.4 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGpr`
 - **项目**: huanchong-99
@@ -14894,7 +14894,7 @@
 - **创建时间**: 1 day ago
 - **标签**: bash, best-practices, ...
 
-### 328.5 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 328.5 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGps`
 - **项目**: huanchong-99
@@ -14907,7 +14907,7 @@
 - **创建时间**: 1 day ago
 - **标签**: bash, best-practices, ...
 
-### 328.6 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 328.6 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGpt`
 - **项目**: huanchong-99
@@ -15371,7 +15371,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 336.1 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 336.1 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwe6rZ9DOUQdEsGpo`
 - **项目**: huanchong-99

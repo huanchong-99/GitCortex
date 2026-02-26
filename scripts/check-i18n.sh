@@ -34,7 +34,7 @@ lint_count() {
 
 get_json_keys() {
   local file=$1
-  if [ ! -f "$file" ]; then
+  if [[ ! -f "$file" ]]; then
     return 2
   fi
   jq -r '
@@ -46,7 +46,7 @@ get_json_keys() {
 
 check_duplicate_keys() {
   local file=$1
-  if [ ! -f "$file" ]; then
+  if [[ ! -f "$file" ]]; then
     return 2
   fi
 
@@ -66,7 +66,7 @@ check_duplicate_json_keys() {
   local locales_dir="$REPO_ROOT/frontend/src/i18n/locales"
   local exit_code=0
 
-  if [ ! -d "$locales_dir" ]; then
+  if [[ ! -d "$locales_dir" ]]; then
     echo "❌ Locales directory not found: $locales_dir"
     return 1
   fi
@@ -95,7 +95,7 @@ check_key_consistency() {
   local fail_on_extra="${I18N_FAIL_ON_EXTRA:-0}"
   local verbose="${I18N_VERBOSE:-0}"
 
-  if [ ! -d "$locales_dir/en" ]; then
+  if [[ ! -d "$locales_dir/en" ]]; then
     echo "❌ Missing source locale directory: $locales_dir/en"
     return 1
   fi
@@ -127,7 +127,7 @@ check_key_consistency() {
     fi
 
     for lang in "${languages[@]}"; do
-      [ "$lang" = "en" ] && continue
+      [[ "$lang" = "en" ]] && continue
       local tgt_file="$locales_dir/$lang/$ns.json"
 
       local tgt_keys
@@ -146,29 +146,29 @@ check_key_consistency() {
         extra=$(comm -13 <(printf "%s\n" "$ref_keys") <(printf "%s\n" "$tgt_keys"))
       fi
 
-      if [ -n "$missing" ]; then
+      if [[ -n "$missing" ]]; then
         echo "❌ [$lang/$ns] Missing keys:"
-        if [ "$verbose" = "1" ]; then
+        if [[ "$verbose" = "1" ]]; then
           printf '   - %s\n' "$missing"
         else
           printf '   - %s\n' "$(echo "$missing" | head -n 50)"
           local total_missing
           total_missing=$(printf "%s\n" "$missing" | wc -l | tr -d ' ')
-          if [ "$total_missing" -gt 50 ]; then
+          if [[ "$total_missing" -gt 50 ]]; then
             echo "   ... and $((total_missing - 50)) more. Set I18N_VERBOSE=1 to print all."
           fi
         fi
         exit_code=1
       fi
 
-      if [ -n "$extra" ]; then
-        if [ "$fail_on_extra" = "1" ]; then
+      if [[ -n "$extra" ]]; then
+        if [[ "$fail_on_extra" = "1" ]]; then
           echo "❌ [$lang/$ns] Extra keys (not in en):"
-          [ "$verbose" = "1" ] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
+          [[ "$verbose" = "1" ]] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
           exit_code=1
         else
           echo "⚠️  [$lang/$ns] Extra keys (not in en):"
-          [ "$verbose" = "1" ] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
+          [[ "$verbose" = "1" ]] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
         fi
       fi
     done

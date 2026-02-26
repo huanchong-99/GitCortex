@@ -260,7 +260,7 @@ export function OrganizationSettings() {
   const handleRemoveMember = async (userId: string) => {
     if (!selectedOrgId) return;
 
-    const confirmed = window.confirm(t('confirmRemoveMember'));
+    const confirmed = globalThis.confirm(t('confirmRemoveMember'));
     if (!confirmed) return;
 
     setError(null);
@@ -277,7 +277,7 @@ export function OrganizationSettings() {
   const handleDeleteOrganization = async () => {
     if (!selectedOrgId || !selectedOrg) return;
 
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       t('settings.confirmDelete', { orgName: selectedOrg.name })
     );
     if (!confirmed) return;
@@ -429,27 +429,35 @@ export function OrganizationSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loadingInvitations ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="ml-2">{t('invitationList.loading')}</span>
-              </div>
-            ) : invitations.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t('invitationList.none')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {invitations.map((invitation) => (
-                  <PendingInvitationItem
-                    key={invitation.id}
-                    invitation={invitation}
-                    onRevoke={handleRevokeInvitation}
-                    isRevoking={revokeInvitation.isPending}
-                  />
-                ))}
-              </div>
-            )}
+            {(() => {
+              if (loadingInvitations) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2">{t('invitationList.loading')}</span>
+                  </div>
+                );
+              } else if (invitations.length === 0) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {t('invitationList.none')}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="space-y-3">
+                    {invitations.map((invitation) => (
+                      <PendingInvitationItem
+                        key={invitation.id}
+                        invitation={invitation}
+                        onRevoke={handleRevokeInvitation}
+                        isRevoking={revokeInvitation.isPending}
+                      />
+                    ))}
+                  </div>
+                );
+              }
+            })()}
           </CardContent>
         </Card>
       )}
@@ -475,31 +483,39 @@ export function OrganizationSettings() {
             </div>
           </CardHeader>
           <CardContent>
-            {loadingMembers ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="ml-2">{t('memberList.loading')}</span>
-              </div>
-            ) : members.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t('memberList.none')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {members.map((member) => (
-                  <MemberListItem
-                    key={member.user_id}
-                    member={member}
-                    currentUserId={currentUserId}
-                    isAdmin={isAdmin}
-                    onRemove={handleRemoveMember}
-                    onRoleChange={handleRoleChange}
-                    isRemoving={removeMember.isPending}
-                    isRoleChanging={updateMemberRole.isPending}
-                  />
-                ))}
-              </div>
-            )}
+            {(() => {
+              if (loadingMembers) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2">{t('memberList.loading')}</span>
+                  </div>
+                );
+              } else if (members.length === 0) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {t('memberList.none')}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="space-y-3">
+                    {members.map((member) => (
+                      <MemberListItem
+                        key={member.user_id}
+                        member={member}
+                        currentUserId={currentUserId}
+                        isAdmin={isAdmin}
+                        onRemove={handleRemoveMember}
+                        onRoleChange={handleRoleChange}
+                        isRemoving={removeMember.isPending}
+                        isRoleChanging={updateMemberRole.isPending}
+                      />
+                    ))}
+                  </div>
+                );
+              }
+            })()}
           </CardContent>
         </Card>
       )}
@@ -513,54 +529,66 @@ export function OrganizationSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loadingProjects || loadingRemoteProjects ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="ml-2">{t('sharedProjects.loading')}</span>
-              </div>
-            ) : isRemoteProjectUnsupported ? (
-              <Alert>
-                <AlertDescription>
-                  {remoteProjectUnsupportedMessage}
-                </AlertDescription>
-              </Alert>
-            ) : remoteProjectsError ? (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {remoteProjectsError instanceof Error
-                    ? remoteProjectsError.message
-                    : loadRemoteProjectsErrorMessage}
-                </AlertDescription>
-              </Alert>
-            ) : remoteProjects.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t('sharedProjects.noProjects')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {remoteProjects.map((remoteProject) => {
-                  // Find the local project linked to this remote project
-                  const linkedLocalProject = allProjects.find(
-                    (p) => p.remoteProjectId === remoteProject.id
-                  );
+            {(() => {
+              if (loadingProjects || loadingRemoteProjects) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2">{t('sharedProjects.loading')}</span>
+                  </div>
+                );
+              } else if (isRemoteProjectUnsupported) {
+                return (
+                  <Alert>
+                    <AlertDescription>
+                      {remoteProjectUnsupportedMessage}
+                    </AlertDescription>
+                  </Alert>
+                );
+              } else if (remoteProjectsError) {
+                return (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      {remoteProjectsError instanceof Error
+                        ? remoteProjectsError.message
+                        : loadRemoteProjectsErrorMessage}
+                    </AlertDescription>
+                  </Alert>
+                );
+              } else if (remoteProjects.length === 0) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {t('sharedProjects.noProjects')}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="space-y-3">
+                    {remoteProjects.map((remoteProject) => {
+                      // Find the local project linked to this remote project
+                      const linkedLocalProject = allProjects.find(
+                        (p) => p.remoteProjectId === remoteProject.id
+                      );
 
-                  return (
-                    <RemoteProjectItem
-                      key={remoteProject.id}
-                      remoteProject={remoteProject}
-                      linkedLocalProject={linkedLocalProject}
-                      availableLocalProjects={availableLocalProjects}
-                      onLink={handleLinkProject}
-                      onUnlink={handleUnlinkProject}
-                      isLinking={linkToExisting.isPending}
-                      isUnlinking={unlinkProject.isPending}
-                      disabled={isRemoteProjectUnsupported}
-                      disabledReason={remoteProjectUnsupportedMessage}
-                    />
-                  );
-                })}
-              </div>
-            )}
+                      return (
+                        <RemoteProjectItem
+                          key={remoteProject.id}
+                          remoteProject={remoteProject}
+                          linkedLocalProject={linkedLocalProject}
+                          availableLocalProjects={availableLocalProjects}
+                          onLink={handleLinkProject}
+                          onUnlink={handleUnlinkProject}
+                          isLinking={linkToExisting.isPending}
+                          isUnlinking={unlinkProject.isPending}
+                          disabled={isRemoteProjectUnsupported}
+                          disabledReason={remoteProjectUnsupportedMessage}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              }
+            })()}
           </CardContent>
         </Card>
       )}

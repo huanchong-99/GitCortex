@@ -124,7 +124,7 @@ export function WorkflowDebugPage() {
     );
   }
 
-  const wsUrl = buildWorkflowDebugWsUrl(window.location);
+  const wsUrl = buildWorkflowDebugWsUrl(globalThis.location);
   const defaultRoleLabel = t('terminalCard.defaultRole');
 
   // Map DTO tasks to internal WorkflowTask format

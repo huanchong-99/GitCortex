@@ -406,69 +406,87 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
               </div>
             </div>
             <div className="flex-1 min-h-0 p-4">
-              {shouldRenderLiveTerminal(selectedTerminal) ? (
-                <TerminalEmulator
-                  key={selectedTerminal.id}
-                  ref={terminalRef}
-                  terminalId={selectedTerminal.id}
-                  wsUrl={wsUrl}
-                  onError={handleTerminalError}
-                />
-              ) : isHistoricalTerminal ? (
-                <div className="h-full min-h-0 rounded-lg border bg-background p-4 flex flex-col">
-                  <div className="text-sm text-muted-foreground mb-3">
-                    {t('terminalDebug.historyTitle', {
-                      defaultValue: 'Terminal history',
-                    })}
-                  </div>
-
-                  {currentHistory?.loading ? (
-                    <div className="text-sm text-muted-foreground">
-                      {t('terminalDebug.historyLoading', {
-                        defaultValue: 'Loading terminal history...',
-                      })}
-                    </div>
-                  ) : currentHistory?.error ? (
-                    <div className="space-y-3">
-                      <div className="text-sm text-red-500">
-                        {t('terminalDebug.historyLoadFailed', {
-                          defaultValue: 'Failed to load terminal history.',
+              {(() => {
+                if (shouldRenderLiveTerminal(selectedTerminal)) {
+                  return (
+                    <TerminalEmulator
+                      key={selectedTerminal.id}
+                      ref={terminalRef}
+                      terminalId={selectedTerminal.id}
+                      wsUrl={wsUrl}
+                      onError={handleTerminalError}
+                    />
+                  );
+                } else if (isHistoricalTerminal) {
+                  return (
+                    <div className="h-full min-h-0 rounded-lg border bg-background p-4 flex flex-col">
+                      <div className="text-sm text-muted-foreground mb-3">
+                        {t('terminalDebug.historyTitle', {
+                          defaultValue: 'Terminal history',
                         })}
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (!selectedTerminalId) {
-                            return;
-                          }
-                          void loadTerminalHistory(selectedTerminalId);
-                        }}
-                      >
-                        {t('terminalDebug.reloadHistory', {
-                          defaultValue: 'Reload history',
-                        })}
-                      </Button>
+
+                      {(() => {
+                        if (currentHistory?.loading) {
+                          return (
+                            <div className="text-sm text-muted-foreground">
+                              {t('terminalDebug.historyLoading', {
+                                defaultValue: 'Loading terminal history...',
+                              })}
+                            </div>
+                          );
+                        } else if (currentHistory?.error) {
+                          return (
+                            <div className="space-y-3">
+                              <div className="text-sm text-red-500">
+                                {t('terminalDebug.historyLoadFailed', {
+                                  defaultValue: 'Failed to load terminal history.',
+                                })}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (!selectedTerminalId) {
+                                    return;
+                                  }
+                                  void loadTerminalHistory(selectedTerminalId);
+                                }}
+                              >
+                                {t('terminalDebug.reloadHistory', {
+                                  defaultValue: 'Reload history',
+                                })}
+                              </Button>
+                            </div>
+                          );
+                        } else if (currentHistory?.lines.length) {
+                          return (
+                            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto pr-1">
+                              <pre className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground">
+                                {currentHistoryText}
+                              </pre>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="text-sm text-muted-foreground">
+                              {t('terminalDebug.historyEmpty', {
+                                defaultValue: 'No terminal history available yet.',
+                              })}
+                            </div>
+                          );
+                        }
+                      })()}
                     </div>
-                  ) : currentHistory?.lines.length ? (
-                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto pr-1">
-                      <pre className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground">
-                        {currentHistoryText}
-                      </pre>
+                  );
+                } else {
+                  return (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      {t('terminalDebug.starting')}
                     </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      {t('terminalDebug.historyEmpty', {
-                        defaultValue: 'No terminal history available yet.',
-                      })}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  {t('terminalDebug.starting')}
-                </div>
-              )}
+                  );
+                }
+              })()}
             </div>
           </>
         ) : (

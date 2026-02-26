@@ -11,7 +11,7 @@ cargo test -p services
 
 echo "3. Checking for compilation errors..."
 ERRORS=$(cargo check -p services 2>&1 | grep "^error" | wc -l)
-if [ "$ERRORS" -ne 0 ]; then
+if [[ "$ERRORS" -ne 0 ]]; then
     echo "❌ Found $ERRORS compilation errors"
     exit 1
 fi

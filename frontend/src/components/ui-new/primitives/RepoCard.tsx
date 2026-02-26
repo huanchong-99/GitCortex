@@ -220,37 +220,38 @@ export function RepoCard({
       {/* PR status row */}
       {prNumber && (
         <div className="flex items-center gap-half my-base">
-          {prStatus === 'merged' ? (
-            prUrl ? (
-              <button
-                onClick={() => openExternalLink(prUrl)}
-                className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-success hover:bg-tertiary text-sm font-medium transition-colors"
-              >
-                <CheckCircleIcon className="size-icon-xs" weight="fill" />
-                {t('git.pr.merged', { prNumber })}
-                <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
-              </button>
+          {(() => {
+            const isMerged = prStatus === 'merged';
+            const icon = isMerged ? (
+              <CheckCircleIcon className="size-icon-xs" weight="fill" />
             ) : (
-              <span className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-success text-sm font-medium">
-                <CheckCircleIcon className="size-icon-xs" weight="fill" />
-                {t('git.pr.merged', { prNumber })}
-              </span>
-            )
-          ) : prUrl ? (
-            <button
-              onClick={() => openExternalLink(prUrl)}
-              className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-normal hover:bg-tertiary text-sm font-medium transition-colors"
-            >
               <GitPullRequestIcon className="size-icon-xs" weight="fill" />
-              {t('git.pr.open', { number: prNumber })}
-              <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
-            </button>
-          ) : (
-            <span className="inline-flex items-center gap-half px-base py-half rounded-sm bg-panel text-normal text-sm font-medium">
-              <GitPullRequestIcon className="size-icon-xs" weight="fill" />
-              {t('git.pr.open', { number: prNumber })}
-            </span>
-          )}
+            );
+            const text = isMerged
+              ? t('git.pr.merged', { prNumber })
+              : t('git.pr.open', { number: prNumber });
+            const textColor = isMerged ? 'text-success' : 'text-normal';
+
+            if (prUrl) {
+              return (
+                <button
+                  onClick={() => openExternalLink(prUrl)}
+                  className={`inline-flex items-center gap-half px-base py-half rounded-sm bg-panel ${textColor} hover:bg-tertiary text-sm font-medium transition-colors`}
+                >
+                  {icon}
+                  {text}
+                  <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
+                </button>
+              );
+            } else {
+              return (
+                <span className={`inline-flex items-center gap-half px-base py-half rounded-sm bg-panel ${textColor} text-sm font-medium`}>
+                  {icon}
+                  {text}
+                </span>
+              );
+            }
+          })()}
           {/* Push button - shows loading/success/error state */}
           {(showPushButton ||
             isPushPending ||
@@ -259,30 +260,39 @@ export function RepoCard({
             <button
               onClick={onPushClick}
               disabled={isPushPending || isPushSuccess || isPushError}
-              className={`inline-flex items-center gap-half px-base py-half rounded-sm text-sm font-medium transition-colors disabled:cursor-not-allowed ${
-                isPushSuccess
-                  ? 'bg-success/20 text-success'
-                  : isPushError
-                    ? 'bg-error/20 text-error'
-                    : 'bg-panel text-normal hover:bg-tertiary disabled:opacity-50'
-              }`}
+              className={(() => {
+                const baseClasses = 'inline-flex items-center gap-half px-base py-half rounded-sm text-sm font-medium transition-colors disabled:cursor-not-allowed';
+                if (isPushSuccess) {
+                  return `${baseClasses} bg-success/20 text-success`;
+                } else if (isPushError) {
+                  return `${baseClasses} bg-error/20 text-error`;
+                } else {
+                  return `${baseClasses} bg-panel text-normal hover:bg-tertiary disabled:opacity-50`;
+                }
+              })()}
             >
-              {isPushPending ? (
-                <SpinnerGapIcon className="size-icon-xs animate-spin" />
-              ) : isPushSuccess ? (
-                <CheckCircleIcon className="size-icon-xs" weight="fill" />
-              ) : isPushError ? (
-                <WarningCircleIcon className="size-icon-xs" weight="fill" />
-              ) : (
-                <ArrowUpIcon className="size-icon-xs" weight="bold" />
-              )}
-              {isPushPending
-                ? t('git.states.pushing')
-                : isPushSuccess
-                  ? t('git.states.pushed')
-                  : isPushError
-                    ? t('git.states.pushFailed')
-                    : t('git.states.push')}
+              {(() => {
+                if (isPushPending) {
+                  return <SpinnerGapIcon className="size-icon-xs animate-spin" />;
+                } else if (isPushSuccess) {
+                  return <CheckCircleIcon className="size-icon-xs" weight="fill" />;
+                } else if (isPushError) {
+                  return <WarningCircleIcon className="size-icon-xs" weight="fill" />;
+                } else {
+                  return <ArrowUpIcon className="size-icon-xs" weight="bold" />;
+                }
+              })()}
+              {(() => {
+                if (isPushPending) {
+                  return t('git.states.pushing');
+                } else if (isPushSuccess) {
+                  return t('git.states.pushed');
+                } else if (isPushError) {
+                  return t('git.states.pushFailed');
+                } else {
+                  return t('git.states.push');
+                }
+              })()}
             </button>
           )}
         </div>

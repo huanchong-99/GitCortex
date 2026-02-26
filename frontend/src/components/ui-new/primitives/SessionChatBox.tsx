@@ -171,13 +171,16 @@ export function SessionChatBox({
   const isInApprovalMode = approvalMode?.isActive ?? false;
 
   // Key to force editor remount when entering feedback/edit/approval mode (triggers auto-focus)
-  const focusKey = isInFeedbackMode
-    ? 'feedback'
-    : isInEditMode
-      ? 'edit'
-      : isInApprovalMode
-        ? 'approval'
-        : 'normal';
+  let focusKey: string;
+  if (isInFeedbackMode) {
+    focusKey = 'feedback';
+  } else if (isInEditMode) {
+    focusKey = 'edit';
+  } else if (isInApprovalMode) {
+    focusKey = 'approval';
+  } else {
+    focusKey = 'normal';
+  }
 
   // Derived state from status
   const isDisabled =
@@ -197,15 +200,18 @@ export function SessionChatBox({
     !isInApprovalMode &&
     editor.value.trim().length === 0;
 
-  const placeholder = isInFeedbackMode
-    ? 'Provide feedback for the plan...'
-    : isInEditMode
-      ? 'Edit your message...'
-      : isInApprovalMode
-        ? 'Provide feedback to request changes...'
-        : session.isNewSessionMode
-          ? 'Start a new conversation...'
-          : 'Continue working on this task...';
+  let placeholder: string;
+  if (isInFeedbackMode) {
+    placeholder = 'Provide feedback for the plan...';
+  } else if (isInEditMode) {
+    placeholder = 'Edit your message...';
+  } else if (isInApprovalMode) {
+    placeholder = 'Provide feedback to request changes...';
+  } else if (session.isNewSessionMode) {
+    placeholder = 'Start a new conversation...';
+  } else {
+    placeholder = 'Continue working on this task...';
+  }
 
   // Cmd+Enter handler
   const handleCmdEnter = () => {
@@ -253,11 +259,14 @@ export function SessionChatBox({
   } = session;
   const isLatestSelected =
     sessions.length > 0 && selectedSessionId === sessions[0].id;
-  const sessionLabel = isNewSessionMode
-    ? t('conversation.sessions.newSession')
-    : isLatestSelected
-      ? t('conversation.sessions.latest')
-      : t('conversation.sessions.previous');
+  let sessionLabel: string;
+  if (isNewSessionMode) {
+    sessionLabel = t('conversation.sessions.newSession');
+  } else if (isLatestSelected) {
+    sessionLabel = t('conversation.sessions.latest');
+  } else {
+    sessionLabel = t('conversation.sessions.previous');
+  }
 
   // Stats
   const filesChanged = stats?.filesChanged ?? 0;

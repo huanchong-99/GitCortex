@@ -230,57 +230,69 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
 
               {/* Directory listing */}
               <div className="flex-1 border rounded-md overflow-auto">
-                {loading ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    Loading...
-                  </div>
-                ) : error ? (
-                  <Alert variant="destructive" className="m-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                ) : filteredEntries.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    {searchTerm.trim()
-                      ? 'No matches found'
-                      : 'No folders found'}
-                  </div>
-                ) : (
-                  <div className="p-2">
-                    {filteredEntries.map((entry, index) => (
-                      <div
-                        key={index}
-                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-accent ${
-                          !entry.is_directory
-                            ? 'opacity-50 cursor-not-allowed'
-                            : ''
-                        }`}
-                        onClick={() =>
-                          entry.is_directory && handleFolderClick(entry)
-                        }
-                        title={entry.name} // Show full name on hover
-                      >
-                        {entry.is_directory ? (
-                          entry.is_git_repo ? (
-                            <FolderOpen className="h-4 w-4 text-success flex-shrink-0" />
-                          ) : (
-                            <Folder className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                          )
-                        ) : (
-                          <File className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        )}
-                        <span className="text-sm flex-1 truncate min-w-0">
-                          {entry.name}
-                        </span>
-                        {entry.is_git_repo && (
-                          <span className="text-xs text-success bg-green-100 px-2 py-1 rounded flex-shrink-0">
-                            {t('folderPicker.gitRepo')}
-                          </span>
-                        )}
+                {(() => {
+                  if (loading) {
+                    return (
+                      <div className="p-4 text-center text-muted-foreground">
+                        Loading...
                       </div>
-                    ))}
-                  </div>
-                )}
+                    );
+                  } else if (error) {
+                    return (
+                      <Alert variant="destructive" className="m-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    );
+                  } else if (filteredEntries.length === 0) {
+                    return (
+                      <div className="p-4 text-center text-muted-foreground">
+                        {searchTerm.trim()
+                          ? 'No matches found'
+                          : 'No folders found'}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="p-2">
+                        {filteredEntries.map((entry, index) => (
+                          <div
+                            key={index}
+                            className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-accent ${
+                              !entry.is_directory
+                                ? 'opacity-50 cursor-not-allowed'
+                                : ''
+                            }`}
+                            onClick={() =>
+                              entry.is_directory && handleFolderClick(entry)
+                            }
+                            title={entry.name} // Show full name on hover
+                          >
+                            {(() => {
+                              if (entry.is_directory) {
+                                if (entry.is_git_repo) {
+                                  return <FolderOpen className="h-4 w-4 text-success flex-shrink-0" />;
+                                } else {
+                                  return <Folder className="h-4 w-4 text-blue-600 flex-shrink-0" />;
+                                }
+                              } else {
+                                return <File className="h-4 w-4 text-gray-400 flex-shrink-0" />;
+                              }
+                            })()}
+                            <span className="text-sm flex-1 truncate min-w-0">
+                              {entry.name}
+                            </span>
+                            {entry.is_git_repo && (
+                              <span className="text-xs text-success bg-green-100 px-2 py-1 rounded flex-shrink-0">
+                                {t('folderPicker.gitRepo')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </div>
 

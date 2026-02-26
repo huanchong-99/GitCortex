@@ -19,7 +19,7 @@ export function PendingInvitationItem({
   const { t } = useTranslation('organization');
 
   const handleRevoke = () => {
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       `Are you sure you want to revoke the invitation for ${invitation.email}? This action cannot be undone.`
     );
     if (confirmed) {

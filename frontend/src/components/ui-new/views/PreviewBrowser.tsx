@@ -227,15 +227,13 @@ export function PreviewBrowser({
           {/* Start/Stop Button */}
           <IconButtonGroup>
             <IconButtonGroupItem
-              icon={
-                isServerRunning
-                  ? isStopping
-                    ? SpinnerIcon
-                    : PauseIcon
-                  : isStarting
-                    ? SpinnerIcon
-                    : PlayIcon
-              }
+              icon={(() => {
+                if (isServerRunning) {
+                  return isStopping ? SpinnerIcon : PauseIcon;
+                } else {
+                  return isStarting ? SpinnerIcon : PlayIcon;
+                }
+              })()}
               iconClassName={
                 (isServerRunning && isStopping) ||
                 (!isServerRunning && isStarting)
@@ -346,59 +344,67 @@ export function PreviewBrowser({
           </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-base text-low">
-            {isLoading ? (
-              <>
-                <SpinnerIcon className="size-icon-lg animate-spin text-brand" />
-                <p className="text-sm">
-                  {isStarting
-                    ? t('preview.loading.startingServer')
-                    : t('preview.loading.waitingForServer')}
-                </p>
-              </>
-            ) : hasDevScript ? (
-              <>
-                <p>{t('preview.noServer.title')}</p>
-                {hasFailedDevServer && handleFixDevScript ? (
-                  <PrimaryButton
-                    variant="tertiary"
-                    value={t('scriptFixer.fixScript')}
-                    actionIcon={WrenchIcon}
-                    onClick={handleFixDevScript}
-                  />
-                ) : (
-                  <PrimaryButton
-                    value={t('attempt.actions.startDevServer')}
-                    actionIcon={PlayIcon}
-                    onClick={onStart}
-                  />
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col gap-double p-double max-w-md">
-                <div className="flex flex-col gap-base">
-                  <p className="text-xl text-high max-w-xs">
-                    {t('preview.noServer.setupTitle')}
-                  </p>
-                  <p>{t('preview.noServer.setupPrompt')}</p>
-                </div>
-                <div className="flex flex-col gap-base">
-                  <div>
-                    <PrimaryButton
-                      value={t('preview.noServer.editDevScript')}
-                      onClick={handleEditDevScript}
-                    />
+            {(() => {
+              if (isLoading) {
+                return (
+                  <>
+                    <SpinnerIcon className="size-icon-lg animate-spin text-brand" />
+                    <p className="text-sm">
+                      {isStarting
+                        ? t('preview.loading.startingServer')
+                        : t('preview.loading.waitingForServer')}
+                    </p>
+                  </>
+                );
+              } else if (hasDevScript) {
+                return (
+                  <>
+                    <p>{t('preview.noServer.title')}</p>
+                    {hasFailedDevServer && handleFixDevScript ? (
+                      <PrimaryButton
+                        variant="tertiary"
+                        value={t('scriptFixer.fixScript')}
+                        actionIcon={WrenchIcon}
+                        onClick={handleFixDevScript}
+                      />
+                    ) : (
+                      <PrimaryButton
+                        value={t('attempt.actions.startDevServer')}
+                        actionIcon={PlayIcon}
+                        onClick={onStart}
+                      />
+                    )}
+                  </>
+                );
+              } else {
+                return (
+                  <div className="flex flex-col gap-double p-double max-w-md">
+                    <div className="flex flex-col gap-base">
+                      <p className="text-xl text-high max-w-xs">
+                        {t('preview.noServer.setupTitle')}
+                      </p>
+                      <p>{t('preview.noServer.setupPrompt')}</p>
+                    </div>
+                    <div className="flex flex-col gap-base">
+                      <div>
+                        <PrimaryButton
+                          value={t('preview.noServer.editDevScript')}
+                          onClick={handleEditDevScript}
+                        />
+                      </div>
+                      <a
+                        href="https://www.gitcortex.com/docs/core-features/testing-your-application"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand hover:text-brand-hover underline"
+                      >
+                        {t('preview.noServer.learnMore')}
+                      </a>
+                    </div>
                   </div>
-                  <a
-                    href="https://www.gitcortex.com/docs/core-features/testing-your-application"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-brand hover:text-brand-hover underline"
-                  >
-                    {t('preview.noServer.learnMore')}
-                  </a>
-                </div>
-              </div>
-            )}
+                );
+              }
+            })()}
           </div>
         )}
       </div>

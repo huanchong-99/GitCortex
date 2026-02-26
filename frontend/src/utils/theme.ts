@@ -13,7 +13,7 @@ export function getActualTheme(
 
   if (themeMode === ThemeMode.SYSTEM) {
     // Check system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
+    return globalThis.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'dark'
       : 'light';
   }

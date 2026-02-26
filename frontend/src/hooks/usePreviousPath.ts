@@ -11,18 +11,18 @@ function createSessionId(): string {
 }
 
 function getSessionId(): string {
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     return 'server';
   }
 
   try {
-    const existing = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const existing = globalThis.sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (existing) {
       return existing;
     }
 
     const created = createSessionId();
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY, created);
+    globalThis.sessionStorage.setItem(SESSION_STORAGE_KEY, created);
     return created;
   } catch {
     return 'memory';

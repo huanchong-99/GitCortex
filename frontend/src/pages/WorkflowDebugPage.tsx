@@ -43,8 +43,8 @@ export function WorkflowDebugPage() {
 
   // Construct WebSocket URL for PTY connection
   // TerminalEmulator appends `/terminal/${terminalId}` to this base URL
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = `${wsProtocol}://${window.location.host}/api`;
+  const wsProtocol = globalThis.location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsUrl = `${wsProtocol}://${globalThis.location.host}/api`;
 
   // Map WorkflowTaskDto to WorkflowTask with Terminal type conversion
   const tasks: (WorkflowTask & { terminals: Terminal[] })[] = workflow.tasks.map((taskDto) => ({

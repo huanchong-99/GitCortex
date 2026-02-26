@@ -10,7 +10,7 @@
 /** Returns true when running inside an iframe (vs top-level window). */
 export function inIframe(): boolean {
   try {
-    return window.self !== window.top;
+    return globalThis.self !== globalThis.top;
   } catch {
     return true;
   }
@@ -133,7 +133,7 @@ function getSelectedText(): string {
     const end = input.selectionEnd ?? 0;
     return start < end ? input.value.slice(start, end) : '';
   }
-  const sel = window.getSelection();
+  const sel = globalThis.getSelection();
   return sel ? sel.toString() : '';
 }
 
@@ -270,7 +270,7 @@ const pasteResolvers: Record<string, (text: string) => void> = {};
 /** Ask the extension to copy text to the OS clipboard (fallback path). */
 export function parentClipboardWrite(text: string) {
   try {
-    window.parent.postMessage(
+    globalThis.parent.postMessage(
       { type: 'vscode-iframe-clipboard-copy', text },
       '*'
     );
@@ -285,7 +285,7 @@ export function parentClipboardRead(): Promise<string> {
     const requestId = Math.random().toString(36).slice(2);
     pasteResolvers[requestId] = (text: string) => resolve(text);
     try {
-      window.parent.postMessage(
+      globalThis.parent.postMessage(
         { type: 'vscode-iframe-clipboard-paste-request', requestId },
         '*'
       );
@@ -333,7 +333,7 @@ export function installVSCodeIframeKeyboardBridge() {
 
   const forward = (type: string, e: KeyboardEvent) => {
     try {
-      window.parent.postMessage({ type, event: serializeKeyEvent(e) }, '*');
+      globalThis.parent.postMessage({ type, event: serializeKeyEvent(e) }, '*');
     } catch (_err) {
       void 0;
     }

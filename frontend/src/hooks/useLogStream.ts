@@ -34,8 +34,8 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
     const open = () => {
       // Capture processId at the time of opening the WebSocket
       const capturedProcessId = processId;
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
+      const protocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = globalThis.location.host;
       const ws = new WebSocket(
         `${protocol}//${host}/api/execution-processes/${processId}/raw-logs/ws`
       );

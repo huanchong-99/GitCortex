@@ -15,7 +15,7 @@ docker compose -f "$COMPOSE_FILE" up -d --build
 
 echo "Waiting for /healthz (max ${MAX_WAIT}s)..."
 elapsed=0
-while [ $elapsed -lt $MAX_WAIT ]; do
+while [[ $elapsed -lt $MAX_WAIT ]]; do
     if curl -sf "$BASE_URL/healthz" > /dev/null 2>&1; then
         echo "OK /healthz after ${elapsed}s"
         break
@@ -23,7 +23,7 @@ while [ $elapsed -lt $MAX_WAIT ]; do
     sleep 2
     elapsed=$((elapsed + 2))
 done
-if [ $elapsed -ge $MAX_WAIT ]; then
+if [[ $elapsed -ge $MAX_WAIT ]]; then
     echo "FAIL: Timeout waiting for /healthz"
     docker compose -f "$COMPOSE_FILE" logs
     exit 1
@@ -41,7 +41,7 @@ echo "OK /readyz ready=true"
 
 echo "Checking frontend..."
 HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" "$BASE_URL/")
-if [ "$HTTP_CODE" != "200" ]; then
+if [[ "$HTTP_CODE" != "200" ]]; then
     echo "FAIL: Frontend returned $HTTP_CODE"
     docker compose -f "$COMPOSE_FILE" logs
     exit 1

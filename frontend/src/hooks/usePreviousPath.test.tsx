@@ -44,7 +44,7 @@ describe('usePreviousPath', () => {
   beforeEach(() => {
     authState.userId = null;
     resetPreviousPathHistory();
-    window.sessionStorage.clear();
+    globalThis.sessionStorage.clear();
     vi.clearAllMocks();
   });
 

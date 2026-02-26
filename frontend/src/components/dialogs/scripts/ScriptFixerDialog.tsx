@@ -122,12 +122,14 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
           const repo = await repoApi.getById(selectedRepoId);
           if (cancelled) return;
 
-          const scriptContent =
-            scriptType === 'setup'
-              ? (repo.setupScript ?? '')
-              : scriptType === 'cleanup'
-                ? (repo.cleanupScript ?? '')
-                : (repo.devServerScript ?? '');
+          let scriptContent: string;
+          if (scriptType === 'setup') {
+            scriptContent = repo.setupScript ?? '';
+          } else if (scriptType === 'cleanup') {
+            scriptContent = repo.cleanupScript ?? '';
+          } else {
+            scriptContent = repo.devServerScript ?? '';
+          }
 
           setScript(scriptContent);
           setOriginalScript(scriptContent);
@@ -168,12 +170,14 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
       try {
         // Only send the field being edited - other fields will be preserved by the backend
         const scriptValue = script.trim() || null;
-        const updateData: Partial<UpdateRepo> =
-          scriptType === 'setup'
-            ? { setupScript: scriptValue }
-            : scriptType === 'cleanup'
-              ? { cleanupScript: scriptValue }
-              : { devServerScript: scriptValue };
+        let updateData: Partial<UpdateRepo>;
+        if (scriptType === 'setup') {
+          updateData = { setupScript: scriptValue };
+        } else if (scriptType === 'cleanup') {
+          updateData = { cleanupScript: scriptValue };
+        } else {
+          updateData = { devServerScript: scriptValue };
+        }
 
         await repoApi.update(selectedRepoId, updateData as UpdateRepo);
 
@@ -201,12 +205,14 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
       try {
         // Only send the field being edited - other fields will be preserved by the backend
         const scriptValue = script.trim() || null;
-        const updateData: Partial<UpdateRepo> =
-          scriptType === 'setup'
-            ? { setupScript: scriptValue }
-            : scriptType === 'cleanup'
-              ? { cleanupScript: scriptValue }
-              : { devServerScript: scriptValue };
+        let updateData: Partial<UpdateRepo>;
+        if (scriptType === 'setup') {
+          updateData = { setupScript: scriptValue };
+        } else if (scriptType === 'cleanup') {
+          updateData = { cleanupScript: scriptValue };
+        } else {
+          updateData = { devServerScript: scriptValue };
+        }
 
         await repoApi.update(selectedRepoId, updateData as UpdateRepo);
 
@@ -236,12 +242,24 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
       }
     }, [selectedRepoId, script, scriptType, workspaceId, queryClient, t]);
 
-    const dialogTitle =
-      scriptType === 'setup'
-        ? t('scriptFixer.setupScriptTitle')
-        : scriptType === 'cleanup'
-          ? t('scriptFixer.cleanupScriptTitle')
-          : t('scriptFixer.devServerTitle');
+    const getPlaceholderText = () => {
+      if (scriptType === 'setup') {
+        return '#!/bin/bash\nnpm install';
+      } else if (scriptType === 'cleanup') {
+        return '#!/bin/bash\nrm -rf node_modules';
+      } else {
+        return '#!/bin/bash\nnpm run dev';
+      }
+    };
+
+    let dialogTitle: string;
+    if (scriptType === 'setup') {
+      dialogTitle = t('scriptFixer.setupScriptTitle');
+    } else if (scriptType === 'cleanup') {
+      dialogTitle = t('scriptFixer.cleanupScriptTitle');
+    } else {
+      dialogTitle = t('scriptFixer.devServerTitle');
+    }
 
     return (
       <Dialog
@@ -292,13 +310,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
                     value={script}
                     onChange={(e) => setScript(e.target.value)}
                     className="font-mono text-sm p-3 border-0 min-h-full bg-panel"
-                    placeholder={
-                      scriptType === 'setup'
-                        ? '#!/bin/bash\nnpm install'
-                        : scriptType === 'cleanup'
-                          ? '#!/bin/bash\nrm -rf node_modules'
-                          : '#!/bin/bash\nnpm run dev'
-                    }
+                    placeholder={getPlaceholderText()}
                     disableInternalScroll
                   />
                 )}

@@ -126,44 +126,54 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
           </DialogDescription>
         </DialogHeader>
 
-        {isRemoteDisabled ? (
-          <Alert className="mt-1">
-            <AlertDescription>{remoteDisabledMessage}</AlertDescription>
-          </Alert>
-        ) : !isSignedIn ? (
-          <LoginRequiredPrompt
-            buttonVariant="outline"
-            buttonSize="sm"
-            buttonClassName="mt-1"
-          />
-        ) : !isProjectLinked ? (
-          <Alert className="mt-1">
-            <LinkIcon className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>{t('shareDialog.linkProjectRequired.description')}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLinkProject}
-                className="ml-2"
-              >
-                {t('shareDialog.linkProjectRequired.action')}
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <>
-            {shareTask.isSuccess ? (
-              <Alert variant="success">{t('shareDialog.success')}</Alert>
-            ) : (
+        {(() => {
+          if (isRemoteDisabled) {
+            return (
+              <Alert className="mt-1">
+                <AlertDescription>{remoteDisabledMessage}</AlertDescription>
+              </Alert>
+            );
+          } else if (!isSignedIn) {
+            return (
+              <LoginRequiredPrompt
+                buttonVariant="outline"
+                buttonSize="sm"
+                buttonClassName="mt-1"
+              />
+            );
+          } else if (!isProjectLinked) {
+            return (
+              <Alert className="mt-1">
+                <LinkIcon className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>{t('shareDialog.linkProjectRequired.description')}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLinkProject}
+                    className="ml-2"
+                  >
+                    {t('shareDialog.linkProjectRequired.action')}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            );
+          } else {
+            return (
               <>
-                {shareError && (
-                  <Alert variant="destructive">{shareError}</Alert>
+                {shareTask.isSuccess ? (
+                  <Alert variant="success">{t('shareDialog.success')}</Alert>
+                ) : (
+                  <>
+                    {shareError && (
+                      <Alert variant="destructive">{shareError}</Alert>
+                    )}
+                  </>
                 )}
               </>
-            )}
-          </>
-        )}
+            );
+          }
+        })()}
 
         <DialogFooter className="flex sm:flex-row sm:justify-end gap-2">
           <Button variant="outline" onClick={handleClose}>

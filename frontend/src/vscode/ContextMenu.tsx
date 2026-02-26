@@ -8,7 +8,7 @@ type Point = { x: number; y: number };
 
 function inIframe(): boolean {
   try {
-    return window.self !== window.top;
+    return globalThis.self !== globalThis.top;
   } catch {
     return true;
   }
@@ -35,7 +35,7 @@ async function writeClipboardText(text: string): Promise<boolean> {
 }
 
 function getSelectedText(): string {
-  const sel = window.getSelection();
+  const sel = globalThis.getSelection();
   return sel ? sel.toString() : '';
 }
 
@@ -93,7 +93,7 @@ export const WebviewContextMenu: React.FC = () => {
         cut = end > start && !el.readOnly && !el.disabled;
         paste = !el.readOnly && !el.disabled;
       } else if (isEditable(tgt)) {
-        const sel = window.getSelection();
+        const sel = globalThis.getSelection();
         cut = !!sel && sel.toString().length > 0;
         paste = true;
       } else {
@@ -127,8 +127,8 @@ export const WebviewContextMenu: React.FC = () => {
     const id = requestAnimationFrame(() => {
       const menuW = el.offsetWidth;
       const menuH = el.offsetHeight;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+      const vw = globalThis.innerWidth;
+      const vh = globalThis.innerHeight;
       const margin = 4;
       let x = pos.x;
       let y = pos.y;

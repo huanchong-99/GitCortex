@@ -313,22 +313,26 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
 
                   {needGitReset && canGitReset && (
                     <div
-                      className={
-                        !worktreeResetOn
-                          ? 'flex items-start gap-3 rounded-md border p-3'
-                          : hasRisk
-                            ? 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3'
-                            : 'flex items-start gap-3 rounded-md border p-3 border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20'
-                      }
+                      className={(() => {
+                        if (!worktreeResetOn) {
+                          return 'flex items-start gap-3 rounded-md border p-3';
+                        } else if (hasRisk) {
+                          return 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3';
+                        } else {
+                          return 'flex items-start gap-3 rounded-md border p-3 border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20';
+                        }
+                      })()}
                     >
                       <AlertTriangle
-                        className={
-                          !worktreeResetOn
-                            ? 'h-4 w-4 text-muted-foreground mt-0.5'
-                            : hasRisk
-                              ? 'h-4 w-4 text-destructive mt-0.5'
-                              : 'h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5'
-                        }
+                        className={(() => {
+                          if (!worktreeResetOn) {
+                            return 'h-4 w-4 text-muted-foreground mt-0.5';
+                          } else if (hasRisk) {
+                            return 'h-4 w-4 text-destructive mt-0.5';
+                          } else {
+                            return 'h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5';
+                          }
+                        })()}
                       />
                       <div className="text-sm min-w-0 w-full break-words">
                         <p className="font-medium mb-2">
@@ -444,13 +448,17 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                           }}
                         >
                           <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
-                            {forceReset
-                              ? worktreeResetOn
-                                ? t('restoreLogsDialog.resetWorktree.enabled')
-                                : t('restoreLogsDialog.resetWorktree.disabled')
-                              : t(
-                                  'restoreLogsDialog.resetWorktree.disabledUncommitted'
-                                )}
+                            {(() => {
+                              if (forceReset) {
+                                if (worktreeResetOn) {
+                                  return t('restoreLogsDialog.resetWorktree.enabled');
+                                } else {
+                                  return t('restoreLogsDialog.resetWorktree.disabled');
+                                }
+                              } else {
+                                return t('restoreLogsDialog.resetWorktree.disabledUncommitted');
+                              }
+                            })()}
                           </div>
                           <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
                             <span

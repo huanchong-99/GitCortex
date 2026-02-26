@@ -23,7 +23,7 @@ fi
 search() {
   local pattern="$1"
   shift
-  if [ "$SEARCH_TOOL" = "rg" ]; then
+  if [[ "$SEARCH_TOOL" = "rg" ]]; then
     rg -n "$pattern" "$@"
   else
     grep -R -n -E "$pattern" "$@"
@@ -49,7 +49,7 @@ fi
 
 note "Check: Logging security"
 log_hits="$(search "(tracing::)?(trace|debug|info|warn|error)!\([^\n]*?(api[_-]?key|token|secret|authorization)" crates 2>/dev/null || true)"
-if [ -n "$log_hits" ]; then
+if [[ -n "$log_hits" ]]; then
   fail "Potential secret logging detected"
   echo "$log_hits"
 fi
@@ -60,14 +60,14 @@ if ! search "^\.env(\..*)?$" .gitignore >/dev/null 2>&1; then
 fi
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   tracked_env="$(git ls-files ".env" ".env.*")"
-  if [ -n "$tracked_env" ]; then
+  if [[ -n "$tracked_env" ]]; then
     fail ".env files are tracked by git"
     echo "$tracked_env"
   fi
 fi
 
 note "Check: Hardcoded secrets"
-if [ "$SEARCH_TOOL" = "rg" ]; then
+if [[ "$SEARCH_TOOL" = "rg" ]]; then
   SECRET_EXCLUDES=(--glob "!docs/**" --glob "!tests/**" --glob "!README.md" --glob "!.git/**")
 else
   SECRET_EXCLUDES=(--exclude-dir=docs --exclude-dir=tests --exclude=README.md --exclude-dir=.git)
@@ -86,7 +86,7 @@ secret_patterns=(
 
 for pattern in "${secret_patterns[@]}"; do
   hits="$(search "$pattern" crates "${SECRET_EXCLUDES[@]}" 2>/dev/null || true)"
-  if [ -n "$hits" ]; then
+  if [[ -n "$hits" ]]; then
     fail "Hardcoded secret pattern detected: $pattern"
     echo "$hits"
   fi
@@ -103,7 +103,7 @@ if ! search "\.decrypt\(" crates/db/src/models/workflow.rs >/dev/null 2>&1; then
   fail "decrypt() call not found in crates/db/src/models/workflow.rs"
 fi
 
-if [ "$failures" -ne 0 ]; then
+if [[ "$failures" -ne 0 ]]; then
   echo "Security audit failed: $failures issue(s)"
   exit 1
 fi
