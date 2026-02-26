@@ -89,7 +89,7 @@ export function TerminalCard({ terminal, onClick }: TerminalCardProps) {
     : undefined;
   const orderLabel = t('terminalCard.orderLabel', { index: terminal.orderIndex + 1 });
   const roleValue = terminal.role?.trim();
-  const roleLabel = roleValue || t('terminalCard.defaultRole');
+  const roleLabel = roleValue ?? t('terminalCard.defaultRole');
 
   return (
     <button

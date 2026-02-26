@@ -41,7 +41,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
   const [historyByTerminalId, setHistoryByTerminalId] = useState<Record<string, TerminalHistoryState>>({});
   const readyTerminalIdsRef = useRef<Set<string>>(new Set());
-  const [forceUpdateState, setForceUpdateState] = useState({});
+  const [, setForceUpdateState] = useState({});
   const startingTerminalIdsRef = useRef<Set<string>>(new Set());
   const terminalRef = useRef<TerminalEmulatorRef>(null);
   const autoStartedRef = useRef<Set<string>>(new Set());
@@ -58,7 +58,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
 
   const getTerminalLabel = (terminal: Terminal) => {
     const role = terminal.role?.trim();
-    return role ? role : `${defaultRoleLabel} ${terminal.orderIndex + 1}`;
+    return role ?? `${defaultRoleLabel} ${terminal.orderIndex + 1}`;
   };
 
   const getStatusLabel = (status: Terminal['status']) =>

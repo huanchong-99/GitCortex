@@ -36,7 +36,8 @@ export function useRebase(
         return attemptsApi.rebase(attemptId, data).then((res) => {
           if (!res.success) {
             // Propagate typed failure Result for caller to handle (no manual ApiError construction)
-            return Promise.reject(new Error(res.error?.message || 'Rebase failed'));
+            const errorMessage = res.error && 'message' in res.error ? res.error.message : 'Rebase failed';
+            return Promise.reject(new Error(errorMessage));
           }
         });
       },
