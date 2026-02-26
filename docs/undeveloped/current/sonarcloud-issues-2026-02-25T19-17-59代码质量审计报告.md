@@ -7505,7 +7505,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 183.2 Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabetically.
+### 183.2 Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabetically. ✅ 已修复
 
 - **问题ID**: `AZyVweatZ9DOUQdEsGfY`
 - **项目**: huanchong-99
@@ -7582,7 +7582,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 185.2 Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabetically.
+### 185.2 Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabetically. ✅ 已修复
 
 - **问题ID**: `AZyVweZxZ9DOUQdEsGe-`
 - **项目**: huanchong-99
@@ -9475,7 +9475,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 224.2 Use `.includes()`, rather than `.indexOf()`, when checking for existence.
+### 224.2 Use `.includes()`, rather than `.indexOf()`, when checking for existence. ✅ 已修复
 
 - **问题ID**: `AZyVweQvZ9DOUQdEsGbp`
 - **项目**: huanchong-99
@@ -9488,7 +9488,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es6, readability
 
-### 224.3 Use `.includes()`, rather than `.indexOf()`, when checking for existence.
+### 224.3 Use `.includes()`, rather than `.indexOf()`, when checking for existence. ✅ 已修复
 
 - **问题ID**: `AZyVweQvZ9DOUQdEsGbq`
 - **项目**: huanchong-99
@@ -10730,7 +10730,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 254.4 Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabetically.
+### 254.4 Provide a compare function that depends on "String.localeCompare", to reliably sort elements alphabetically. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm7`
 - **项目**: huanchong-99
@@ -11191,7 +11191,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 268.2 Use `.includes()`, rather than `.indexOf()`, when checking for existence.
+### 268.2 Use `.includes()`, rather than `.indexOf()`, when checking for existence. ✅ 已修复
 
 - **问题ID**: `AZyVwevrZ9DOUQdEsGlj`
 - **项目**: huanchong-99
