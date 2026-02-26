@@ -965,7 +965,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 24.3 Complete the task associated to this "TODO" comment.
+### 24.3 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeI`
 - **项目**: huanchong-99
@@ -1923,7 +1923,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 43.2 'If' statement should not be the only statement in 'else' block
+### 43.2 'If' statement should not be the only statement in 'else' block ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh2`
 - **项目**: huanchong-99
@@ -2166,7 +2166,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 49.4 Complete the task associated to this "TODO" comment.
+### 49.4 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiK`
 - **项目**: huanchong-99
@@ -2270,7 +2270,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.12 Complete the task associated to this "TODO" comment.
+### 49.12 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiS`
 - **项目**: huanchong-99
@@ -3519,7 +3519,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 86.10 Complete the task associated to this "TODO" comment.
+### 86.10 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg_`
 - **项目**: huanchong-99
@@ -4026,7 +4026,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 99.1 Use `export…from` to re-export `validateStep0Project`.
+### 99.1 Use `export…from` to re-export `validateStep0Project`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdI`
 - **项目**: huanchong-99
@@ -4039,7 +4039,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention
 
-### 99.2 Use `export…from` to re-export `validateStep1Basic`.
+### 99.2 Use `export…from` to re-export `validateStep1Basic`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdJ`
 - **项目**: huanchong-99
@@ -4052,7 +4052,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention
 
-### 99.3 Use `export…from` to re-export `validateStep2Tasks`.
+### 99.3 Use `export…from` to re-export `validateStep2Tasks`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdK`
 - **项目**: huanchong-99
@@ -4065,7 +4065,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention
 
-### 99.4 Use `export…from` to re-export `validateStep3Models`.
+### 99.4 Use `export…from` to re-export `validateStep3Models`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdL`
 - **项目**: huanchong-99
@@ -4078,7 +4078,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention
 
-### 99.5 Use `export…from` to re-export `validateStep4Terminals`.
+### 99.5 Use `export…from` to re-export `validateStep4Terminals`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdM`
 - **项目**: huanchong-99
@@ -4091,7 +4091,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention
 
-### 99.6 Use `export…from` to re-export `validateStep5Commands`.
+### 99.6 Use `export…from` to re-export `validateStep5Commands`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdN`
 - **项目**: huanchong-99
@@ -4104,7 +4104,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention
 
-### 99.7 Use `export…from` to re-export `validateStep6Advanced`.
+### 99.7 Use `export…from` to re-export `validateStep6Advanced`. ✅ 已修复
 
 - **问题ID**: `AZyVweUzZ9DOUQdEsGdO`
 - **项目**: huanchong-99
@@ -4854,7 +4854,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 120.3 `String.raw` should be used to avoid escaping `\`.
+### 120.3 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVweNRZ9DOUQdEsGah`
 - **项目**: huanchong-99
@@ -4873,7 +4873,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 121.1 Remove this redundant jump.
+### 121.1 Remove this redundant jump. ✅ 已修复
 
 - **问题ID**: `AZyVwe3TZ9DOUQdEsGoq`
 - **项目**: huanchong-99

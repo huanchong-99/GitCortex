@@ -120,8 +120,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     enabled: !isCreateMode,
   });
 
-  // Get first repo ID for PR comments.
-  // TODO: Support multiple repos - currently only fetches comments from the primary repo.
+  // Get first repo ID for PR comments (currently only fetches comments from the primary repo).
   const primaryRepoId = repos[0]?.id;
 
   // GitHub comments hook (fetching, normalization, and helpers)
