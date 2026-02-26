@@ -48,7 +48,7 @@ class MockWebSocket {
 const websocketInstances: MockWebSocket[] = [];
 
 // Store the original WebSocket
-const originalWebSocket = global.WebSocket;
+const originalWebSocket = globalThis.WebSocket;
 
 describe('wsStore', () => {
   let useWsStore: typeof import('../wsStore').useWsStore;
@@ -56,14 +56,14 @@ describe('wsStore', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     // Mock WebSocket globally
-    global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     websocketInstances.length = 0;
 
     const OriginalCtor = MockWebSocket as unknown as {
       new (url: string): MockWebSocket;
     };
 
-    global.WebSocket = class extends OriginalCtor {
+    globalThis.WebSocket = class extends OriginalCtor {
       constructor(url: string) {
         super(url);
         websocketInstances.push(this);
@@ -96,7 +96,7 @@ describe('wsStore', () => {
     });
 
     vi.useRealTimers();
-    global.WebSocket = originalWebSocket;
+    globalThis.WebSocket = originalWebSocket;
     vi.clearAllMocks();
   });
 

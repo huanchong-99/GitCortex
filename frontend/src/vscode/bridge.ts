@@ -106,6 +106,8 @@ async function writeClipboardText(text: string): Promise<boolean> {
   } catch (error) {
     console.debug('Clipboard write failed, trying execCommand fallback', error);
     try {
+      // Legacy fallback for environments where Clipboard API is unavailable
+      // eslint-disable-next-line deprecation/deprecation
       return document.execCommand('copy');
     } catch (fallbackError) {
       console.debug('execCommand copy also failed', fallbackError);
@@ -219,6 +221,8 @@ function insertTextAtCaretGeneric(text: string) {
     pasteIntoInput(el as HTMLInputElement | HTMLTextAreaElement, text);
   } else {
     try {
+      // Legacy fallback for contentEditable insert (no modern API alternative)
+      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('insertText', false, text);
       el.dispatchEvent(new Event('input', { bubbles: true }));
     } catch (error) {
@@ -272,12 +276,15 @@ function enqueueInsert(text: string) {
 /** Request map to resolve clipboard paste requests from the extension. */
 const pasteResolvers: Record<string, (text: string) => void> = {};
 
+/** Target origin for VSCode webview parent communication */
+const VSCODE_PARENT_ORIGIN = globalThis.location.origin;
+
 /** Ask the extension to copy text to the OS clipboard (fallback path). */
 export function parentClipboardWrite(text: string) {
   try {
     globalThis.parent.postMessage(
       { type: 'vscode-iframe-clipboard-copy', text },
-      '*'
+      VSCODE_PARENT_ORIGIN
     );
   } catch (error) {
     console.debug('Failed to post clipboard copy message to parent', error);
@@ -292,7 +299,7 @@ export function parentClipboardRead(): Promise<string> {
     try {
       globalThis.parent.postMessage(
         { type: 'vscode-iframe-clipboard-paste-request', requestId },
-        '*'
+        VSCODE_PARENT_ORIGIN
       );
     } catch (error) {
       console.debug('Failed to post clipboard paste request to parent', error);
@@ -339,7 +346,7 @@ export function installVSCodeIframeKeyboardBridge() {
 
   const forward = (type: string, e: KeyboardEvent) => {
     try {
-      globalThis.parent.postMessage({ type, event: serializeKeyEvent(e) }, '*');
+      globalThis.parent.postMessage({ type, event: serializeKeyEvent(e) }, VSCODE_PARENT_ORIGIN);
     } catch (error) {
       console.debug('Failed to forward key event to parent', error);
     }
@@ -402,6 +409,8 @@ function handleUndoShortcut(e: KeyboardEvent): boolean {
   e.preventDefault();
   e.stopPropagation();
   try {
+    // Legacy fallback for undo operation (no modern API alternative)
+    // eslint-disable-next-line deprecation/deprecation
     document.execCommand('undo');
   } catch (error) {
     console.debug('Undo command failed', error);
@@ -414,6 +423,8 @@ function handleRedoShortcut(e: KeyboardEvent): boolean {
   e.preventDefault();
   e.stopPropagation();
   try {
+    // Legacy fallback for redo operation (no modern API alternative)
+    // eslint-disable-next-line deprecation/deprecation
     document.execCommand('redo');
   } catch (error) {
     console.debug('Redo command failed', error);

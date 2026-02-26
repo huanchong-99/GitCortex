@@ -180,7 +180,6 @@ export function ProjectSettings() {
     const handler = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        e.returnValue = '';
       }
     };
     globalThis.addEventListener('beforeunload', handler);

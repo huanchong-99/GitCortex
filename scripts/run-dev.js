@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const net = require("net");
-const { spawn, spawnSync } = require("child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const net = require("node:net");
+const { spawn, spawnSync } = require("node:child_process");
 const { getPorts } = require("./setup-dev-environment");
 
 const children = new Set();

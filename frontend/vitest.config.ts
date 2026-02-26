@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 import { Plugin } from 'vite';
 
 process.env.BROWSERSLIST_IGNORE_OLD_DATA = '1';

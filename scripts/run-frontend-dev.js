@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const path = require("path");
-const { spawn } = require("child_process");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
 
 function resolveNpmCommand(args) {
   if (process.platform !== "win32") {

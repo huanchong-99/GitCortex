@@ -12306,7 +12306,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 292.1 Prefer `structuredClone(…)` over `JSON.parse(JSON.stringify(…))` to create a deep clone.
+### 292.1 Prefer `structuredClone(…)` over `JSON.parse(JSON.stringify(…))` to create a deep clone. ✅ 已修复
 
 - **问题ID**: `AZyVweycZ9DOUQdEsGmj`
 - **项目**: huanchong-99
@@ -12332,7 +12332,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 292.3 Prefer `structuredClone(…)` over `JSON.parse(JSON.stringify(…))` to create a deep clone.
+### 292.3 Prefer `structuredClone(…)` over `JSON.parse(JSON.stringify(…))` to create a deep clone. ✅ 已修复
 
 - **问题ID**: `AZyVweycZ9DOUQdEsGml`
 - **项目**: huanchong-99
@@ -12954,7 +12954,7 @@
 - **创建时间**: 1 month ago
 - **标签**: internationalization, unicode
 
-### 303.2 'returnValue' is deprecated.
+### 303.2 'returnValue' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwetbZ9DOUQdEsGkn`
 - **项目**: huanchong-99
@@ -13165,7 +13165,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 306.3 'returnValue' is deprecated.
+### 306.3 'returnValue' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVweuDZ9DOUQdEsGk-`
 - **项目**: huanchong-99
@@ -13236,7 +13236,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 307.3 'returnValue' is deprecated.
+### 307.3 'returnValue' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwetQZ9DOUQdEsGkl`
 - **项目**: huanchong-99
@@ -13307,7 +13307,7 @@
 - **创建时间**: 25 days ago
 - **标签**: cwe
 
-### 308.5 Prefer `globalThis` over `global`.
+### 308.5 Prefer `globalThis` over `global`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGoh`
 - **项目**: huanchong-99
@@ -13320,7 +13320,7 @@
 - **创建时间**: 25 days ago
 - **标签**: es2020, portability
 
-### 308.6 Prefer `globalThis` over `global`.
+### 308.6 Prefer `globalThis` over `global`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGoi`
 - **项目**: huanchong-99
@@ -13346,7 +13346,7 @@
 - **创建时间**: 17 days ago
 - **标签**: function, type
 
-### 308.8 Prefer `globalThis` over `global`.
+### 308.8 Prefer `globalThis` over `global`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGok`
 - **项目**: huanchong-99
@@ -13359,7 +13359,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2020, portability
 
-### 308.9 Prefer `globalThis` over `global`.
+### 308.9 Prefer `globalThis` over `global`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGol`
 - **项目**: huanchong-99
@@ -13989,7 +13989,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant
 
-### 322.6 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 322.6 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoC`
 - **项目**: huanchong-99
@@ -14002,7 +14002,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 322.7 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 322.7 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoD`
 - **项目**: huanchong-99
@@ -14028,7 +14028,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 322.9 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 322.9 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoF`
 - **项目**: huanchong-99
@@ -14041,7 +14041,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 322.10 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 322.10 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoG`
 - **项目**: huanchong-99
@@ -14054,7 +14054,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 322.11 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 322.11 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoH`
 - **项目**: huanchong-99
@@ -14067,7 +14067,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 322.12 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 322.12 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoI`
 - **项目**: huanchong-99
@@ -14138,7 +14138,7 @@
 - **创建时间**: 1 month ago
 - **标签**: proficiency
 
-### 323.4 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 323.4 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnl`
 - **项目**: huanchong-99
@@ -14203,7 +14203,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 323.9 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 323.9 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnq`
 - **项目**: huanchong-99
@@ -14370,7 +14370,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 323.22 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 323.22 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn4`
 - **项目**: huanchong-99
@@ -14383,7 +14383,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 323.23 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated.
+### 323.23 The signature '(commandId: string, showUI?: boolean | undefined, value?: string | undefined): boolean' of 'document.execCommand' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn5`
 - **项目**: huanchong-99
@@ -14441,7 +14441,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 324.1 Prefer `node:path` over `path`.
+### 324.1 Prefer `node:path` over `path`. ✅ 已修复
 
 - **问题ID**: `AZyVwe3jZ9DOUQdEsGos`
 - **项目**: huanchong-99
@@ -14454,7 +14454,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 324.2 Prefer `node:fs` over `fs`.
+### 324.2 Prefer `node:fs` over `fs`. ✅ 已修复
 
 - **问题ID**: `AZyVwe3jZ9DOUQdEsGot`
 - **项目**: huanchong-99
@@ -14486,7 +14486,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 325.1 Prefer `node:path` over `path`.
+### 325.1 Prefer `node:path` over `path`. ✅ 已修复
 
 - **问题ID**: `AZyVwe3rZ9DOUQdEsGov`
 - **项目**: huanchong-99
@@ -14499,7 +14499,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 325.2 Prefer `node:fs` over `fs`.
+### 325.2 Prefer `node:fs` over `fs`. ✅ 已修复
 
 - **问题ID**: `AZyVwe3rZ9DOUQdEsGow`
 - **项目**: huanchong-99
@@ -15113,7 +15113,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 332.1 Prefer `node:child_process` over `child_process`.
+### 332.1 Prefer `node:child_process` over `child_process`. ✅ 已修复
 
 - **问题ID**: `AZyVwe70Z9DOUQdEsGqf`
 - **项目**: huanchong-99
@@ -15126,7 +15126,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 332.2 Prefer `node:fs` over `fs`.
+### 332.2 Prefer `node:fs` over `fs`. ✅ 已修复
 
 - **问题ID**: `AZyVwe70Z9DOUQdEsGqg`
 - **项目**: huanchong-99
@@ -15139,7 +15139,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 332.3 Prefer `node:path` over `path`.
+### 332.3 Prefer `node:path` over `path`. ✅ 已修复
 
 - **问题ID**: `AZyVwe70Z9DOUQdEsGqh`
 - **项目**: huanchong-99
@@ -15158,7 +15158,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 333.1 Prefer `node:fs` over `fs`.
+### 333.1 Prefer `node:fs` over `fs`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqW`
 - **项目**: huanchong-99
@@ -15184,7 +15184,7 @@
 - **创建时间**: 2 days ago
 - **标签**: convention, import, ...
 
-### 333.3 Prefer `node:path` over `path`.
+### 333.3 Prefer `node:path` over `path`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqY`
 - **项目**: huanchong-99
@@ -15210,7 +15210,7 @@
 - **创建时间**: 2 days ago
 - **标签**: convention, import, ...
 
-### 333.5 Prefer `node:child_process` over `child_process`.
+### 333.5 Prefer `node:child_process` over `child_process`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqa`
 - **项目**: huanchong-99
@@ -15255,7 +15255,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 334.1 Prefer `node:path` over `path`.
+### 334.1 Prefer `node:path` over `path`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7SZ9DOUQdEsGp8`
 - **项目**: huanchong-99
@@ -15268,7 +15268,7 @@
 - **创建时间**: 12 days ago
 - **标签**: convention, import, ...
 
-### 334.2 Prefer `node:child_process` over `child_process`.
+### 334.2 Prefer `node:child_process` over `child_process`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7SZ9DOUQdEsGp9`
 - **项目**: huanchong-99
@@ -15287,7 +15287,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 335.1 Prefer `node:fs` over `fs`.
+### 335.1 Prefer `node:fs` over `fs`. ✅ 已修复
 
 - **问题ID**: `AZyVwe78Z9DOUQdEsGqk`
 - **项目**: huanchong-99
@@ -15300,7 +15300,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 335.2 Prefer `node:path` over `path`.
+### 335.2 Prefer `node:path` over `path`. ✅ 已修复
 
 - **问题ID**: `AZyVwe78Z9DOUQdEsGql`
 - **项目**: huanchong-99
@@ -15326,7 +15326,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 335.4 Prefer top-level await over using a promise chain.
+### 335.4 Prefer top-level await over using a promise chain. ✅ 已修复
 
 - **问题ID**: `AZyVwe78Z9DOUQdEsGqn`
 - **项目**: huanchong-99
@@ -15339,7 +15339,7 @@
 - **创建时间**: 1 month ago
 - **标签**: async, es2022, ...
 
-### 335.5 Prefer top-level await over using a promise chain.
+### 335.5 Prefer top-level await over using a promise chain. ✅ 已修复
 
 - **问题ID**: `AZyVwe78Z9DOUQdEsGqo`
 - **项目**: huanchong-99
@@ -15352,7 +15352,7 @@
 - **创建时间**: 1 month ago
 - **标签**: async, es2022, ...
 
-### 335.6 Prefer top-level await over using a promise chain.
+### 335.6 Prefer top-level await over using a promise chain. ✅ 已修复
 
 - **问题ID**: `AZyVwe78Z9DOUQdEsGqp`
 - **项目**: huanchong-99

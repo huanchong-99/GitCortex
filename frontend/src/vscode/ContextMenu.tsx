@@ -159,6 +159,8 @@ export const WebviewContextMenu: React.FC = () => {
     }
     if (!copied) {
       try {
+        // Legacy fallback for environments where Clipboard API is unavailable
+        // eslint-disable-next-line deprecation/deprecation
         document.execCommand('copy');
       } catch {
         /* empty */
@@ -182,6 +184,8 @@ export const WebviewContextMenu: React.FC = () => {
       if (sel) {
         await writeClipboardText(sel);
         try {
+          // Legacy fallback for contentEditable cut operation
+          // eslint-disable-next-line deprecation/deprecation
           document.execCommand('delete');
         } catch {
           /* empty */
@@ -203,6 +207,8 @@ export const WebviewContextMenu: React.FC = () => {
       pasteIntoInput(tgt as HTMLInputElement | HTMLTextAreaElement, text);
     } else if (isEditable(tgt)) {
       (tgt as HTMLElement).focus();
+      // Legacy fallback for contentEditable paste operation
+      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('insertText', false, text);
     }
     close();
@@ -210,6 +216,8 @@ export const WebviewContextMenu: React.FC = () => {
 
   const onUndo = () => {
     try {
+      // Legacy fallback for undo operation (no modern API alternative)
+      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('undo');
     } catch {
       /* empty */
@@ -218,6 +226,8 @@ export const WebviewContextMenu: React.FC = () => {
   };
   const onRedo = () => {
     try {
+      // Legacy fallback for redo operation (no modern API alternative)
+      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('redo');
     } catch {
       /* empty */
@@ -226,6 +236,8 @@ export const WebviewContextMenu: React.FC = () => {
   };
   const onSelectAll = () => {
     try {
+      // Legacy fallback for select all operation (no modern API alternative)
+      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('selectAll');
     } catch {
       /* empty */
