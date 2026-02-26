@@ -36,7 +36,8 @@ const RawLogText = memo(
         return <AnsiHtml key={key} text={text} />;
       }
 
-      const escapedQuery = searchQuery.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+      const replacement = String.raw`\$&`;
+      const escapedQuery = searchQuery.replaceAll(/[.*+?^${}()|[\]\\]/g, replacement);
       const regex = new RegExp(`(${escapedQuery})`, 'gi');
       const parts = text.split(regex);
 
