@@ -792,7 +792,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 23.1 Merge this RUN instruction with the consecutive ones.
+### 23.1 Merge this RUN instruction with the consecutive ones. ✅ 已修复
 
 - **问题ID**: `AZyVwe8EZ9DOUQdEsGqq`
 - **项目**: huanchong-99
