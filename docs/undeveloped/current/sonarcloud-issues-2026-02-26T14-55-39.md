@@ -1480,7 +1480,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 38.2 Remove this use of the "void" operator.
+### 38.2 Remove this use of the "void" operator. ✅ 已修复
 
 - **问题ID**: `AZyZVcVEuNB-_5CPqJgb`
 - **项目**: huanchong-99
@@ -2217,7 +2217,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 59.1 Do not use Array index in keys
+### 59.1 Do not use Array index in keys ✅ 已修复
 
 - **问题ID**: `AZyVweUQZ9DOUQdEsGdB`
 - **项目**: huanchong-99
@@ -2236,7 +2236,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 60.1 Extract this nested ternary operation into an independent statement.
+### 60.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc2`
 - **项目**: huanchong-99
@@ -2249,7 +2249,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 60.2 Extract this nested ternary operation into an independent statement.
+### 60.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc9`
 - **项目**: huanchong-99
@@ -2262,7 +2262,7 @@
 - **创建时间**: 27 days ago
 - **标签**: confusing
 
-### 60.3 Extract this nested ternary operation into an independent statement.
+### 60.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc-`
 - **项目**: huanchong-99
@@ -2275,7 +2275,7 @@
 - **创建时间**: 27 days ago
 - **标签**: confusing
 
-### 60.4 Extract this nested ternary operation into an independent statement.
+### 60.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc_`
 - **项目**: huanchong-99
@@ -2294,7 +2294,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 61.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 61.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcv`
 - **项目**: huanchong-99
@@ -2307,7 +2307,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 61.2 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 61.2 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcw`
 - **项目**: huanchong-99
@@ -2339,7 +2339,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 62.1 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 62.1 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyZVcHZuNB-_5CPqJgG`
 - **项目**: huanchong-99
@@ -2352,7 +2352,7 @@
 - **创建时间**: 5 hours ago
 - **标签**: accessibility, react
 
-### 62.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 62.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyZVcHZuNB-_5CPqJgH`
 - **项目**: huanchong-99
@@ -2365,7 +2365,7 @@
 - **创建时间**: 5 hours ago
 - **标签**: accessibility, react
 
-### 62.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 62.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyZVcHZuNB-_5CPqJgI`
 - **项目**: huanchong-99
@@ -2378,7 +2378,7 @@
 - **创建时间**: 5 hours ago
 - **标签**: accessibility, react
 
-### 62.4 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 62.4 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyZVcHZuNB-_5CPqJgJ`
 - **项目**: huanchong-99
