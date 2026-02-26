@@ -62,7 +62,7 @@ const RawLogText = memo(
       const urlRegex = /(https?:\/\/\S+)/g;
       const parts = content.split(urlRegex);
 
-      return parts.map((part, index) => {
+      return parts.map((part) => {
         if (/^https?:\/\/\S+$/.test(part)) {
           return (
             <a
@@ -78,7 +78,7 @@ const RawLogText = memo(
           );
         }
         // For non-URL parts, apply ANSI formatting with highlighting
-        return highlightMatches(part, `part-${index}`);
+        return highlightMatches(part, `part-${part.slice(0, 20)}`);
       });
     };
 

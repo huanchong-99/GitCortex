@@ -255,9 +255,9 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                   } else {
                     return (
                       <div className="p-2">
-                        {filteredEntries.map((entry, index) => (
+                        {filteredEntries.map((entry) => (
                           <div
-                            key={index}
+                            key={`${entry.path}-${entry.name}`}
                             className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-accent ${
                               !entry.is_directory
                                 ? 'opacity-50 cursor-not-allowed'

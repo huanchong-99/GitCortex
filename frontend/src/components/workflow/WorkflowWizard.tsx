@@ -289,8 +289,8 @@ export function WorkflowWizard({
               <div>
                 <p className="text-sm text-error font-medium">{t('wizard.errors.validationTitle')}</p>
                 <ul className="mt-2 text-sm text-error list-disc list-inside">
-                  {Object.values(errors).map((error, index) => (
-                    <li key={index}>{t(error)}</li>
+                  {Object.entries(errors).map(([key, error]) => (
+                    <li key={`error-${key}`}>{t(error)}</li>
                   ))}
                 </ul>
               </div>

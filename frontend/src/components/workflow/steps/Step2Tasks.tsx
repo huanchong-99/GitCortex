@@ -135,9 +135,9 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
       </div>
 
       <div className="flex gap-half">
-        {Array.from({ length: taskCount }).map((_, index) => (
+        {Array.from({ length: taskCount }, (_, i) => i).map((index) => (
           <div
-            key={index}
+            key={`task-indicator-${index}`}
             className={cn(
               'h-1 flex-1 rounded-sm transition-colors',
               index < completedTasks
