@@ -868,7 +868,7 @@ export const useWsStore = create<WsState>((set, get) => ({
         if (isStale()) return;
 
         const heartbeatInterval = setInterval(
-          createHeartbeatHandler(targetWorkflowId, ws),
+          createHeartbeatHandler(targetWorkflowId),
           HEARTBEAT_INTERVAL
         );
 

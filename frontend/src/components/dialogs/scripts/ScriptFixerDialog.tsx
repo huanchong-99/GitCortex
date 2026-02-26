@@ -133,11 +133,13 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
         (p) => p.runReason === runReason && !p.dropped
       );
       // Sort by createdAt descending and return the first one
-      return filtered.toSorted(
-        (a, b) =>
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime()
-      )[0];
+      return filtered
+        .slice()
+        .sort(
+          (a: ExecutionProcess, b: ExecutionProcess) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime()
+        )[0];
     }, [executionProcesses, scriptType]);
 
     // Stream logs for the latest process
