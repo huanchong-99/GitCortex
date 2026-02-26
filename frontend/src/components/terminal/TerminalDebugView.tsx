@@ -41,7 +41,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
   const [historyByTerminalId, setHistoryByTerminalId] = useState<Record<string, TerminalHistoryState>>({});
   const readyTerminalIdsRef = useRef<Set<string>>(new Set());
-  const [, forceUpdate] = useState({});
+  const [forceUpdateState, setForceUpdateState] = useState({});
   const startingTerminalIdsRef = useRef<Set<string>>(new Set());
   const terminalRef = useRef<TerminalEmulatorRef>(null);
   const autoStartedRef = useRef<Set<string>>(new Set());
@@ -209,7 +209,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         resetAutoStart(terminalId);
         // Clear ready state on failure
         readyTerminalIdsRef.current.delete(terminalId);
-        forceUpdate({});
+        setForceUpdateState({});
       } else {
         console.log('Terminal started successfully');
         // Mark this terminal as ready and clear restart flag
@@ -217,14 +217,14 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         readyTerminalIdsRef.current.add(terminalId);
         // Note: Don't reset restart attempts here - only reset on manual restart
         // This prevents infinite loops when API succeeds but process doesn't actually start
-        forceUpdate({});
+        setForceUpdateState({});
       }
     } catch (error) {
       console.error('Failed to start terminal:', error);
       resetAutoStart(terminalId);
       // Clear ready state on failure
       readyTerminalIdsRef.current.delete(terminalId);
-      forceUpdate({});
+      setForceUpdateState({});
     } finally {
       startingTerminalIdsRef.current.delete(terminalId);
     }
@@ -262,7 +262,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     console.error(`Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for terminal ${terminalId}`);
     needsRestartRef.current.add(terminalId);
     readyTerminalIdsRef.current.delete(terminalId);
-    forceUpdate({});
+    setForceUpdateState({});
   }, []);
 
   // Helper to perform terminal restart
@@ -272,7 +272,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     needsRestartRef.current.add(terminalId);
     readyTerminalIdsRef.current.delete(terminalId);
     autoStartedRef.current.delete(terminalId);
-    forceUpdate({});
+    setForceUpdateState({});
     startTerminal(terminalId);
   }, [startTerminal]);
 
@@ -314,7 +314,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     if (['failed', 'not_started'].includes(selectedTerminal.status)) {
       if (readyTerminalIdsRef.current.has(selectedTerminalId)) {
         readyTerminalIdsRef.current.delete(selectedTerminalId);
-        forceUpdate({});
+        setForceUpdateState({});
       }
       // Allow re-auto-start when status returns to not_started
       if (selectedTerminal.status === 'not_started') {

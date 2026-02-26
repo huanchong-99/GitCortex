@@ -127,7 +127,8 @@ function relativizePath(p: string, workspaceRoot?: string): string {
 function formatLoc(path: string, line?: number, col?: number) {
   if (!path) return '';
   if (line == null) return path;
-  return `${path}:${line}${col != null ? `:${col}` : ''}`;
+  const colPart = col != null ? `:${col}` : '';
+  return `${path}:${line}${colPart}`;
 }
 
 function formatDomBits(ce?: OpenInEditorPayload['clickedElement']) {
@@ -340,7 +341,8 @@ function formatClickedMarkdown(
     const indent = '  '.repeat(i);
     const arrow = i > 0 ? '└─ ' : '';
     const tag = i === 0 ? ' ← start' : '';
-    return `${indent}${arrow}${c.name} (\`${l || 'no source'}\`)${tag}`;
+    const sourceText = l || 'no source';
+    return `${indent}${arrow}${c.name} (\`${sourceText}\`)${tag}`;
   });
 
   return [

@@ -44,8 +44,9 @@ export function buildResolveConflictsInstructions(
   const source = sourceBranch || 'current attempt branch';
   const base = baseBranch ?? 'base branch';
   const filesList = conflictedFiles.slice(0, 12);
+  const filesListText = filesList.map((f) => `- ${f}`).join('\n');
   const filesBlock = filesList.length
-    ? `\n\nFiles with conflicts:\n${filesList.map((f) => `- ${f}`).join('\n')}`
+    ? `\n\nFiles with conflicts:\n${filesListText}`
     : '';
 
   const opTitle = displayConflictOpLabel(op);

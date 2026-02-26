@@ -385,7 +385,7 @@ process.on("exit", () => releaseDevLock());
 
 // Handle Windows Ctrl+C
 if (process.platform === "win32") {
-  require("readline")
+  require("node:readline")
     .createInterface({
       input: process.stdin,
       output: process.stdout,

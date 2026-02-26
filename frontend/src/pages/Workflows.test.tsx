@@ -105,8 +105,8 @@ vi.mock('@/components/workflow/WorkflowWizard', () => ({
 
 const wsStoreMock = vi.hoisted(() => ({
   sendPromptResponse: vi.fn(() => true),
-  workflowId: null as string | null | undefined,
-  handlers: undefined as WorkflowEventHandlers | undefined,
+  workflowId: null,
+  handlers: undefined,
 }));
 
 // Mock useProjects hook to avoid WebSocket connection in tests
