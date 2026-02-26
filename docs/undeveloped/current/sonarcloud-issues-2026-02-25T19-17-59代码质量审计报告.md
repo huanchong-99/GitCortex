@@ -8935,7 +8935,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 212.1 Refactor this function to reduce its Cognitive Complexity from 41 to the 15 allowed.
+### 212.1 Refactor this function to reduce its Cognitive Complexity from 41 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhS`
 - **项目**: huanchong-99
@@ -11268,7 +11268,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 270.2 Refactor this function to reduce its Cognitive Complexity from 29 to the 15 allowed.
+### 270.2 Refactor this function to reduce its Cognitive Complexity from 29 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl6`
 - **项目**: huanchong-99

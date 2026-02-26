@@ -62,6 +62,123 @@ interface PreviewBrowserProps {
   className?: string;
 }
 
+// Helper to get start/stop button icon
+function getServerControlIcon(
+  isServerRunning: boolean,
+  isStarting: boolean,
+  isStopping: boolean
+) {
+  if (isServerRunning) {
+    return isStopping ? SpinnerIcon : PauseIcon;
+  }
+  return isStarting ? SpinnerIcon : PlayIcon;
+}
+
+// Helper to check if icon should animate
+function shouldAnimateIcon(
+  isServerRunning: boolean,
+  isStarting: boolean,
+  isStopping: boolean
+): boolean {
+  return (isServerRunning && isStopping) || (!isServerRunning && isStarting);
+}
+
+// Helper to get disabled state for start/stop button
+function getServerControlDisabled(
+  isServerRunning: boolean,
+  isStarting: boolean,
+  isStopping: boolean,
+  hasDevScript: boolean
+): boolean {
+  if (isServerRunning) {
+    return isStopping;
+  }
+  return isStarting || !hasDevScript;
+}
+
+// Helper component for empty state content
+function EmptyStateContent({
+  isLoading,
+  isStarting,
+  hasDevScript,
+  hasFailedDevServer,
+  onStart,
+  handleEditDevScript,
+  handleFixDevScript,
+  t,
+}: {
+  isLoading: boolean;
+  isStarting: boolean;
+  hasDevScript: boolean;
+  hasFailedDevServer?: boolean;
+  onStart: () => void;
+  handleEditDevScript: () => void;
+  handleFixDevScript?: () => void;
+  t: any;
+}) {
+  if (isLoading) {
+    return (
+      <>
+        <SpinnerIcon className="size-icon-lg animate-spin text-brand" />
+        <p className="text-sm">
+          {isStarting
+            ? t('preview.loading.startingServer')
+            : t('preview.loading.waitingForServer')}
+        </p>
+      </>
+    );
+  }
+
+  if (hasDevScript) {
+    return (
+      <>
+        <p>{t('preview.noServer.title')}</p>
+        {hasFailedDevServer && handleFixDevScript ? (
+          <PrimaryButton
+            variant="tertiary"
+            value={t('scriptFixer.fixScript')}
+            actionIcon={WrenchIcon}
+            onClick={handleFixDevScript}
+          />
+        ) : (
+          <PrimaryButton
+            value={t('attempt.actions.startDevServer')}
+            actionIcon={PlayIcon}
+            onClick={onStart}
+          />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-double p-double max-w-md">
+      <div className="flex flex-col gap-base">
+        <p className="text-xl text-high max-w-xs">
+          {t('preview.noServer.setupTitle')}
+        </p>
+        <p>{t('preview.noServer.setupPrompt')}</p>
+      </div>
+      <div className="flex flex-col gap-base">
+        <div>
+          <PrimaryButton
+            value={t('preview.noServer.editDevScript')}
+            onClick={handleEditDevScript}
+          />
+        </div>
+        <a
+          href="https://www.gitcortex.com/docs/core-features/testing-your-application"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-brand hover:text-brand-hover underline"
+        >
+          {t('preview.noServer.learnMore')}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export function PreviewBrowser({
   url,
   autoDetectedUrl,
@@ -227,23 +344,19 @@ export function PreviewBrowser({
           {/* Start/Stop Button */}
           <IconButtonGroup>
             <IconButtonGroupItem
-              icon={(() => {
-                if (isServerRunning) {
-                  return isStopping ? SpinnerIcon : PauseIcon;
-                } else {
-                  return isStarting ? SpinnerIcon : PlayIcon;
-                }
-              })()}
+              icon={getServerControlIcon(isServerRunning, isStarting, isStopping)}
               iconClassName={
-                (isServerRunning && isStopping) ||
-                (!isServerRunning && isStarting)
+                shouldAnimateIcon(isServerRunning, isStarting, isStopping)
                   ? 'animate-spin'
                   : undefined
               }
               onClick={isServerRunning ? onStop : onStart}
-              disabled={
-                isServerRunning ? isStopping : isStarting || !hasDevScript
-              }
+              disabled={getServerControlDisabled(
+                isServerRunning,
+                isStarting,
+                isStopping,
+                hasDevScript
+              )}
               aria-label={
                 isServerRunning
                   ? t('preview.toolbar.stopDevServer')
@@ -344,67 +457,16 @@ export function PreviewBrowser({
           </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-base text-low">
-            {(() => {
-              if (isLoading) {
-                return (
-                  <>
-                    <SpinnerIcon className="size-icon-lg animate-spin text-brand" />
-                    <p className="text-sm">
-                      {isStarting
-                        ? t('preview.loading.startingServer')
-                        : t('preview.loading.waitingForServer')}
-                    </p>
-                  </>
-                );
-              } else if (hasDevScript) {
-                return (
-                  <>
-                    <p>{t('preview.noServer.title')}</p>
-                    {hasFailedDevServer && handleFixDevScript ? (
-                      <PrimaryButton
-                        variant="tertiary"
-                        value={t('scriptFixer.fixScript')}
-                        actionIcon={WrenchIcon}
-                        onClick={handleFixDevScript}
-                      />
-                    ) : (
-                      <PrimaryButton
-                        value={t('attempt.actions.startDevServer')}
-                        actionIcon={PlayIcon}
-                        onClick={onStart}
-                      />
-                    )}
-                  </>
-                );
-              } else {
-                return (
-                  <div className="flex flex-col gap-double p-double max-w-md">
-                    <div className="flex flex-col gap-base">
-                      <p className="text-xl text-high max-w-xs">
-                        {t('preview.noServer.setupTitle')}
-                      </p>
-                      <p>{t('preview.noServer.setupPrompt')}</p>
-                    </div>
-                    <div className="flex flex-col gap-base">
-                      <div>
-                        <PrimaryButton
-                          value={t('preview.noServer.editDevScript')}
-                          onClick={handleEditDevScript}
-                        />
-                      </div>
-                      <a
-                        href="https://www.gitcortex.com/docs/core-features/testing-your-application"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand hover:text-brand-hover underline"
-                      >
-                        {t('preview.noServer.learnMore')}
-                      </a>
-                    </div>
-                  </div>
-                );
-              }
-            })()}
+            <EmptyStateContent
+              isLoading={isLoading}
+              isStarting={isStarting}
+              hasDevScript={hasDevScript}
+              hasFailedDevServer={hasFailedDevServer}
+              onStart={onStart}
+              handleEditDevScript={handleEditDevScript}
+              handleFixDevScript={handleFixDevScript}
+              t={t}
+            />
           </div>
         )}
       </div>

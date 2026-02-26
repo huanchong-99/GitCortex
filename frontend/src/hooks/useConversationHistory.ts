@@ -90,6 +90,117 @@ const nextActionPatch: (
   executionProcessId: '',
 });
 
+// Helper to check if entries have pending approval
+function hasPendingApprovalInEntries(entries: PatchTypeWithKey[]): boolean {
+  return entries.some((entry) => {
+    if (entry.type !== 'NORMALIZED_ENTRY') return false;
+    const entryType = entry.content.entry_type;
+    return (
+      entryType.type === 'tool_use' &&
+      entryType.status.status === 'pending_approval'
+    );
+  });
+}
+
+// Helper to check if entries have setup required error
+function findSetupRequiredText(entries: PatchTypeWithKey[]): string | undefined {
+  for (const entry of entries) {
+    if (entry.type !== 'NORMALIZED_ENTRY') continue;
+    if (
+      entry.content.entry_type.type === 'error_message' &&
+      entry.content.entry_type.error_type.type === 'setup_required'
+    ) {
+      return entry.content.content;
+    }
+  }
+  return undefined;
+}
+
+// Helper to create user message patch
+function createUserMessagePatch(
+  executionProcessId: string,
+  prompt: string,
+  patchWithKey: (patch: PatchType, executionProcessId: string, index: number | 'user') => PatchTypeWithKey
+): PatchTypeWithKey {
+  const userNormalizedEntry: NormalizedEntry = {
+    entry_type: {
+      type: 'user_message',
+    },
+    content: prompt,
+    timestamp: null,
+  };
+  const userPatch: PatchType = {
+    type: 'NORMALIZED_ENTRY',
+    content: userNormalizedEntry,
+  };
+  return patchWithKey(userPatch, executionProcessId, 'user');
+}
+
+// Helper to create script tool patch
+function createScriptToolPatch(
+  executionProcess: ExecutionProcess | undefined,
+  executionProcessId: string,
+  toolName: string,
+  script: string,
+  entries: PatchTypeWithKey[],
+  patchWithKey: (patch: PatchType, executionProcessId: string, index: number | 'user') => PatchTypeWithKey
+): PatchTypeWithKey {
+  const exitCode = Number(executionProcess?.exitCode) || 0;
+  const exit_status: CommandExitStatus | null =
+    executionProcess?.status === 'running'
+      ? null
+      : {
+          type: 'exit_code',
+          code: exitCode,
+        };
+
+  const toolStatus: ToolStatus =
+    executionProcess?.status === ExecutionProcessStatus.running
+      ? { status: 'created' }
+      : exitCode === 0
+        ? { status: 'success' }
+        : { status: 'failed' };
+
+  const output = entries.map((line) => line.content).join('\n');
+
+  const toolNormalizedEntry: NormalizedEntry = {
+    entry_type: {
+      type: 'tool_use',
+      tool_name: toolName,
+      action_type: {
+        action: 'command_run',
+        command: script,
+        result: {
+          output,
+          exit_status,
+        },
+      },
+      status: toolStatus,
+    },
+    content: toolName,
+    timestamp: null,
+  };
+  const toolPatch: PatchType = {
+    type: 'NORMALIZED_ENTRY',
+    content: toolNormalizedEntry,
+  };
+  return patchWithKey(toolPatch, executionProcessId, 0);
+}
+
+// Helper to get script tool name
+function getScriptToolName(context: string): string | null {
+  switch (context) {
+    case 'SetupScript':
+      return 'Setup Script';
+    case 'CleanupScript':
+      return 'Cleanup Script';
+    case 'ToolInstallScript':
+      return 'Tool Install Script';
+    default:
+      return null;
+  }
+}
+
 export const useConversationHistory = ({
   attempt,
   onEntriesUpdated,
@@ -215,71 +326,41 @@ export const useConversationHistory = ({
       const allEntries = Object.values(executionProcessState)
         .sort(
           (a, b) =>
-            new Date(
-              a.executionProcess.createdAt
-            ).getTime() -
-            new Date(
-              b.executionProcess.createdAt
-            ).getTime()
+            new Date(a.executionProcess.createdAt).getTime() -
+            new Date(b.executionProcess.createdAt).getTime()
         )
         .flatMap((p, index) => {
           const entries: PatchTypeWithKey[] = [];
-          if (
-            p.executionProcess.executorAction.typ.type ===
-              'CodingAgentInitialRequest' ||
-            p.executionProcess.executorAction.typ.type ===
-              'CodingAgentFollowUpRequest' ||
-            p.executionProcess.executorAction.typ.type === 'ReviewRequest'
-          ) {
-            // New user message
-            const actionType = p.executionProcess.executorAction.typ;
-            const userNormalizedEntry: NormalizedEntry = {
-              entry_type: {
-                type: 'user_message',
-              },
-              content: actionType.prompt,
-              timestamp: null,
-            };
-            const userPatch: PatchType = {
-              type: 'NORMALIZED_ENTRY',
-              content: userNormalizedEntry,
-            };
-            const userPatchTypeWithKey = patchWithKey(
-              userPatch,
-              p.executionProcess.id,
-              'user'
-            );
-            entries.push(userPatchTypeWithKey);
+          const actionType = p.executionProcess.executorAction.typ.type;
 
-            // Remove all coding agent added user messages, replace with our custom one
+          if (
+            actionType === 'CodingAgentInitialRequest' ||
+            actionType === 'CodingAgentFollowUpRequest' ||
+            actionType === 'ReviewRequest'
+          ) {
+            // Add user message
+            const userPatch = createUserMessagePatch(
+              p.executionProcess.id,
+              p.executionProcess.executorAction.typ.prompt,
+              patchWithKey
+            );
+            entries.push(userPatch);
+
+            // Remove all coding agent added user messages
             const entriesExcludingUser = p.entries.filter(
               (e) =>
                 e.type !== 'NORMALIZED_ENTRY' ||
                 e.content.entry_type.type !== 'user_message'
             );
 
-            const hasPendingApprovalEntry = entriesExcludingUser.some(
-              (entry) => {
-                if (entry.type !== 'NORMALIZED_ENTRY') return false;
-                const entryType = entry.content.entry_type;
-                return (
-                  entryType.type === 'tool_use' &&
-                  entryType.status.status === 'pending_approval'
-                );
-              }
-            );
-
-            if (hasPendingApprovalEntry) {
+            if (hasPendingApprovalInEntries(entriesExcludingUser)) {
               hasPendingApproval = true;
             }
 
             entries.push(...entriesExcludingUser);
 
-            const liveProcessStatus = getLiveExecutionProcess(
-              p.executionProcess.id
-            )?.status;
-            const isProcessRunning =
-              liveProcessStatus === ExecutionProcessStatus.running;
+            const liveProcessStatus = getLiveExecutionProcess(p.executionProcess.id)?.status;
+            const isProcessRunning = liveProcessStatus === ExecutionProcessStatus.running;
             const processFailedOrKilled =
               liveProcessStatus === ExecutionProcessStatus.failed ||
               liveProcessStatus === ExecutionProcessStatus.killed;
@@ -293,50 +374,23 @@ export const useConversationHistory = ({
               index === Object.keys(executionProcessState).length - 1
             ) {
               lastProcessFailedOrKilled = true;
-
-              // Check if this failed process has a SetupRequired entry
-              const hasSetupRequired = entriesExcludingUser.some((entry) => {
-                if (entry.type !== 'NORMALIZED_ENTRY') return false;
-                if (
-                  entry.content.entry_type.type === 'error_message' &&
-                  entry.content.entry_type.error_type.type === 'setup_required'
-                ) {
-                  setupHelpText = entry.content.content;
-                  return true;
-                }
-                return false;
-              });
-
-              if (hasSetupRequired) {
+              const setupText = findSetupRequiredText(entriesExcludingUser);
+              if (setupText) {
                 needsSetup = true;
+                setupHelpText = setupText;
               }
             }
 
-            if (isProcessRunning && !hasPendingApprovalEntry) {
+            if (isProcessRunning && !hasPendingApprovalInEntries(entriesExcludingUser)) {
               entries.push(makeLoadingPatch(p.executionProcess.id));
             }
-          } else if (
-            p.executionProcess.executorAction.typ.type === 'ScriptRequest'
-          ) {
-            // Add setup and cleanup script as a tool call
-            let toolName = '';
-            switch (p.executionProcess.executorAction.typ.context) {
-              case 'SetupScript':
-                toolName = 'Setup Script';
-                break;
-              case 'CleanupScript':
-                toolName = 'Cleanup Script';
-                break;
-              case 'ToolInstallScript':
-                toolName = 'Tool Install Script';
-                break;
-              default:
-                return [];
-            }
-
-            const executionProcess = getLiveExecutionProcess(
-              p.executionProcess.id
+          } else if (actionType === 'ScriptRequest') {
+            const toolName = getScriptToolName(
+              p.executionProcess.executorAction.typ.context
             );
+            if (!toolName) return [];
+
+            const executionProcess = getLiveExecutionProcess(p.executionProcess.id);
 
             if (executionProcess?.status === ExecutionProcessStatus.running) {
               hasRunningProcess = true;
@@ -350,52 +404,16 @@ export const useConversationHistory = ({
               lastProcessFailedOrKilled = true;
             }
 
-            const exitCode = Number(executionProcess?.exitCode) || 0;
-            const exit_status: CommandExitStatus | null =
-              executionProcess?.status === 'running'
-                ? null
-                : {
-                    type: 'exit_code',
-                    code: exitCode,
-                  };
-
-            const toolStatus: ToolStatus =
-              executionProcess?.status === ExecutionProcessStatus.running
-                ? { status: 'created' }
-                : exitCode === 0
-                  ? { status: 'success' }
-                  : { status: 'failed' };
-
-            const output = p.entries.map((line) => line.content).join('\n');
-
-            const toolNormalizedEntry: NormalizedEntry = {
-              entry_type: {
-                type: 'tool_use',
-                tool_name: toolName,
-                action_type: {
-                  action: 'command_run',
-                  command: p.executionProcess.executorAction.typ.script,
-                  result: {
-                    output,
-                    exit_status,
-                  },
-                },
-                status: toolStatus,
-              },
-              content: toolName,
-              timestamp: null,
-            };
-            const toolPatch: PatchType = {
-              type: 'NORMALIZED_ENTRY',
-              content: toolNormalizedEntry,
-            };
-            const toolPatchWithKey: PatchTypeWithKey = patchWithKey(
-              toolPatch,
+            const toolPatch = createScriptToolPatch(
+              executionProcess,
               p.executionProcess.id,
-              0
+              toolName,
+              p.executionProcess.executorAction.typ.script,
+              p.entries,
+              patchWithKey
             );
 
-            entries.push(toolPatchWithKey);
+            entries.push(toolPatch);
           }
 
           return entries;
