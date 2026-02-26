@@ -1,4 +1,4 @@
-import { isWsOutputMessage, isWsErrorMessage, WsMessage } from '../websocket';
+import { isWsOutputMessage, isWsErrorMessage } from '../websocket';
 
 describe('WebSocket Type Guards', () => {
     describe('isWsOutputMessage', () => {
