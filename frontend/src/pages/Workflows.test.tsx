@@ -386,7 +386,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -410,7 +410,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -431,7 +431,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -456,7 +456,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -491,7 +491,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -520,7 +520,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3/merge') {
@@ -536,7 +536,7 @@ describe('Workflows Page', () => {
                 mergedTasks: [],
               },
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3') {
@@ -546,7 +546,7 @@ describe('Workflows Page', () => {
               success: true,
               data: mockCompletedWorkflowDetail,
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -599,7 +599,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: [] }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -639,7 +639,7 @@ describe('Workflows Page', () => {
             status: 500,
             statusText: 'Internal Server Error',
             json: async () => ({ success: false, message: 'Failed to fetch' }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -661,7 +661,7 @@ describe('Workflows Page', () => {
           Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response)
+          } satisfies Partial<Response>)
         )
       );
 
@@ -693,7 +693,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3') {
@@ -703,14 +703,14 @@ describe('Workflows Page', () => {
               success: true,
               data: mockCompletedWorkflowDetail,
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: null }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -767,7 +767,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3') {
@@ -777,14 +777,14 @@ describe('Workflows Page', () => {
               success: true,
               data: mockCompletedWorkflowDetail,
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: null }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -919,7 +919,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3') {
@@ -929,7 +929,7 @@ describe('Workflows Page', () => {
               success: true,
               data: mockCompletedWorkflowDetail,
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -986,7 +986,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3') {
@@ -996,7 +996,7 @@ describe('Workflows Page', () => {
               success: true,
               data: mockCompletedWorkflowDetail,
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
@@ -1005,7 +1005,7 @@ describe('Workflows Page', () => {
             status: 400,
             statusText: 'Bad Request',
             json: async () => ({ success: false, message: 'response is required' }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -1072,7 +1072,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockWorkflows }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3') {
@@ -1082,7 +1082,7 @@ describe('Workflows Page', () => {
               success: true,
               data: mockCompletedWorkflowDetail,
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
@@ -1091,7 +1091,7 @@ describe('Workflows Page', () => {
             status: 400,
             statusText: 'Bad Request',
             json: async () => ({ success: false, message: 'response is required' }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -1158,14 +1158,14 @@ describe('Workflows Page', () => {
                 },
               ],
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-unordered') {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: mockUnorderedWorkflowDetail }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
@@ -1209,7 +1209,7 @@ describe('Workflows Page', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({ success: true, data: [] }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/projects/resolve-by-path') {
@@ -1217,7 +1217,7 @@ describe('Workflows Page', () => {
             ok: false,
             status: 500,
             json: async () => ({ success: false, message: 'resolve failed' }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows') {
@@ -1236,7 +1236,7 @@ describe('Workflows Page', () => {
                 status: 'draft',
               },
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         if (url === '/api/workflows/workflow-new') {
@@ -1252,7 +1252,7 @@ describe('Workflows Page', () => {
                 status: 'draft',
               },
             }),
-          } as Response);
+          } satisfies Partial<Response>);
         }
 
         return Promise.reject(new Error(`Unexpected request: ${url}`));
