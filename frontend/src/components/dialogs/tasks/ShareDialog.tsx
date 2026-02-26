@@ -26,6 +26,74 @@ export interface ShareDialogProps {
   task: TaskWithAttemptStatus;
 }
 
+// Status content renderer
+function StatusContent({
+  isRemoteDisabled,
+  isSignedIn,
+  isProjectLinked,
+  shareTask,
+  shareError,
+  remoteDisabledMessage,
+  handleLinkProject,
+  t,
+}: {
+  isRemoteDisabled: boolean;
+  isSignedIn: boolean;
+  isProjectLinked: boolean;
+  shareTask: any;
+  shareError: string | null;
+  remoteDisabledMessage: string;
+  handleLinkProject: () => void;
+  t: any;
+}) {
+  if (isRemoteDisabled) {
+    return (
+      <Alert className="mt-1">
+        <AlertDescription>{remoteDisabledMessage}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <LoginRequiredPrompt
+        buttonVariant="outline"
+        buttonSize="sm"
+        buttonClassName="mt-1"
+      />
+    );
+  }
+
+  if (!isProjectLinked) {
+    return (
+      <Alert className="mt-1">
+        <LinkIcon className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between">
+          <span>{t('shareDialog.linkProjectRequired.description')}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLinkProject}
+            className="ml-2"
+          >
+            {t('shareDialog.linkProjectRequired.action')}
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (shareTask.isSuccess) {
+    return <Alert variant="success">{t('shareDialog.success')}</Alert>;
+  }
+
+  if (shareError) {
+    return <Alert variant="destructive">{shareError}</Alert>;
+  }
+
+  return null;
+}
+
 const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
   const modal = useModal();
   const { t } = useTranslation('tasks');
@@ -126,54 +194,16 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
           </DialogDescription>
         </DialogHeader>
 
-        {(() => {
-          if (isRemoteDisabled) {
-            return (
-              <Alert className="mt-1">
-                <AlertDescription>{remoteDisabledMessage}</AlertDescription>
-              </Alert>
-            );
-          } else if (!isSignedIn) {
-            return (
-              <LoginRequiredPrompt
-                buttonVariant="outline"
-                buttonSize="sm"
-                buttonClassName="mt-1"
-              />
-            );
-          } else if (!isProjectLinked) {
-            return (
-              <Alert className="mt-1">
-                <LinkIcon className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>{t('shareDialog.linkProjectRequired.description')}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLinkProject}
-                    className="ml-2"
-                  >
-                    {t('shareDialog.linkProjectRequired.action')}
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            );
-          } else {
-            return (
-              <>
-                {shareTask.isSuccess ? (
-                  <Alert variant="success">{t('shareDialog.success')}</Alert>
-                ) : (
-                  <>
-                    {shareError && (
-                      <Alert variant="destructive">{shareError}</Alert>
-                    )}
-                  </>
-                )}
-              </>
-            );
-          }
-        })()}
+        <StatusContent
+          isRemoteDisabled={isRemoteDisabled}
+          isSignedIn={isSignedIn}
+          isProjectLinked={isProjectLinked}
+          shareTask={shareTask}
+          shareError={shareError}
+          remoteDisabledMessage={remoteDisabledMessage}
+          handleLinkProject={handleLinkProject}
+          t={t}
+        />
 
         <DialogFooter className="flex sm:flex-row sm:justify-end gap-2">
           <Button variant="outline" onClick={handleClose}>

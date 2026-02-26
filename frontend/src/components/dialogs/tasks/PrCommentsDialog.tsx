@@ -44,7 +44,7 @@ function getCommentLine(comment: UnifiedPrComment): number | undefined {
 }
 
 function getCommentDiffHunk(comment: UnifiedPrComment): string | undefined {
-  return comment.comment_type === 'review' ? comment.diff_hunk : undefined;
+  return comment.comment_type === 'review' ? comment.diff_hunk ?? undefined : undefined;
 }
 
 // Content renderer component

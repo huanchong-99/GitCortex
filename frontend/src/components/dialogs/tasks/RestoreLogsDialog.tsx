@@ -249,7 +249,6 @@ function UncommittedChangesWarning({
           </div>
           <ToggleSwitch
             enabled={acknowledgeUncommitted}
-            onClick={() => {}}
             enabledColor="bg-amber-500"
           />
         </button>
@@ -305,7 +304,7 @@ function ResetWorktreeCanReset({
               ? t('restoreLogsDialog.resetWorktree.enabled')
               : t('restoreLogsDialog.resetWorktree.disabled')}
           </div>
-          <ToggleSwitch enabled={worktreeResetOn} onClick={() => {}} />
+          <ToggleSwitch enabled={worktreeResetOn} />
         </button>
         {worktreeResetOn && (
           <>
@@ -394,7 +393,6 @@ function ResetWorktreeCannotReset({
           </div>
           <ToggleSwitch
             enabled={worktreeResetOn && forceReset}
-            onClick={() => {}}
           />
         </button>
         <button
@@ -412,7 +410,6 @@ function ResetWorktreeCannotReset({
           </div>
           <ToggleSwitch
             enabled={forceReset}
-            onClick={() => {}}
             enabledColor="bg-destructive"
           />
         </button>
