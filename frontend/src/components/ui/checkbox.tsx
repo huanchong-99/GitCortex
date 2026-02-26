@@ -10,32 +10,32 @@ interface CheckboxProps {
   disabled?: boolean;
 }
 
-const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
+const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   (
     { className, checked = false, onCheckedChange, disabled, ...props },
     ref
   ) => {
     return (
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={checked}
-        ref={ref}
-        className={cn(
-          'peer h-4 w-4 shrink-0 rounded-sm border border-primary-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-          checked && 'bg-primary text-primary-foreground',
-          className
-        )}
-        disabled={disabled}
-        onClick={() => onCheckedChange?.(!checked)}
-        {...props}
-      >
-        {checked && (
-          <div className="flex items-center justify-center text-current">
-            <Check className="h-4 w-4" />
-          </div>
-        )}
-      </button>
+      <div className="relative inline-flex">
+        <input
+          type="checkbox"
+          ref={ref}
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onCheckedChange?.(e.target.checked)}
+          className="sr-only peer"
+          {...props}
+        />
+        <div
+          className={cn(
+            'h-4 w-4 shrink-0 rounded-sm border border-primary-foreground ring-offset-background peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 flex items-center justify-center',
+            checked && 'bg-primary text-primary-foreground',
+            className
+          )}
+        >
+          {checked && <Check className="h-4 w-4" />}
+        </div>
+      </div>
     );
   }
 );

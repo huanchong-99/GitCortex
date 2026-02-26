@@ -32,7 +32,7 @@ export const JSONEditor: React.FC<JSONEditorProps> = ({
   // Convert app theme to CodeMirror theme
   const getCodeMirrorTheme = () => {
     if (theme === ThemeMode.SYSTEM) {
-      return globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+      return globalThis.window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light';
     }

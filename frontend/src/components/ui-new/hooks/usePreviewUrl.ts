@@ -17,7 +17,7 @@ const urlPatterns = [
 // Get the hostname from the current browser location, falling back to 'localhost'
 const getBrowserHostname = (): string => {
   if (typeof globalThis.window !== 'undefined') {
-    return globalThis.location.hostname;
+    return globalThis.window.location.hostname;
   }
   return 'localhost';
 };

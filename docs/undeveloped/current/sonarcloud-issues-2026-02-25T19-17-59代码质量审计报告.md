@@ -2743,7 +2743,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 65.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 65.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweeYZ9DOUQdEsGgX`
 - **项目**: huanchong-99
@@ -3782,7 +3782,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 93.5 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 93.5 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweOZZ9DOUQdEsGa0`
 - **项目**: huanchong-99
@@ -4520,7 +4520,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 112.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 112.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweckZ9DOUQdEsGf9`
 - **项目**: huanchong-99
@@ -8171,7 +8171,7 @@
 - **创建时间**: 14 days ago
 - **标签**: confusing, type-dependent
 
-### 195.13 Use <menu>, <ol>, or <ul> instead of the "list" role to ensure accessibility across all devices.
+### 195.13 Use <menu>, <ol>, or <ul> instead of the "list" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj5`
 - **项目**: huanchong-99

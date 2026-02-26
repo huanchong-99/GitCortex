@@ -309,10 +309,10 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                             )}
                           .
                         </p>
-                        <div
+                        <button
+                          type="button"
                           className="mt-2 w-full flex items-center cursor-pointer select-none"
-                          role="switch"
-                          aria-checked={acknowledgeUncommitted}
+                          aria-pressed={acknowledgeUncommitted}
                           onClick={() => setAcknowledgeUncommitted((v) => !v)}
                         >
                           <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
@@ -338,7 +338,7 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                               }
                             />
                           </div>
-                        </div>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -351,10 +351,10 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                           {t('restoreLogsDialog.resetWorktree.title')}
                           {repoCount > 1 && ` (${repoCount} repos)`}
                         </p>
-                        <div
+                        <button
+                          type="button"
                           className="mt-2 w-full flex items-center cursor-pointer select-none"
-                          role="switch"
-                          aria-checked={worktreeResetOn}
+                          aria-pressed={worktreeResetOn}
                           onClick={() => setWorktreeResetOn((v) => !v)}
                         >
                           <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
@@ -380,7 +380,7 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                               }
                             />
                           </div>
-                        </div>
+                        </button>
                         {worktreeResetOn && (
                           <>
                             <p className="mt-2 text-xs text-muted-foreground">
@@ -448,9 +448,10 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                           {t('restoreLogsDialog.resetWorktree.title')}
                           {repoCount > 1 && ` (${repoCount} repos)`}
                         </p>
-                        <div
+                        <button
+                          type="button"
                           className={`mt-2 w-full flex items-center select-none cursor-pointer`}
-                          role="switch"
+                          aria-pressed={worktreeResetOn && forceReset}
                           onClick={() => {
                             setWorktreeResetOn((on) => {
                               if (forceReset) return !on; // free toggle when forced
@@ -480,10 +481,11 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                               }
                             />
                           </div>
-                        </div>
-                        <div
+                        </button>
+                        <button
+                          type="button"
                           className="mt-2 w-full flex items-center cursor-pointer select-none"
-                          role="switch"
+                          aria-pressed={forceReset}
                           onClick={() => {
                             setForceReset((v) => {
                               const next = !v;
@@ -513,7 +515,7 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                               }
                             />
                           </div>
-                        </div>
+                        </button>
                         <p className="mt-2 text-xs text-muted-foreground">
                           {forceReset
                             ? t(

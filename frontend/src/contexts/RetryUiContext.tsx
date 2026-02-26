@@ -19,7 +19,6 @@ const RetryUiContext = createContext<RetryUiContextType | null>(null);
 export function RetryUiProvider({
   children,
 }: {
-  attemptId?: string;
   children: React.ReactNode;
 }) {
   const { executionProcessesAll: executionProcesses } =

@@ -78,15 +78,14 @@ function CompactCard({
   const displayText = isReview && path ? `${path}: ${body}` : body;
 
   return (
-    <span
+    <button
+      type="button"
       className={cn(
         'inline-flex items-center gap-1.5 py-0.5 bg-muted rounded border align-middle cursor-pointer border-border hover:border-muted-foreground max-w-[300px]',
         className
       )}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      role="button"
-      tabIndex={0}
       title={`@${author}: ${body}\n\n${t('prComments.card.tooltip')}`}
     >
       <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
@@ -94,7 +93,7 @@ function CompactCard({
       <span className="text-xs text-muted-foreground truncate">
         {truncateBody(displayText, 50)}
       </span>
-    </span>
+    </button>
   );
 }
 
@@ -119,15 +118,14 @@ function FullCard({
   const Icon = isReview ? Code : MessageSquare;
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'p-3 bg-muted/50 rounded-md border border-border cursor-pointer hover:border-muted-foreground transition-colors overflow-hidden',
+        'p-3 bg-muted/50 rounded-md border border-border cursor-pointer hover:border-muted-foreground transition-colors overflow-hidden text-left',
         variant === 'full' && 'inline-block align-bottom max-w-md',
         className
       )}
       onClick={onClick}
-      role="button"
-      tabIndex={0}
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -173,7 +171,7 @@ function FullCard({
       <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words mt-2">
         {body}
       </p>
-    </div>
+    </button>
   );
 }
 
