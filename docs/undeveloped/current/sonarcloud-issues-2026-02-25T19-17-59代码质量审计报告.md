@@ -2941,7 +2941,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 72.1 Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devices.
+### 72.1 Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwefRZ9DOUQdEsGgk`
 - **项目**: huanchong-99
@@ -4687,7 +4687,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 116.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 116.2 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweb9Z9DOUQdEsGfz`
 - **项目**: huanchong-99
@@ -6368,7 +6368,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 156.3 Elements with the 'switch' interactive role must be focusable.
+### 156.3 Elements with the 'switch' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcU`
 - **项目**: huanchong-99
@@ -6446,7 +6446,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 156.9 Elements with the 'switch' interactive role must be focusable.
+### 156.9 Elements with the 'switch' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGca`
 - **项目**: huanchong-99
@@ -6472,7 +6472,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.11 Elements with the 'switch' interactive role must be focusable.
+### 156.11 Elements with the 'switch' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcc`
 - **项目**: huanchong-99
@@ -6498,7 +6498,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.13 Elements with the ARIA role "switch" must have the following attributes defined: aria-checked
+### 156.13 Elements with the ARIA role "switch" must have the following attributes defined: aria-checked ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGce`
 - **项目**: huanchong-99
@@ -6524,7 +6524,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 156.15 Elements with the 'switch' interactive role must be focusable.
+### 156.15 Elements with the 'switch' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcg`
 - **项目**: huanchong-99
@@ -6550,7 +6550,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.17 Elements with the ARIA role "switch" must have the following attributes defined: aria-checked
+### 156.17 Elements with the ARIA role "switch" must have the following attributes defined: aria-checked ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGci`
 - **项目**: huanchong-99
@@ -6910,7 +6910,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 164.1 Use <hr> instead of the "separator" role to ensure accessibility across all devices.
+### 164.1 Use <hr> instead of the "separator" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwerYZ9DOUQdEsGkM`
 - **项目**: huanchong-99
@@ -9250,7 +9250,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 219.1 Use <a href=...>, or <area href=...> instead of the "link" role to ensure accessibility across all devices.
+### 219.1 Use <a href=...>, or <area href=...> instead of the "link" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwePhZ9DOUQdEsGbQ`
 - **项目**: huanchong-99
@@ -9263,7 +9263,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 219.2 Use <img alt=...> instead of the "presentation" role to ensure accessibility across all devices.
+### 219.2 Use <img alt=...> instead of the "presentation" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwePhZ9DOUQdEsGbR`
 - **项目**: huanchong-99
@@ -9289,7 +9289,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 219.4 Use <img alt=...> instead of the "presentation" role to ensure accessibility across all devices.
+### 219.4 Use <img alt=...> instead of the "presentation" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwePhZ9DOUQdEsGbT`
 - **项目**: huanchong-99
@@ -9321,7 +9321,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 220.2 Use <section aria-label=...>, or <section aria-labelledby=...> instead of the "region" role to ensure accessibility across all devices.
+### 220.2 Use <section aria-label=...>, or <section aria-labelledby=...> instead of the "region" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwePFZ9DOUQdEsGbJ`
 - **项目**: huanchong-99
@@ -9334,7 +9334,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 220.3 Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devices.
+### 220.3 Use <details>, <fieldset>, <optgroup>, or <address> instead of the "group" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwePFZ9DOUQdEsGbK`
 - **项目**: huanchong-99
@@ -9353,7 +9353,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 221.1 Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.
+### 221.1 Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweP1Z9DOUQdEsGbZ`
 - **项目**: huanchong-99
@@ -9663,7 +9663,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 225.10 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 225.10 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbC`
 - **项目**: huanchong-99
@@ -9702,7 +9702,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 225.13 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 225.13 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbF`
 - **项目**: huanchong-99
