@@ -786,7 +786,7 @@ export const useWsStore = create<WsState>((set, get) => ({
     } else {
       clearConnectionTimers(connection);
 
-      if (connection.ws?.readyState < WebSocket.CLOSING) {
+      if (connection.ws && connection.ws.readyState !== undefined && connection.ws.readyState < WebSocket.CLOSING) {
         connection.ws.close();
       }
 
@@ -1235,7 +1235,7 @@ export const useWsStore = create<WsState>((set, get) => ({
     for (const connection of state._workflowConnections.values()) {
       clearConnectionTimers(connection);
 
-      if (connection.ws?.readyState < WebSocket.CLOSING) {
+      if (connection.ws && connection.ws.readyState !== undefined && connection.ws.readyState < WebSocket.CLOSING) {
         connection.ws.close();
       }
     }

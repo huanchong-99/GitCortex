@@ -9,9 +9,6 @@ import type {
   WorkflowDetailDto as Workflow,
   WorkflowListItemDto,
   WorkflowTaskDto,
-  TerminalDto,
-  WorkflowCommandDto,
-  SlashCommandPresetDto,
 } from 'shared/types';
 
 // ============================================================================

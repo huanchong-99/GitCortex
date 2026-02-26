@@ -18,7 +18,6 @@ import {
   GitBranch,
   Terminal as TerminalIcon,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
 import type { Terminal } from '@/components/workflow/TerminalCard';
 import { useTranslation } from 'react-i18next';
