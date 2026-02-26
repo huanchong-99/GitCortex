@@ -36,74 +36,118 @@ const browsing = (page: PageId, stack: PageId[] = []): CommandBarState => ({
 
 const noEffect: CommandBarEffect = { type: 'none' };
 
+function handleReset(event: Extract<CommandBarEvent, { type: 'RESET' }>): [CommandBarState, CommandBarEffect] {
+  return [browsing(event.page), noEffect];
+}
+
+function handleSearchChange(
+  state: CommandBarState,
+  event: Extract<CommandBarEvent, { type: 'SEARCH_CHANGE' }>
+): [CommandBarState, CommandBarEffect] {
+  return [{ ...state, search: event.query }, noEffect];
+}
+
+function handleGoBack(state: CommandBarState): [CommandBarState, CommandBarEffect] {
+  const prevPage = state.stack[state.stack.length - 1];
+  if (state.status === 'browsing' && !prevPage) return [state, noEffect];
+  return [browsing(prevPage ?? 'root', state.stack.slice(0, -1)), noEffect];
+}
+
+function handleSelectRepo(
+  state: Extract<CommandBarState, { status: 'selectingRepo' }>,
+  repoId: string
+): [CommandBarState, CommandBarEffect] {
+  return [
+    browsing('root'),
+    {
+      type: 'execute',
+      action: state.pendingAction,
+      repoId,
+    },
+  ];
+}
+
+function handleSelectPage(
+  state: Extract<CommandBarState, { status: 'browsing' }>,
+  pageId: PageId
+): [CommandBarState, CommandBarEffect] {
+  return [
+    {
+      ...state,
+      page: pageId,
+      stack: [...state.stack, state.page],
+      search: '',
+    },
+    noEffect,
+  ];
+}
+
+function handleSelectAction(
+  state: Extract<CommandBarState, { status: 'browsing' }>,
+  action: ActionDefinition,
+  repoCount: number
+): [CommandBarState, CommandBarEffect] {
+  if (action.requiresTarget === 'git') {
+    if (repoCount === 1) {
+      return [
+        state,
+        { type: 'execute', action, repoId: '__single__' },
+      ];
+    }
+    if (repoCount > 1) {
+      return [
+        {
+          status: 'selectingRepo',
+          stack: [...state.stack, state.page],
+          search: '',
+          pendingAction: action as GitActionDefinition,
+        },
+        noEffect,
+      ];
+    }
+  }
+  return [state, { type: 'execute', action }];
+}
+
+function handleSelectItem(
+  state: CommandBarState,
+  event: Extract<CommandBarEvent, { type: 'SELECT_ITEM' }>,
+  repoCount: number
+): [CommandBarState, CommandBarEffect] {
+  if (state.status === 'selectingRepo' && event.item.type === 'repo') {
+    return handleSelectRepo(state, event.item.repo.id);
+  }
+
+  if (state.status === 'browsing') {
+    const { item } = event;
+    if (item.type === 'page') {
+      return handleSelectPage(state, item.pageId);
+    }
+    if (item.type === 'action') {
+      return handleSelectAction(state, item.action, repoCount);
+    }
+  }
+
+  return [state, noEffect];
+}
+
 function reducer(
   state: CommandBarState,
   event: CommandBarEvent,
   repoCount: number
 ): [CommandBarState, CommandBarEffect] {
-  if (event.type === 'RESET') {
-    return [browsing(event.page), noEffect];
+  switch (event.type) {
+    case 'RESET':
+      return handleReset(event);
+    case 'SEARCH_CHANGE':
+      return handleSearchChange(state, event);
+    case 'GO_BACK':
+      return handleGoBack(state);
+    case 'SELECT_ITEM':
+      return handleSelectItem(state, event, repoCount);
+    default:
+      return [state, noEffect];
   }
-  if (event.type === 'SEARCH_CHANGE') {
-    return [{ ...state, search: event.query }, noEffect];
-  }
-  if (event.type === 'GO_BACK') {
-    const prevPage = state.stack[state.stack.length - 1];
-    if (state.status === 'browsing' && !prevPage) return [state, noEffect];
-    return [browsing(prevPage ?? 'root', state.stack.slice(0, -1)), noEffect];
-  }
-
-  if (event.type === 'SELECT_ITEM') {
-    if (state.status === 'selectingRepo' && event.item.type === 'repo') {
-      return [
-        browsing('root'),
-        {
-          type: 'execute',
-          action: state.pendingAction,
-          repoId: event.item.repo.id,
-        },
-      ];
-    }
-
-    if (state.status === 'browsing') {
-      const { item } = event;
-      if (item.type === 'page') {
-        return [
-          {
-            ...state,
-            page: item.pageId,
-            stack: [...state.stack, state.page],
-            search: '',
-          },
-          noEffect,
-        ];
-      }
-      if (item.type === 'action') {
-        if (item.action.requiresTarget === 'git') {
-          if (repoCount === 1) {
-            return [
-              state,
-              { type: 'execute', action: item.action, repoId: '__single__' },
-            ];
-          }
-          if (repoCount > 1) {
-            return [
-              {
-                status: 'selectingRepo',
-                stack: [...state.stack, state.page],
-                search: '',
-                pendingAction: item.action as GitActionDefinition,
-              },
-              noEffect,
-            ];
-          }
-        }
-        return [state, { type: 'execute', action: item.action }];
-      }
-    }
-  }
-
-  return [state, noEffect];
 }
 
 export function useCommandBarState(initialPage: PageId, repoCount: number) {
