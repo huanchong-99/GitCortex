@@ -62,6 +62,72 @@ function getMenuPosition(anchorEl: HTMLElement) {
   return { top, bottom, left };
 }
 
+function handleTagSelection(
+  option: FileTagOption,
+  nodeToReplace: ReturnType<typeof $createTextNode>
+) {
+  const textToInsert = option.item.tag?.content ?? '';
+  const textNode = $createTextNode(textToInsert);
+  nodeToReplace.replace(textNode);
+  textNode.select(textToInsert.length, textToInsert.length);
+}
+
+function checkPathExists(fullPath: string): boolean {
+  const root = $getRoot();
+  const children = root.getChildren();
+
+  for (const child of children) {
+    if (!$isParagraphNode(child)) continue;
+
+    const textNodes = child.getAllTextNodes();
+    for (const textNode of textNodes) {
+      if (
+        textNode.hasFormat('code') &&
+        textNode.getTextContent() === fullPath
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function appendPathToBottom(fullPath: string) {
+  if (!fullPath) return;
+
+  const root = $getRoot();
+  const pathParagraph = $createParagraphNode();
+  const pathNode = $createTextNode(fullPath);
+  pathNode.toggleFormat('code');
+  pathParagraph.append(pathNode);
+  root.append(pathParagraph);
+}
+
+function handleFileSelection(
+  option: FileTagOption,
+  nodeToReplace: ReturnType<typeof $createTextNode>
+) {
+  const fileName = option.item.file?.name ?? '';
+  const fullPath = option.item.file?.path ?? '';
+
+  // Insert filename as inline code at cursor position
+  const fileNameNode = $createTextNode(fileName);
+  fileNameNode.toggleFormat('code');
+  nodeToReplace.replace(fileNameNode);
+
+  // Add a space after the inline code for better UX
+  const spaceNode = $createTextNode(' ');
+  fileNameNode.insertAfter(spaceNode);
+  spaceNode.select(1, 1);
+
+  // Check if full path already exists and append if not
+  const pathAlreadyExists = checkPathExists(fullPath);
+  if (!pathAlreadyExists) {
+    appendPathToBottom(fullPath);
+  }
+}
+
 export function FileTagTypeaheadPlugin({
   workspaceId,
   projectId,
@@ -114,57 +180,9 @@ export function FileTagTypeaheadPlugin({
           if (!nodeToReplace) return;
 
           if (option.item.type === 'tag') {
-            // For tags, keep the existing behavior (insert tag content as plain text)
-            const textToInsert = option.item.tag?.content ?? '';
-            const textNode = $createTextNode(textToInsert);
-            nodeToReplace.replace(textNode);
-            textNode.select(textToInsert.length, textToInsert.length);
+            handleTagSelection(option, nodeToReplace);
           } else {
-            // For files, insert filename as inline code at cursor,
-            // and append full path as inline code at the bottom
-            const fileName = option.item.file?.name ?? '';
-            const fullPath = option.item.file?.path ?? '';
-
-            // Step 1: Insert filename as inline code at cursor position
-            const fileNameNode = $createTextNode(fileName);
-            fileNameNode.toggleFormat('code');
-            nodeToReplace.replace(fileNameNode);
-
-            // Add a space after the inline code for better UX
-            const spaceNode = $createTextNode(' ');
-            fileNameNode.insertAfter(spaceNode);
-            spaceNode.select(1, 1); // Position cursor after the space
-
-            // Step 2: Check if full path already exists at the bottom
-            const root = $getRoot();
-            const children = root.getChildren();
-            let pathAlreadyExists = false;
-
-            // Scan all paragraphs to find if this path already exists as inline code
-            for (const child of children) {
-              if (!$isParagraphNode(child)) continue;
-
-              const textNodes = child.getAllTextNodes();
-              for (const textNode of textNodes) {
-                if (
-                  textNode.hasFormat('code') &&
-                  textNode.getTextContent() === fullPath
-                ) {
-                  pathAlreadyExists = true;
-                  break;
-                }
-              }
-              if (pathAlreadyExists) break;
-            }
-
-            // Step 3: If path doesn't exist, append it at the bottom
-            if (!pathAlreadyExists && fullPath) {
-              const pathParagraph = $createParagraphNode();
-              const pathNode = $createTextNode(fullPath);
-              pathNode.toggleFormat('code');
-              pathParagraph.append(pathNode);
-              root.append(pathParagraph);
-            }
+            handleFileSelection(option, nodeToReplace);
           }
         });
 
