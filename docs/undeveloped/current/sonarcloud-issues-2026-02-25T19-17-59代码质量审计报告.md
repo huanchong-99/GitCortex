@@ -10143,7 +10143,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 238.2 Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'.
+### 238.2 Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'. ✅ 已修复
 
 - **问题ID**: `AZyVweXLZ9DOUQdEsGdw`
 - **项目**: huanchong-99
@@ -10354,7 +10354,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 243.4 Prefer `Number.parseInt` over `parseInt`.
+### 243.4 Prefer `Number.parseInt` over `parseInt`. ✅ 已修复
 
 - **问题ID**: `AZyVweV8Z9DOUQdEsGdg`
 - **项目**: huanchong-99
@@ -10691,7 +10691,7 @@
 
 > 该文件共有 **11** 个问题
 
-### 254.1 Prefer negative index over length minus index for `slice`.
+### 254.1 Prefer negative index over length minus index for `slice`. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm3`
 - **项目**: huanchong-99
@@ -10878,7 +10878,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 257.1 Consider removing 'undefined' type or '?' specifier, one of them is redundant.
+### 257.1 Consider removing 'undefined' type or '?' specifier, one of them is redundant. ✅ 已修复
 
 - **问题ID**: `AZyVwezjZ9DOUQdEsGnD`
 - **项目**: huanchong-99
@@ -11294,7 +11294,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 270.4 Using `join()` for p.entries.map((line) => line.content) may use Object's default stringification format ('[object Object]') when stringified.
+### 270.4 Using `join()` for p.entries.map((line) => line.content) may use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl8`
 - **项目**: huanchong-99
