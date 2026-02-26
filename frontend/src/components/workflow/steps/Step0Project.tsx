@@ -177,13 +177,15 @@ export const Step0Project: React.FC<Step0ProjectProps> = ({
         <div className="rounded-sm border border-border bg-secondary p-base">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-base">
-              {isLoading ? (
-                <RefreshCw className="size-icon-sm animate-spin text-low" />
-              ) : gitStatus.isGitRepo ? (
-                <Check className="size-icon-sm text-success" />
-              ) : (
-                <AlertTriangle className="size-icon-sm text-warning" />
-              )}
+              {(() => {
+                if (isLoading) {
+                  return <RefreshCw className="size-icon-sm animate-spin text-low" />;
+                }
+                if (gitStatus.isGitRepo) {
+                  return <Check className="size-icon-sm text-success" />;
+                }
+                return <AlertTriangle className="size-icon-sm text-warning" />;
+              })()}
               <span className="text-base font-medium text-normal">
                 {gitStatus.isGitRepo
                   ? t('step0.status.gitDetected')

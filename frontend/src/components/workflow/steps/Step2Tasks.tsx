@@ -135,19 +135,27 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
       </div>
 
       <div className="flex gap-half">
-        {Array.from({ length: taskCount }, (_, i) => i).map((index) => (
-          <div
-            key={`task-indicator-${index}`}
-            className={cn(
-              'h-1 flex-1 rounded-sm transition-colors',
-              index < completedTasks
-                ? 'bg-brand'
-                : index === currentTaskIndex
-                ? 'bg-brand/50'
-                : 'bg-border'
-            )}
-          />
-        ))}
+        {Array.from({ length: taskCount }, (_, i) => i).map((index) => {
+          const getIndicatorClass = (): string => {
+            if (index < completedTasks) {
+              return 'bg-brand';
+            }
+            if (index === currentTaskIndex) {
+              return 'bg-brand/50';
+            }
+            return 'bg-border';
+          };
+
+          return (
+            <div
+              key={`task-indicator-${index}`}
+              className={cn(
+                'h-1 flex-1 rounded-sm transition-colors',
+                getIndicatorClass()
+              )}
+            />
+          );
+        })}
       </div>
 
       {taskCount > 1 && (

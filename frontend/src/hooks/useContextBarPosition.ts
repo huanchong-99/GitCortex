@@ -64,12 +64,17 @@ function calculateNearestSnapPosition(
   const xZone = x < containerWidth / 2 ? 'left' : 'right';
 
   // Determine top/middle/bottom based on thirds
-  const yZone =
-    y < containerHeight / 3
-      ? 'top'
-      : y > (2 * containerHeight) / 3
-        ? 'bottom'
-        : 'middle';
+  const getYZone = (): 'top' | 'middle' | 'bottom' => {
+    if (y < containerHeight / 3) {
+      return 'top';
+    }
+    if (y > (2 * containerHeight) / 3) {
+      return 'bottom';
+    }
+    return 'middle';
+  };
+
+  const yZone = getYZone();
 
   return `${yZone}-${xZone}` as SnapPosition;
 }
