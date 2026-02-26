@@ -91,52 +91,50 @@ function clearPorts() {
 if (require.main === module) {
   const command = process.argv[2];
 
-  (async () => {
-    try {
-      switch (command) {
-        case "get": {
-          const ports = await getPorts();
-          console.log(JSON.stringify(ports));
-          break;
-        }
-
-        case "clear":
-          clearPorts();
-          break;
-
-        case "frontend": {
-          const ports = await getPorts();
-          console.log(JSON.stringify(ports.frontend, null, 2));
-          break;
-        }
-
-        case "backend": {
-          const ports = await getPorts();
-          console.log(JSON.stringify(ports.backend, null, 2));
-          break;
-        }
-
-        default:
-          console.log("Usage:");
-          console.log(
-            "  node setup-dev-environment.js get     - Setup dev environment (ports + assets)"
-          );
-          console.log(
-            "  node setup-dev-environment.js frontend - Get frontend port only"
-          );
-          console.log(
-            "  node setup-dev-environment.js backend  - Get backend port only"
-          );
-          console.log(
-            "  node setup-dev-environment.js clear    - No-op (fixed ports are used)"
-          );
-          break;
+  try {
+    switch (command) {
+      case "get": {
+        const ports = await getPorts();
+        console.log(JSON.stringify(ports));
+        break;
       }
-    } catch (error) {
-      console.error(error);
-      process.exit(1);
+
+      case "clear":
+        clearPorts();
+        break;
+
+      case "frontend": {
+        const ports = await getPorts();
+        console.log(JSON.stringify(ports.frontend, null, 2));
+        break;
+      }
+
+      case "backend": {
+        const ports = await getPorts();
+        console.log(JSON.stringify(ports.backend, null, 2));
+        break;
+      }
+
+      default:
+        console.log("Usage:");
+        console.log(
+          "  node setup-dev-environment.js get     - Setup dev environment (ports + assets)"
+        );
+        console.log(
+          "  node setup-dev-environment.js frontend - Get frontend port only"
+        );
+        console.log(
+          "  node setup-dev-environment.js backend  - Get backend port only"
+        );
+        console.log(
+          "  node setup-dev-environment.js clear    - No-op (fixed ports are used)"
+        );
+        break;
     }
-  })();
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
 }
 
 module.exports = { getPorts, clearPorts };

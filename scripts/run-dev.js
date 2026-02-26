@@ -394,73 +394,70 @@ if (process.platform === "win32") {
 }
 
 /**
- * Main entry point
+ * Main entry point - using top-level await
  */
-async function main() {
-  try {
-    acquireDevLock();
-    console.log("[dev] Setting up development environment...");
+try {
+  acquireDevLock();
+  console.log("[dev] Setting up development environment...");
 
-    const ports = await getPorts();
+  const ports = await getPorts();
 
-    console.log(`[dev] Frontend port: ${ports.frontend}`);
-    console.log(`[dev] Backend port: ${ports.backend}`);
+  console.log(`[dev] Frontend port: ${ports.frontend}`);
+  console.log(`[dev] Backend port: ${ports.backend}`);
 
-    // Clean stale listeners up-front to avoid partial startup followed by
-    // cascading shutdown (frontend failure causing backend to exit).
-    await ensurePortAvailable(ports.backend, "Backend");
-    await ensurePortAvailable(ports.frontend, "Frontend");
+  // Clean stale listeners up-front to avoid partial startup followed by
+  // cascading shutdown (frontend failure causing backend to exit).
+  await ensurePortAvailable(ports.backend, "Backend");
+  await ensurePortAvailable(ports.frontend, "Frontend");
 
-    const env = {
-      ...process.env,
-      FRONTEND_PORT: String(ports.frontend),
-      BACKEND_PORT: String(ports.backend),
-      DISABLE_WORKTREE_ORPHAN_CLEANUP: "1",
-      RUST_LOG: "debug",
-    };
+  const env = {
+    ...process.env,
+    FRONTEND_PORT: String(ports.frontend),
+    BACKEND_PORT: String(ports.backend),
+    DISABLE_WORKTREE_ORPHAN_CLEANUP: "1",
+    RUST_LOG: "debug",
+  };
 
-    // Start backend
-    run(
-      "backend",
-      "cargo",
-      ["watch", "-w", "crates", "--", "cargo", "run", "--bin", "server"],
-      { env }
-    );
+  // Start backend
+  run(
+    "backend",
+    "cargo",
+    ["watch", "-w", "crates", "--", "cargo", "run", "--bin", "server"],
+    { env }
+  );
 
-    console.log(
-      `[dev] Waiting for backend readiness on 127.0.0.1:${ports.backend}...`
-    );
-    await waitForPort(ports.backend, {
-      host: "127.0.0.1",
-      timeoutMs: 300000,
-      retryDelayMs: 1000,
-      connectTimeoutMs: 1000,
-      name: "backend",
-    });
-    console.log("[dev] Backend is ready");
+  console.log(
+    `[dev] Waiting for backend readiness on 127.0.0.1:${ports.backend}...`
+  );
+  await waitForPort(ports.backend, {
+    host: "127.0.0.1",
+    timeoutMs: 300000,
+    retryDelayMs: 1000,
+    connectTimeoutMs: 1000,
+    name: "backend",
+  });
+  console.log("[dev] Backend is ready");
 
-    // Re-check frontend port just before launch to handle races from late
-    // terminating/stale previous vite processes.
-    await ensurePortAvailable(ports.frontend, "Frontend");
+  // Re-check frontend port just before launch to handle races from late
+  // terminating/stale previous vite processes.
+  await ensurePortAvailable(ports.frontend, "Frontend");
 
-    // Start frontend
-    run(
-      "frontend",
-      "npm",
-      ["run", "dev", "--", "--port", String(ports.frontend), "--host"],
-      {
-        env,
-        cwd: path.join(__dirname, "..", "frontend")
-      }
-    );
+  // Start frontend
+  run(
+    "frontend",
+    "npm",
+    ["run", "dev", "--", "--port", String(ports.frontend), "--host"],
+    {
+      env,
+      cwd: path.join(__dirname, "..", "frontend")
+    }
+  );
 
-    console.log("[dev] Development servers started successfully");
-    console.log("[dev] Press Ctrl+C to stop");
-  } catch (err) {
-    releaseDevLock();
-    console.error("[dev] Failed to start development environment:", err);
-    process.exit(1);
-  }
+  console.log("[dev] Development servers started successfully");
+  console.log("[dev] Press Ctrl+C to stop");
+} catch (err) {
+  releaseDevLock();
+  console.error("[dev] Failed to start development environment:", err);
+  process.exit(1);
 }
 
-main();
