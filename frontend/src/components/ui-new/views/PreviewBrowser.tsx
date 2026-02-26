@@ -213,7 +213,7 @@ export function PreviewBrowser({
   const showIframe = url && !isLoading && isServerRunning;
 
   const hasDevScript = repos.some(
-    (repo) => repo.devServerScript && repo.devServerScript.trim() !== ''
+    (repo) => repo.devServerScript?.trim() !== ''
   );
 
   const getIframeContainerStyle = (): React.CSSProperties => {
