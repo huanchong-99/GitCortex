@@ -12614,7 +12614,7 @@
 - **创建时间**: 16 days ago
 - **标签**: readability
 
-### 300.2 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.2 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlJ`
 - **项目**: huanchong-99
@@ -12627,7 +12627,7 @@
 - **创建时间**: 17 days ago
 - **标签**: redundant, type-dependent
 
-### 300.3 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.3 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlK`
 - **项目**: huanchong-99
@@ -12640,7 +12640,7 @@
 - **创建时间**: 17 days ago
 - **标签**: redundant, type-dependent
 
-### 300.4 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.4 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlL`
 - **项目**: huanchong-99
@@ -12653,7 +12653,7 @@
 - **创建时间**: 17 days ago
 - **标签**: redundant, type-dependent
 
-### 300.5 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.5 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlM`
 - **项目**: huanchong-99
@@ -12666,7 +12666,7 @@
 - **创建时间**: 17 days ago
 - **标签**: redundant, type-dependent
 
-### 300.6 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.6 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlN`
 - **项目**: huanchong-99
@@ -12679,7 +12679,7 @@
 - **创建时间**: 17 days ago
 - **标签**: redundant, type-dependent
 
-### 300.7 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.7 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlO`
 - **项目**: huanchong-99
@@ -12692,7 +12692,7 @@
 - **创建时间**: 15 days ago
 - **标签**: redundant, type-dependent
 
-### 300.8 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 300.8 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlP`
 - **项目**: huanchong-99
@@ -12776,7 +12776,7 @@
 - **创建时间**: 17 days ago
 - **标签**: confusing
 
-### 301.5 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 301.5 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGkf`
 - **项目**: huanchong-99
@@ -12973,7 +12973,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 304.1 This assertion is unnecessary since the receiver accepts the original type of the expression.
+### 304.1 This assertion is unnecessary since the receiver accepts the original type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwetvZ9DOUQdEsGkw`
 - **项目**: huanchong-99
