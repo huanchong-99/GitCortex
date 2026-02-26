@@ -188,9 +188,7 @@ export function AgentSettings() {
     const executorsMap =
       localParsedProfiles.executors as unknown as ExecutorsMap;
     const base =
-      baseConfig && executorsMap[executorType]?.[baseConfig]?.[executorType]
-        ? executorsMap[executorType][baseConfig][executorType]
-        : {};
+      executorsMap[executorType]?.[baseConfig ?? '']?.[executorType] ?? {};
 
     const updatedProfiles = {
       ...localParsedProfiles,

@@ -45,7 +45,7 @@ export function useMessageEditRetry(
       } catch {
         throw new EditDialogCancelledError();
       }
-      if (!modalResult || modalResult.action !== 'confirmed') {
+      if (modalResult?.action !== 'confirmed') {
         throw new EditDialogCancelledError();
       }
 

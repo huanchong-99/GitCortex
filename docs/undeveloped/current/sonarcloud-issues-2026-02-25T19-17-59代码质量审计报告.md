@@ -6278,7 +6278,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 154.2 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 154.2 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVweRfZ9DOUQdEsGb9`
 - **项目**: huanchong-99
@@ -7940,7 +7940,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 193.1 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 193.1 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVweaJZ9DOUQdEsGfE`
 - **项目**: huanchong-99
@@ -7953,7 +7953,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 193.2 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 193.2 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVweaJZ9DOUQdEsGfF`
 - **项目**: huanchong-99
@@ -11698,7 +11698,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 277.1 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 277.1 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVweyCZ9DOUQdEsGme`
 - **项目**: huanchong-99
@@ -11998,7 +11998,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 284.1 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 284.1 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwev0Z9DOUQdEsGlm`
 - **项目**: huanchong-99

@@ -45,7 +45,7 @@ export function useRetryProcess(
       } catch {
         throw new RetryDialogCancelledError();
       }
-      if (!modalResult || modalResult.action !== 'confirmed') {
+      if (modalResult?.action !== 'confirmed') {
         throw new RetryDialogCancelledError();
       }
 

@@ -54,7 +54,7 @@ function GitActionsDialogContent({
 
   return (
     <div className="space-y-4">
-      {mergedPR && mergedPR.type === 'pr' && (
+      {mergedPR?.type === 'pr' && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>
             {t('git.actions.prMerged', {

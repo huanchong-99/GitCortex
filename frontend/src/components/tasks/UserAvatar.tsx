@@ -84,7 +84,7 @@ export const UserAvatar = ({
     setImageError(false);
   }, [optimizedImageUrl]);
 
-  const shouldShowImage = optimizedImageUrl && !imageError;
+  const shouldShowImage = !!optimizedImageUrl && !imageError;
 
   const initials = buildInitials(
     effectiveFirstName,
