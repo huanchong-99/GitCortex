@@ -278,7 +278,7 @@ export function PreviewBrowserContainer({
 
   const handleOpenInNewTab = useCallback(() => {
     if (effectiveUrl) {
-      window.open(effectiveUrl, '_blank');
+      globalThis.window.open(effectiveUrl, '_blank');
     }
   }, [effectiveUrl]);
 

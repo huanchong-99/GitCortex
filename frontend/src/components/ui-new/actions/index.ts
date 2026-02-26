@@ -653,7 +653,7 @@ export const Actions = {
           git_repo_path: undefined,
         });
         if (response.url) {
-          window.open(response.url, '_blank');
+          globalThis.window.open(response.url, '_blank');
         }
       } catch {
         // Show editor selection dialog on failure

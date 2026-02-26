@@ -145,7 +145,7 @@ function FullCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                window.open(url, '_blank', 'noopener,noreferrer');
+                globalThis.window.open(url, '_blank', 'noopener,noreferrer');
               }}
               className="hover:text-foreground transition-colors"
               aria-label="Open in browser"

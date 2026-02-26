@@ -215,7 +215,7 @@ export function GitPanelContainer({
 
       // If a URL is returned (remote mode), open it in a new tab
       if (response.url) {
-        window.open(response.url, '_blank');
+        globalThis.window.open(response.url, '_blank');
       }
     } catch (err) {
       console.error('Failed to open repo in editor:', err);

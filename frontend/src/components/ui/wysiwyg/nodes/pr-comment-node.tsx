@@ -42,7 +42,7 @@ function PrCommentComponent({
       event.stopPropagation();
       // Open URL in new tab if available
       if (data.url) {
-        window.open(data.url, '_blank', 'noopener,noreferrer');
+        globalThis.window.open(data.url, '_blank', 'noopener,noreferrer');
       }
     },
     [data.url]

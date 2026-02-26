@@ -99,7 +99,7 @@ export function RepoCard({
   const [selectedAction, setSelectedAction] = useRepoAction(repoId);
 
   const openExternalLink = (url: string) => {
-    const popup = window.open(url, '_blank', 'noopener,noreferrer');
+    const popup = globalThis.window.open(url, '_blank', 'noopener,noreferrer');
     if (popup) {
       popup.opener = null;
     }

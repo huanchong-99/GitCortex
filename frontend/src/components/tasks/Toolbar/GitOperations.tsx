@@ -311,7 +311,7 @@ function GitOperations({
           const prMerge = mergeInfo.openPR;
           return (
             <button
-              onClick={() => window.open(prMerge.prInfo.url, '_blank')}
+              onClick={() => globalThis.window.open(prMerge.prInfo.url, '_blank')}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100/60 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:underline truncate max-w-[180px] sm:max-w-none"
               aria-label={t('git.pr.open', {
                 number: Number(prMerge.prInfo.number),

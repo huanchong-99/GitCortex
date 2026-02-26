@@ -27,7 +27,7 @@ export function useOpenInEditor(
 
         // If a URL is returned, open it in a new window/tab
         if (response.url) {
-          window.open(response.url, '_blank');
+          globalThis.window.open(response.url, '_blank');
         }
       } catch (err) {
         console.error('Failed to open editor:', err);
