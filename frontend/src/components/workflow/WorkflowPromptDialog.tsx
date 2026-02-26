@@ -43,7 +43,7 @@ function normalizeChoiceOptions(prompt: TerminalPromptDetectedPayload): string[]
     return prompt.options;
   }
 
-  if (prompt.optionDetails && prompt.optionDetails.length > 0) {
+  if (prompt.optionDetails?.length) {
     return prompt.optionDetails
       .map((option) => option.label)
       .filter((label) => label.trim().length > 0);
@@ -75,7 +75,7 @@ function getDefaultChoiceIndex(prompt: TerminalPromptDetectedPayload): number {
   if (typeof prompt.selectedIndex === 'number' && prompt.selectedIndex >= 0) {
     return prompt.selectedIndex;
   }
-  if (prompt.optionDetails && prompt.optionDetails.length > 0) {
+  if (prompt.optionDetails?.length) {
     const selectedOption = prompt.optionDetails.find((option) => option.selected);
     if (selectedOption && selectedOption.index >= 0) {
       return selectedOption.index;
