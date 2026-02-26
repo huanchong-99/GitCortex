@@ -88,7 +88,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     [sharedTasksQuery.data, sharedTasksEnabled]
   );
 
-  const localTasksById = useMemo(() => data?.tasks ?? {}, [data?.tasks]);
+  const localTasksById = useMemo(() => data?.tasks || {}, [data?.tasks]);
 
   const referencedSharedIds = useMemo(
     () =>

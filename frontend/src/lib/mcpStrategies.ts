@@ -8,7 +8,7 @@ function isJsonObject(v: unknown): v is JsonObject {
 
 export class McpConfigStrategyGeneral {
   static createFullConfig(cfg: McpConfig): JsonObject {
-    const cloned: JsonValue = JSON.parse(JSON.stringify(cfg.template ?? {}));
+    const cloned: JsonValue = JSON.parse(JSON.stringify(cfg.template || {}));
     const fullConfig: JsonObject = isJsonObject(cloned) ? cloned : {};
     let current: JsonObject = fullConfig;
 
@@ -84,7 +84,7 @@ export class McpConfigStrategyGeneral {
     }
 
     const updatedVal: JsonValue = JSON.parse(
-      JSON.stringify(existingConfig ?? {})
+      JSON.stringify(existingConfig || {})
     );
     const updated: JsonObject = isJsonObject(updatedVal) ? updatedVal : {};
     let current: JsonObject = updated;

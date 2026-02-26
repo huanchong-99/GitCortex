@@ -51,7 +51,7 @@ export const useExecutionProcesses = (
       initialData
     );
 
-  const executionProcessesById = data?.execution_processes ?? {};
+  const executionProcessesById = data?.execution_processes || {};
   const executionProcesses = Object.values(executionProcessesById).sort(
     (a, b) =>
       new Date(a.createdAt as unknown as string).getTime() -

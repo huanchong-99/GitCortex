@@ -231,7 +231,7 @@ export function CreateChatBoxContainer() {
           isSending={createWorkspace.isPending}
           executor={{
             selected: effectiveProfile?.executor ?? null,
-            options: Object.keys(profiles ?? {}) as BaseCodingAgent[],
+            options: Object.keys(profiles || {}) as BaseCodingAgent[],
             onChange: handleExecutorChange,
           }}
           variant={

@@ -48,7 +48,7 @@ export function useExecutorSelection({
     useState<BaseCodingAgent | null>(null);
 
   const executorOptions = useMemo(
-    () => Object.keys(profiles ?? {}) as BaseCodingAgent[],
+    () => Object.keys(profiles || {}) as BaseCodingAgent[],
     [profiles]
   );
 

@@ -22,7 +22,7 @@ export function useProjects(): UseProjectsResult {
   const { data, isConnected, isInitialized, error } =
     useJsonPatchWsStream<ProjectsState>(endpoint, true, initialData);
 
-  const projectsById = useMemo(() => data?.projects ?? {}, [data]);
+  const projectsById = useMemo(() => data?.projects || {}, [data]);
 
   const projects = useMemo(() => {
     return Object.values(projectsById).sort(

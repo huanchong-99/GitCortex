@@ -52,7 +52,7 @@ export const useDiffStream = (
   );
 
   const diffs = useMemo(() => {
-    return Object.values(data?.entries ?? {})
+    return Object.values(data?.entries || {})
       .filter((entry) => entry?.type === 'DIFF')
       .map((entry) => entry.content);
   }, [data?.entries]);

@@ -27,7 +27,9 @@ export function useRebase(
             message: 'Attempt id is not set',
           });
         }
-        const { repoId, newBaseBranch, oldBaseBranch } = args ?? {};
+        const repoId = args?.repoId;
+        const newBaseBranch = args?.newBaseBranch;
+        const oldBaseBranch = args?.oldBaseBranch;
 
         const data: RebaseTaskAttemptRequest = {
           repo_id: repoId,

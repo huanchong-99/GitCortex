@@ -16,7 +16,8 @@ export function useOpenInEditor(
     async (options?: OpenEditorOptions): Promise<void> => {
       if (!attemptId) return;
 
-      const { editorType, filePath } = options ?? {};
+      const editorType = options?.editorType;
+      const filePath = options?.filePath;
 
       try {
         const response = await attemptsApi.openEditor(attemptId, {

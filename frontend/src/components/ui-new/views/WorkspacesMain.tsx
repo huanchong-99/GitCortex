@@ -43,7 +43,7 @@ export function WorkspacesMain({
   diffStats,
 }: Readonly<WorkspacesMainProps>) {
   const { t } = useTranslation(['tasks', 'common']);
-  const { session } = workspaceWithSession ?? {};
+  const session = workspaceWithSession?.session;
 
   // Always render the main structure to prevent chat box flash during workspace transitions
   return (

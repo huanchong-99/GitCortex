@@ -23,7 +23,7 @@ export function KeyValueField({
   const formContext = registry.formContext as EnvFormContext | undefined;
 
   // Ensure we have a stable object reference
-  const data: KeyValueData = useMemo(() => formData ?? {}, [formData]);
+  const data: KeyValueData = useMemo(() => formData || {}, [formData]);
   const entries = useMemo(() => Object.entries(data), [data]);
 
   // Use the formContext handler to update env correctly

@@ -234,7 +234,7 @@ export function McpSettings() {
 
   const isMcpUnsupported = mcpError?.code === MCP_NOT_SUPPORTED_ERROR_CODE;
 
-  const preconfiguredObj = (mcpConfig?.preconfigured ?? {}) as Record<
+  const preconfiguredObj = (mcpConfig?.preconfigured || {}) as Record<
     string,
     unknown
   >;

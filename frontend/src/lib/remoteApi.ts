@@ -9,7 +9,7 @@ const makeRequest = async (path: string, options: RequestInit = {}) => {
     throw new Error('Not authenticated');
   }
 
-  const headers = new Headers(options.headers ?? {});
+  const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }

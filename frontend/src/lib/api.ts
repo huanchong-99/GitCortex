@@ -118,7 +118,7 @@ export class ApiError<E = unknown> extends Error {
 }
 
 const makeRequest = async (url: string, options: RequestInit = {}) => {
-  const headers = new Headers(options.headers ?? {});
+  const headers = new Headers(options.headers || {});
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }

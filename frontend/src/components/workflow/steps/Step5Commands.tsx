@@ -419,7 +419,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
     const defaultDescription = preset ? getDefaultDescription(preset) : '';
 
     // Update custom descriptions
-    const currentDescriptions = config.customDescriptions ?? {};
+    const currentDescriptions = config.customDescriptions || {};
     const nextDescriptions = { ...currentDescriptions };
 
     // Only store if different from default
@@ -430,7 +430,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
     }
 
     // Update additional commands
-    const currentCommands = config.additionalCommands ?? {};
+    const currentCommands = config.additionalCommands || {};
     const nextCommands = { ...currentCommands };
 
     // Only store if not empty
@@ -441,7 +441,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
     }
 
     // Update custom params
-    const currentParams = config.customParams ?? {};
+    const currentParams = config.customParams || {};
     const nextParams = { ...currentParams };
 
     // Only store if not empty
