@@ -15,15 +15,13 @@ export function ChatSystemMessage({
   onToggle,
 }: Readonly<ChatSystemMessageProps>) {
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'flex items-start gap-base text-sm text-low cursor-pointer',
+        'flex items-start gap-base text-sm text-low cursor-pointer text-left w-full',
         className
       )}
       onClick={onToggle}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle?.(); } }}
     >
       <InfoIcon className="shrink-0 size-icon-base mt-0.5" />
       <span
@@ -34,6 +32,6 @@ export function ChatSystemMessage({
       >
         {content}
       </span>
-    </div>
+    </button>
   );
 }

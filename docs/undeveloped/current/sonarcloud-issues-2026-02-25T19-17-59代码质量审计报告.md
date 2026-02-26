@@ -2673,7 +2673,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 62.1 Headings must have content and the content must be accessible by a screen reader.
+### 62.1 Headings must have content and the content must be accessible by a screen reader. ✅ 已修复
 
 - **问题ID**: `AZyVweeQZ9DOUQdEsGgV`
 - **项目**: huanchong-99
@@ -3583,7 +3583,7 @@
 - **创建时间**: 27 days ago
 - **标签**: accessibility, react
 
-### 88.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 88.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwefHZ9DOUQdEsGgi`
 - **项目**: huanchong-99
@@ -3596,7 +3596,7 @@
 - **创建时间**: 27 days ago
 - **标签**: accessibility, react
 
-### 88.4 `tabIndex` should only be declared on interactive elements.
+### 88.4 `tabIndex` should only be declared on interactive elements. ✅ 已修复
 
 - **问题ID**: `AZyVwefHZ9DOUQdEsGgj`
 - **项目**: huanchong-99
@@ -4372,7 +4372,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 109.2 Elements with the 'button' interactive role must be focusable.
+### 109.2 Elements with the 'button' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVwecUZ9DOUQdEsGf4`
 - **项目**: huanchong-99
@@ -4385,7 +4385,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 109.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 109.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwecUZ9DOUQdEsGf5`
 - **项目**: huanchong-99
@@ -4552,7 +4552,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 113.2 Elements with the 'button' interactive role must be focusable.
+### 113.2 Elements with the 'button' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVwebLZ9DOUQdEsGfg`
 - **项目**: huanchong-99
@@ -4565,7 +4565,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 113.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 113.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwebLZ9DOUQdEsGfh`
 - **项目**: huanchong-99
@@ -4629,7 +4629,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 115.2 Elements with the 'button' interactive role must be focusable.
+### 115.2 Elements with the 'button' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVwea8Z9DOUQdEsGfb`
 - **项目**: huanchong-99
@@ -4642,7 +4642,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 115.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 115.3 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVwea8Z9DOUQdEsGfc`
 - **项目**: huanchong-99
@@ -9173,7 +9173,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 217.1 Headings must have content and the content must be accessible by a screen reader.
+### 217.1 Headings must have content and the content must be accessible by a screen reader. ✅ 已修复
 
 - **问题ID**: `AZyVweP-Z9DOUQdEsGba`
 - **项目**: huanchong-99
@@ -9411,7 +9411,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 222.4 Headings must have content and the content must be accessible by a screen reader.
+### 222.4 Headings must have content and the content must be accessible by a screen reader. ✅ 已修复
 
 - **问题ID**: `AZyVweQkZ9DOUQdEsGbn`
 - **项目**: huanchong-99
@@ -10168,7 +10168,7 @@
 - **工作量**: 925min effort
 - **创建时间**: 1 month ago
 
-### 238.4 Elements with the 'button' interactive role must be focusable.
+### 238.4 Elements with the 'button' interactive role must be focusable. ✅ 已修复
 
 - **问题ID**: `AZyVweXLZ9DOUQdEsGdy`
 - **项目**: huanchong-99
@@ -10181,7 +10181,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 238.5 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.
+### 238.5 Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweXLZ9DOUQdEsGdz`
 - **项目**: huanchong-99

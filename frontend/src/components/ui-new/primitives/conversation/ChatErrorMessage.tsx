@@ -15,15 +15,13 @@ export function ChatErrorMessage({
   onToggle,
 }: Readonly<ChatErrorMessageProps>) {
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'flex items-start gap-base text-sm text-error cursor-pointer',
+        'flex items-start gap-base text-sm text-error cursor-pointer text-left w-full',
         className
       )}
       onClick={onToggle}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle?.(); } }}
     >
       <WarningCircleIcon className="shrink-0 size-icon-base mt-0.5" />
       <span
@@ -34,6 +32,6 @@ export function ChatErrorMessage({
       >
         {content}
       </span>
-    </div>
+    </button>
   );
 }
