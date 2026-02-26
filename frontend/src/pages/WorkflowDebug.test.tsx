@@ -9,7 +9,6 @@ import { setTestLanguage, i18n } from '@/test/renderWithI18n';
 import type { ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { Workflow } from '@/hooks/useWorkflows';
-import userEvent from '@testing-library/user-event';
 
 vi.mock('@/hooks/useWorkflows');
 

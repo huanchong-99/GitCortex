@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { PipelineView } from './PipelineView';
 import type { Terminal } from './TerminalCard';
-import type { WorkflowDetailDto, WorkflowTaskDto, TerminalDto } from '@/shared/types';
+import type { WorkflowTaskDto, TerminalDto } from '@/shared/types';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('PipelineView', () => {

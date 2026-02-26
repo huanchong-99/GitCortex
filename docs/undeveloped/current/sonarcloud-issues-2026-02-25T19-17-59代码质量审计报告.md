@@ -8106,7 +8106,7 @@
 - **工作量**: 615min effort
 - **创建时间**: 1 month ago
 
-### 195.8 '(payload as { message?: unknown }).message ?? ''' will use Object's default stringification format ('[object Object]') when stringified.
+### 195.8 '(payload as { message?: unknown }).message ?? ''' will use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj0`
 - **项目**: huanchong-99
@@ -8294,7 +8294,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 196.1 Make this public static property readonly.
+### 196.1 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjl`
 - **项目**: huanchong-99
@@ -8307,7 +8307,7 @@
 - **创建时间**: 15 days ago
 - **标签**: cwe
 
-### 196.2 Make this public static property readonly.
+### 196.2 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjm`
 - **项目**: huanchong-99
@@ -8320,7 +8320,7 @@
 - **创建时间**: 15 days ago
 - **标签**: cwe
 
-### 196.3 Make this public static property readonly.
+### 196.3 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjn`
 - **项目**: huanchong-99
@@ -8333,7 +8333,7 @@
 - **创建时间**: 3 days ago
 - **标签**: cwe
 
-### 196.4 Make this public static property readonly.
+### 196.4 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjo`
 - **项目**: huanchong-99
@@ -8346,7 +8346,7 @@
 - **创建时间**: 3 days ago
 - **标签**: cwe
 
-### 196.5 Make this public static property readonly.
+### 196.5 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjp`
 - **项目**: huanchong-99
@@ -8359,7 +8359,7 @@
 - **创建时间**: 3 days ago
 - **标签**: cwe
 
-### 196.6 Make this public static property readonly.
+### 196.6 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjq`
 - **项目**: huanchong-99
@@ -8372,7 +8372,7 @@
 - **创建时间**: 3 days ago
 - **标签**: cwe
 
-### 196.7 `String.raw` should be used to avoid escaping `\`.
+### 196.7 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjr`
 - **项目**: huanchong-99
@@ -8385,7 +8385,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 196.8 `String.raw` should be used to avoid escaping `\`.
+### 196.8 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVwep-Z9DOUQdEsGjs`
 - **项目**: huanchong-99
@@ -8583,7 +8583,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 201.3 'err.message' will use Object's default stringification format ('[object Object]') when stringified.
+### 201.3 'err.message' will use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVwemBZ9DOUQdEsGif`
 - **项目**: huanchong-99
@@ -9205,7 +9205,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 218.2 Prefer `Number.parseInt` over `parseInt`.
+### 218.2 Prefer `Number.parseInt` over `parseInt`. ✅ 已修复
 
 - **问题ID**: `AZyVwePYZ9DOUQdEsGbN`
 - **项目**: huanchong-99
@@ -9218,7 +9218,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, es2015
 
-### 218.3 Prefer `Number.parseInt` over `parseInt`.
+### 218.3 Prefer `Number.parseInt` over `parseInt`. ✅ 已修复
 
 - **问题ID**: `AZyVwePYZ9DOUQdEsGbO`
 - **项目**: huanchong-99
@@ -9231,7 +9231,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, es2015
 
-### 218.4 Prefer `Number.parseInt` over `parseInt`.
+### 218.4 Prefer `Number.parseInt` over `parseInt`. ✅ 已修复
 
 - **问题ID**: `AZyVwePYZ9DOUQdEsGbP`
 - **项目**: huanchong-99
@@ -10028,7 +10028,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 234.1 Remove this unused import of 'WorkflowDetailDto'.
+### 234.1 Remove this unused import of 'WorkflowDetailDto'. ✅ 已修复
 
 - **问题ID**: `AZyVweWrZ9DOUQdEsGdp`
 - **项目**: huanchong-99
@@ -10570,7 +10570,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 249.1 Remove this unused import of 'CreateWorkflowRequest'.
+### 249.1 Remove this unused import of 'CreateWorkflowRequest'. ✅ 已修复
 
 - **问题ID**: `AZyVweXCZ9DOUQdEsGdu`
 - **项目**: huanchong-99
@@ -12415,7 +12415,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 295.1 Remove this unused import of 'within'.
+### 295.1 Remove this unused import of 'within'. ✅ 已修复
 
 - **问题ID**: `AZyVweuWZ9DOUQdEsGlD`
 - **项目**: huanchong-99
@@ -12479,7 +12479,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 297.1 Remove this unused import of 'userEvent'.
+### 297.1 Remove this unused import of 'userEvent'. ✅ 已修复
 
 - **问题ID**: `AZyVweunZ9DOUQdEsGlH`
 - **项目**: huanchong-99

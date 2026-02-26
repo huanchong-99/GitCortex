@@ -126,9 +126,13 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-          const message =
-            payload && typeof payload === 'object' && 'message' in payload
-              ? String((payload as { message?: unknown }).message ?? '')
+          const messageValue = payload && typeof payload === 'object' && 'message' in payload
+            ? (payload as { message?: unknown }).message
+            : undefined;
+          const message = typeof messageValue === 'string'
+            ? messageValue
+            : messageValue instanceof Error
+              ? messageValue.message
               : '';
           throw new Error(message || `Failed to load terminal history (${response.status})`);
         }

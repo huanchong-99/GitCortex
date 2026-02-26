@@ -32,11 +32,11 @@ vi.mock('@xterm/addon-fit', () => {
 // Mock WebSocket
 class MockWebSocket {
   static readonly instances: MockWebSocket[] = [];
-  static readonly autoOpen = true;
-  static readonly CONNECTING = 0;
-  static readonly OPEN = 1;
-  static readonly CLOSING = 2;
-  static readonly CLOSED = 3;
+  static autoOpen = true;
+  static readonly CONNECTING = 0 as const;
+  static readonly OPEN = 1 as const;
+  static readonly CLOSING = 2 as const;
+  static readonly CLOSED = 3 as const;
 
   url = '';
   readyState = MockWebSocket.CONNECTING;

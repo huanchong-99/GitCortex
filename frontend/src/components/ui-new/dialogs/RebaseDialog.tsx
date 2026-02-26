@@ -46,7 +46,8 @@ function extractErrorMessage(err: unknown): string {
   }
 
   if ('message' in err && err.message) {
-    return String(err.message);
+    const msg = err.message;
+    return typeof msg === 'string' ? msg : msg instanceof Error ? msg.message : String(msg);
   }
 
   return 'Failed to rebase';

@@ -6,7 +6,6 @@ import {
   getDefaultWizardConfig,
   wizardConfigToCreateRequest,
 } from './types';
-import type { CreateWorkflowRequest } from '@/hooks/useWorkflows';
 
 describe('Workflow Types', () => {
   describe('WizardStep enum', () => {
