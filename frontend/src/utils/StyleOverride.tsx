@@ -110,7 +110,7 @@ export function AppWithStyleOverride({
 
       if (
         event.origin !== ALLOWED_PARENT_ORIGIN ||
-        event.source !== window.parent
+        event.source !== globalThis.window.parent
       ) {
         console.warn(
           '[StyleOverride] Message from unauthorized origin:',
@@ -162,12 +162,12 @@ export function AppWithStyleOverride({
       return;
     }
 
-    if (window.parent && window.parent !== window) {
+    if (globalThis.window.parent && globalThis.window.parent !== globalThis.window) {
       const readyMessage: VibeIframeReadyMessage = {
         type: 'VIBE_IFRAME_READY',
       };
 
-      window.parent.postMessage(readyMessage, ALLOWED_PARENT_ORIGIN);
+      globalThis.window.parent.postMessage(readyMessage, ALLOWED_PARENT_ORIGIN);
     }
   }, []);
 
