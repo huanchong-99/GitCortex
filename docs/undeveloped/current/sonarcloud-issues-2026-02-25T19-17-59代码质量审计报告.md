@@ -6138,7 +6138,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.7 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 150.7 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcr`
 - **项目**: huanchong-99
@@ -6151,7 +6151,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 150.8 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 150.8 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSqZ9DOUQdEsGcs`
 - **项目**: huanchong-99
@@ -6381,7 +6381,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 156.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcV`
 - **项目**: huanchong-99
@@ -6459,7 +6459,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.10 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 156.10 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcb`
 - **项目**: huanchong-99
@@ -6485,7 +6485,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.12 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 156.12 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcd`
 - **项目**: huanchong-99
@@ -6537,7 +6537,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.16 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 156.16 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGch`
 - **项目**: huanchong-99

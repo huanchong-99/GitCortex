@@ -184,14 +184,19 @@ export function CreateChatBoxContainer() {
   ]);
 
   // Determine error to display
-  const displayError =
-    hasAttemptedSubmit && repos.length === 0
-      ? 'Add at least one repository to create a workspace'
-      : createWorkspace.error
-        ? createWorkspace.error instanceof Error
-          ? createWorkspace.error.message
-          : 'Failed to create workspace'
-        : null;
+  const displayError = (() => {
+    if (hasAttemptedSubmit && repos.length === 0) {
+      return 'Add at least one repository to create a workspace';
+    } else if (createWorkspace.error) {
+      if (createWorkspace.error instanceof Error) {
+        return createWorkspace.error.message;
+      } else {
+        return 'Failed to create workspace';
+      }
+    } else {
+      return null;
+    }
+  })();
 
   // Wait for initial value to be applied before rendering
   // This ensures the editor mounts with content ready, so autoFocus works correctly
