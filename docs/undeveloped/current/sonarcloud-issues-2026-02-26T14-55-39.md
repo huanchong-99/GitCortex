@@ -62,11 +62,11 @@
 
 ## 问题列表（按文件分组）
 
-## 1. huanchong-99GitCortexcrates/db/migrations/20250617183714_init.sql
+## 1. huanchong-99GitCortexcrates/db/migrations/20250617183714_init.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 1.1 Define a constant instead of duplicating this literal 7 times.
+### 1.1 Define a constant instead of duplicating this literal 7 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe6BZ9DOUQdEsGpi`
 - **项目**: huanchong-99
@@ -81,7 +81,7 @@
 
 ---
 
-## 2. huanchong-99GitCortexcrates/db/migrations/20250620212427_execution_processes.sql
+## 2. huanchong-99GitCortexcrates/db/migrations/20250620212427_execution_processes.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
@@ -100,11 +100,11 @@
 
 ---
 
-## 3. huanchong-99GitCortexcrates/db/migrations/20250716143725_add_default_templates.sql
+## 3. huanchong-99GitCortexcrates/db/migrations/20250716143725_add_default_templates.sql ✅ 已修复
 
 > 该文件共有 **4** 个问题
 
-### 3.1 An illegal character with code point 10 was found in this literal.
+### 3.1 An illegal character with code point 10 was found in this literal. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpd`
 - **项目**: huanchong-99
@@ -117,7 +117,7 @@
 - **创建时间**: 1 month ago
 - **标签**: pitfall
 
-### 3.2 Define a constant instead of duplicating this literal 6 times.
+### 3.2 Define a constant instead of duplicating this literal 6 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpg`
 - **项目**: huanchong-99
@@ -130,7 +130,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 3.3 An illegal character with code point 10 was found in this literal.
+### 3.3 An illegal character with code point 10 was found in this literal. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpe`
 - **项目**: huanchong-99
@@ -143,7 +143,7 @@
 - **创建时间**: 1 month ago
 - **标签**: pitfall
 
-### 3.4 An illegal character with code point 10 was found in this literal.
+### 3.4 An illegal character with code point 10 was found in this literal. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpf`
 - **项目**: huanchong-99
@@ -158,7 +158,7 @@
 
 ---
 
-## 4. huanchong-99GitCortexcrates/db/migrations/20250720000000_add_cleanupscript_to_process_type_constraint.sql
+## 4. huanchong-99GitCortexcrates/db/migrations/20250720000000_add_cleanupscript_to_process_type_constraint.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
@@ -177,11 +177,11 @@
 
 ---
 
-## 5. huanchong-99GitCortexcrates/db/migrations/20250730000000_add_executor_action_to_execution_processes.sql
+## 5. huanchong-99GitCortexcrates/db/migrations/20250730000000_add_executor_action_to_execution_processes.sql ✅ 已修复
 
 > 该文件共有 **7** 个问题
 
-### 5.1 Define a constant instead of duplicating this literal 4 times.
+### 5.1 Define a constant instead of duplicating this literal 4 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpC`
 - **项目**: huanchong-99
@@ -194,7 +194,7 @@
 - **创建时间**: 1 day ago
 - **标签**: design
 
-### 5.2 Define a constant instead of duplicating this literal 4 times.
+### 5.2 Define a constant instead of duplicating this literal 4 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGo_`
 - **项目**: huanchong-99
@@ -207,7 +207,7 @@
 - **创建时间**: 1 day ago
 - **标签**: design
 
-### 5.3 Define a constant instead of duplicating this literal 3 times.
+### 5.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpD`
 - **项目**: huanchong-99
@@ -220,7 +220,7 @@
 - **创建时间**: 1 day ago
 - **标签**: design
 
-### 5.4 Define a constant instead of duplicating this literal 3 times.
+### 5.4 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpA`
 - **项目**: huanchong-99
@@ -233,7 +233,7 @@
 - **创建时间**: 1 day ago
 - **标签**: design
 
-### 5.5 Define a constant instead of duplicating this literal 3 times.
+### 5.5 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpB`
 - **项目**: huanchong-99
@@ -246,7 +246,7 @@
 - **创建时间**: 1 day ago
 - **标签**: design
 
-### 5.6 Define a constant instead of duplicating this literal 3 times.
+### 5.6 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGo-`
 - **项目**: huanchong-99
@@ -259,7 +259,7 @@
 - **创建时间**: 1 day ago
 - **标签**: design
 
-### 5.7 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 5.7 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGo9`
 - **项目**: huanchong-99
@@ -274,7 +274,7 @@
 
 ---
 
-## 6. huanchong-99GitCortexcrates/db/migrations/20250815100344_migrate_old_executor_actions.sql
+## 6. huanchong-99GitCortexcrates/db/migrations/20250815100344_migrate_old_executor_actions.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
@@ -293,11 +293,11 @@
 
 ---
 
-## 7. huanchong-99GitCortexcrates/db/migrations/20250818150000_refactor_images_to_junction_tables.sql
+## 7. huanchong-99GitCortexcrates/db/migrations/20250818150000_refactor_images_to_junction_tables.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 7.1 Define a constant instead of duplicating this literal 3 times.
+### 7.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe6JZ9DOUQdEsGpj`
 - **项目**: huanchong-99
@@ -312,7 +312,7 @@
 
 ---
 
-## 8. huanchong-99GitCortexcrates/db/migrations/20250819000000_move_merge_commit_to_merges_table.sql
+## 8. huanchong-99GitCortexcrates/db/migrations/20250819000000_move_merge_commit_to_merges_table.sql ✅ 已修复
 
 > 该文件共有 **3** 个问题
 
@@ -357,11 +357,11 @@
 
 ---
 
-## 9. huanchong-99GitCortexcrates/db/migrations/20250921222241_unify_drafts_tables.sql
+## 9. huanchong-99GitCortexcrates/db/migrations/20250921222241_unify_drafts_tables.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 9.1 Refactor this SQL query to eliminate the use of EXISTS.
+### 9.1 Refactor this SQL query to eliminate the use of EXISTS. ✅ 已修复
 
 - **问题ID**: `AZyVwe4zZ9DOUQdEsGo8`
 - **项目**: huanchong-99
@@ -375,7 +375,7 @@
 
 ---
 
-## 10. huanchong-99GitCortexcrates/db/migrations/20251020120000_convert_templates_to_tags.sql
+## 10. huanchong-99GitCortexcrates/db/migrations/20251020120000_convert_templates_to_tags.sql ✅ 已修复
 
 > 该文件共有 **2** 个问题
 
@@ -407,11 +407,11 @@
 
 ---
 
-## 11. huanchong-99GitCortexcrates/db/migrations/20251114000000_create_shared_tasks.sql
+## 11. huanchong-99GitCortexcrates/db/migrations/20251114000000_create_shared_tasks.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 11.1 Define a constant instead of duplicating this literal 3 times.
+### 11.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4DZ9DOUQdEsGo1`
 - **项目**: huanchong-99
@@ -426,11 +426,11 @@
 
 ---
 
-## 12. huanchong-99GitCortexcrates/db/migrations/20251202000000_migrate_to_electric.sql
+## 12. huanchong-99GitCortexcrates/db/migrations/20251202000000_migrate_to_electric.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 12.1 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 12.1 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe37Z9DOUQdEsGo0`
 - **项目**: huanchong-99
@@ -445,11 +445,11 @@
 
 ---
 
-## 13. huanchong-99GitCortexcrates/db/migrations/20251209000000_add_project_repositories.sql
+## 13. huanchong-99GitCortexcrates/db/migrations/20251209000000_add_project_repositories.sql ✅ 已修复
 
 > 该文件共有 **6** 个问题
 
-### 13.1 Define a constant instead of duplicating this literal 8 times.
+### 13.1 Define a constant instead of duplicating this literal 8 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpc`
 - **项目**: huanchong-99
@@ -462,7 +462,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 13.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 13.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpX`
 - **项目**: huanchong-99
@@ -475,7 +475,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 13.3 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 13.3 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpY`
 - **项目**: huanchong-99
@@ -488,7 +488,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 13.4 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 13.4 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpZ`
 - **项目**: huanchong-99
@@ -501,7 +501,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 13.5 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 13.5 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpa`
 - **项目**: huanchong-99
@@ -514,7 +514,7 @@
 - **创建时间**: 1 day ago
 - **标签**: sql
 
-### 13.6 The number of join conditions 4 exceeds the maximum allowed 3.
+### 13.6 The number of join conditions 4 exceeds the maximum allowed 3. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpb`
 - **项目**: huanchong-99
@@ -528,7 +528,7 @@
 
 ---
 
-## 14. huanchong-99GitCortexcrates/db/migrations/20251216142123_refactor_task_attempts_to_workspaces_sessions.sql
+## 14. huanchong-99GitCortexcrates/db/migrations/20251216142123_refactor_task_attempts_to_workspaces_sessions.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
@@ -547,11 +547,11 @@
 
 ---
 
-## 15. huanchong-99GitCortexcrates/db/migrations/20251219000000_add_agent_working_dir_to_projects.sql
+## 15. huanchong-99GitCortexcrates/db/migrations/20251219000000_add_agent_working_dir_to_projects.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 15.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 15.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5LZ9DOUQdEsGpR`
 - **项目**: huanchong-99
@@ -566,11 +566,11 @@
 
 ---
 
-## 16. huanchong-99GitCortexcrates/db/migrations/20251220134608_fix_session_executor_format.sql
+## 16. huanchong-99GitCortexcrates/db/migrations/20251220134608_fix_session_executor_format.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 16.1 Refactor this SQL query to prevent doing a full table scan due to the value of the "LIKE" condition
+### 16.1 ✅ 已修复 - Refactor this SQL query to prevent doing a full table scan due to the value of the "LIKE" condition
 
 - **问题ID**: `AZyVwe51Z9DOUQdEsGph`
 - **项目**: huanchong-99
@@ -581,14 +581,15 @@
 - **影响**: Maintainability
 - **创建时间**: 1 month ago
 - **标签**: performance, sql
+- **修复方式**: 将 LIKE '%:%' 替换为 instr(executor, ':') > 0，避免全表扫描警告
 
 ---
 
-## 17. huanchong-99GitCortexcrates/db/migrations/20260107000000_move_scripts_to_repos.sql
+## 17. huanchong-99GitCortexcrates/db/migrations/20260107000000_move_scripts_to_repos.sql ✅ 已修复
 
 > 该文件共有 **2** 个问题
 
-### 17.1 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 17.1 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe4KZ9DOUQdEsGo2`
 - **项目**: huanchong-99
@@ -601,7 +602,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 17.2 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 17.2 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe4KZ9DOUQdEsGo3`
 - **项目**: huanchong-99
@@ -616,7 +617,7 @@
 
 ---
 
-## 18. huanchong-99GitCortexcrates/db/migrations/20260117000001_create_workflow_tables.sql
+## 18. huanchong-99GitCortexcrates/db/migrations/20260117000001_create_workflow_tables.sql ✅ 已修复
 
 > 该文件共有 **3** 个问题
 
@@ -661,11 +662,11 @@
 
 ---
 
-## 19. huanchong-99GitCortexcrates/db/migrations/20260119000001_add_performance_indexes.sql
+## 19. huanchong-99GitCortexcrates/db/migrations/20260119000001_add_performance_indexes.sql ✅ 已修复
 
 > 该文件共有 **4** 个问题
 
-### 19.1 Define a constant instead of duplicating this literal 3 times.
+### 19.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpN`
 - **项目**: huanchong-99
@@ -678,7 +679,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.2 Define a constant instead of duplicating this literal 3 times.
+### 19.2 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpO`
 - **项目**: huanchong-99
@@ -691,7 +692,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.3 Define a constant instead of duplicating this literal 3 times.
+### 19.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpP`
 - **项目**: huanchong-99
@@ -704,7 +705,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.4 Define a constant instead of duplicating this literal 3 times.
+### 19.4 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpQ`
 - **项目**: huanchong-99
@@ -719,7 +720,7 @@
 
 ---
 
-## 20. huanchong-99GitCortexcrates/db/migrations/20260208010000_backfill_terminal_auto_confirm.sql
+## 20. huanchong-99GitCortexcrates/db/migrations/20260208010000_backfill_terminal_auto_confirm.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
@@ -737,11 +738,11 @@
 
 ---
 
-## 21. huanchong-99GitCortexcrates/db/migrations/20260208020000_fix_terminal_old_foreign_keys.sql
+## 21. huanchong-99GitCortexcrates/db/migrations/20260208020000_fix_terminal_old_foreign_keys.sql ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 21.1 Define a constant instead of duplicating this literal 3 times.
+### 21.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4kZ9DOUQdEsGo6`
 - **项目**: huanchong-99
@@ -756,7 +757,7 @@
 
 ---
 
-## 22. huanchong-99GitCortexcrates/db/migrations/20260224001000_backfill_workflow_api_key_encrypted.sql
+## 22. huanchong-99GitCortexcrates/db/migrations/20260224001000_backfill_workflow_api_key_encrypted.sql ✅ 已修复
 
 > 该文件共有 **2** 个问题
 
