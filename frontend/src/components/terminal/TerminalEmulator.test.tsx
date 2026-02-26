@@ -31,8 +31,8 @@ vi.mock('@xterm/addon-fit', () => {
 
 // Mock WebSocket
 class MockWebSocket {
-  static instances: MockWebSocket[] = [];
-  static autoOpen = true;
+  static readonly instances: MockWebSocket[] = [];
+  static readonly autoOpen = true;
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;
   static readonly CLOSING = 2;
@@ -99,13 +99,13 @@ describe('TerminalEmulator', () => {
   describe('Rendering', () => {
     it('should render terminal container', () => {
       render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
-      const container = document.querySelector('.w-full.h-full.min-h-\\[300px\\]');
+      const container = document.querySelector(String.raw`.w-full.h-full.min-h-\[300px\]`);
       expect(container).toBeInTheDocument();
     });
 
     it('should have correct CSS classes for styling', () => {
       render(<TerminalEmulator terminalId={VALID_TERMINAL_ID} />);
-      const container = document.querySelector('.bg-\\[\\#1e1e1e\\]');
+      const container = document.querySelector(String.raw`.bg-\[\#1e1e1e\]`);
       expect(container).toBeInTheDocument();
     });
 

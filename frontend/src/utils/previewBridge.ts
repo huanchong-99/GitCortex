@@ -88,7 +88,8 @@ export class ClickToComponentListener {
               version: 1,
               type: 'enable-button',
             };
-            (event.source as Window).postMessage(enableMsg, '*');
+            const targetOrigin = (event.origin && event.origin !== 'null') ? event.origin : globalThis.location.origin;
+            (event.source as Window).postMessage(enableMsg, targetOrigin);
           }
           this.handlers.onReady?.();
           break;
@@ -128,7 +129,8 @@ export class ClickToComponentListener {
    * Send a message to the iframe (if needed)
    */
   sendToIframe(iframe: HTMLIFrameElement, message: unknown): void {
-    iframe.contentWindow?.postMessage(message, '*');
+    const targetOrigin = iframe.src ? new URL(iframe.src).origin : globalThis.location.origin;
+    iframe.contentWindow?.postMessage(message, targetOrigin);
   }
 }
 

@@ -43,7 +43,7 @@ const DeleteTaskConfirmationDialogImpl =
     };
 
     const handleCancelDelete = () => {
-      modal.reject();
+      modal.reject(new Error('Delete cancelled by user'));
       modal.hide();
     };
 

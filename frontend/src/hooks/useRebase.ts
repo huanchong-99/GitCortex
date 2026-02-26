@@ -21,11 +21,7 @@ export function useRebase(
     {
       mutationFn: (args) => {
         if (!attemptId) {
-          return Promise.reject({
-            success: false as const,
-            error: undefined,
-            message: 'Attempt id is not set',
-          });
+          return Promise.reject(new Error('Attempt id is not set'));
         }
         const repoId = args?.repoId;
         const newBaseBranch = args?.newBaseBranch;

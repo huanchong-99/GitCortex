@@ -84,7 +84,7 @@ const StopShareTaskDialogImpl = NiceModal.create<StopShareTaskDialogProps>(
           if (shouldResolve) {
             modal.resolve();
           } else {
-            modal.reject();
+            modal.reject(new Error('Stop share cancelled by user'));
           }
         }}
       >

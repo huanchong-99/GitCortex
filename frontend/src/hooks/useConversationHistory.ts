@@ -492,7 +492,7 @@ export const useConversationHistory = ({
           },
           onError: () => {
             controller.close();
-            reject();
+            reject(new Error('Failed to load running process'));
           },
         });
       });

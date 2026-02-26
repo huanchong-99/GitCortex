@@ -13828,7 +13828,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 319.2 Specify a target origin for this message.
+### 319.2 Specify a target origin for this message. ✅ 已修复
 
 - **问题ID**: `AZyVwe1WZ9DOUQdEsGnd`
 - **项目**: huanchong-99
@@ -13841,7 +13841,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, html5, ...
 
-### 319.3 Specify a target origin for this message.
+### 319.3 Specify a target origin for this message. ✅ 已修复
 
 - **问题ID**: `AZyVwe1WZ9DOUQdEsGne`
 - **项目**: huanchong-99
@@ -14268,7 +14268,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.14 Specify a target origin for this message.
+### 323.14 Specify a target origin for this message. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnv`
 - **项目**: huanchong-99
@@ -14293,7 +14293,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 323.16 Specify a target origin for this message.
+### 323.16 Specify a target origin for this message. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGny`
 - **项目**: huanchong-99
@@ -14332,7 +14332,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 323.19 Specify a target origin for this message.
+### 323.19 Specify a target origin for this message. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn1`
 - **项目**: huanchong-99
