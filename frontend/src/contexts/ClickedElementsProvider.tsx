@@ -128,7 +128,8 @@ function formatLoc(path: string, line?: number, col?: number) {
   if (!path) return '';
   if (line == null) return path;
   const colPart = col != null ? `:${col}` : '';
-  return `${path}:${line}${colPart}`;
+  const lineCol = `${line}${colPart}`;
+  return `${path}:${lineCol}`;
 }
 
 function formatDomBits(ce?: OpenInEditorPayload['clickedElement']) {
@@ -323,11 +324,9 @@ function formatClickedMarkdown(
   const first = effectiveChain[0];
   const parsed = parsePathWithLineCol(first.pathToSource);
   const rel = relativizePath(parsed.path, workspaceRoot);
-  const loc = formatLoc(
-    rel,
-    first.source?.lineNumber ?? parsed.line,
-    first.source?.columnNumber ?? parsed.col
-  );
+  const lineNum = first.source?.lineNumber ?? parsed.line;
+  const colNum = first.source?.columnNumber ?? parsed.col;
+  const loc = formatLoc(rel, lineNum, colNum);
 
   // Build hierarchy from effective chain
   const items = effectiveChain.map((c, i) => {

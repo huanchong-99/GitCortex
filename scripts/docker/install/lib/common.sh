@@ -16,7 +16,8 @@ log_error() { printf '[ERROR] %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; return 0
 # --- Utilities ---
 
 require_command() {
-    command -v "$1" >/dev/null 2>&1 || { log_error "Required command not found: $1"; exit 1; }
+    local cmd="$1"
+    command -v "$cmd" >/dev/null 2>&1 || { log_error "Required command not found: $cmd"; exit 1; }
     return 0
 }
 

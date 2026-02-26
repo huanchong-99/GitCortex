@@ -49,8 +49,10 @@ function serializeKeyEvent(e: KeyboardEvent): KeyPayload {
 type EditableElement = HTMLInputElement | HTMLTextAreaElement | (HTMLElement & { isContentEditable: boolean });
 
 /** Platform check used for shortcut detection. */
-const isMac = () => navigator.userAgentData?.platform?.toUpperCase().includes('MAC') ??
-                    navigator.userAgent.toUpperCase().includes('MAC');
+const isMac = () => {
+  const platform = navigator.userAgentData?.platform ?? navigator.platform;
+  return platform.toUpperCase().includes('MAC');
+};
 
 /** True for Cmd/Ctrl+C (no Shift/Alt). */
 const isCopy = (e: KeyboardEvent) =>

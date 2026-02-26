@@ -51,10 +51,7 @@ export function buildResolveConflictsInstructions(
 
   const opTitle = displayConflictOpLabel(op);
   const header = formatConflictHeader(op, source, base, repoName);
+  const gitEditorNote = `\n\nPlease resolve each file carefully. When continuing, ensure the ${opTitle.toLowerCase()} does not hang (set \`GIT_EDITOR=true\` or use a non-interactive editor).`;
 
-  return (
-    `${header}` +
-    filesBlock +
-    `\n\nPlease resolve each file carefully. When continuing, ensure the ${opTitle.toLowerCase()} does not hang (set \`GIT_EDITOR=true\` or use a non-interactive editor).`
-  );
+  return `${header}${filesBlock}${gitEditorNote}`;
 }

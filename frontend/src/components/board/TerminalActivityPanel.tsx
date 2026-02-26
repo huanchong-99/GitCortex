@@ -70,8 +70,8 @@ function TerminalActivityItem({
       </div>
       {recentOutput.length > 0 && (
         <div className="mt-1 pl-4 text-[10px] font-mono text-low max-h-12 overflow-hidden">
-          {recentOutput.slice(-3).map((line) => (
-            <div key={line || '\u00A0'} className="truncate">{line || '\u00A0'}</div>
+          {recentOutput.slice(-3).map((line, idx) => (
+            <div key={`output-${idx}`} className="truncate">{line || '\u00A0'}</div>
           ))}
         </div>
       )}

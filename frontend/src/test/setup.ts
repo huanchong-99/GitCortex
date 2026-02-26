@@ -29,4 +29,3 @@ if (typeof HTMLCanvasElement !== 'undefined') {
     }) as unknown as CanvasRenderingContext2D;
 }
 
-export {};

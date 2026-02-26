@@ -23,7 +23,7 @@ import type {
 const workflowWizardMock = vi.hoisted(() => ({
   submitConfig: {
     project: {
-      workingDirectory: 'E:\\test\\test',
+      workingDirectory: String.raw`E:\test\test`,
       gitStatus: { isGitRepo: true, isDirty: false },
     },
     basic: {
@@ -564,7 +564,7 @@ describe('Workflows Page', () => {
         .getByText('Completed Workflow')
         .closest('.cursor-pointer');
       expect(workflowCard).toBeInTheDocument();
-      fireEvent.click(workflowCard!);
+      fireEvent.click(workflowCard);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Merge Workflow' })).toBeInTheDocument();
@@ -724,7 +724,7 @@ describe('Workflows Page', () => {
         expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
 
       await waitFor(() => {
         expect(
@@ -798,7 +798,7 @@ describe('Workflows Page', () => {
         expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
 
       await waitFor(() => {
         expect(
@@ -943,7 +943,7 @@ describe('Workflows Page', () => {
         expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
 
       await waitFor(() => {
         expect(
@@ -1019,7 +1019,7 @@ describe('Workflows Page', () => {
         expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
 
       await waitFor(() => {
         expect(
@@ -1105,7 +1105,7 @@ describe('Workflows Page', () => {
         expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer')!);
+      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
 
       await waitFor(() => {
         expect(
@@ -1179,7 +1179,7 @@ describe('Workflows Page', () => {
         expect(screen.getByText('Unordered Workflow')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Unordered Workflow').closest('.cursor-pointer')!);
+      fireEvent.click(screen.getByText('Unordered Workflow').closest('.cursor-pointer'));
 
       await waitFor(() => {
         expect(screen.getByText('Task A')).toBeInTheDocument();

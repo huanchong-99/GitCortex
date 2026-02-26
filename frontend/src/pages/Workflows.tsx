@@ -145,7 +145,7 @@ export function Workflows() {
   useEffect(() => {
     if (projects.length > 0 && projectIdFromUrl !== validProjectId) {
       const newParams = new URLSearchParams(searchParams);
-      newParams.set('projectId', validProjectId!);
+      newParams.set('projectId', validProjectId);
       setSearchParams(newParams, { replace: true });
       setSelectedWorkflowId(null);
     }
