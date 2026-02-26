@@ -75,8 +75,12 @@ function RebaseDialogContent({
     } catch (err) {
       // Check if this is a conflict error (Result type with success=false)
       const resultErr = err as Result<void, GitOperationError> | undefined;
-      const errorType =
-        resultErr && !resultErr.success ? resultErr.error?.type : undefined;
+      let errorType: string | undefined;
+      if (resultErr && !resultErr.success) {
+        errorType = resultErr.error?.type;
+      } else {
+        errorType = undefined;
+      }
 
       if (
         errorType === 'merge_conflicts' ||

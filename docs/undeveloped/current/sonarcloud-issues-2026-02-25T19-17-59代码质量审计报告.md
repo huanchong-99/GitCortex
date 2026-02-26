@@ -1030,7 +1030,7 @@
 - **创建时间**: 1 month ago
 - **标签**: optimization, performance
 
-### 24.8 Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed.
+### 24.8 Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeN`
 - **项目**: huanchong-99
@@ -1243,7 +1243,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 27.3 Refactor this function to reduce its Cognitive Complexity from 32 to the 15 allowed.
+### 27.3 Refactor this function to reduce its Cognitive Complexity from 32 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweYgZ9DOUQdEsGeh`
 - **项目**: huanchong-99
@@ -1391,7 +1391,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 30.1 Refactor this function to reduce its Cognitive Complexity from 26 to the 15 allowed.
+### 30.1 Refactor this function to reduce its Cognitive Complexity from 26 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweRDZ9DOUQdEsGbv`
 - **项目**: huanchong-99
@@ -1557,7 +1557,7 @@
 
 > 该文件共有 **9** 个问题
 
-### 34.1 Refactor this function to reduce its Cognitive Complexity from 21 to the 15 allowed.
+### 34.1 Refactor this function to reduce its Cognitive Complexity from 21 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGes`
 - **项目**: huanchong-99
@@ -3190,7 +3190,7 @@
 
 > 该文件共有 **9** 个问题
 
-### 81.1 Refactor this function to reduce its Cognitive Complexity from 23 to the 15 allowed.
+### 81.1 Refactor this function to reduce its Cognitive Complexity from 23 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgD`
 - **项目**: huanchong-99

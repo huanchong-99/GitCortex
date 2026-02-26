@@ -125,9 +125,11 @@ export function CreateChatBoxContainer() {
 
       // Fallback to DEFAULT or first available
       if (!targetVariant) {
-        targetVariant = variants.includes('DEFAULT')
-          ? 'DEFAULT'
-          : (variants[0] ?? null);
+        if (variants.includes('DEFAULT')) {
+          targetVariant = 'DEFAULT';
+        } else {
+          targetVariant = variants[0] ?? null;
+        }
       }
 
       setSelectedProfile({ executor, variant: targetVariant });
