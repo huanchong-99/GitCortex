@@ -1269,7 +1269,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 27.5 Unexpected negated condition.
+### 27.5 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweYgZ9DOUQdEsGej`
 - **项目**: huanchong-99
@@ -1417,7 +1417,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 30.3 Unexpected negated condition.
+### 30.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweRDZ9DOUQdEsGbw`
 - **项目**: huanchong-99
@@ -1443,7 +1443,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 30.5 Unexpected negated condition.
+### 30.5 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweRDZ9DOUQdEsGby`
 - **项目**: huanchong-99
@@ -1583,7 +1583,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 34.3 Unexpected negated condition.
+### 34.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGeu`
 - **项目**: huanchong-99
@@ -1935,7 +1935,7 @@
 - **工作量**: 2705min effort
 - **创建时间**: 1 month ago
 
-### 43.3 Unexpected negated condition.
+### 43.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh3`
 - **项目**: huanchong-99
@@ -2571,7 +2571,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 58.2 This assertion is unnecessary since it does not change the type of the expression.
+### 58.2 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwei1Z9DOUQdEsGhk`
 - **项目**: huanchong-99
@@ -3769,7 +3769,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 93.4 Unexpected negated condition.
+### 93.4 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweOZZ9DOUQdEsGaz`
 - **项目**: huanchong-99
@@ -4206,7 +4206,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 103.2 Unexpected negated condition.
+### 103.2 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweY4Z9DOUQdEsGeo`
 - **项目**: huanchong-99
@@ -4257,7 +4257,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 105.2 This assertion is unnecessary since it does not change the type of the expression.
+### 105.2 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweluZ9DOUQdEsGib`
 - **项目**: huanchong-99
@@ -4982,7 +4982,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 124.3 Unexpected negated condition.
+### 124.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweomZ9DOUQdEsGjO`
 - **项目**: huanchong-99
@@ -5996,7 +5996,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 148.6 Unexpected negated condition.
+### 148.6 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcy`
 - **项目**: huanchong-99
@@ -6227,7 +6227,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 152.4 Unexpected negated condition.
+### 152.4 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweSCZ9DOUQdEsGcH`
 - **项目**: huanchong-99
@@ -6394,7 +6394,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.5 Unexpected negated condition.
+### 156.5 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcW`
 - **项目**: huanchong-99
@@ -6420,7 +6420,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 156.7 Unexpected negated condition.
+### 156.7 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcY`
 - **项目**: huanchong-99
@@ -6608,7 +6608,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 157.4 Unexpected negated condition.
+### 157.4 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweROZ9DOUQdEsGb3`
 - **项目**: huanchong-99
@@ -6634,7 +6634,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 157.6 Unexpected negated condition.
+### 157.6 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweROZ9DOUQdEsGb5`
 - **项目**: huanchong-99
@@ -7256,7 +7256,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 174.2 Unexpected negated condition.
+### 174.2 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweXbZ9DOUQdEsGd5`
 - **项目**: huanchong-99
@@ -7839,7 +7839,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 191.9 Unexpected negated condition.
+### 191.9 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfP`
 - **项目**: huanchong-99
@@ -8119,7 +8119,7 @@
 - **创建时间**: 14 days ago
 - **标签**: object, string, ...
 
-### 195.9 Unexpected negated condition.
+### 195.9 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj1`
 - **项目**: huanchong-99
@@ -8487,7 +8487,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 198.1 Unexpected negated condition.
+### 198.1 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwemhZ9DOUQdEsGim`
 - **项目**: huanchong-99
@@ -8699,7 +8699,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 203.4 This assertion is unnecessary since it does not change the type of the expression.
+### 203.4 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwempZ9DOUQdEsGiq`
 - **项目**: huanchong-99
@@ -9103,7 +9103,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 214.3 Unexpected negated condition.
+### 214.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwehPZ9DOUQdEsGhH`
 - **项目**: huanchong-99
@@ -9372,7 +9372,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 222.1 This assertion is unnecessary since it does not change the type of the expression.
+### 222.1 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweQkZ9DOUQdEsGbk`
 - **项目**: huanchong-99
@@ -10551,7 +10551,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design, type-dependent
 
-### 248.2 Unexpected negated condition.
+### 248.2 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweVQZ9DOUQdEsGdT`
 - **项目**: huanchong-99
@@ -10717,7 +10717,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload, confusing
 
-### 254.3 Unexpected negated condition.
+### 254.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm5`
 - **项目**: huanchong-99
@@ -11255,7 +11255,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 270.1 This assertion is unnecessary since it does not change the type of the expression.
+### 270.1 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl5`
 - **项目**: huanchong-99
@@ -11421,7 +11421,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 272.4 This assertion is unnecessary since it does not change the type of the expression.
+### 272.4 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewEZ9DOUQdEsGlu`
 - **项目**: huanchong-99
@@ -11601,7 +11601,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 276.1 Unexpected negated condition.
+### 276.1 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmG`
 - **项目**: huanchong-99
@@ -11736,7 +11736,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 279.1 This assertion is unnecessary since it does not change the type of the expression.
+### 279.1 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwexVZ9DOUQdEsGmP`
 - **项目**: huanchong-99
@@ -11819,7 +11819,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 282.1 This assertion is unnecessary since it does not change the type of the expression.
+### 282.1 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGlw`
 - **项目**: huanchong-99
@@ -11832,7 +11832,7 @@
 - **创建时间**: 26 days ago
 - **标签**: redundant, type-dependent
 
-### 282.2 This assertion is unnecessary since it does not change the type of the expression.
+### 282.2 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGlx`
 - **项目**: huanchong-99
@@ -11845,7 +11845,7 @@
 - **创建时间**: 26 days ago
 - **标签**: redundant, type-dependent
 
-### 282.3 This assertion is unnecessary since it does not change the type of the expression.
+### 282.3 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGly`
 - **项目**: huanchong-99
@@ -11858,7 +11858,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 282.4 This assertion is unnecessary since it does not change the type of the expression.
+### 282.4 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGlz`
 - **项目**: huanchong-99
@@ -11871,7 +11871,7 @@
 - **创建时间**: 26 days ago
 - **标签**: redundant, type-dependent
 
-### 282.5 This assertion is unnecessary since it does not change the type of the expression.
+### 282.5 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGl0`
 - **项目**: huanchong-99
@@ -11884,7 +11884,7 @@
 - **创建时间**: 26 days ago
 - **标签**: redundant, type-dependent
 
-### 282.6 This assertion is unnecessary since it does not change the type of the expression.
+### 282.6 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGl1`
 - **项目**: huanchong-99
@@ -11897,7 +11897,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 282.7 This assertion is unnecessary since it does not change the type of the expression.
+### 282.7 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGl2`
 - **项目**: huanchong-99
@@ -11910,7 +11910,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 282.8 This assertion is unnecessary since it does not change the type of the expression.
+### 282.8 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwewWZ9DOUQdEsGl3`
 - **项目**: huanchong-99
@@ -12043,7 +12043,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 285.3 This assertion is unnecessary since it does not change the type of the expression.
+### 285.3 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwev8Z9DOUQdEsGlp`
 - **项目**: huanchong-99
@@ -12075,7 +12075,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 286.1 Unexpected negated condition.
+### 286.1 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwex6Z9DOUQdEsGmb`
 - **项目**: huanchong-99
@@ -12101,7 +12101,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 286.3 Unexpected negated condition.
+### 286.3 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwex6Z9DOUQdEsGmd`
 - **项目**: huanchong-99
@@ -12204,7 +12204,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 288.1 This assertion is unnecessary since it does not change the type of the expression.
+### 288.1 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwevLZ9DOUQdEsGlW`
 - **项目**: huanchong-99
@@ -12236,7 +12236,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, nullish-coalescing, ...
 
-### 289.2 Unexpected negated condition.
+### 289.2 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVweyMZ9DOUQdEsGmg`
 - **项目**: huanchong-99
@@ -12274,7 +12274,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 291.1 This assertion is unnecessary since it does not change the type of the expression.
+### 291.1 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweyUZ9DOUQdEsGmh`
 - **项目**: huanchong-99
@@ -12287,7 +12287,7 @@
 - **创建时间**: 26 days ago
 - **标签**: redundant, type-dependent
 
-### 291.2 This assertion is unnecessary since it does not change the type of the expression.
+### 291.2 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweyUZ9DOUQdEsGmi`
 - **项目**: huanchong-99
@@ -12319,7 +12319,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, modernize, ...
 
-### 292.2 This assertion is unnecessary since it does not change the type of the expression.
+### 292.2 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweycZ9DOUQdEsGmk`
 - **项目**: huanchong-99
@@ -12345,7 +12345,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, modernize, ...
 
-### 292.4 This assertion is unnecessary since it does not change the type of the expression.
+### 292.4 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweycZ9DOUQdEsGmm`
 - **项目**: huanchong-99
@@ -14015,7 +14015,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 322.8 This assertion is unnecessary since it does not change the type of the expression.
+### 322.8 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoE`
 - **项目**: huanchong-99
@@ -14164,7 +14164,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.6 This assertion is unnecessary since it does not change the type of the expression.
+### 323.6 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnn`
 - **项目**: huanchong-99
@@ -14190,7 +14190,7 @@
 - **创建时间**: 1 month ago
 - **标签**: proficiency
 
-### 323.8 Unexpected negated condition.
+### 323.8 Unexpected negated condition. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnp`
 - **项目**: huanchong-99
@@ -14216,7 +14216,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 323.10 This assertion is unnecessary since it does not change the type of the expression.
+### 323.10 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnr`
 - **项目**: huanchong-99
@@ -14319,7 +14319,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, html5, ...
 
-### 323.18 This assertion is unnecessary since it does not change the type of the expression.
+### 323.18 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn0`
 - **项目**: huanchong-99
