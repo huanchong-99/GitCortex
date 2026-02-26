@@ -10041,7 +10041,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015, type-dependent, ...
 
-### 234.2 `String.raw` should be used to avoid escaping `\`.
+### 234.2 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVweWrZ9DOUQdEsGdq`
 - **项目**: huanchong-99
@@ -10054,7 +10054,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 234.3 `String.raw` should be used to avoid escaping `\`.
+### 234.3 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVweWrZ9DOUQdEsGdr`
 - **项目**: huanchong-99
@@ -10092,7 +10092,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 236.1 `String.raw` should be used to avoid escaping `\`.
+### 236.1 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVweWZZ9DOUQdEsGdm`
 - **项目**: huanchong-99
@@ -10455,7 +10455,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 245.1 `String.raw` should be used to avoid escaping `\`.
+### 245.1 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVweVZZ9DOUQdEsGdV`
 - **项目**: huanchong-99
@@ -12601,7 +12601,7 @@
 
 > 该文件共有 **9** 个问题
 
-### 300.1 `String.raw` should be used to avoid escaping `\`.
+### 300.1 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlI`
 - **项目**: huanchong-99
