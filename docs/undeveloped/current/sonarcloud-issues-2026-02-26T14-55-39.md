@@ -85,7 +85,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 2.1 Define a constant instead of duplicating this literal 3 times.
+### 2.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4rZ9DOUQdEsGo7`
 - **项目**: huanchong-99
@@ -278,7 +278,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 6.1 Define a constant instead of duplicating this literal 3 times.
+### 6.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4TZ9DOUQdEsGo4`
 - **项目**: huanchong-99
@@ -316,7 +316,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 8.1 Define a constant instead of duplicating this literal 3 times.
+### 8.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe31Z9DOUQdEsGoz`
 - **项目**: huanchong-99
@@ -329,7 +329,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 8.2 Define a constant instead of duplicating this literal 3 times.
+### 8.2 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe31Z9DOUQdEsGox`
 - **项目**: huanchong-99
@@ -342,7 +342,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 8.3 Define a constant instead of duplicating this literal 3 times.
+### 8.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe31Z9DOUQdEsGoy`
 - **项目**: huanchong-99
@@ -379,7 +379,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 10.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 10.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5SZ9DOUQdEsGpS`
 - **项目**: huanchong-99
@@ -392,7 +392,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 10.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 10.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5SZ9DOUQdEsGpT`
 - **项目**: huanchong-99
@@ -532,7 +532,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 14.1 Define a constant instead of duplicating this literal 7 times.
+### 14.1 Define a constant instead of duplicating this literal 7 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4cZ9DOUQdEsGo5`
 - **项目**: huanchong-99
@@ -621,7 +621,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 18.1 Define a constant instead of duplicating this literal 4 times.
+### 18.1 Define a constant instead of duplicating this literal 4 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5bZ9DOUQdEsGpW`
 - **项目**: huanchong-99
@@ -634,7 +634,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 18.2 Define a constant instead of duplicating this literal 3 times.
+### 18.2 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5bZ9DOUQdEsGpU`
 - **项目**: huanchong-99
@@ -647,7 +647,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 18.3 Define a constant instead of duplicating this literal 3 times.
+### 18.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5bZ9DOUQdEsGpV`
 - **项目**: huanchong-99
@@ -724,7 +724,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 20.1 Refactor this SQL query to eliminate the use of EXISTS.
+### 20.1 Refactor this SQL query to eliminate the use of EXISTS. ✅ 已修复
 
 - **问题ID**: `AZyVwe6RZ9DOUQdEsGpk`
 - **项目**: huanchong-99
@@ -761,7 +761,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 22.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 22.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe6gZ9DOUQdEsGpm`
 - **项目**: huanchong-99
@@ -774,7 +774,7 @@
 - **创建时间**: 1 day ago
 - **标签**: sql
 
-### 22.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 22.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe6gZ9DOUQdEsGpn`
 - **项目**: huanchong-99
@@ -2474,7 +2474,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 65.1 Refactor this function to reduce its Cognitive Complexity from 31 to the 15 allowed.
+### 65.1 Refactor this function to reduce its Cognitive Complexity from 31 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcS`
 - **项目**: huanchong-99

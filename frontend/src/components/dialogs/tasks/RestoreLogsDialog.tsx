@@ -71,6 +71,371 @@ function getToggleLabelText(forceReset: boolean, worktreeResetOn: boolean, t: an
   return t('restoreLogsDialog.resetWorktree.disabledUncommitted');
 }
 
+// Toggle switch component
+function ToggleSwitch({
+  enabled,
+  onClick,
+  enabledColor = 'bg-emerald-500',
+}: {
+  enabled: boolean;
+  onClick: () => void;
+  enabledColor?: string;
+}) {
+  return (
+    <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
+      <span
+        className={
+          (enabled ? enabledColor : 'bg-muted-foreground/30') +
+          ' absolute inset-0 rounded-full transition-colors'
+        }
+      />
+      <span
+        className={
+          (enabled ? 'translate-x-5' : 'translate-x-1') +
+          ' pointer-events-none relative inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform'
+        }
+      />
+    </div>
+  );
+}
+
+// Repository list component
+function RepositoryList({
+  repoInfo,
+  repoCount,
+}: {
+  repoInfo: Array<{
+    repoId: string;
+    repoName: string;
+    targetSha: string | null;
+  }>;
+  repoCount: number;
+}) {
+  return (
+    <div className="mt-1 space-y-1">
+      {repoInfo.map((repo) => (
+        <div
+          key={repo.repoId}
+          className="flex flex-wrap items-center gap-2 min-w-0"
+        >
+          <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
+          {repoCount > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {repo.repoName}:
+            </span>
+          )}
+          {repo.targetSha && (
+            <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted">
+              {repo.targetSha.slice(0, 7)}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// History change warning section
+function HistoryChangeWarning({
+  hasLater,
+  laterCount,
+  laterCoding,
+  laterSetup,
+  laterCleanup,
+  t,
+}: {
+  hasLater: boolean;
+  laterCount: number;
+  laterCoding: number;
+  laterSetup: number;
+  laterCleanup: number;
+  t: any;
+}) {
+  if (!hasLater) return null;
+
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3">
+      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
+      <div className="text-sm min-w-0 w-full break-words">
+        <p className="font-medium text-destructive mb-2">
+          {t('restoreLogsDialog.historyChange.title')}
+        </p>
+        <p className="mt-0.5">
+          {t('restoreLogsDialog.historyChange.willDelete')}
+          {laterCount > 0 && (
+            <>
+              {' '}
+              {t('restoreLogsDialog.historyChange.andLaterProcesses', {
+                count: laterCount,
+              })}
+            </>
+          )}{' '}
+          {t('restoreLogsDialog.historyChange.fromHistory')}
+        </p>
+        <ul className="mt-1 text-xs text-muted-foreground list-disc pl-5">
+          {laterCoding > 0 && (
+            <li>
+              {t('restoreLogsDialog.historyChange.codingAgentRuns', {
+                count: laterCoding,
+              })}
+            </li>
+          )}
+          {laterSetup + laterCleanup > 0 && (
+            <li>
+              {t('restoreLogsDialog.historyChange.scriptProcesses', {
+                count: laterSetup + laterCleanup,
+              })}
+              {laterSetup > 0 && laterCleanup > 0 && (
+                <>
+                  {' '}
+                  {t('restoreLogsDialog.historyChange.setupCleanupBreakdown', {
+                    setup: laterSetup,
+                    cleanup: laterCleanup,
+                  })}
+                </>
+              )}
+            </li>
+          )}
+        </ul>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t('restoreLogsDialog.historyChange.permanentWarning')}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Uncommitted changes warning section
+function UncommittedChangesWarning({
+  anyDirty,
+  totalUncommitted,
+  totalUntracked,
+  acknowledgeUncommitted,
+  setAcknowledgeUncommitted,
+  t,
+}: {
+  anyDirty: boolean;
+  totalUncommitted: number;
+  totalUntracked: number;
+  acknowledgeUncommitted: boolean;
+  setAcknowledgeUncommitted: (v: boolean) => void;
+  t: any;
+}) {
+  if (!anyDirty) return null;
+
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20 p-3">
+      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+      <div className="text-sm min-w-0 w-full break-words">
+        <p className="font-medium text-amber-700 dark:text-amber-300">
+          {t('restoreLogsDialog.uncommittedChanges.title')}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t('restoreLogsDialog.uncommittedChanges.description', {
+            count: totalUncommitted,
+          })}
+          {totalUntracked > 0 &&
+            t('restoreLogsDialog.uncommittedChanges.andUntracked', {
+              count: totalUntracked,
+            })}
+          .
+        </p>
+        <button
+          type="button"
+          className="mt-2 w-full flex items-center cursor-pointer select-none"
+          aria-pressed={acknowledgeUncommitted}
+          onClick={() => setAcknowledgeUncommitted(!acknowledgeUncommitted)}
+        >
+          <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
+            {t('restoreLogsDialog.uncommittedChanges.acknowledgeLabel')}
+          </div>
+          <ToggleSwitch
+            enabled={acknowledgeUncommitted}
+            onClick={() => {}}
+            enabledColor="bg-amber-500"
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Reset worktree section (can reset)
+function ResetWorktreeCanReset({
+  needGitReset,
+  canGitReset,
+  worktreeResetOn,
+  setWorktreeResetOn,
+  repoCount,
+  repoInfo,
+  totalUncommitted,
+  totalUntracked,
+  t,
+}: {
+  needGitReset: boolean;
+  canGitReset: boolean;
+  worktreeResetOn: boolean;
+  setWorktreeResetOn: (v: boolean) => void;
+  repoCount: number;
+  repoInfo: Array<{
+    repoId: string;
+    repoName: string;
+    targetSha: string | null;
+  }>;
+  totalUncommitted: number;
+  totalUntracked: number;
+  t: any;
+}) {
+  if (!(needGitReset && canGitReset)) return null;
+
+  return (
+    <div className={getResetContainerClassName(worktreeResetOn, false)}>
+      <AlertTriangle className={getResetIconClassName(worktreeResetOn, false)} />
+      <div className="text-sm min-w-0 w-full break-words">
+        <p className="font-medium mb-2">
+          {t('restoreLogsDialog.resetWorktree.title')}
+          {repoCount > 1 && ` (${repoCount} repos)`}
+        </p>
+        <button
+          type="button"
+          className="mt-2 w-full flex items-center cursor-pointer select-none"
+          aria-pressed={worktreeResetOn}
+          onClick={() => setWorktreeResetOn(!worktreeResetOn)}
+        >
+          <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
+            {worktreeResetOn
+              ? t('restoreLogsDialog.resetWorktree.enabled')
+              : t('restoreLogsDialog.resetWorktree.disabled')}
+          </div>
+          <ToggleSwitch enabled={worktreeResetOn} onClick={() => {}} />
+        </button>
+        {worktreeResetOn && (
+          <>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t('restoreLogsDialog.resetWorktree.restoreDescription')}
+            </p>
+            <RepositoryList repoInfo={repoInfo} repoCount={repoCount} />
+            {(totalUncommitted > 0 || totalUntracked > 0) && (
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground list-disc pl-5">
+                {totalUncommitted > 0 && (
+                  <li>
+                    {t('restoreLogsDialog.resetWorktree.discardChanges', {
+                      count: totalUncommitted,
+                    })}
+                  </li>
+                )}
+                {totalUntracked > 0 && (
+                  <li>
+                    {t('restoreLogsDialog.resetWorktree.untrackedPresent', {
+                      count: totalUntracked,
+                    })}
+                  </li>
+                )}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Reset worktree section (cannot reset - has uncommitted)
+function ResetWorktreeCannotReset({
+  needGitReset,
+  canGitReset,
+  worktreeResetOn,
+  setWorktreeResetOn,
+  forceReset,
+  setForceReset,
+  repoCount,
+  repoInfo,
+  t,
+}: {
+  needGitReset: boolean;
+  canGitReset: boolean;
+  worktreeResetOn: boolean;
+  setWorktreeResetOn: (v: boolean) => void;
+  forceReset: boolean;
+  setForceReset: (v: boolean) => void;
+  repoCount: number;
+  repoInfo: Array<{
+    repoId: string;
+    repoName: string;
+    targetSha: string | null;
+  }>;
+  t: any;
+}) {
+  if (!(needGitReset && !canGitReset)) return null;
+
+  const containerClassName =
+    forceReset && worktreeResetOn
+      ? 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3'
+      : 'flex items-start gap-3 rounded-md border p-3';
+
+  return (
+    <div className={containerClassName}>
+      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
+      <div className="text-sm min-w-0 w-full break-words">
+        <p className="font-medium text-destructive">
+          {t('restoreLogsDialog.resetWorktree.title')}
+          {repoCount > 1 && ` (${repoCount} repos)`}
+        </p>
+        <button
+          type="button"
+          className="mt-2 w-full flex items-center select-none cursor-pointer"
+          aria-pressed={worktreeResetOn && forceReset}
+          onClick={() => {
+            setWorktreeResetOn(
+              forceReset ? !worktreeResetOn : false
+            );
+          }}
+        >
+          <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
+            {getToggleLabelText(forceReset, worktreeResetOn, t)}
+          </div>
+          <ToggleSwitch
+            enabled={worktreeResetOn && forceReset}
+            onClick={() => {}}
+          />
+        </button>
+        <button
+          type="button"
+          className="mt-2 w-full flex items-center cursor-pointer select-none"
+          aria-pressed={forceReset}
+          onClick={() => {
+            const next = !forceReset;
+            if (next) setWorktreeResetOn(true);
+            setForceReset(next);
+          }}
+        >
+          <div className="text-xs font-medium text-destructive flex-1 min-w-0 break-words">
+            {t('restoreLogsDialog.resetWorktree.forceReset')}
+          </div>
+          <ToggleSwitch
+            enabled={forceReset}
+            onClick={() => {}}
+            enabledColor="bg-destructive"
+          />
+        </button>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {forceReset
+            ? t('restoreLogsDialog.resetWorktree.uncommittedWillDiscard')
+            : t('restoreLogsDialog.resetWorktree.uncommittedPresentHint')}
+        </p>
+        {repoInfo.length > 0 && (
+          <>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t('restoreLogsDialog.resetWorktree.restoreDescription')}
+            </p>
+            <RepositoryList repoInfo={repoInfo} repoCount={repoCount} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
   ({
     executionProcessId,
@@ -225,338 +590,44 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {hasLater && (
-                    <div className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3">
-                      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
-                      <div className="text-sm min-w-0 w-full break-words">
-                        <p className="font-medium text-destructive mb-2">
-                          {t('restoreLogsDialog.historyChange.title')}
-                        </p>
-                        <>
-                          <p className="mt-0.5">
-                            {t('restoreLogsDialog.historyChange.willDelete')}
-                            {laterCount > 0 && (
-                              <>
-                                {' '}
-                                {t(
-                                  'restoreLogsDialog.historyChange.andLaterProcesses',
-                                  { count: laterCount }
-                                )}
-                              </>
-                            )}{' '}
-                            {t('restoreLogsDialog.historyChange.fromHistory')}
-                          </p>
-                          <ul className="mt-1 text-xs text-muted-foreground list-disc pl-5">
-                            {laterCoding > 0 && (
-                              <li>
-                                {t(
-                                  'restoreLogsDialog.historyChange.codingAgentRuns',
-                                  { count: laterCoding }
-                                )}
-                              </li>
-                            )}
-                            {laterSetup + laterCleanup > 0 && (
-                              <li>
-                                {t(
-                                  'restoreLogsDialog.historyChange.scriptProcesses',
-                                  { count: laterSetup + laterCleanup }
-                                )}
-                                {laterSetup > 0 && laterCleanup > 0 && (
-                                  <>
-                                    {' '}
-                                    {t(
-                                      'restoreLogsDialog.historyChange.setupCleanupBreakdown',
-                                      {
-                                        setup: laterSetup,
-                                        cleanup: laterCleanup,
-                                      }
-                                    )}
-                                  </>
-                                )}
-                              </li>
-                            )}
-                          </ul>
-                        </>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t(
-                            'restoreLogsDialog.historyChange.permanentWarning'
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {anyDirty && (
-                    <div className="flex items-start gap-3 rounded-md border border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20 p-3">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
-                      <div className="text-sm min-w-0 w-full break-words">
-                        <p className="font-medium text-amber-700 dark:text-amber-300">
-                          {t('restoreLogsDialog.uncommittedChanges.title')}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {t(
-                            'restoreLogsDialog.uncommittedChanges.description',
-                            {
-                              count: totalUncommitted,
-                            }
-                          )}
-                          {totalUntracked > 0 &&
-                            t(
-                              'restoreLogsDialog.uncommittedChanges.andUntracked',
-                              {
-                                count: totalUntracked,
-                              }
-                            )}
-                          .
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-2 w-full flex items-center cursor-pointer select-none"
-                          aria-pressed={acknowledgeUncommitted}
-                          onClick={() => setAcknowledgeUncommitted((v) => !v)}
-                        >
-                          <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
-                            {t(
-                              'restoreLogsDialog.uncommittedChanges.acknowledgeLabel'
-                            )}
-                          </div>
-                          <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
-                            <span
-                              className={
-                                (acknowledgeUncommitted
-                                  ? 'bg-amber-500'
-                                  : 'bg-muted-foreground/30') +
-                                ' absolute inset-0 rounded-full transition-colors'
-                              }
-                            />
-                            <span
-                              className={
-                                (acknowledgeUncommitted
-                                  ? 'translate-x-5'
-                                  : 'translate-x-1') +
-                                ' pointer-events-none relative inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform'
-                              }
-                            />
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {needGitReset && canGitReset && (
-                    <div className={getResetContainerClassName(worktreeResetOn, hasRisk)}>
-                      <AlertTriangle className={getResetIconClassName(worktreeResetOn, hasRisk)} />
-                      <div className="text-sm min-w-0 w-full break-words">
-                        <p className="font-medium mb-2">
-                          {t('restoreLogsDialog.resetWorktree.title')}
-                          {repoCount > 1 && ` (${repoCount} repos)`}
-                        </p>
-                        <button
-                          type="button"
-                          className="mt-2 w-full flex items-center cursor-pointer select-none"
-                          aria-pressed={worktreeResetOn}
-                          onClick={() => setWorktreeResetOn((v) => !v)}
-                        >
-                          <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
-                            {worktreeResetOn
-                              ? t('restoreLogsDialog.resetWorktree.enabled')
-                              : t('restoreLogsDialog.resetWorktree.disabled')}
-                          </div>
-                          <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
-                            <span
-                              className={
-                                (worktreeResetOn
-                                  ? 'bg-emerald-500'
-                                  : 'bg-muted-foreground/30') +
-                                ' absolute inset-0 rounded-full transition-colors'
-                              }
-                            />
-                            <span
-                              className={
-                                (worktreeResetOn
-                                  ? 'translate-x-5'
-                                  : 'translate-x-1') +
-                                ' pointer-events-none relative inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform'
-                              }
-                            />
-                          </div>
-                        </button>
-                        {worktreeResetOn && (
-                          <>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              {t(
-                                'restoreLogsDialog.resetWorktree.restoreDescription'
-                              )}
-                            </p>
-                            <div className="mt-1 space-y-1">
-                              {repoInfo.map((repo) => (
-                                <div
-                                  key={repo.repoId}
-                                  className="flex flex-wrap items-center gap-2 min-w-0"
-                                >
-                                  <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
-                                  {repoCount > 1 && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {repo.repoName}:
-                                    </span>
-                                  )}
-                                  {repo.targetSha && (
-                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted">
-                                      {repo.targetSha.slice(0, 7)}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                            {(totalUncommitted > 0 || totalUntracked > 0) && (
-                              <ul className="mt-2 space-y-1 text-xs text-muted-foreground list-disc pl-5">
-                                {totalUncommitted > 0 && (
-                                  <li>
-                                    {t(
-                                      'restoreLogsDialog.resetWorktree.discardChanges',
-                                      { count: totalUncommitted }
-                                    )}
-                                  </li>
-                                )}
-                                {totalUntracked > 0 && (
-                                  <li>
-                                    {t(
-                                      'restoreLogsDialog.resetWorktree.untrackedPresent',
-                                      { count: totalUntracked }
-                                    )}
-                                  </li>
-                                )}
-                              </ul>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {needGitReset && !canGitReset && (
-                    <div
-                      className={
-                        forceReset && worktreeResetOn
-                          ? 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3'
-                          : 'flex items-start gap-3 rounded-md border p-3'
-                      }
-                    >
-                      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
-                      <div className="text-sm min-w-0 w-full break-words">
-                        <p className="font-medium text-destructive">
-                          {t('restoreLogsDialog.resetWorktree.title')}
-                          {repoCount > 1 && ` (${repoCount} repos)`}
-                        </p>
-                        <button
-                          type="button"
-                          className={`mt-2 w-full flex items-center select-none cursor-pointer`}
-                          aria-pressed={worktreeResetOn && forceReset}
-                          onClick={() => {
-                            setWorktreeResetOn((on) => {
-                              if (forceReset) return !on; // free toggle when forced
-                              // Without force, only allow explicitly disabling reset
-                              return false;
-                            });
-                          }}
-                        >
-                          <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
-                            {getToggleLabelText(forceReset, worktreeResetOn, t)}
-                          </div>
-                          <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
-                            <span
-                              className={
-                                (worktreeResetOn && forceReset
-                                  ? 'bg-emerald-500'
-                                  : 'bg-muted-foreground/30') +
-                                ' absolute inset-0 rounded-full transition-colors'
-                              }
-                            />
-                            <span
-                              className={
-                                (worktreeResetOn && forceReset
-                                  ? 'translate-x-5'
-                                  : 'translate-x-1') +
-                                ' pointer-events-none relative inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform'
-                              }
-                            />
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          className="mt-2 w-full flex items-center cursor-pointer select-none"
-                          aria-pressed={forceReset}
-                          onClick={() => {
-                            setForceReset((v) => {
-                              const next = !v;
-                              if (next) setWorktreeResetOn(true);
-                              return next;
-                            });
-                          }}
-                        >
-                          <div className="text-xs font-medium text-destructive flex-1 min-w-0 break-words">
-                            {t('restoreLogsDialog.resetWorktree.forceReset')}
-                          </div>
-                          <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
-                            <span
-                              className={
-                                (forceReset
-                                  ? 'bg-destructive'
-                                  : 'bg-muted-foreground/30') +
-                                ' absolute inset-0 rounded-full transition-colors'
-                              }
-                            />
-                            <span
-                              className={
-                                (forceReset
-                                  ? 'translate-x-5'
-                                  : 'translate-x-1') +
-                                ' pointer-events-none relative inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform'
-                              }
-                            />
-                          </div>
-                        </button>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {forceReset
-                            ? t(
-                                'restoreLogsDialog.resetWorktree.uncommittedWillDiscard'
-                              )
-                            : t(
-                                'restoreLogsDialog.resetWorktree.uncommittedPresentHint'
-                              )}
-                        </p>
-                        {repoInfo.length > 0 && (
-                          <>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              {t(
-                                'restoreLogsDialog.resetWorktree.restoreDescription'
-                              )}
-                            </p>
-                            <div className="mt-1 space-y-1">
-                              {repoInfo.map((repo) => (
-                                <div
-                                  key={repo.repoId}
-                                  className="flex flex-wrap items-center gap-2 min-w-0"
-                                >
-                                  <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
-                                  {repoCount > 1 && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {repo.repoName}:
-                                    </span>
-                                  )}
-                                  {repo.targetSha && (
-                                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted">
-                                      {repo.targetSha.slice(0, 7)}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <HistoryChangeWarning
+                    hasLater={hasLater}
+                    laterCount={laterCount}
+                    laterCoding={laterCoding}
+                    laterSetup={laterSetup}
+                    laterCleanup={laterCleanup}
+                    t={t}
+                  />
+                  <UncommittedChangesWarning
+                    anyDirty={anyDirty}
+                    totalUncommitted={totalUncommitted}
+                    totalUntracked={totalUntracked}
+                    acknowledgeUncommitted={acknowledgeUncommitted}
+                    setAcknowledgeUncommitted={setAcknowledgeUncommitted}
+                    t={t}
+                  />
+                  <ResetWorktreeCanReset
+                    needGitReset={needGitReset}
+                    canGitReset={canGitReset}
+                    worktreeResetOn={worktreeResetOn}
+                    setWorktreeResetOn={setWorktreeResetOn}
+                    repoCount={repoCount}
+                    repoInfo={repoInfo}
+                    totalUncommitted={totalUncommitted}
+                    totalUntracked={totalUntracked}
+                    t={t}
+                  />
+                  <ResetWorktreeCannotReset
+                    needGitReset={needGitReset}
+                    canGitReset={canGitReset}
+                    worktreeResetOn={worktreeResetOn}
+                    setWorktreeResetOn={setWorktreeResetOn}
+                    forceReset={forceReset}
+                    setForceReset={setForceReset}
+                    repoCount={repoCount}
+                    repoInfo={repoInfo}
+                    t={t}
+                  />
                 </div>
               )}
             </div>

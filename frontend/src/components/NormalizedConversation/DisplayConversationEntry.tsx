@@ -217,36 +217,45 @@ const MessageCard: React.FC<{
   onToggle?: () => void;
 }> = ({ children, variant, expanded, onToggle }) => {
   const frameBase =
-    'border px-3 py-2 w-full cursor-pointer  bg-[hsl(var(--card))] border-[hsl(var(--border))]';
+    'border px-3 py-2 w-full bg-[hsl(var(--card))] border-[hsl(var(--border))]';
   const systemTheme = 'border-400/40 text-zinc-500';
   const errorTheme =
     'border-red-400/40 bg-red-50 dark:bg-[hsl(var(--card))] text-[hsl(var(--foreground))]';
 
+  const content = (
+    <div className="flex items-center gap-1.5">
+      <div className="min-w-0 flex-1">{children}</div>
+      {onToggle && (
+        <ExpandChevron
+          expanded={!!expanded}
+          onClick={onToggle}
+          variant={variant}
+        />
+      )}
+    </div>
+  );
+
+  if (onToggle) {
+    return (
+      <button
+        type="button"
+        className={`${frameBase} ${
+          variant === 'system' ? systemTheme : errorTheme
+        } cursor-pointer text-left`}
+        onClick={onToggle}
+      >
+        {content}
+      </button>
+    );
+  }
+
   return (
     <div
-      role="button"
-      tabIndex={0}
       className={`${frameBase} ${
         variant === 'system' ? systemTheme : errorTheme
       }`}
-      onClick={onToggle}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onToggle?.();
-        }
-      }}
     >
-      <div className="flex items-center gap-1.5">
-        <div className="min-w-0 flex-1">{children}</div>
-        {onToggle && (
-          <ExpandChevron
-            expanded={!!expanded}
-            onClick={onToggle}
-            variant={variant}
-          />
-        )}
-      </div>
+      {content}
     </div>
   );
 };
@@ -268,20 +277,19 @@ const ExpandChevron: React.FC<{
       : 'text-red-700 dark:text-red-300';
 
   return (
-    <ChevronDown
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
       }}
-      className={`h-4 w-4 cursor-pointer transition-transform ${color} ${
+      className={`h-4 w-4 cursor-pointer transition-transform bg-transparent border-0 p-0 ${color} ${
         expanded ? '' : '-rotate-90'
       }`}
-    />
+      aria-label={expanded ? 'Collapse' : 'Expand'}
+    >
+      <ChevronDown className="h-4 w-4" />
+    </button>
   );
 };
 

@@ -137,20 +137,19 @@ const FileChangeRenderer = ({
     <div>
       <div className={headerClass}>
         {icon}
-        <p
-          role="button"
-          tabIndex={0}
-          onClick={() => expandable && setExpanded()}
-          onKeyDown={(e) => {
-            if ((e.key === 'Enter' || e.key === ' ') && expandable) {
-              e.preventDefault();
-              setExpanded();
-            }
-          }}
-          className="text-sm font-mono overflow-x-auto flex-1 cursor-pointer"
-        >
-          {titleNode}
-        </p>
+        {expandable ? (
+          <button
+            type="button"
+            onClick={() => setExpanded()}
+            className="text-sm font-mono overflow-x-auto flex-1 cursor-pointer text-left bg-transparent border-0 p-0"
+          >
+            {titleNode}
+          </button>
+        ) : (
+          <p className="text-sm font-mono overflow-x-auto flex-1">
+            {titleNode}
+          </p>
+        )}
       </div>
 
       {/* Body */}

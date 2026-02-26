@@ -101,17 +101,10 @@ function EditDiffRenderer({
     <div>
       <div className={headerClass}>
         <SquarePen className="h-3 w-3" />
-        <p
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={() => setExpanded()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setExpanded();
-            }
-          }}
-          className="text-sm font-mono overflow-x-auto flex-1 cursor-pointer"
+          className="text-sm font-mono overflow-x-auto flex-1 cursor-pointer text-left bg-transparent border-0 p-0"
         >
           {path}{' '}
           <span style={{ color: 'hsl(var(--console-success))' }}>
@@ -120,7 +113,7 @@ function EditDiffRenderer({
           <span style={{ color: 'hsl(var(--console-error))' }}>
             -{deletions}
           </span>
-        </p>
+        </button>
       </div>
 
       {effectiveExpanded && (
