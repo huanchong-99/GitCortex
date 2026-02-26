@@ -51,20 +51,13 @@ export function ChatScriptEntry({
   };
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
         'flex items-start gap-base text-sm cursor-pointer hover:bg-secondary/50 rounded-md -mx-half px-half py-half transition-colors',
         className
       )}
       onClick={handleClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleClick();
-        }
-      }}
     >
       <span className="relative shrink-0 mt-0.5">
         <TerminalIcon className="size-icon-base text-low" />
@@ -88,6 +81,6 @@ export function ChatScriptEntry({
           <span>{t('scriptFixer.fixScript')}</span>
         </button>
       )}
-    </div>
+    </button>
   );
 }

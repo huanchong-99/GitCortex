@@ -64,7 +64,7 @@ export function GitPanelContainer({
 
           const relevantPR = openPR || mergedPR;
           if (relevantPR?.type === 'pr') {
-            prNumber = Number(relevantPR.prInfo.number);
+            prNumber = Number.parseInt(relevantPR.prInfo.number, 10);
             prUrl = relevantPR.prInfo.url;
             prStatus = relevantPR.prInfo.status;
           }

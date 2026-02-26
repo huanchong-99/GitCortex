@@ -96,8 +96,8 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
   };
 
   const handleCustomTerminalCount = (index: number, value: string) => {
-    const count = parseInt(value, 10);
-    if (!isNaN(count)) {
+    const count = Number.parseInt(value, 10);
+    if (!Number.isNaN(count)) {
       handleTerminalCountSelect(index, count);
     }
   };

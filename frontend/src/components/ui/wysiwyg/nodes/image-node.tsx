@@ -157,12 +157,11 @@ function ImageComponent({
     getThumbnailContent();
 
   return (
-    <span
+    <button
+      type="button"
       className="inline-flex items-center gap-1.5 px-1.5 py-1 bg-muted rounded border align-bottom cursor-pointer border-border hover:border-muted-foreground"
       onClick={handleClick}
       onDoubleClick={onDoubleClickEdit}
-      role="button"
-      tabIndex={0}
     >
       {thumbnailContent}
       <span className="flex flex-col min-w-0">
@@ -175,7 +174,7 @@ function ImageComponent({
           </span>
         )}
       </span>
-    </span>
+    </button>
   );
 }
 

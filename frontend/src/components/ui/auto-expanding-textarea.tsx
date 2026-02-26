@@ -33,9 +33,9 @@ const AutoExpandingTextarea = React.forwardRef<
       } else {
         // Calculate line height
         const style = globalThis.getComputedStyle(textarea);
-        const lineHeight = parseInt(style.lineHeight) || 20;
-        const paddingTop = parseInt(style.paddingTop) || 0;
-        const paddingBottom = parseInt(style.paddingBottom) || 0;
+        const lineHeight = Number.parseInt(style.lineHeight, 10) || 20;
+        const paddingTop = Number.parseInt(style.paddingTop, 10) || 0;
+        const paddingBottom = Number.parseInt(style.paddingBottom, 10) || 0;
 
         // Calculate max height based on maxRows
         const maxHeight = lineHeight * maxRows + paddingTop + paddingBottom;

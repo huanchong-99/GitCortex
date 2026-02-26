@@ -38,7 +38,7 @@ export const AttemptHeaderActions = ({
 
   return (
     <>
-      {typeof mode !== 'undefined' && onModeChange && (
+      {mode !== undefined && onModeChange && (
         <TooltipProvider>
           <ToggleGroup
             type="single"
@@ -125,7 +125,7 @@ export const AttemptHeaderActions = ({
           </ToggleGroup>
         </TooltipProvider>
       )}
-      {typeof mode !== 'undefined' && onModeChange && (
+      {mode !== undefined && onModeChange && (
         <div className="h-4 w-px bg-border" />
       )}
       <ActionsDropdown task={task} attempt={attempt} sharedTask={sharedTask} />

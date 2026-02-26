@@ -27,7 +27,7 @@ export function AgentSelector({
   showLabel = false,
 }: Readonly<AgentSelectorProps>) {
   const agents = profiles
-    ? (Object.keys(profiles).sort() as BaseCodingAgent[])
+    ? (Object.keys(profiles).sort((a, b) => a.localeCompare(b)) as BaseCodingAgent[])
     : [];
   const selectedAgent = selectedExecutorProfile?.executor;
 

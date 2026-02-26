@@ -147,12 +147,12 @@ export function MultiFileSearchTextarea({
 
     // Find the next separator after cursor
     const nextSeparatorIndex = Math.min(
-      textAfter.indexOf(',') === -1
-        ? Infinity
-        : textAfter.indexOf(',') + cursorPosition,
-      textAfter.indexOf('\n') === -1
-        ? Infinity
-        : textAfter.indexOf('\n') + cursorPosition
+      textAfter.includes(',')
+        ? textAfter.indexOf(',') + cursorPosition
+        : Infinity,
+      textAfter.includes('\n')
+        ? textAfter.indexOf('\n') + cursorPosition
+        : Infinity
     );
 
     const tokenStart = lastSeparatorIndex + 1;

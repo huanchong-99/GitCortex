@@ -28,7 +28,7 @@ export function ConfigSelector({
 }: Readonly<ConfigSelectorProps>) {
   const selectedAgent = selectedExecutorProfile?.executor;
   const configs = selectedAgent && profiles ? profiles[selectedAgent] : null;
-  const configOptions = configs ? Object.keys(configs).sort() : [];
+  const configOptions = configs ? Object.keys(configs).sort((a, b) => a.localeCompare(b)) : [];
   const selectedVariant = selectedExecutorProfile?.variant || 'DEFAULT';
 
   if (

@@ -34,8 +34,8 @@ export const Step1Basic: React.FC<Step1BasicProps> = ({
   };
 
   const handleCustomTaskCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    if (!isNaN(value) && value >= 5 && value <= 10) {
+    const value = Number.parseInt(e.target.value, 10);
+    if (!Number.isNaN(value) && value >= 5 && value <= 10) {
       onChange({ taskCount: value });
     }
   };

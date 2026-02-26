@@ -46,20 +46,13 @@ export function CollapsibleSectionHeader({
         <span className="font-medium truncate text-normal">{title}</span>
         <div className="flex items-center gap-half">
           {IconComponent && onIconClick && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={handleIconClick}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleIconClick(e as unknown as React.MouseEvent);
-                }
-              }}
               className="text-low hover:text-normal"
             >
               <IconComponent className="size-icon-xs" weight="bold" />
-            </span>
+            </button>
           )}
           <CaretDownIcon
             weight="fill"
