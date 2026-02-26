@@ -46,13 +46,16 @@ export function useActionVisibilityContext(): ActionVisibilityContext {
       diffKeys.length > 0 && diffKeys.every((k) => expanded[k] !== false);
 
     // Compute dev server state
-    const devServerState: DevServerState = isStarting
-      ? 'starting'
-      : isStopping
-        ? 'stopping'
-        : runningDevServers.length > 0
-          ? 'running'
-          : 'stopped';
+    let devServerState: DevServerState;
+    if (isStarting) {
+      devServerState = 'starting';
+    } else if (isStopping) {
+      devServerState = 'stopping';
+    } else if (runningDevServers.length > 0) {
+      devServerState = 'running';
+    } else {
+      devServerState = 'stopped';
+    }
 
     // Compute git state from branch status
     const hasOpenPR =

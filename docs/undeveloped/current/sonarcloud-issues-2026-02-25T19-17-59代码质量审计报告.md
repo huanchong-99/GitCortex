@@ -1017,7 +1017,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 24.7 `SCRIPT_TOOL_NAMES` should be a `Set`, and use `SCRIPT_TOOL_NAMES.has()` to check existence or non-existence.
+### 24.7 `SCRIPT_TOOL_NAMES` should be a `Set`, and use `SCRIPT_TOOL_NAMES.has()` to check existence or non-existence. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeM`
 - **项目**: huanchong-99
