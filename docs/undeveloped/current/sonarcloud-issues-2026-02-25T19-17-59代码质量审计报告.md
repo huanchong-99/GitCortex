@@ -6666,7 +6666,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing, type-dependent
 
-### 158.2 Refactor this code to not nest functions more than 4 levels deep.
+### 158.2 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcJ`
 - **项目**: huanchong-99
@@ -6679,7 +6679,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 158.3 Refactor this code to not nest functions more than 4 levels deep.
+### 158.3 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcK`
 - **项目**: huanchong-99
@@ -6692,7 +6692,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 158.4 Refactor this code to not nest functions more than 4 levels deep.
+### 158.4 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcM`
 - **项目**: huanchong-99
@@ -10474,7 +10474,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 246.1 Refactor this code to not nest functions more than 4 levels deep.
+### 246.1 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVweVGZ9DOUQdEsGdQ`
 - **项目**: huanchong-99
@@ -11307,7 +11307,7 @@
 - **创建时间**: 1 month ago
 - **标签**: object, string, ...
 
-### 270.5 Refactor this code to not nest functions more than 4 levels deep.
+### 270.5 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl9`
 - **项目**: huanchong-99
@@ -11320,7 +11320,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 270.6 Refactor this code to not nest functions more than 4 levels deep.
+### 270.6 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl-`
 - **项目**: huanchong-99
@@ -13397,7 +13397,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 310.1 Refactor this code to not nest functions more than 4 levels deep.
+### 310.1 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwe2XZ9DOUQdEsGob`
 - **项目**: huanchong-99
@@ -13520,7 +13520,7 @@
 - **创建时间**: 17 days ago
 - **标签**: optimization, performance
 
-### 311.9 Refactor this code to not nest functions more than 4 levels deep.
+### 311.9 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoT`
 - **项目**: huanchong-99
@@ -13546,7 +13546,7 @@
 - **创建时间**: 17 days ago
 - **标签**: type-dependent
 
-### 311.11 Refactor this code to not nest functions more than 4 levels deep.
+### 311.11 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoV`
 - **项目**: huanchong-99
@@ -13559,7 +13559,7 @@
 - **创建时间**: 17 days ago
 - **标签**: brain-overload
 
-### 311.12 Refactor this code to not nest functions more than 4 levels deep.
+### 311.12 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoW`
 - **项目**: huanchong-99
@@ -13585,7 +13585,7 @@
 - **创建时间**: 17 days ago
 - **标签**: type-dependent
 
-### 311.14 Refactor this code to not nest functions more than 4 levels deep.
+### 311.14 Refactor this code to not nest functions more than 4 levels deep. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoY`
 - **项目**: huanchong-99

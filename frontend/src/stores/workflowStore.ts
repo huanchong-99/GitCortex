@@ -100,19 +100,22 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   updateTerminalStatus: (workflowId, taskId, terminalId, status) => {
+    // Helper: Update terminals for a specific task
+    const updateTaskTerminals = (task: WorkflowTaskDto): WorkflowTaskDto => {
+      if (task.id !== taskId) return task;
+
+      const updatedTerminals = task.terminals.map((terminal) =>
+        terminal.id === terminalId ? { ...terminal, status } : terminal
+      );
+
+      return { ...task, terminals: updatedTerminals };
+    };
+
     set((state) => {
       const workflow = state.workflows.get(workflowId);
       if (!workflow) return state;
 
-      const updatedTasks = workflow.tasks.map((task) => {
-        if (task.id !== taskId) return task;
-
-        const updatedTerminals = task.terminals.map((terminal) =>
-          terminal.id === terminalId ? { ...terminal, status } : terminal
-        );
-
-        return { ...task, terminals: updatedTerminals };
-      });
+      const updatedTasks = workflow.tasks.map(updateTaskTerminals);
 
       const newWorkflows = new Map(state.workflows);
       newWorkflows.set(workflowId, { ...workflow, tasks: updatedTasks });

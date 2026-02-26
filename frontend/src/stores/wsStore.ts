@@ -822,104 +822,55 @@ export const useWsStore = create<WsState>((set, get) => ({
   },
 
   connectToWorkflow: (workflowId: string) => {
-    const openConnection = (targetWorkflowId: string) => {
-      const currentState = get();
-      const currentConnection =
-        currentState._workflowConnections.get(targetWorkflowId);
+    // Helper: Create heartbeat interval handler
+    const createHeartbeatHandler = (targetWorkflowId: string, ws: WebSocket) => {
+      return () => {
+        const latest = get()._workflowConnections.get(targetWorkflowId);
+        if (latest?.ws?.readyState !== WebSocket.OPEN) return;
 
-      if (!currentConnection) {
-        return;
-      }
+        const heartbeatMessage: WsMessage = {
+          type: 'system.heartbeat',
+          payload: {},
+          timestamp: new Date().toISOString(),
+          id: generateMessageId(),
+        };
 
-      if (
-        currentConnection.ws &&
-        (currentConnection.ws.readyState === WebSocket.CONNECTING ||
-          currentConnection.ws.readyState === WebSocket.OPEN)
-      ) {
-        return;
-      }
+        latest.ws.send(JSON.stringify(heartbeatMessage));
 
-      clearConnectionTimers(currentConnection);
+        const heartbeatConnections = new Map(get()._workflowConnections);
+        const active = heartbeatConnections.get(targetWorkflowId);
+        if (!active || active.ws !== latest.ws) return;
 
-      const ws = new WebSocket(currentConnection.url);
-      const connectingConnections = new Map(currentState._workflowConnections);
+        heartbeatConnections.set(targetWorkflowId, {
+          ...active,
+          lastHeartbeat: new Date(),
+        });
 
-      connectingConnections.set(targetWorkflowId, {
-        ...currentConnection,
-        ws,
-        status:
-          currentConnection.reconnectAttempts > 0
-            ? 'reconnecting'
-            : 'connecting',
-        manualDisconnect: false,
-        heartbeatInterval: null,
-        reconnectTimeout: null,
-      });
+        const activeConnection = heartbeatConnections.get(targetWorkflowId)!;
+        set({
+          _workflowConnections: heartbeatConnections,
+          _ws: activeConnection.ws,
+          _heartbeatInterval: activeConnection.heartbeatInterval,
+          _reconnectTimeout: activeConnection.reconnectTimeout,
+          _url: activeConnection.url,
+          _manualDisconnect: activeConnection.manualDisconnect,
+          workflowConnectionStatus: toWorkflowConnectionStatusRecord(heartbeatConnections),
+          connectionStatus: aggregateConnectionStatus(heartbeatConnections),
+          lastHeartbeat: aggregateLastHeartbeat(heartbeatConnections),
+          reconnectAttempts: aggregateReconnectAttempts(heartbeatConnections),
+        });
+      };
+    };
 
-      const connectingConnection = connectingConnections.get(targetWorkflowId)!;
-      set({
-        _workflowConnections: connectingConnections,
-        currentWorkflowId: targetWorkflowId,
-        _ws: connectingConnection.ws,
-        _heartbeatInterval: connectingConnection.heartbeatInterval,
-        _reconnectTimeout: connectingConnection.reconnectTimeout,
-        _url: connectingConnection.url,
-        _manualDisconnect: connectingConnection.manualDisconnect,
-        workflowConnectionStatus: toWorkflowConnectionStatusRecord(
-          connectingConnections
-        ),
-        connectionStatus: aggregateConnectionStatus(connectingConnections),
-        lastHeartbeat: aggregateLastHeartbeat(connectingConnections),
-        reconnectAttempts: aggregateReconnectAttempts(connectingConnections),
-      });
-
-      const isStale = () =>
-        get()._workflowConnections.get(targetWorkflowId)?.ws !== ws;
-
-      ws.onopen = () => {
+    // Helper: Handle WebSocket open event
+    const handleWebSocketOpen = (targetWorkflowId: string, ws: WebSocket, isStale: () => boolean) => {
+      return () => {
         if (isStale()) return;
 
-        const heartbeatInterval = setInterval(() => {
-          const latest = get()._workflowConnections.get(targetWorkflowId);
-          if (latest?.ws?.readyState === WebSocket.OPEN) {
-            const heartbeatMessage: WsMessage = {
-              type: 'system.heartbeat',
-              payload: {},
-              timestamp: new Date().toISOString(),
-              id: generateMessageId(),
-            };
-
-            latest.ws.send(JSON.stringify(heartbeatMessage));
-
-            const heartbeatConnections = new Map(get()._workflowConnections);
-            const active = heartbeatConnections.get(targetWorkflowId);
-            if (!active || active.ws !== latest.ws) {
-              return;
-            }
-
-            heartbeatConnections.set(targetWorkflowId, {
-              ...active,
-              lastHeartbeat: new Date(),
-            });
-
-            const activeConnection =
-              heartbeatConnections.get(targetWorkflowId)!;
-            set({
-              _workflowConnections: heartbeatConnections,
-              _ws: activeConnection.ws,
-              _heartbeatInterval: activeConnection.heartbeatInterval,
-              _reconnectTimeout: activeConnection.reconnectTimeout,
-              _url: activeConnection.url,
-              _manualDisconnect: activeConnection.manualDisconnect,
-              workflowConnectionStatus:
-                toWorkflowConnectionStatusRecord(heartbeatConnections),
-              connectionStatus: aggregateConnectionStatus(heartbeatConnections),
-              lastHeartbeat: aggregateLastHeartbeat(heartbeatConnections),
-              reconnectAttempts:
-                aggregateReconnectAttempts(heartbeatConnections),
-            });
-          }
-        }, HEARTBEAT_INTERVAL);
+        const heartbeatInterval = setInterval(
+          createHeartbeatHandler(targetWorkflowId, ws),
+          HEARTBEAT_INTERVAL
+        );
 
         const connectedConnections = new Map(get()._workflowConnections);
         const active = connectedConnections.get(targetWorkflowId);
@@ -945,61 +896,58 @@ export const useWsStore = create<WsState>((set, get) => ({
           _reconnectTimeout: activeConnection.reconnectTimeout,
           _url: activeConnection.url,
           _manualDisconnect: activeConnection.manualDisconnect,
-          workflowConnectionStatus:
-            toWorkflowConnectionStatusRecord(connectedConnections),
+          workflowConnectionStatus: toWorkflowConnectionStatusRecord(connectedConnections),
           connectionStatus: aggregateConnectionStatus(connectedConnections),
           lastHeartbeat: aggregateLastHeartbeat(connectedConnections),
           reconnectAttempts: aggregateReconnectAttempts(connectedConnections),
         });
       };
+    };
 
-      ws.onmessage = (event: MessageEvent) => {
+    // Helper: Handle message handlers execution
+    const executeMessageHandlers = (
+      handlers: Set<MessageHandler> | undefined,
+      payload: unknown,
+      messageType: string,
+      targetWorkflowId: string,
+      handlerType: 'Global' | 'Workflow'
+    ) => {
+      if (!handlers) return;
+
+      handlers.forEach((handler) => {
+        try {
+          handler(payload);
+        } catch (error) {
+          console.error(
+            `[wsStore] ${handlerType} handler failed for event "${messageType}" (workflow "${targetWorkflowId}")`,
+            error
+          );
+        }
+      });
+    };
+
+    // Helper: Handle WebSocket message event
+    const handleWebSocketMessage = (targetWorkflowId: string, isStale: () => boolean) => {
+      return (event: MessageEvent) => {
         if (isStale()) return;
 
         try {
           const message = JSON.parse(event.data as string) as WsMessage;
           const currentStateForMessage = get();
-          const globalHandlers = currentStateForMessage._handlers.get(
-            message.type
-          );
+          const globalHandlers = currentStateForMessage._handlers.get(message.type);
           const scopedHandlers = currentStateForMessage._workflowHandlers
             .get(targetWorkflowId)
             ?.get(message.type);
 
-          if (!globalHandlers && !scopedHandlers) {
-            return;
-          }
+          if (!globalHandlers && !scopedHandlers) return;
 
           const normalizedPayload = normalizeWorkflowEventPayload(
             message.type,
             message.payload
           );
 
-          if (globalHandlers) {
-            globalHandlers.forEach((handler) => {
-              try {
-                handler(normalizedPayload);
-              } catch (error) {
-                console.error(
-                  `[wsStore] Global handler failed for event "${message.type}" (workflow "${targetWorkflowId}")`,
-                  error
-                );
-              }
-            });
-          }
-
-          if (scopedHandlers) {
-            scopedHandlers.forEach((handler) => {
-              try {
-                handler(normalizedPayload);
-              } catch (error) {
-                console.error(
-                  `[wsStore] Workflow handler failed for event "${message.type}" (workflow "${targetWorkflowId}")`,
-                  error
-                );
-              }
-            });
-          }
+          executeMessageHandlers(globalHandlers, normalizedPayload, message.type, targetWorkflowId, 'Global');
+          executeMessageHandlers(scopedHandlers, normalizedPayload, message.type, targetWorkflowId, 'Workflow');
         } catch (error) {
           console.error(
             `[wsStore] Failed to parse inbound message for workflow "${targetWorkflowId}"`,
@@ -1007,153 +955,207 @@ export const useWsStore = create<WsState>((set, get) => ({
           );
         }
       };
+    };
 
-      ws.onclose = () => {
+    // Helper: Handle manual disconnect or zero refCount
+    const handleManualDisconnect = (
+      targetWorkflowId: string,
+      ws: WebSocket,
+      currentStateForClose: ReturnType<typeof get>
+    ) => {
+      const closedConnections = new Map(currentStateForClose._workflowConnections);
+      const active = closedConnections.get(targetWorkflowId);
+
+      if (!active || active.ws !== ws) return;
+
+      closedConnections.set(targetWorkflowId, {
+        ...active,
+        ws: null,
+        status: 'disconnected',
+        heartbeatInterval: null,
+        reconnectTimeout: null,
+      });
+
+      const activeConnection = closedConnections.get(targetWorkflowId)!;
+      set({
+        _workflowConnections: closedConnections,
+        _ws: activeConnection.ws,
+        _heartbeatInterval: activeConnection.heartbeatInterval,
+        _reconnectTimeout: activeConnection.reconnectTimeout,
+        _url: activeConnection.url,
+        _manualDisconnect: activeConnection.manualDisconnect,
+        workflowConnectionStatus: toWorkflowConnectionStatusRecord(closedConnections),
+        connectionStatus: aggregateConnectionStatus(closedConnections),
+        lastHeartbeat: aggregateLastHeartbeat(closedConnections),
+        reconnectAttempts: aggregateReconnectAttempts(closedConnections),
+      });
+    };
+
+    // Helper: Handle reconnection attempt
+    const handleReconnectAttempt = (
+      targetWorkflowId: string,
+      ws: WebSocket,
+      attempts: number,
+      currentStateForClose: ReturnType<typeof get>,
+      openConnection: (id: string) => void
+    ) => {
+      const delay = BASE_RECONNECT_DELAY * Math.pow(2, attempts - 1);
+      const reconnectTimeout = setTimeout(() => {
+        const latest = get()._workflowConnections.get(targetWorkflowId);
+        if (!latest || latest.manualDisconnect || latest.refCount <= 0) return;
+        openConnection(targetWorkflowId);
+      }, delay);
+
+      const reconnectingConnections = new Map(currentStateForClose._workflowConnections);
+      const active = reconnectingConnections.get(targetWorkflowId);
+
+      if (!active || active.ws !== ws) {
+        clearTimeout(reconnectTimeout);
+        return;
+      }
+
+      reconnectingConnections.set(targetWorkflowId, {
+        ...active,
+        ws: null,
+        status: 'reconnecting',
+        reconnectAttempts: attempts,
+        heartbeatInterval: null,
+        reconnectTimeout,
+      });
+
+      const activeConnection = reconnectingConnections.get(targetWorkflowId)!;
+      set({
+        _workflowConnections: reconnectingConnections,
+        _ws: activeConnection.ws,
+        _heartbeatInterval: activeConnection.heartbeatInterval,
+        _reconnectTimeout: activeConnection.reconnectTimeout,
+        _url: activeConnection.url,
+        _manualDisconnect: activeConnection.manualDisconnect,
+        workflowConnectionStatus: toWorkflowConnectionStatusRecord(reconnectingConnections),
+        connectionStatus: aggregateConnectionStatus(reconnectingConnections),
+        lastHeartbeat: aggregateLastHeartbeat(reconnectingConnections),
+        reconnectAttempts: aggregateReconnectAttempts(reconnectingConnections),
+      });
+    };
+
+    // Helper: Handle max reconnect attempts exceeded
+    const handleMaxReconnectExceeded = (
+      targetWorkflowId: string,
+      ws: WebSocket,
+      currentStateForClose: ReturnType<typeof get>
+    ) => {
+      const disconnectedConnections = new Map(currentStateForClose._workflowConnections);
+      const active = disconnectedConnections.get(targetWorkflowId);
+      if (!active || active.ws !== ws) return;
+
+      disconnectedConnections.set(targetWorkflowId, {
+        ...active,
+        ws: null,
+        status: 'disconnected',
+        heartbeatInterval: null,
+        reconnectTimeout: null,
+      });
+
+      const activeConnection = disconnectedConnections.get(targetWorkflowId)!;
+      set({
+        _workflowConnections: disconnectedConnections,
+        _ws: activeConnection.ws,
+        _heartbeatInterval: activeConnection.heartbeatInterval,
+        _reconnectTimeout: activeConnection.reconnectTimeout,
+        _url: activeConnection.url,
+        _manualDisconnect: activeConnection.manualDisconnect,
+        workflowConnectionStatus: toWorkflowConnectionStatusRecord(disconnectedConnections),
+        connectionStatus: aggregateConnectionStatus(disconnectedConnections),
+        lastHeartbeat: aggregateLastHeartbeat(disconnectedConnections),
+        reconnectAttempts: aggregateReconnectAttempts(disconnectedConnections),
+      });
+    };
+
+    // Helper: Handle WebSocket close event
+    const handleWebSocketClose = (
+      targetWorkflowId: string,
+      ws: WebSocket,
+      isStale: () => boolean,
+      openConnection: (id: string) => void
+    ) => {
+      return () => {
         if (isStale()) return;
 
         const currentStateForClose = get();
-        const connection =
-          currentStateForClose._workflowConnections.get(targetWorkflowId);
+        const connection = currentStateForClose._workflowConnections.get(targetWorkflowId);
 
-        if (!connection) {
-          return;
-        }
+        if (!connection) return;
 
         if (connection.heartbeatInterval) {
           clearInterval(connection.heartbeatInterval);
         }
 
         if (connection.manualDisconnect || connection.refCount <= 0) {
-          const closedConnections = new Map(
-            currentStateForClose._workflowConnections
-          );
-          const active = closedConnections.get(targetWorkflowId);
-
-          if (!active || active.ws !== ws) {
-            return;
-          }
-
-          closedConnections.set(targetWorkflowId, {
-            ...active,
-            ws: null,
-            status: 'disconnected',
-            heartbeatInterval: null,
-            reconnectTimeout: null,
-          });
-
-          const activeConnection = closedConnections.get(targetWorkflowId)!;
-          set({
-            _workflowConnections: closedConnections,
-            _ws: activeConnection.ws,
-            _heartbeatInterval: activeConnection.heartbeatInterval,
-            _reconnectTimeout: activeConnection.reconnectTimeout,
-            _url: activeConnection.url,
-            _manualDisconnect: activeConnection.manualDisconnect,
-            workflowConnectionStatus:
-              toWorkflowConnectionStatusRecord(closedConnections),
-            connectionStatus: aggregateConnectionStatus(closedConnections),
-            lastHeartbeat: aggregateLastHeartbeat(closedConnections),
-            reconnectAttempts: aggregateReconnectAttempts(closedConnections),
-          });
+          handleManualDisconnect(targetWorkflowId, ws, currentStateForClose);
           return;
         }
 
         const attempts = connection.reconnectAttempts + 1;
 
         if (attempts <= MAX_RECONNECT_ATTEMPTS) {
-          const delay = BASE_RECONNECT_DELAY * Math.pow(2, attempts - 1);
-          const reconnectTimeout = setTimeout(() => {
-            const latest = get()._workflowConnections.get(targetWorkflowId);
-            if (!latest || latest.manualDisconnect || latest.refCount <= 0) {
-              return;
-            }
-            openConnection(targetWorkflowId);
-          }, delay);
-
-          const reconnectingConnections = new Map(
-            currentStateForClose._workflowConnections
-          );
-          const active = reconnectingConnections.get(targetWorkflowId);
-
-          if (!active || active.ws !== ws) {
-            clearTimeout(reconnectTimeout);
-            return;
-          }
-
-          reconnectingConnections.set(targetWorkflowId, {
-            ...active,
-            ws: null,
-            status: 'reconnecting',
-            reconnectAttempts: attempts,
-            heartbeatInterval: null,
-            reconnectTimeout,
-          });
-
-          const activeConnection =
-            reconnectingConnections.get(targetWorkflowId)!;
-          set({
-            _workflowConnections: reconnectingConnections,
-            _ws: activeConnection.ws,
-            _heartbeatInterval: activeConnection.heartbeatInterval,
-            _reconnectTimeout: activeConnection.reconnectTimeout,
-            _url: activeConnection.url,
-            _manualDisconnect: activeConnection.manualDisconnect,
-            workflowConnectionStatus: toWorkflowConnectionStatusRecord(
-              reconnectingConnections
-            ),
-            connectionStatus: aggregateConnectionStatus(
-              reconnectingConnections
-            ),
-            lastHeartbeat: aggregateLastHeartbeat(reconnectingConnections),
-            reconnectAttempts: aggregateReconnectAttempts(
-              reconnectingConnections
-            ),
-          });
+          handleReconnectAttempt(targetWorkflowId, ws, attempts, currentStateForClose, openConnection);
         } else {
-          const disconnectedConnections = new Map(
-            currentStateForClose._workflowConnections
-          );
-          const active = disconnectedConnections.get(targetWorkflowId);
-          if (!active || active.ws !== ws) {
-            return;
-          }
-
-          disconnectedConnections.set(targetWorkflowId, {
-            ...active,
-            ws: null,
-            status: 'disconnected',
-            heartbeatInterval: null,
-            reconnectTimeout: null,
-          });
-
-          const activeConnection =
-            disconnectedConnections.get(targetWorkflowId)!;
-          set({
-            _workflowConnections: disconnectedConnections,
-            _ws: activeConnection.ws,
-            _heartbeatInterval: activeConnection.heartbeatInterval,
-            _reconnectTimeout: activeConnection.reconnectTimeout,
-            _url: activeConnection.url,
-            _manualDisconnect: activeConnection.manualDisconnect,
-            workflowConnectionStatus: toWorkflowConnectionStatusRecord(
-              disconnectedConnections
-            ),
-            connectionStatus: aggregateConnectionStatus(
-              disconnectedConnections
-            ),
-            lastHeartbeat: aggregateLastHeartbeat(disconnectedConnections),
-            reconnectAttempts: aggregateReconnectAttempts(
-              disconnectedConnections
-            ),
-          });
+          handleMaxReconnectExceeded(targetWorkflowId, ws, currentStateForClose);
         }
       };
+    };
 
+    const openConnection = (targetWorkflowId: string) => {
+      const currentState = get();
+      const currentConnection = currentState._workflowConnections.get(targetWorkflowId);
+
+      if (!currentConnection) return;
+
+      if (
+        currentConnection.ws &&
+        (currentConnection.ws.readyState === WebSocket.CONNECTING ||
+          currentConnection.ws.readyState === WebSocket.OPEN)
+      ) {
+        return;
+      }
+
+      clearConnectionTimers(currentConnection);
+
+      const ws = new WebSocket(currentConnection.url);
+      const connectingConnections = new Map(currentState._workflowConnections);
+
+      connectingConnections.set(targetWorkflowId, {
+        ...currentConnection,
+        ws,
+        status: currentConnection.reconnectAttempts > 0 ? 'reconnecting' : 'connecting',
+        manualDisconnect: false,
+        heartbeatInterval: null,
+        reconnectTimeout: null,
+      });
+
+      const connectingConnection = connectingConnections.get(targetWorkflowId)!;
+      set({
+        _workflowConnections: connectingConnections,
+        currentWorkflowId: targetWorkflowId,
+        _ws: connectingConnection.ws,
+        _heartbeatInterval: connectingConnection.heartbeatInterval,
+        _reconnectTimeout: connectingConnection.reconnectTimeout,
+        _url: connectingConnection.url,
+        _manualDisconnect: connectingConnection.manualDisconnect,
+        workflowConnectionStatus: toWorkflowConnectionStatusRecord(connectingConnections),
+        connectionStatus: aggregateConnectionStatus(connectingConnections),
+        lastHeartbeat: aggregateLastHeartbeat(connectingConnections),
+        reconnectAttempts: aggregateReconnectAttempts(connectingConnections),
+      });
+
+      const isStale = () => get()._workflowConnections.get(targetWorkflowId)?.ws !== ws;
+
+      ws.onopen = handleWebSocketOpen(targetWorkflowId, ws, isStale);
+      ws.onmessage = handleWebSocketMessage(targetWorkflowId, isStale);
+      ws.onclose = handleWebSocketClose(targetWorkflowId, ws, isStale, openConnection);
       ws.onerror = () => {
         if (isStale()) return;
-        console.error(
-          `[wsStore] WebSocket error on workflow "${targetWorkflowId}"`
-        );
+        console.error(`[wsStore] WebSocket error on workflow "${targetWorkflowId}"`);
       };
     };
 

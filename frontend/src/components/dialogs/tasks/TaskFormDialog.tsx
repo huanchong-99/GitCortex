@@ -83,6 +83,100 @@ type TaskFormValues = {
   autoStart: boolean;
 };
 
+// Helper component: Single repo branch selector
+const SingleRepoBranchField = ({
+  config,
+  fieldValue,
+  onFieldChange,
+  isSubmitting,
+  branchesLoading,
+  t,
+}: {
+  config: { repoId: string; targetBranch: string | null; branches: string[] };
+  fieldValue: RepoBranch[];
+  onFieldChange: (value: RepoBranch[]) => void;
+  isSubmitting: boolean;
+  branchesLoading: boolean;
+  t: (key: string) => string;
+}) => {
+  const selectedBranch =
+    fieldValue.find((v) => v.repoId === config.repoId)?.branch ?? config.targetBranch;
+
+  return (
+    <div className={cn('flex-1 min-w-0', isSubmitting && 'opacity-50 pointer-events-none')}>
+      <BranchSelector
+        branches={config.branches}
+        selectedBranch={selectedBranch}
+        onBranchSelect={(branch) => {
+          onFieldChange([{ repoId: config.repoId, branch }]);
+        }}
+        placeholder={
+          branchesLoading
+            ? t('createAttemptDialog.loadingBranches')
+            : t('createAttemptDialog.selectBranch')
+        }
+      />
+    </div>
+  );
+};
+
+// Helper component: Multi repo branch selector
+const MultiRepoBranchField = ({
+  repoBranchConfigs,
+  fieldValue,
+  onFieldChange,
+  isSubmitting,
+  branchesLoading,
+}: {
+  repoBranchConfigs: Array<{ repoId: string; targetBranch: string | null; branches: string[] }>;
+  fieldValue: RepoBranch[];
+  onFieldChange: (value: RepoBranch[]) => void;
+  isSubmitting: boolean;
+  branchesLoading: boolean;
+}) => {
+  const configs = repoBranchConfigs.map((config) => ({
+    ...config,
+    targetBranch:
+      fieldValue.find((v) => v.repoId === config.repoId)?.branch ?? config.targetBranch,
+  }));
+
+  const handleBranchChange = (repoId: string, branch: string) => {
+    const newValue = fieldValue.map((v) =>
+      v.repoId === repoId ? { ...v, branch } : v
+    );
+    if (!newValue.find((v) => v.repoId === repoId)) {
+      newValue.push({ repoId, branch });
+    }
+    onFieldChange(newValue);
+  };
+
+  return (
+    <RepoBranchSelector
+      configs={configs}
+      onBranchChange={handleBranchChange}
+      isLoading={branchesLoading}
+      showLabel={true}
+      className={cn(isSubmitting && 'opacity-50 pointer-events-none')}
+    />
+  );
+};
+
+// Helper function: Get submit button text
+const getSubmitButtonText = (
+  editMode: boolean,
+  isSubmitting: boolean,
+  autoStart: boolean,
+  t: (key: string) => string
+): string => {
+  if (editMode) {
+    return isSubmitting ? t('taskFormDialog.updating') : t('taskFormDialog.updateTask');
+  }
+  if (isSubmitting) {
+    return autoStart ? t('taskFormDialog.starting') : t('taskFormDialog.creating');
+  }
+  return t('taskFormDialog.create');
+};
+
 const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
   const { mode, projectId } = props;
   const editMode = mode === 'edit';
@@ -532,72 +626,30 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                       </form.Field>
                       {isSingleRepo && (
                         <form.Field name="repoBranches">
-                          {(field) => {
-                            const config = repoBranchConfigs[0];
-                            const selectedBranch =
-                              field.state.value.find(
-                                (v) => v.repoId === config.repoId
-                              )?.branch ?? config.targetBranch;
-                            return (
-                              <div
-                                className={cn(
-                                  'flex-1 min-w-0',
-                                  isSubmitting &&
-                                    'opacity-50 pointer-events-none'
-                                )}
-                              >
-                                <BranchSelector
-                                  branches={config.branches}
-                                  selectedBranch={selectedBranch}
-                                  onBranchSelect={(branch) => {
-                                    field.handleChange([
-                                      { repoId: config.repoId, branch },
-                                    ]);
-                                  }}
-                                  placeholder={
-                                    branchesLoading
-                                      ? t('createAttemptDialog.loadingBranches')
-                                      : t('createAttemptDialog.selectBranch')
-                                  }
-                                />
-                              </div>
-                            );
-                          }}
+                          {(field) => (
+                            <SingleRepoBranchField
+                              config={repoBranchConfigs[0]}
+                              fieldValue={field.state.value}
+                              onFieldChange={field.handleChange}
+                              isSubmitting={isSubmitting}
+                              branchesLoading={branchesLoading}
+                              t={t}
+                            />
+                          )}
                         </form.Field>
                       )}
                     </div>
                     {!isSingleRepo && (
                       <form.Field name="repoBranches">
-                        {(field) => {
-                          const configs = repoBranchConfigs.map((config) => ({
-                            ...config,
-                            targetBranch:
-                              field.state.value.find(
-                                (v) => v.repoId === config.repoId
-                              )?.branch ?? config.targetBranch,
-                          }));
-                          return (
-                            <RepoBranchSelector
-                              configs={configs}
-                              onBranchChange={(repoId, branch) => {
-                                const newValue = field.state.value.map((v) =>
-                                  v.repoId === repoId ? { ...v, branch } : v
-                                );
-                                if (
-                                  !newValue.find((v) => v.repoId === repoId)
-                                ) {
-                                  newValue.push({ repoId, branch });
-                                }
-                                field.handleChange(newValue);
-                              }}
-                              isLoading={branchesLoading}
-                              showLabel={true}
-                              className={cn(
-                                isSubmitting && 'opacity-50 pointer-events-none'
-                              )}
-                            />
-                          );
-                        }}
+                        {(field) => (
+                          <MultiRepoBranchField
+                            repoBranchConfigs={repoBranchConfigs}
+                            fieldValue={field.state.value}
+                            onFieldChange={field.handleChange}
+                            isSubmitting={isSubmitting}
+                            branchesLoading={branchesLoading}
+                          />
+                        )}
                       </form.Field>
                     )}
                   </div>
@@ -656,23 +708,14 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                   values: state.values,
                 })}
               >
-                {({ canSubmit, isSubmitting, values }) => {
-                  const buttonText = editMode
-                    ? isSubmitting
-                      ? t('taskFormDialog.updating')
-                      : t('taskFormDialog.updateTask')
-                    : isSubmitting
-                      ? values.autoStart
-                        ? t('taskFormDialog.starting')
-                        : t('taskFormDialog.creating')
-                      : t('taskFormDialog.create');
-
-                  return (
-                    <Button onClick={form.handleSubmit} disabled={!canSubmit}>
-                      {buttonText}
-                    </Button>
-                  );
-                }}
+                {({ canSubmit, isSubmitting, values }) => (
+                  <Button
+                    onClick={form.handleSubmit}
+                    disabled={!canSubmit}
+                  >
+                    {getSubmitButtonText(editMode, isSubmitting, values.autoStart, t)}
+                  </Button>
+                )}
               </form.Subscribe>
             </div>
           </div>

@@ -315,6 +315,108 @@ export const useConversationHistory = ({
 
   const flattenEntriesForEmit = useCallback(
     (executionProcessState: ExecutionProcessStateStore): PatchTypeWithKey[] => {
+      // Helper: Process coding agent entries
+      const processCodingAgentEntries = (
+        p: ExecutionProcessState,
+        index: number,
+        totalProcesses: number
+      ): {
+        entries: PatchTypeWithKey[];
+        hasPendingApproval: boolean;
+        isProcessRunning: boolean;
+        processFailedOrKilled: boolean;
+        needsSetup: boolean;
+        setupHelpText: string | undefined;
+      } => {
+        const entries: PatchTypeWithKey[] = [];
+
+        // Add user message
+        const userPatch = createUserMessagePatch(
+          p.executionProcess.id,
+          p.executionProcess.executorAction.typ.prompt,
+          patchWithKey
+        );
+        entries.push(userPatch);
+
+        // Remove all coding agent added user messages
+        const entriesExcludingUser = p.entries.filter(
+          (e) =>
+            e.type !== 'NORMALIZED_ENTRY' ||
+            e.content.entry_type.type !== 'user_message'
+        );
+
+        const hasPendingApproval = hasPendingApprovalInEntries(entriesExcludingUser);
+        entries.push(...entriesExcludingUser);
+
+        const liveProcessStatus = getLiveExecutionProcess(p.executionProcess.id)?.status;
+        const isProcessRunning = liveProcessStatus === ExecutionProcessStatus.running;
+        const processFailedOrKilled =
+          liveProcessStatus === ExecutionProcessStatus.failed ||
+          liveProcessStatus === ExecutionProcessStatus.killed;
+
+        let needsSetup = false;
+        let setupHelpText: string | undefined;
+
+        if (processFailedOrKilled && index === totalProcesses - 1) {
+          const setupText = findSetupRequiredText(entriesExcludingUser);
+          if (setupText) {
+            needsSetup = true;
+            setupHelpText = setupText;
+          }
+        }
+
+        if (isProcessRunning && !hasPendingApprovalInEntries(entriesExcludingUser)) {
+          entries.push(makeLoadingPatch(p.executionProcess.id));
+        }
+
+        return {
+          entries,
+          hasPendingApproval,
+          isProcessRunning,
+          processFailedOrKilled,
+          needsSetup,
+          setupHelpText,
+        };
+      };
+
+      // Helper: Process script request entries
+      const processScriptRequestEntries = (
+        p: ExecutionProcessState,
+        index: number,
+        totalProcesses: number
+      ): {
+        entries: PatchTypeWithKey[];
+        isProcessRunning: boolean;
+        processFailedOrKilled: boolean;
+      } => {
+        const toolName = getScriptToolName(
+          p.executionProcess.executorAction.typ.context
+        );
+        if (!toolName) return { entries: [], isProcessRunning: false, processFailedOrKilled: false };
+
+        const executionProcess = getLiveExecutionProcess(p.executionProcess.id);
+        const isProcessRunning = executionProcess?.status === ExecutionProcessStatus.running;
+        const processFailedOrKilled =
+          (executionProcess?.status === ExecutionProcessStatus.failed ||
+            executionProcess?.status === ExecutionProcessStatus.killed) &&
+          index === totalProcesses - 1;
+
+        const toolPatch = createScriptToolPatch(
+          executionProcess,
+          p.executionProcess.id,
+          toolName,
+          p.executionProcess.executorAction.typ.script,
+          p.entries,
+          patchWithKey
+        );
+
+        return {
+          entries: [toolPatch],
+          isProcessRunning,
+          processFailedOrKilled,
+        };
+      };
+
       // Flags to control Next Action bar emit
       let hasPendingApproval = false;
       let hasRunningProcess = false;
@@ -330,93 +432,45 @@ export const useConversationHistory = ({
             new Date(b.executionProcess.createdAt).getTime()
         )
         .flatMap((p, index) => {
-          const entries: PatchTypeWithKey[] = [];
           const actionType = p.executionProcess.executorAction.typ.type;
+          const totalProcesses = Object.keys(executionProcessState).length;
 
           if (
             actionType === 'CodingAgentInitialRequest' ||
             actionType === 'CodingAgentFollowUpRequest' ||
             actionType === 'ReviewRequest'
           ) {
-            // Add user message
-            const userPatch = createUserMessagePatch(
-              p.executionProcess.id,
-              p.executionProcess.executorAction.typ.prompt,
-              patchWithKey
-            );
-            entries.push(userPatch);
+            const result = processCodingAgentEntries(p, index, totalProcesses);
 
-            // Remove all coding agent added user messages
-            const entriesExcludingUser = p.entries.filter(
-              (e) =>
-                e.type !== 'NORMALIZED_ENTRY' ||
-                e.content.entry_type.type !== 'user_message'
-            );
-
-            if (hasPendingApprovalInEntries(entriesExcludingUser)) {
+            if (result.hasPendingApproval) {
               hasPendingApproval = true;
             }
-
-            entries.push(...entriesExcludingUser);
-
-            const liveProcessStatus = getLiveExecutionProcess(p.executionProcess.id)?.status;
-            const isProcessRunning = liveProcessStatus === ExecutionProcessStatus.running;
-            const processFailedOrKilled =
-              liveProcessStatus === ExecutionProcessStatus.failed ||
-              liveProcessStatus === ExecutionProcessStatus.killed;
-
-            if (isProcessRunning) {
+            if (result.isProcessRunning) {
               hasRunningProcess = true;
             }
-
-            if (
-              processFailedOrKilled &&
-              index === Object.keys(executionProcessState).length - 1
-            ) {
+            if (result.processFailedOrKilled) {
               lastProcessFailedOrKilled = true;
-              const setupText = findSetupRequiredText(entriesExcludingUser);
-              if (setupText) {
+              if (result.needsSetup) {
                 needsSetup = true;
-                setupHelpText = setupText;
+                setupHelpText = result.setupHelpText;
               }
             }
 
-            if (isProcessRunning && !hasPendingApprovalInEntries(entriesExcludingUser)) {
-              entries.push(makeLoadingPatch(p.executionProcess.id));
-            }
+            return result.entries;
           } else if (actionType === 'ScriptRequest') {
-            const toolName = getScriptToolName(
-              p.executionProcess.executorAction.typ.context
-            );
-            if (!toolName) return [];
+            const result = processScriptRequestEntries(p, index, totalProcesses);
 
-            const executionProcess = getLiveExecutionProcess(p.executionProcess.id);
-
-            if (executionProcess?.status === ExecutionProcessStatus.running) {
+            if (result.isProcessRunning) {
               hasRunningProcess = true;
             }
-
-            if (
-              (executionProcess?.status === ExecutionProcessStatus.failed ||
-                executionProcess?.status === ExecutionProcessStatus.killed) &&
-              index === Object.keys(executionProcessState).length - 1
-            ) {
+            if (result.processFailedOrKilled) {
               lastProcessFailedOrKilled = true;
             }
 
-            const toolPatch = createScriptToolPatch(
-              executionProcess,
-              p.executionProcess.id,
-              toolName,
-              p.executionProcess.executorAction.typ.script,
-              p.entries,
-              patchWithKey
-            );
-
-            entries.push(toolPatch);
+            return result.entries;
           }
 
-          return entries;
+          return [];
         });
 
       // Emit the next action bar if no process running
