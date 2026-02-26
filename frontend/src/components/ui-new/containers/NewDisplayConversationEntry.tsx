@@ -342,12 +342,12 @@ function FileEditEntry({
   change,
   expansionKey,
   status,
-}: {
+}: Readonly<{
   path: string;
   change: FileEditAction['changes'][number];
   expansionKey: string;
   status: ToolStatus;
-}) {
+}>) {
   // Auto-expand when pending approval
   const pendingApproval = status.status === 'pending_approval';
   const [expanded, toggle] = usePersistedExpanded(
@@ -419,12 +419,12 @@ function PlanEntry({
   expansionKey,
   workspaceId,
   status,
-}: {
+}: Readonly<{
   plan: string;
   expansionKey: string;
   workspaceId?: string;
   status: ToolStatus;
-}) {
+}>) {
   const { t } = useTranslation('common');
   // Expand plans by default when pending approval
   const pendingApproval = status.status === 'pending_approval';
@@ -462,13 +462,13 @@ function GenericToolApprovalEntry({
   expansionKey,
   workspaceId,
   status,
-}: {
+}: Readonly<{
   toolName: string;
   content: string;
   expansionKey: string;
   workspaceId?: string;
   status: ToolStatus;
-}) {
+}>) {
   const [expanded, toggle] = usePersistedExpanded(
     `tool:${expansionKey}`,
     true // auto-expand for pending approval
@@ -494,12 +494,12 @@ function UserMessageEntry({
   expansionKey,
   workspaceId,
   executionProcessId,
-}: {
+}: Readonly<{
   content: string;
   expansionKey: string;
   workspaceId?: string;
   executionProcessId?: string;
-}) {
+}>) {
   const [expanded, toggle] = usePersistedExpanded(`user:${expansionKey}`, true);
   const { startEdit, isEntryGreyed, isInEditMode } = useMessageEditContext();
 
@@ -532,10 +532,10 @@ function UserMessageEntry({
 function AssistantMessageEntry({
   content,
   workspaceId,
-}: {
+}: Readonly<{
   content: string;
   workspaceId?: string;
-}) {
+}>) {
   return <ChatAssistantMessage content={content} workspaceId={workspaceId} />;
 }
 
@@ -549,14 +549,14 @@ function ToolSummaryEntry({
   content,
   toolName,
   command,
-}: {
+}: Readonly<{
   summary: string;
   expansionKey: string;
   status: ToolStatus;
   content: string;
   toolName: string;
   command?: string;
-}) {
+}>) {
   const [expanded, toggle] = usePersistedExpanded(
     `tool:${expansionKey}`,
     false
@@ -599,10 +599,10 @@ function ToolSummaryEntry({
 function TodoManagementEntry({
   todos,
   expansionKey,
-}: {
+}: Readonly<{
   todos: TodoItem[];
   expansionKey: string;
-}) {
+}>) {
   const [expanded, toggle] = usePersistedExpanded(
     `todo:${expansionKey}`,
     false
@@ -617,10 +617,10 @@ function TodoManagementEntry({
 function SystemMessageEntry({
   content,
   expansionKey,
-}: {
+}: Readonly<{
   content: string;
   expansionKey: string;
-}) {
+}>) {
   const [expanded, toggle] = usePersistedExpanded(
     `system:${expansionKey}`,
     false
@@ -645,14 +645,14 @@ function ScriptEntryWithFix({
   status,
   workspaceId,
   sessionId,
-}: {
+}: Readonly<{
   title: string;
   processId: string;
   exitCode: number | null;
   status: ToolStatus;
   workspaceId?: string;
   sessionId?: string;
-}) {
+}>) {
   // Try to get repos from workspace context - may not be available in all contexts
   let repos: RepoWithTargetBranch[] = [];
   try {
@@ -707,10 +707,10 @@ function ScriptEntryWithFix({
 function ErrorMessageEntry({
   content,
   expansionKey,
-}: {
+}: Readonly<{
   content: string;
   expansionKey: string;
-}) {
+}>) {
   const [expanded, toggle] = usePersistedExpanded(
     `error:${expansionKey}`,
     false

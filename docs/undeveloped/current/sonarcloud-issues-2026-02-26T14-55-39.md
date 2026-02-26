@@ -1267,7 +1267,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 35.3 Mark the props of the component as read-only.
+### 35.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiM`
 - **项目**: huanchong-99
@@ -1280,7 +1280,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.4 Mark the props of the component as read-only.
+### 35.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiN`
 - **项目**: huanchong-99
@@ -1293,7 +1293,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.5 Mark the props of the component as read-only.
+### 35.5 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiO`
 - **项目**: huanchong-99
@@ -1306,7 +1306,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.6 Mark the props of the component as read-only.
+### 35.6 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiP`
 - **项目**: huanchong-99
@@ -1319,7 +1319,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.7 Mark the props of the component as read-only.
+### 35.7 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiQ`
 - **项目**: huanchong-99
@@ -1332,7 +1332,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.8 Mark the props of the component as read-only.
+### 35.8 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiR`
 - **项目**: huanchong-99
@@ -1358,7 +1358,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 35.10 Mark the props of the component as read-only.
+### 35.10 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiT`
 - **项目**: huanchong-99
@@ -1371,7 +1371,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.11 Mark the props of the component as read-only.
+### 35.11 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiU`
 - **项目**: huanchong-99
@@ -1384,7 +1384,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 35.12 Mark the props of the component as read-only.
+### 35.12 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiV`
 - **项目**: huanchong-99
@@ -1410,7 +1410,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 35.14 Mark the props of the component as read-only.
+### 35.14 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiX`
 - **项目**: huanchong-99
