@@ -74,6 +74,16 @@ function getButtonClassName(isActive: boolean, isDisabled: boolean): string {
   return 'text-low hover:text-high hover:bg-secondary';
 }
 
+/**
+ * Get tooltip title based on disabled state
+ */
+function getTooltipTitle(
+  isDisabled: boolean,
+  t: (key: string) => string
+): string | undefined {
+  return isDisabled ? t('viewSwitcher.selectWorkflowFirst') : undefined;
+}
+
 export function NewDesignLayout() {
   const { t } = useTranslation('workflow');
   const location = useLocation();
@@ -118,7 +128,7 @@ export function NewDesignLayout() {
                     'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors',
                     getButtonClassName(isActive, isDisabled)
                   )}
-                  title={isDisabled ? t('viewSwitcher.selectWorkflowFirst') : undefined}
+                  title={getTooltipTitle(isDisabled, t)}
                 >
                   <Icon className="w-4 h-4" />
                   {t(option.labelKey)}

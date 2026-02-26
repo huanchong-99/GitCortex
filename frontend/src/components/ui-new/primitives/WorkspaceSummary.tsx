@@ -167,18 +167,23 @@ export function WorkspaceSummary({
             )}
 
             {/* Time elapsed OR "Draft" label (when not running) */}
-            {!isRunning &&
-              (isDraft ? (
-                <span className="min-w-0 flex-1 truncate">
-                  {t('workspaces.draft')}
-                </span>
-              ) : latestProcessCompletedAt ? (
-                <span className="min-w-0 flex-1 truncate">
-                  {formatRelativeTime(latestProcessCompletedAt)}
-                </span>
-              ) : (
-                <span className="flex-1" />
-              ))}
+            {!isRunning && (() => {
+              if (isDraft) {
+                return (
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('workspaces.draft')}
+                  </span>
+                );
+              }
+              if (latestProcessCompletedAt) {
+                return (
+                  <span className="min-w-0 flex-1 truncate">
+                    {formatRelativeTime(latestProcessCompletedAt)}
+                  </span>
+                );
+              }
+              return <span className="flex-1" />;
+            })()}
 
             {/* Spacer when running (no elapsed time shown) */}
             {isRunning && <span className="flex-1" />}

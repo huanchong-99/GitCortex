@@ -243,11 +243,12 @@ function DiffsPanelContent({
                           : t('diff.collapseAll')
                       }
                     >
-                      {allCollapsed ? (
-                        <ChevronsDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronsUp className="h-4 w-4" />
-                      )}
+                      {(() => {
+                        if (allCollapsed) {
+                          return <ChevronsDown className="h-4 w-4" />;
+                        }
+                        return <ChevronsUp className="h-4 w-4" />;
+                      })()}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
