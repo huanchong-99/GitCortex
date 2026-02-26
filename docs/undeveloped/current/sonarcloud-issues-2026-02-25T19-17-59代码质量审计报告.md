@@ -10621,7 +10621,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 251.2 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 251.2 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwezzZ9DOUQdEsGnG`
 - **项目**: huanchong-99
@@ -10653,7 +10653,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 252.2 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 252.2 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwey8Z9DOUQdEsGmt`
 - **项目**: huanchong-99
@@ -10897,7 +10897,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 258.1 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 258.1 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwezKZ9DOUQdEsGmv`
 - **项目**: huanchong-99
@@ -11031,7 +11031,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 263.3 The 'value' object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 263.3 The 'value' object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwe0oZ9DOUQdEsGnR`
 - **项目**: huanchong-99
@@ -11076,7 +11076,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 264.3 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 264.3 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwezSZ9DOUQdEsGmz`
 - **项目**: huanchong-99
@@ -11108,7 +11108,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 265.2 The 'value' object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 265.2 The 'value' object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwe0JZ9DOUQdEsGnL`
 - **项目**: huanchong-99
