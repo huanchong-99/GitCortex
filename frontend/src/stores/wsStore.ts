@@ -446,68 +446,72 @@ function normalizeDecisionDetail(decision: JsonRecord): PromptDecisionDetail {
   return detail;
 }
 
-function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
-  if (!isJsonRecord(payload)) {
-    return payload;
+// Helper to handle string decision source
+function handleStringDecisionSource(
+  decisionSource: string,
+  payload: JsonRecord,
+  workflowId: string,
+  terminalId: string,
+  promptContext: ReturnType<typeof extractPromptEventContext>
+): TerminalPromptDecisionPayload {
+  const normalizedDecision = normalizePromptDecisionAction(decisionSource);
+  const decisionDetailSource = isJsonRecord(payload.decisionDetail)
+    ? payload.decisionDetail
+    : isJsonRecord(payload.decision_detail)
+      ? payload.decision_detail
+      : undefined;
+  const decisionRawSource = payload.decisionRaw ?? payload.decision_raw;
+
+  const normalizedPayload: TerminalPromptDecisionPayload = {
+    workflowId,
+    terminalId,
+    ...promptContext,
+    decision: normalizedDecision,
+  };
+
+  if (decisionDetailSource) {
+    normalizedPayload.decisionDetail = normalizeDecisionDetail(decisionDetailSource);
   }
 
-  const workflowId = getStringField(payload, 'workflowId', 'workflow_id');
-  const terminalId = getStringField(payload, 'terminalId', 'terminal_id');
-
-  if (!workflowId || !terminalId) {
-    return payload;
+  if (decisionRawSource !== undefined) {
+    normalizedPayload.decisionRaw = decisionRawSource;
   }
 
-  const promptContext = extractPromptEventContext(payload);
-
-  const decisionSource = payload.decision;
-
-  if (typeof decisionSource === 'string') {
-    const normalizedDecision = normalizePromptDecisionAction(decisionSource);
-    const decisionDetailSource = isJsonRecord(payload.decisionDetail)
-      ? payload.decisionDetail
-      : isJsonRecord(payload.decision_detail)
-        ? payload.decision_detail
-        : undefined;
-    const decisionRawSource = payload.decisionRaw ?? payload.decision_raw;
-
-    const normalizedPayload: TerminalPromptDecisionPayload = {
-      workflowId,
-      terminalId,
-      ...promptContext,
-      decision: normalizedDecision,
-    };
-
-    if (decisionDetailSource) {
-      normalizedPayload.decisionDetail = normalizeDecisionDetail(decisionDetailSource);
-    }
-
-    if (decisionRawSource !== undefined) {
-      normalizedPayload.decisionRaw = decisionRawSource;
-    }
-
-    if (normalizedDecision === 'unknown' && decisionRawSource === undefined) {
-      normalizedPayload.decisionRaw = decisionSource;
-    }
-
-    return normalizedPayload;
+  if (normalizedDecision === 'unknown' && decisionRawSource === undefined) {
+    normalizedPayload.decisionRaw = decisionSource;
   }
 
-  if (isJsonRecord(decisionSource)) {
-    const decisionAction = normalizePromptDecisionAction(
-      getStringField(decisionSource, 'action')
-    );
-    const normalizedPayload: TerminalPromptDecisionPayload = {
-      workflowId,
-      terminalId,
-      ...promptContext,
-      decision: decisionAction,
-      decisionDetail: normalizeDecisionDetail(decisionSource),
-      decisionRaw: decisionSource,
-    };
-    return normalizedPayload;
-  }
+  return normalizedPayload;
+}
 
+// Helper to handle object decision source
+function handleObjectDecisionSource(
+  decisionSource: JsonRecord,
+  workflowId: string,
+  terminalId: string,
+  promptContext: ReturnType<typeof extractPromptEventContext>
+): TerminalPromptDecisionPayload {
+  const decisionAction = normalizePromptDecisionAction(
+    getStringField(decisionSource, 'action')
+  );
+  return {
+    workflowId,
+    terminalId,
+    ...promptContext,
+    decision: decisionAction,
+    decisionDetail: normalizeDecisionDetail(decisionSource),
+    decisionRaw: decisionSource,
+  };
+}
+
+// Helper to handle top-level decision action
+function handleTopLevelDecisionAction(
+  payload: JsonRecord,
+  decisionSource: unknown,
+  workflowId: string,
+  terminalId: string,
+  promptContext: ReturnType<typeof extractPromptEventContext>
+): TerminalPromptDecisionPayload {
   const topLevelDecisionAction = normalizePromptDecisionAction(
     getStringField(payload, 'action')
   );
@@ -523,6 +527,49 @@ function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
   }
 
   return normalizedPayload;
+}
+
+function normalizeTerminalPromptDecisionPayload(payload: unknown): unknown {
+  if (!isJsonRecord(payload)) {
+    return payload;
+  }
+
+  const workflowId = getStringField(payload, 'workflowId', 'workflow_id');
+  const terminalId = getStringField(payload, 'terminalId', 'terminal_id');
+
+  if (!workflowId || !terminalId) {
+    return payload;
+  }
+
+  const promptContext = extractPromptEventContext(payload);
+  const decisionSource = payload.decision;
+
+  if (typeof decisionSource === 'string') {
+    return handleStringDecisionSource(
+      decisionSource,
+      payload,
+      workflowId,
+      terminalId,
+      promptContext
+    );
+  }
+
+  if (isJsonRecord(decisionSource)) {
+    return handleObjectDecisionSource(
+      decisionSource,
+      workflowId,
+      terminalId,
+      promptContext
+    );
+  }
+
+  return handleTopLevelDecisionAction(
+    payload,
+    decisionSource,
+    workflowId,
+    terminalId,
+    promptContext
+  );
 }
 
 function normalizeWorkflowEventPayload(

@@ -335,12 +335,62 @@ export function Workflows() {
     }
   }, [promptQueue, submittingPromptId]);
 
+  // Helper to handle successful prompt submission
+  const handlePromptSubmitSuccess = useCallback(
+    (promptId: string, promptContextKey: string) => {
+      pendingPromptDecisionsRef.current.delete(promptContextKey);
+      setPromptQueue((previousQueue) =>
+        previousQueue.filter((item) => item.id !== promptId)
+      );
+    },
+    []
+  );
+
+  // Helper to handle prompt submission error with WebSocket fallback
+  const handlePromptSubmitErrorWithFallback = useCallback(
+    (
+      currentPrompt: WorkflowPromptQueueItem,
+      isEnterConfirmResponse: boolean,
+      sendPromptResponseOverWorkflowWs: (payload: any) => boolean
+    ): boolean => {
+      if (!isEnterConfirmResponse) return false;
+
+      const sent = sendPromptResponseOverWorkflowWs({
+        workflowId: currentPrompt.detected.workflowId,
+        terminalId: currentPrompt.detected.terminalId,
+        response: '',
+      });
+
+      if (sent) {
+        const promptContextKey = getPromptContextKey(currentPrompt.detected);
+        handlePromptSubmitSuccess(currentPrompt.id, promptContextKey);
+        return true;
+      }
+
+      promptSubmittedHistoryRef.current.delete(currentPrompt.id);
+      setPromptSubmitError('Failed to submit prompt response over WebSocket');
+      return true;
+    },
+    [handlePromptSubmitSuccess]
+  );
+
+  // Helper to handle general prompt submission error
+  const handlePromptSubmitError = useCallback(
+    (currentPrompt: WorkflowPromptQueueItem, error: unknown) => {
+      promptSubmittedHistoryRef.current.delete(currentPrompt.id);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to submit prompt response';
+      setPromptSubmitError(message);
+    },
+    []
+  );
+
   const handleSubmitPromptResponse = useCallback(
     async (response: string) => {
       const currentPrompt = activePrompt;
-      if (!currentPrompt) {
-        return;
-      }
+      if (!currentPrompt) return;
 
       const isEnterConfirmResponse =
         response === ENTER_CONFIRM_RESPONSE_TOKEN &&
@@ -348,9 +398,7 @@ export function Workflows() {
 
       const requestResponse = isEnterConfirmResponse ? '' : response;
 
-      if (submittingPromptRef.current === currentPrompt.id) {
-        return;
-      }
+      if (submittingPromptRef.current === currentPrompt.id) return;
 
       submittingPromptRef.current = currentPrompt.id;
       setSubmittingPromptId(currentPrompt.id);
@@ -369,39 +417,17 @@ export function Workflows() {
           response: requestResponse,
         });
 
-        pendingPromptDecisionsRef.current.delete(promptContextKey);
-
-        setPromptQueue((previousQueue) =>
-          previousQueue.filter((item) => item.id !== currentPrompt.id)
-        );
+        handlePromptSubmitSuccess(currentPrompt.id, promptContextKey);
       } catch (error) {
-        const promptContextKey = getPromptContextKey(currentPrompt.detected);
+        const handled = handlePromptSubmitErrorWithFallback(
+          currentPrompt,
+          isEnterConfirmResponse,
+          sendPromptResponseOverWorkflowWs
+        );
 
-        if (isEnterConfirmResponse) {
-          const sent = sendPromptResponseOverWorkflowWs({
-            workflowId: currentPrompt.detected.workflowId,
-            terminalId: currentPrompt.detected.terminalId,
-            response: '',
-          });
-          if (sent) {
-            pendingPromptDecisionsRef.current.delete(promptContextKey);
-            setPromptQueue((previousQueue) =>
-              previousQueue.filter((item) => item.id !== currentPrompt.id)
-            );
-            return;
-          }
-
-          promptSubmittedHistoryRef.current.delete(currentPrompt.id);
-          setPromptSubmitError('Failed to submit prompt response over WebSocket');
-          return;
+        if (!handled) {
+          handlePromptSubmitError(currentPrompt, error);
         }
-
-        promptSubmittedHistoryRef.current.delete(currentPrompt.id);
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : 'Failed to submit prompt response';
-        setPromptSubmitError(message);
       } finally {
         if (submittingPromptRef.current === currentPrompt.id) {
           submittingPromptRef.current = null;
@@ -415,6 +441,9 @@ export function Workflows() {
       activePrompt,
       sendPromptResponseOverWorkflowWs,
       submitPromptResponseMutation,
+      handlePromptSubmitSuccess,
+      handlePromptSubmitErrorWithFallback,
+      handlePromptSubmitError,
     ]
   );
 

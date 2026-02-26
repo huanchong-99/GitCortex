@@ -169,6 +169,56 @@ function makeDedupeKey(
   return `${s.name}|${locKey}|${domBits.join('')}`;
 }
 
+// Helper to prune primitive values
+function prunePrimitive(value: unknown, maxString: number): unknown {
+  const t = typeof value;
+  if (t === 'string') {
+    return (value as string).length > maxString
+      ? (value as string).slice(0, maxString) + '…'
+      : value;
+  }
+  if (t === 'number' || t === 'boolean') return value;
+  if (t === 'function') return '[Function]';
+  if (t === 'bigint') return value.toString() + 'n';
+  if (t === 'symbol') return value.toString();
+  return null; // Not a primitive
+}
+
+// Helper to prune array values
+function pruneArray(
+  value: unknown[],
+  depth: number,
+  maxString: number,
+  maxArray: number
+): unknown[] {
+  const lim = value
+    .slice(0, maxArray)
+    .map((v) => pruneValue(v, depth - 1, maxString, maxArray));
+  if (value.length > maxArray) {
+    lim.push(`[+${value.length - maxArray} more]`);
+  }
+  return lim;
+}
+
+// Helper to prune object values
+function pruneObject(
+  obj: Record<string, unknown>,
+  depth: number,
+  maxString: number,
+  maxArray: number
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  let count = 0;
+  for (const k of Object.keys(obj)) {
+    if (count++ > 50) {
+      out['[TruncatedKeys]'] = true;
+      break;
+    }
+    out[k] = pruneValue(obj[k], depth - 1, maxString, maxArray);
+  }
+  return out;
+}
+
 // Remove heavy or unsafe props while retaining debuggability
 function pruneValue(
   value: unknown,
@@ -177,40 +227,20 @@ function pruneValue(
   maxArray = 20
 ): unknown {
   if (depth <= 0) return '[MaxDepth]';
-
   if (value == null) return value;
-  const t = typeof value;
-  if (t === 'string')
-    return (value as string).length > maxString
-      ? (value as string).slice(0, maxString) + '…'
-      : value;
-  if (t === 'number' || t === 'boolean') return value;
-  if (t === 'function') return '[Function]';
-  if (t === 'bigint') return value.toString() + 'n';
-  if (t === 'symbol') return value.toString();
 
+  // Try primitive pruning first
+  const primitive = prunePrimitive(value, maxString);
+  if (primitive !== null) return primitive;
+
+  // Handle arrays
   if (Array.isArray(value)) {
-    const lim = (value as unknown[])
-      .slice(0, maxArray)
-      .map((v) => pruneValue(v, depth - 1, maxString, maxArray));
-    if ((value as unknown[]).length > maxArray)
-      lim.push(`[+${(value as unknown[]).length - maxArray} more]`);
-    return lim;
+    return pruneArray(value as unknown[], depth, maxString, maxArray);
   }
 
-  if (t === 'object') {
-    const obj = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    let count = 0;
-    for (const k of Object.keys(obj)) {
-      // Cap keys to keep small
-      if (count++ > 50) {
-        out['[TruncatedKeys]'] = true;
-        break;
-      }
-      out[k] = pruneValue(obj[k], depth - 1, maxString, maxArray);
-    }
-    return out;
+  // Handle objects
+  if (typeof value === 'object') {
+    return pruneObject(value as Record<string, unknown>, depth, maxString, maxArray);
   }
 
   return '[Unknown]';

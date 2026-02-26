@@ -238,49 +238,61 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     return ['starting', 'waiting', 'working'].includes(status);
   }, []);
 
+  // Helper to check if restart should be skipped
+  const shouldSkipRestart = useCallback((terminalId: string, status: Terminal['status'] | undefined) => {
+    if (!shouldAutoRecoverTerminal(status)) {
+      console.info(
+        `Skip auto-restart for terminal ${terminalId} because status is ${status ?? 'unknown'}`
+      );
+      return true;
+    }
+
+    if (startingTerminalIdsRef.current.has(terminalId)) {
+      console.info(
+        `Skip auto-restart for terminal ${terminalId} because restart is already in progress`
+      );
+      return true;
+    }
+
+    return false;
+  }, [shouldAutoRecoverTerminal]);
+
+  // Helper to handle max restart attempts reached
+  const handleMaxRestartAttemptsReached = useCallback((terminalId: string) => {
+    console.error(`Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for terminal ${terminalId}`);
+    needsRestartRef.current.add(terminalId);
+    readyTerminalIdsRef.current.delete(terminalId);
+    forceUpdate({});
+  }, []);
+
+  // Helper to perform terminal restart
+  const performTerminalRestart = useCallback((terminalId: string, attempts: number) => {
+    console.log(`Terminal process not running, auto-restarting... (attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS})`);
+    restartAttemptsRef.current.set(terminalId, attempts + 1);
+    needsRestartRef.current.add(terminalId);
+    readyTerminalIdsRef.current.delete(terminalId);
+    autoStartedRef.current.delete(terminalId);
+    forceUpdate({});
+    startTerminal(terminalId);
+  }, [startTerminal]);
+
   // Handle terminal errors - auto-restart if process is not running
   const handleTerminalError = useCallback((error: Error) => {
     console.error('Terminal error:', error.message);
 
-    // If the error indicates the process is not running, auto-restart (with limit)
-    if (error.message.includes('Terminal process not running') && selectedTerminalId) {
-      if (!shouldAutoRecoverTerminal(selectedTerminal?.status)) {
-        console.info(
-          `Skip auto-restart for terminal ${selectedTerminalId} because status is ${selectedTerminal?.status ?? 'unknown'}`
-        );
-        return;
-      }
+    const isProcessNotRunning = error.message.includes('Terminal process not running');
+    if (!isProcessNotRunning || !selectedTerminalId) return;
 
-      if (startingTerminalIdsRef.current.has(selectedTerminalId)) {
-        console.info(
-          `Skip auto-restart for terminal ${selectedTerminalId} because restart is already in progress`
-        );
-        return;
-      }
+    if (shouldSkipRestart(selectedTerminalId, selectedTerminal?.status)) return;
 
-      const attempts = restartAttemptsRef.current.get(selectedTerminalId) || 0;
-      if (attempts >= MAX_RESTART_ATTEMPTS) {
-        console.error(`Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached for terminal ${selectedTerminalId}`);
-        // Clear flags to show "starting" message and stop retrying
-        needsRestartRef.current.add(selectedTerminalId);
-        readyTerminalIdsRef.current.delete(selectedTerminalId);
-        forceUpdate({});
-        return;
-      }
-
-      console.log(`Terminal process not running, auto-restarting... (attempt ${attempts + 1}/${MAX_RESTART_ATTEMPTS})`);
-      restartAttemptsRef.current.set(selectedTerminalId, attempts + 1);
-      // Mark as needing restart to hide TerminalEmulator
-      needsRestartRef.current.add(selectedTerminalId);
-      // Clear ready state
-      readyTerminalIdsRef.current.delete(selectedTerminalId);
-      // Allow re-auto-start
-      autoStartedRef.current.delete(selectedTerminalId);
-      forceUpdate({});
-      // Start the terminal
-      startTerminal(selectedTerminalId);
+    const attempts = restartAttemptsRef.current.get(selectedTerminalId) || 0;
+    if (attempts >= MAX_RESTART_ATTEMPTS) {
+      handleMaxRestartAttemptsReached(selectedTerminalId);
+      return;
     }
-  }, [selectedTerminal?.status, selectedTerminalId, shouldAutoRecoverTerminal, startTerminal]);
+
+    performTerminalRestart(selectedTerminalId, attempts);
+  }, [selectedTerminal?.status, selectedTerminalId, shouldSkipRestart, handleMaxRestartAttemptsReached, performTerminalRestart]);
 
   // Auto-start terminal when selected and not yet started
   useEffect(() => {

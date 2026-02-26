@@ -3506,7 +3506,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 86.9 Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed.
+### 86.9 Refactor this function to reduce its Cognitive Complexity from 20 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg-`
 - **项目**: huanchong-99
@@ -3904,7 +3904,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 96.2 Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed.
+### 96.2 Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweNzZ9DOUQdEsGao`
 - **项目**: huanchong-99
@@ -7813,7 +7813,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 191.7 Refactor this function to reduce its Cognitive Complexity from 26 to the 15 allowed.
+### 191.7 Refactor this function to reduce its Cognitive Complexity from 26 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfN`
 - **项目**: huanchong-99
@@ -8055,7 +8055,7 @@
 - **创建时间**: 14 days ago
 - **标签**: es2021, readability
 
-### 195.4 Refactor this function to reduce its Cognitive Complexity from 23 to the 15 allowed.
+### 195.4 Refactor this function to reduce its Cognitive Complexity from 23 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGjw`
 - **项目**: huanchong-99
@@ -10743,7 +10743,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bad-practice, type-dependent
 
-### 254.5 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.
+### 254.5 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm8`
 - **项目**: huanchong-99
@@ -12750,7 +12750,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 301.3 Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed.
+### 301.3 Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGkd`
 - **项目**: huanchong-99
@@ -13455,7 +13455,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2021, readability
 
-### 311.4 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.
+### 311.4 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoO`
 - **项目**: huanchong-99

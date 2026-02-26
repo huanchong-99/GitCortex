@@ -66,6 +66,44 @@ interface TaskFollowUpSectionProps {
   session?: Session;
 }
 
+// Helper to handle image insertion into message
+function insertImageIntoMessage(
+  currentMessage: string,
+  imageMarkdown: string
+): string {
+  return currentMessage
+    ? `${currentMessage}\n\n${imageMarkdown}`
+    : imageMarkdown;
+}
+
+// Helper to handle markdown insertion into message
+function insertMarkdownIntoMessage(
+  currentMessage: string,
+  markdown: string
+): string {
+  return currentMessage ? `${currentMessage}\n\n${markdown}` : markdown;
+}
+
+// Helper to handle queued message cancellation and update
+function handleQueuedMessageUpdate(
+  isQueued: boolean,
+  queuedMessage: any,
+  newContent: string,
+  cancelMutation: any,
+  setLocalMessage: (msg: string) => void,
+  setFollowUpMessageRef: React.MutableRefObject<(value: string) => void>
+): boolean {
+  if (isQueued && queuedMessage) {
+    cancelMutation.mutate();
+    const base = queuedMessage.data.message;
+    const newMessage = insertMarkdownIntoMessage(base, newContent);
+    setLocalMessage(newMessage);
+    setFollowUpMessageRef.current(newMessage);
+    return true;
+  }
+  return false;
+}
+
 export function TaskFollowUpSection({
   task,
   session,
@@ -558,28 +596,23 @@ export function TaskFollowUpSection({
       for (const file of files) {
         try {
           const response = await imagesApi.uploadForAttempt(workspaceId, file);
-          // Append markdown image to current message
           const imageMarkdown = `![${response.original_name}](${response.file_path})`;
 
-          // If queued, cancel queue and use queued message as base (same as editor change behavior)
-          const {
-            isQueued: currentlyQueued,
-            queuedMessage: currentQueuedMessage,
-          } = getQueueState();
-          if (currentlyQueued && currentQueuedMessage) {
-            cancelMutation.mutate();
-            const base = currentQueuedMessage.data.message;
-            const newMessage = base
-              ? `${base}\n\n${imageMarkdown}`
-              : imageMarkdown;
-            setLocalMessage(newMessage);
-            setFollowUpMessageRef.current(newMessage);
-          } else {
+          // If queued, cancel queue and use queued message as base
+          const { isQueued: currentlyQueued, queuedMessage: currentQueuedMessage } = getQueueState();
+          const wasHandled = handleQueuedMessageUpdate(
+            currentlyQueued,
+            currentQueuedMessage,
+            imageMarkdown,
+            cancelMutation,
+            setLocalMessage,
+            setFollowUpMessageRef
+          );
+
+          if (!wasHandled) {
             setLocalMessage((prev) => {
-              const newMessage = prev
-                ? `${prev}\n\n${imageMarkdown}`
-                : imageMarkdown;
-              setFollowUpMessageRef.current(newMessage); // Debounced save to scratch
+              const newMessage = insertImageIntoMessage(prev, imageMarkdown);
+              setFollowUpMessageRef.current(newMessage);
               return newMessage;
             });
           }
@@ -645,18 +678,20 @@ export function TaskFollowUpSection({
 
       const markdown = markdownBlocks.join('\n\n');
 
-      // Same pattern as image paste
-      const { isQueued: currentlyQueued, queuedMessage: currentQueuedMessage } =
-        getQueueState();
-      if (currentlyQueued && currentQueuedMessage) {
-        cancelMutation.mutate();
-        const base = currentQueuedMessage.data.message;
-        const newMessage = base ? `${base}\n\n${markdown}` : markdown;
-        setLocalMessage(newMessage);
-        setFollowUpMessageRef.current(newMessage);
-      } else {
+      // Use same pattern as image paste
+      const { isQueued: currentlyQueued, queuedMessage: currentQueuedMessage } = getQueueState();
+      const wasHandled = handleQueuedMessageUpdate(
+        currentlyQueued,
+        currentQueuedMessage,
+        markdown,
+        cancelMutation,
+        setLocalMessage,
+        setFollowUpMessageRef
+      );
+
+      if (!wasHandled) {
         setLocalMessage((prev) => {
-          const newMessage = prev ? `${prev}\n\n${markdown}` : markdown;
+          const newMessage = insertMarkdownIntoMessage(prev, markdown);
           setFollowUpMessageRef.current(newMessage);
           return newMessage;
         });

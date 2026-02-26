@@ -208,26 +208,51 @@ export function SessionChatBox({
 
   const placeholder = getPlaceholder();
 
+  // Helper to handle approval mode Cmd+Enter
+  const handleApprovalModeEnter = () => {
+    if (approvalMode?.isTimedOut) return false;
+    if (canSend) {
+      approvalMode?.onRequestChanges();
+    } else {
+      approvalMode?.onApprove();
+    }
+    return true;
+  };
+
+  // Helper to handle feedback mode Cmd+Enter
+  const handleFeedbackModeEnter = () => {
+    if (!canSend || feedbackMode?.isTimedOut) return false;
+    feedbackMode?.onSubmitFeedback();
+    return true;
+  };
+
+  // Helper to handle edit mode Cmd+Enter
+  const handleEditModeEnter = () => {
+    if (!canSend) return false;
+    editMode?.onSubmitEdit();
+    return true;
+  };
+
+  // Helper to handle normal mode Cmd+Enter
+  const handleNormalModeEnter = () => {
+    if (!canSend) return false;
+    if (status === 'running') {
+      actions.onQueue();
+      return true;
+    }
+    if (status === 'idle') {
+      actions.onSend();
+      return true;
+    }
+    return false;
+  };
+
   // Cmd+Enter handler
   const handleCmdEnter = () => {
-    // Approval mode: Cmd+Enter triggers approve or request changes based on input
-    if (isInApprovalMode && !approvalMode?.isTimedOut) {
-      if (canSend) {
-        approvalMode?.onRequestChanges();
-      } else {
-        approvalMode?.onApprove();
-      }
-      return;
-    }
-    if (isInFeedbackMode && canSend && !feedbackMode?.isTimedOut) {
-      feedbackMode?.onSubmitFeedback();
-    } else if (isInEditMode && canSend) {
-      editMode?.onSubmitEdit();
-    } else if (status === 'running' && canSend) {
-      actions.onQueue();
-    } else if (status === 'idle' && canSend) {
-      actions.onSend();
-    }
+    if (isInApprovalMode && handleApprovalModeEnter()) return;
+    if (isInFeedbackMode && handleFeedbackModeEnter()) return;
+    if (isInEditMode && handleEditModeEnter()) return;
+    handleNormalModeEnter();
   };
 
   // File input handlers
