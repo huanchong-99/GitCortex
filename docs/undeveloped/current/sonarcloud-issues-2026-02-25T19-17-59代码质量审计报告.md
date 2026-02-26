@@ -11333,7 +11333,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 270.7 Expected the Promise rejection reason to be an Error.
+### 270.7 Expected the Promise rejection reason to be an Error. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl_`
 - **项目**: huanchong-99
@@ -11955,7 +11955,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 283.3 Expected the Promise rejection reason to be an Error. ✅ 已修复
+### 283.3 Expected the Promise rejection reason to be an Error. ✅ 已修复 ✅ 已修复
 
 - **问题ID**: `AZyVwewxZ9DOUQdEsGmD`
 - **项目**: huanchong-99
@@ -11967,7 +11967,7 @@
 - **工作量**: 255min effort
 - **创建时间**: 22 hours ago
 
-### 283.4 Expected the Promise rejection reason to be an Error.
+### 283.4 Expected the Promise rejection reason to be an Error. ✅ 已修复
 
 - **问题ID**: `AZyVwewxZ9DOUQdEsGmE`
 - **项目**: huanchong-99
