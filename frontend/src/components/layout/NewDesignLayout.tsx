@@ -61,6 +61,19 @@ function getCurrentView(pathname: string): ViewType {
   return 'kanban';
 }
 
+/**
+ * Get button className based on state
+ */
+function getButtonClassName(isActive: boolean, isDisabled: boolean): string {
+  if (isActive) {
+    return 'bg-brand/10 text-brand font-medium';
+  }
+  if (isDisabled) {
+    return 'text-low/50 cursor-not-allowed';
+  }
+  return 'text-low hover:text-high hover:bg-secondary';
+}
+
 export function NewDesignLayout() {
   const { t } = useTranslation('workflow');
   const location = useLocation();
@@ -103,11 +116,7 @@ export function NewDesignLayout() {
                   disabled={isDisabled}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors',
-                    isActive
-                      ? 'bg-brand/10 text-brand font-medium'
-                      : isDisabled
-                      ? 'text-low/50 cursor-not-allowed'
-                      : 'text-low hover:text-high hover:bg-secondary'
+                    getButtonClassName(isActive, isDisabled)
                   )}
                   title={isDisabled ? t('viewSwitcher.selectWorkflowFirst') : undefined}
                 >
