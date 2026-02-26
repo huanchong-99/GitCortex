@@ -8673,7 +8673,7 @@
 - **创建时间**: 1 month ago
 - **标签**: regex, type-dependent
 
-### 203.2 Prefer `globalThis.window` over `window`.
+### 203.2 Prefer `globalThis.window` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwempZ9DOUQdEsGio`
 - **项目**: huanchong-99
@@ -9443,7 +9443,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 223.2 Prefer `globalThis.window` over `window`.
+### 223.2 Prefer `globalThis.window` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweQHZ9DOUQdEsGbc`
 - **项目**: huanchong-99
@@ -11395,7 +11395,7 @@
 - **创建时间**: 1 month ago
 - **标签**: regex, type-dependent
 
-### 272.2 Prefer `globalThis.window` over `window`.
+### 272.2 Prefer `globalThis.window` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwewEZ9DOUQdEsGls`
 - **项目**: huanchong-99
@@ -11614,7 +11614,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 276.2 Prefer `globalThis.window` over `window`.
+### 276.2 Prefer `globalThis.window` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmH`
 - **项目**: huanchong-99
@@ -11640,7 +11640,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 276.4 Prefer `globalThis.window` over `window`.
+### 276.4 Prefer `globalThis.window` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmJ`
 - **项目**: huanchong-99
@@ -11774,7 +11774,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 281.1 Prefer `globalThis.window` over `window`.
+### 281.1 Prefer `globalThis.window` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevjZ9DOUQdEsGlf`
 - **项目**: huanchong-99
