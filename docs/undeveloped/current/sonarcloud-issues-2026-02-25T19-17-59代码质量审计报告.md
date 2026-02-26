@@ -6757,7 +6757,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 158.9 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 158.9 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcQ`
 - **项目**: huanchong-99
@@ -6770,7 +6770,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 158.10 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 158.10 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcR`
 - **项目**: huanchong-99
@@ -7852,7 +7852,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 191.10 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 191.10 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfQ`
 - **项目**: huanchong-99
@@ -8628,7 +8628,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 202.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 202.3 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwemJZ9DOUQdEsGii`
 - **项目**: huanchong-99
@@ -8641,7 +8641,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 202.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 202.4 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVwemJZ9DOUQdEsGij`
 - **项目**: huanchong-99
@@ -8769,7 +8769,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 206.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 206.1 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweheZ9DOUQdEsGhL`
 - **项目**: huanchong-99
@@ -8782,7 +8782,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 206.2 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 206.2 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweheZ9DOUQdEsGhM`
 - **项目**: huanchong-99
@@ -8987,7 +8987,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 212.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 212.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhW`
 - **项目**: huanchong-99
@@ -9000,7 +9000,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 212.6 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 212.6 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhX`
 - **项目**: huanchong-99
@@ -9013,7 +9013,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 212.7 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 212.7 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhY`
 - **项目**: huanchong-99
@@ -9385,7 +9385,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 222.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 222.2 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweQkZ9DOUQdEsGbl`
 - **项目**: huanchong-99
@@ -9398,7 +9398,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 222.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 222.3 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweQkZ9DOUQdEsGbm`
 - **项目**: huanchong-99
@@ -9514,7 +9514,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, unused
 
-### 224.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 224.5 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweQvZ9DOUQdEsGbs`
 - **项目**: huanchong-99
@@ -9527,7 +9527,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 224.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 224.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweQvZ9DOUQdEsGbt`
 - **项目**: huanchong-99
@@ -9676,7 +9676,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 225.11 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 225.11 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbD`
 - **项目**: huanchong-99
@@ -9715,7 +9715,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 225.14 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 225.14 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbG`
 - **项目**: huanchong-99
@@ -10194,7 +10194,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 238.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 238.6 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweXLZ9DOUQdEsGd0`
 - **项目**: huanchong-99
@@ -13178,7 +13178,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 306.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 306.4 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVweuDZ9DOUQdEsGk_`
 - **项目**: huanchong-99
@@ -13191,7 +13191,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 306.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+### 306.5 Visible, non-interactive elements with click handlers must have at least one keyboard listener. ✅ 已修复
 
 - **问题ID**: `AZyVweuDZ9DOUQdEsGlA`
 - **项目**: huanchong-99
@@ -14080,7 +14080,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 322.13 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+### 322.13 Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoJ`
 - **项目**: huanchong-99
