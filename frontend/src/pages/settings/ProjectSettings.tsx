@@ -87,7 +87,7 @@ export function ProjectSettings() {
 
       // Confirm if there are unsaved changes
       if (hasUnsavedChanges) {
-        const confirmed = window.confirm(
+        const confirmed = globalThis.window.confirm(
           t('settings.projects.save.confirmSwitch')
         );
         if (!confirmed) return;
@@ -124,7 +124,7 @@ export function ProjectSettings() {
 
     // Confirm if there are unsaved changes
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm(
+      const confirmed = globalThis.window.confirm(
         t('settings.projects.save.confirmSwitch')
       );
       if (!confirmed) {

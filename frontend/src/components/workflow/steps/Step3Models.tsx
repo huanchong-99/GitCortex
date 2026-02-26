@@ -263,7 +263,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   const handleDelete = (modelId: string) => {
     const modelName =
       config.models.find((model) => model.id === modelId)?.displayName ?? '';
-    if (window.confirm(t('step3.messages.confirmDelete', { name: modelName }))) {
+    if (globalThis.window.confirm(t('step3.messages.confirmDelete', { name: modelName }))) {
       const updatedModels = config.models.filter((m) => m.id !== modelId);
       onUpdate({ models: updatedModels });
     }

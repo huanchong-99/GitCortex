@@ -90,7 +90,7 @@ export function ReposSettings() {
       if (id === selectedRepoId) return;
 
       if (hasUnsavedChanges) {
-        const confirmed = window.confirm(
+        const confirmed = globalThis.window.confirm(
           t('settings.repos.save.confirmSwitch')
         );
         if (!confirmed) return;
@@ -115,7 +115,7 @@ export function ReposSettings() {
     if (repoIdParam === selectedRepoId) return;
 
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm(t('settings.repos.save.confirmSwitch'));
+      const confirmed = globalThis.window.confirm(t('settings.repos.save.confirmSwitch'));
       if (!confirmed) {
         if (selectedRepoId) {
           setSearchParams({ repoId: selectedRepoId });
