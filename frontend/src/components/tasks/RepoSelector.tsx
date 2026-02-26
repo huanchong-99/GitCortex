@@ -10,14 +10,14 @@ import {
 } from '@/components/ui/dropdown-menu.tsx';
 import type { Repo } from 'shared/types';
 
-type Props = {
+type Props = Readonly<{
   repos: Repo[];
   selectedRepoId: string | null;
   onRepoSelect: (repoId: string) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-};
+}>;
 
 function RepoSelector({
   repos,

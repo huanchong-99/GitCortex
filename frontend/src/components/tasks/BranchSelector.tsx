@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input.tsx';
 import type { GitBranch } from 'shared/types';
 
-type Props = {
+type Props = Readonly<{
   branches: GitBranch[];
   selectedBranch: string | null;
   onBranchSelect: (branch: string) => void;
@@ -27,7 +27,7 @@ type Props = {
   className?: string;
   excludeCurrentBranch?: boolean;
   disabledTooltip?: string;
-};
+}>;
 
 type RowProps = {
   branch: GitBranch;

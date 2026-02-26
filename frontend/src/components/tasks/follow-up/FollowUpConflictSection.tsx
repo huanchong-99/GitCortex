@@ -4,7 +4,7 @@ import { useOpenInEditor } from '@/hooks/useOpenInEditor';
 import { useAttemptConflicts } from '@/hooks/useAttemptConflicts';
 import type { RepoBranchStatus } from 'shared/types';
 
-type Props = {
+type Props = Readonly<{
   workspaceId?: string;
   attemptBranch: string | null;
   branchStatus: RepoBranchStatus[] | undefined;
@@ -12,7 +12,7 @@ type Props = {
   enableResolve: boolean;
   enableAbort: boolean;
   conflictResolutionInstructions: string | null;
-};
+}>;
 
 export function FollowUpConflictSection({
   workspaceId,

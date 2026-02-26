@@ -3,13 +3,13 @@ import { Label } from '@/components/ui/label';
 import BranchSelector from './BranchSelector';
 import type { RepoBranchConfig } from '@/hooks';
 
-type Props = {
+type Props = Readonly<{
   configs: RepoBranchConfig[];
   onBranchChange: (repoId: string, branch: string) => void;
   isLoading?: boolean;
   showLabel?: boolean;
   className?: string;
-};
+}>;
 
 export function RepoBranchSelector({
   configs,

@@ -3,7 +3,7 @@ import { ConfigSelector } from '@/components/tasks/ConfigSelector';
 import { cn } from '@/lib/utils';
 import type { ExecutorConfig, ExecutorProfileId } from 'shared/types';
 
-type Props = {
+type Props = Readonly<{
   profiles: Record<string, ExecutorConfig> | null;
   selectedProfile: ExecutorProfileId | null;
   onProfileSelect: (profile: ExecutorProfileId) => void;
@@ -11,7 +11,7 @@ type Props = {
   showLabel?: boolean;
   className?: string;
   itemClassName?: string;
-};
+}>;
 
 function ExecutorProfileSelector({
   profiles,
