@@ -275,8 +275,10 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
       }
     };
 
+    const isRemoteDisabled = !systemLoading && !remoteFeaturesEnabled;
+
     const canSubmit = () => {
-      if (!remoteFeaturesEnabled && !systemLoading) return false;
+      if (isRemoteDisabled) return false;
       if (!currentOrgId || isSubmitting) return false;
       if (linkMode === 'existing') {
         return !!currentProjectId && !isLoadingProjects;
@@ -284,8 +286,6 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
         return !!newProjectName.trim();
       }
     };
-
-    const isRemoteDisabled = !systemLoading && !remoteFeaturesEnabled;
 
     return (
       <Dialog open={modal.visible} onOpenChange={handleOpenChange}>
