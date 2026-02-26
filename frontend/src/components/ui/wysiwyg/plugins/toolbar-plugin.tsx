@@ -93,7 +93,7 @@ export function ToolbarPlugin() {
   }, []);
 
   const updatePosition = useCallback(() => {
-    const domSelection = window.getSelection();
+    const domSelection = globalThis.window.getSelection();
     if (
       !domSelection ||
       domSelection.rangeCount === 0 ||
