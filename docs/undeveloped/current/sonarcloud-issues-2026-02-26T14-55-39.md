@@ -5520,11 +5520,11 @@
 
 ---
 
-## 164. huanchong-99GitCortexscripts/check-i18n.sh
+## 164. huanchong-99GitCortexscripts/check-i18n.sh ✅ 已修复
 
 > 该文件共有 **3** 个问题
 
-### 164.1 Add an explicit return statement at the end of the function.
+### 164.1 Add an explicit return statement at the end of the function. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqU`
 - **项目**: huanchong-99
@@ -5537,7 +5537,7 @@
 - **创建时间**: 1 month ago
 - **标签**: best-practice, clarity, ...
 
-### 164.2 Define a constant instead of using the literal '   - %s\n' 7 times.
+### 164.2 Define a constant instead of using the literal '   - %s\n' 7 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqH`
 - **项目**: huanchong-99
@@ -5550,7 +5550,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 164.3 Add an explicit return statement at the end of the function.
+### 164.3 Add an explicit return statement at the end of the function. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqV`
 - **项目**: huanchong-99
@@ -5597,11 +5597,11 @@
 
 ---
 
-## 166. huanchong-99GitCortexscripts/run-dev.js
+## 166. huanchong-99GitCortexscripts/run-dev.js ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 166.1 Prefer top-level await over an async function `main` call.
+### 166.1 Prefer top-level await over an async function `main` call. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqe`
 - **项目**: huanchong-99
@@ -5616,11 +5616,11 @@
 
 ---
 
-## 167. huanchong-99GitCortexscripts/setup-dev-environment.js
+## 167. huanchong-99GitCortexscripts/setup-dev-environment.js ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
-### 167.1 Prefer top-level await over an async IIFE.
+### 167.1 Prefer top-level await over an async IIFE. ✅ 已修复
 
 - **问题ID**: `AZyZVcxvuNB-_5CPqJgv`
 - **项目**: huanchong-99

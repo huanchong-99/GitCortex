@@ -5,15 +5,16 @@
 set -eo pipefail
 
 RULE="i18next/no-literal-string"
+INDENT_FORMAT='   - %s\n'
 
 # Function that outputs violation count to stdout
 lint_count() {
   local dir=$1
   local tmp
   tmp=$(mktemp)
-  
+
   trap 'rm -f "$tmp"' RETURN
-  
+
   (
     set -eo pipefail
     cd "$dir/frontend" || exit 1
@@ -25,11 +26,13 @@ lint_count() {
       --no-error-on-unmatched-pattern \
       > /dev/null 2>&1 || true  # Don't fail on violations
   )
-  
+
   # Parse the clean JSON file
   jq --arg RULE "$RULE" \
      '[.[].messages[] | select(.ruleId == $RULE)] | length' "$tmp" \
      2>/dev/null || echo "0"
+
+  return 0
 }
 
 get_json_keys() {
@@ -80,7 +83,7 @@ check_duplicate_json_keys() {
       : # No duplicates found
     else
       echo "❌ [$rel_path] Duplicate keys found:"
-      printf '   - %s\n' "$duplicates"
+      printf "$INDENT_FORMAT" "$duplicates"
       echo "   JSON silently overwrites duplicate keys - only the last occurrence is used!"
       exit_code=1
     fi
@@ -149,9 +152,9 @@ check_key_consistency() {
       if [[ -n "$missing" ]]; then
         echo "❌ [$lang/$ns] Missing keys:"
         if [[ "$verbose" = "1" ]]; then
-          printf '   - %s\n' "$missing"
+          printf "$INDENT_FORMAT" "$missing"
         else
-          printf '   - %s\n' "$(echo "$missing" | head -n 50)"
+          printf "$INDENT_FORMAT" "$(echo "$missing" | head -n 50)"
           local total_missing
           total_missing=$(printf "%s\n" "$missing" | wc -l | tr -d ' ')
           if [[ "$total_missing" -gt 50 ]]; then
@@ -164,11 +167,11 @@ check_key_consistency() {
       if [[ -n "$extra" ]]; then
         if [[ "$fail_on_extra" = "1" ]]; then
           echo "❌ [$lang/$ns] Extra keys (not in en):"
-          [[ "$verbose" = "1" ]] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
+          [[ "$verbose" = "1" ]] && printf "$INDENT_FORMAT" "$extra" || printf "$INDENT_FORMAT" "$(echo "$extra" | head -n 50)"
           exit_code=1
         else
           echo "⚠️  [$lang/$ns] Extra keys (not in en):"
-          [[ "$verbose" = "1" ]] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
+          [[ "$verbose" = "1" ]] && printf "$INDENT_FORMAT" "$extra" || printf "$INDENT_FORMAT" "$(echo "$extra" | head -n 50)"
         fi
       fi
     done
