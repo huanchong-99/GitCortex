@@ -46,6 +46,80 @@ type NextActionCardProps = {
   needsSetup?: boolean;
 };
 
+const DiffSummaryButton: React.FC<{
+  fileCount: number;
+  added: number;
+  deleted: number;
+  onClick: () => void;
+  label: string;
+}> = ({ fileCount, added, deleted, onClick, label }) => {
+  const { t } = useTranslation('tasks');
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-sm shrink-0 cursor-pointer hover:underline transition-all"
+      aria-label={label}
+    >
+      <span>{t('diff.filesChanged', { count: fileCount })}</span>
+      <span className="opacity-50">•</span>
+      <span className="text-green-600 dark:text-green-400">+{added}</span>
+      <span className="opacity-50">•</span>
+      <span className="text-red-600 dark:text-red-400">-{deleted}</span>
+    </button>
+  );
+};
+
+const ActionButton: React.FC<{
+  needsSetup: boolean;
+  onRunSetup: () => void;
+  onTryAgain: () => void;
+  disabled: boolean;
+  tryAgainDisabled: boolean;
+}> = ({ needsSetup, onRunSetup, onTryAgain, disabled, tryAgainDisabled }) => {
+  const { t } = useTranslation('tasks');
+
+  if (needsSetup) {
+    return (
+      <Button
+        variant="default"
+        size="sm"
+        onClick={onRunSetup}
+        disabled={disabled}
+        className="text-sm w-full sm:w-auto"
+        aria-label={t('attempt.runSetup')}
+      >
+        {t('attempt.runSetup')}
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      variant="destructive"
+      size="sm"
+      onClick={onTryAgain}
+      disabled={tryAgainDisabled}
+      className="text-sm w-full sm:w-auto"
+      aria-label={t('attempt.tryAgain')}
+    >
+      {t('attempt.tryAgain')}
+    </Button>
+  );
+};
+
+const DevServerTooltipContent: React.FC<{
+  projectHasDevScript: boolean;
+  hasRunningDevServer: boolean;
+}> = ({ projectHasDevScript, hasRunningDevServer }) => {
+  const { t } = useTranslation('tasks');
+
+  if (!projectHasDevScript) {
+    return <>{t('attempt.devScriptMissingTooltip')}</>;
+  }
+
+  return <>{hasRunningDevServer ? t('attempt.pauseDev') : t('attempt.startDev')}</>;
+};
+
 export function NextActionCard({
   attemptId,
   sessionId,
@@ -157,29 +231,29 @@ export function NextActionCard({
 
   const editorName = getIdeName(config?.editor?.editor_type);
 
-  // Necessary to prevent this component being displayed beyond fold within Virtualised List
-  if (
-    (!failed || (execution_processes > 2 && !needsSetup)) &&
-    fileCount === 0
-  ) {
+  const shouldHide =
+    (!failed || (execution_processes > 2 && !needsSetup)) && fileCount === 0;
+
+  if (shouldHide) {
     return <div className="h-24"></div>;
   }
+
+  const borderClass = failed ? 'border-destructive' : 'border-foreground';
+  const bgClass = failed ? 'bg-destructive' : 'bg-foreground';
+  const showActionButton = failed && (needsSetup || execution_processes <= 2);
 
   return (
     <TooltipProvider>
       <div className="pt-4 pb-8">
-        <div
-          className={`px-3 py-1 text-background flex ${failed ? 'bg-destructive' : 'bg-foreground'}`}
-        >
+        <div className={`px-3 py-1 text-background flex ${bgClass}`}>
           <span className="font-semibold flex-1">
             {t('attempt.labels.summaryAndActions')}
           </span>
         </div>
 
-        {/* Display setup help text when setup is needed */}
         {needsSetup && setupHelpText && (
           <div
-            className={`border-x border-t ${failed ? 'border-destructive' : 'border-foreground'} px-3 py-2 flex items-start gap-2`}
+            className={`border-x border-t ${borderClass} px-3 py-2 flex items-start gap-2`}
           >
             <Settings className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span className="text-sm">{setupHelpText}</span>
@@ -187,54 +261,28 @@ export function NextActionCard({
         )}
 
         <div
-          className={`border px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0 ${failed ? 'border-destructive' : 'border-foreground'} ${needsSetup && setupHelpText ? 'border-t-0' : ''}`}
+          className={`border px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0 ${borderClass} ${needsSetup && setupHelpText ? 'border-t-0' : ''}`}
         >
-          {/* Left: Diff summary */}
           {!error && (
-            <button
+            <DiffSummaryButton
+              fileCount={fileCount}
+              added={added}
+              deleted={deleted}
               onClick={handleOpenDiffs}
-              className="flex items-center gap-1.5 text-sm shrink-0 cursor-pointer hover:underline transition-all"
-              aria-label={t('attempt.diffs')}
-            >
-              <span>{t('diff.filesChanged', { count: fileCount })}</span>
-              <span className="opacity-50">•</span>
-              <span className="text-green-600 dark:text-green-400">
-                +{added}
-              </span>
-              <span className="opacity-50">•</span>
-              <span className="text-red-600 dark:text-red-400">-{deleted}</span>
-            </button>
+              label={t('attempt.diffs')}
+            />
           )}
 
-          {/* Run Setup or Try Again button */}
-          {failed &&
-            (needsSetup ? (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleRunSetup}
-                disabled={!attempt}
-                className="text-sm w-full sm:w-auto"
-                aria-label={t('attempt.runSetup')}
-              >
-                {t('attempt.runSetup')}
-              </Button>
-            ) : (
-              execution_processes <= 2 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleTryAgain}
-                  disabled={!attempt?.taskId}
-                  className="text-sm w-full sm:w-auto"
-                  aria-label={t('attempt.tryAgain')}
-                >
-                  {t('attempt.tryAgain')}
-                </Button>
-              )
-            ))}
+          {showActionButton && (
+            <ActionButton
+              needsSetup={!!needsSetup}
+              onRunSetup={handleRunSetup}
+              onTryAgain={handleTryAgain}
+              disabled={!attempt}
+              tryAgainDisabled={!attempt?.taskId}
+            />
+          )}
 
-          {/* Right: Icon buttons */}
           {fileCount > 0 && (
             <div className="flex items-center gap-1 shrink-0 sm:ml-auto">
               <Tooltip>
@@ -328,12 +376,10 @@ export function NextActionCard({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {(() => {
-                    if (!projectHasDevScript) {
-                      return t('attempt.devScriptMissingTooltip');
-                    }
-                    return hasRunningDevServer ? t('attempt.pauseDev') : t('attempt.startDev');
-                  })()}
+                  <DevServerTooltipContent
+                    projectHasDevScript={projectHasDevScript}
+                    hasRunningDevServer={hasRunningDevServer}
+                  />
                 </TooltipContent>
               </Tooltip>
 

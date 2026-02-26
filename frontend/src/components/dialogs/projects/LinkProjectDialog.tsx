@@ -41,6 +41,120 @@ interface LinkProjectDialogProps {
 
 type LinkMode = 'existing' | 'create';
 
+const OrganizationSelector: React.FC<{
+  orgsLoading: boolean;
+  isSignedIn: boolean;
+  organizations: Array<{ id: string; name: string }> | undefined;
+  selectedOrgId: string;
+  onOrgChange: (orgId: string) => void;
+  isSubmitting: boolean;
+  t: (key: string) => string;
+}> = ({
+  orgsLoading,
+  isSignedIn,
+  organizations,
+  selectedOrgId,
+  onOrgChange,
+  isSubmitting,
+  t,
+}) => {
+  if (orgsLoading) {
+    return (
+      <div className="px-3 py-2 text-sm text-muted-foreground">
+        {t('linkDialog.loadingOrganizations')}
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <LoginRequiredPrompt
+        title={t('linkDialog.loginRequired.title')}
+        description={t('linkDialog.loginRequired.description')}
+        actionLabel={t('linkDialog.loginRequired.action')}
+      />
+    );
+  }
+
+  if (!organizations?.length) {
+    return (
+      <Alert>
+        <AlertDescription>{t('linkDialog.noOrganizations')}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Select
+      value={selectedOrgId}
+      onValueChange={onOrgChange}
+      disabled={isSubmitting}
+    >
+      <SelectTrigger id="organization-select">
+        <SelectValue placeholder={t('linkDialog.selectOrganization')} />
+      </SelectTrigger>
+      <SelectContent>
+        {organizations.map((org) => (
+          <SelectItem key={org.id} value={org.id}>
+            {org.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
+
+const RemoteProjectSelector: React.FC<{
+  isLoadingProjects: boolean;
+  remoteProjects: Array<{ id: string; name: string }>;
+  currentProjectId: string;
+  onProjectChange: (id: string) => void;
+  isSubmitting: boolean;
+  t: (key: string) => string;
+}> = ({
+  isLoadingProjects,
+  remoteProjects,
+  currentProjectId,
+  onProjectChange,
+  isSubmitting,
+  t,
+}) => {
+  if (isLoadingProjects) {
+    return (
+      <div className="px-3 py-2 text-sm text-muted-foreground">
+        {t('linkDialog.loadingRemoteProjects')}
+      </div>
+    );
+  }
+
+  if (remoteProjects.length === 0) {
+    return (
+      <Alert>
+        <AlertDescription>{t('linkDialog.noRemoteProjects')}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Select
+      value={currentProjectId}
+      onValueChange={onProjectChange}
+      disabled={isSubmitting}
+    >
+      <SelectTrigger id="remote-project-select">
+        <SelectValue placeholder={t('linkDialog.selectRemoteProject')} />
+      </SelectTrigger>
+      <SelectContent>
+        {remoteProjects.map((project) => (
+          <SelectItem key={project.id} value={project.id}>
+            {project.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
+
 const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
   ({ projectId, projectName }) => {
     const modal = useModal();
@@ -202,52 +316,15 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
                 <Label htmlFor="organization-select">
                   {t('linkDialog.organizationLabel')}
                 </Label>
-                {(() => {
-                  if (orgsLoading) {
-                    return (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
-                        {t('linkDialog.loadingOrganizations')}
-                      </div>
-                    );
-                  } else if (!isSignedIn) {
-                    return (
-                      <LoginRequiredPrompt
-                        title={t('linkDialog.loginRequired.title')}
-                        description={t('linkDialog.loginRequired.description')}
-                        actionLabel={t('linkDialog.loginRequired.action')}
-                      />
-                    );
-                  } else if (!orgsResponse?.organizations?.length) {
-                    return (
-                      <Alert>
-                        <AlertDescription>
-                          {t('linkDialog.noOrganizations')}
-                        </AlertDescription>
-                      </Alert>
-                    );
-                  } else {
-                    return (
-                      <Select
-                        value={selectedOrgId}
-                        onValueChange={handleOrgChange}
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger id="organization-select">
-                          <SelectValue
-                            placeholder={t('linkDialog.selectOrganization')}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {orgsResponse.organizations.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    );
-                  }
-                })()}
+                <OrganizationSelector
+                  orgsLoading={orgsLoading}
+                  isSignedIn={isSignedIn}
+                  organizations={orgsResponse?.organizations}
+                  selectedOrgId={selectedOrgId}
+                  onOrgChange={handleOrgChange}
+                  isSubmitting={isSubmitting}
+                  t={t}
+                />
               </div>
 
               {currentOrgId && (
@@ -281,47 +358,17 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
                       <Label htmlFor="remote-project-select">
                         {t('linkDialog.remoteProjectLabel')}
                       </Label>
-                      {(() => {
-                        if (isLoadingProjects) {
-                          return (
-                            <div className="px-3 py-2 text-sm text-muted-foreground">
-                              {t('linkDialog.loadingRemoteProjects')}
-                            </div>
-                          );
-                        } else if (remoteProjects.length === 0) {
-                          return (
-                            <Alert>
-                              <AlertDescription>
-                                {t('linkDialog.noRemoteProjects')}
-                              </AlertDescription>
-                            </Alert>
-                          );
-                        } else {
-                          return (
-                            <Select
-                              value={currentProjectId}
-                              onValueChange={(id) => {
-                                setSelectedRemoteProjectId(id);
-                                setError(null);
-                              }}
-                              disabled={isSubmitting}
-                            >
-                              <SelectTrigger id="remote-project-select">
-                                <SelectValue
-                                  placeholder={t('linkDialog.selectRemoteProject')}
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {remoteProjects.map((project) => (
-                                  <SelectItem key={project.id} value={project.id}>
-                                    {project.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          );
-                        }
-                      })()}
+                      <RemoteProjectSelector
+                        isLoadingProjects={isLoadingProjects}
+                        remoteProjects={remoteProjects}
+                        currentProjectId={currentProjectId}
+                        onProjectChange={(id) => {
+                          setSelectedRemoteProjectId(id);
+                          setError(null);
+                        }}
+                        isSubmitting={isSubmitting}
+                        t={t}
+                      />
                     </div>
                   ) : (
                     <div className="space-y-2">

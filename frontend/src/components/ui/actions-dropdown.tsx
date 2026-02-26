@@ -173,113 +173,111 @@ export function ActionsDropdown({
     sharedTask?.assignee_user_id === userId;
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="icon"
-            aria-label="Actions"
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {hasAttemptActions && (
-            <>
-              <DropdownMenuLabel>{t('actionsMenu.attempt')}</DropdownMenuLabel>
-              <DropdownMenuItem
-                disabled={!attempt?.id}
-                onClick={handleOpenInEditor}
-              >
-                {t('actionsMenu.openInIde')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!attempt?.id}
-                onClick={handleViewProcesses}
-              >
-                {t('actionsMenu.viewProcesses')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!attempt?.id}
-                onClick={handleViewRelatedTasks}
-              >
-                {t('actionsMenu.viewRelatedTasks')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCreateNewAttempt}>
-                {t('actionsMenu.createNewAttempt')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!projectId || !attempt}
-                onClick={handleCreateSubtask}
-              >
-                {t('actionsMenu.createSubtask')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!attempt?.id || !task}
-                onClick={handleGitActions}
-              >
-                {t('actionsMenu.gitActions')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!attempt?.id}
-                onClick={handleEditBranchName}
-              >
-                {t('actionsMenu.editBranchName')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="icon"
+          aria-label="Actions"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {hasAttemptActions && (
+          <>
+            <DropdownMenuLabel>{t('actionsMenu.attempt')}</DropdownMenuLabel>
+            <DropdownMenuItem
+              disabled={!attempt?.id}
+              onClick={handleOpenInEditor}
+            >
+              {t('actionsMenu.openInIde')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!attempt?.id}
+              onClick={handleViewProcesses}
+            >
+              {t('actionsMenu.viewProcesses')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!attempt?.id}
+              onClick={handleViewRelatedTasks}
+            >
+              {t('actionsMenu.viewRelatedTasks')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleCreateNewAttempt}>
+              {t('actionsMenu.createNewAttempt')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!projectId || !attempt}
+              onClick={handleCreateSubtask}
+            >
+              {t('actionsMenu.createSubtask')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!attempt?.id || !task}
+              onClick={handleGitActions}
+            >
+              {t('actionsMenu.gitActions')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!attempt?.id}
+              onClick={handleEditBranchName}
+            >
+              {t('actionsMenu.editBranchName')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
 
-          {hasTaskActions && (
-            <>
-              <DropdownMenuLabel>{t('actionsMenu.task')}</DropdownMenuLabel>
-              {remoteFeaturesEnabled && (
-                <>
-                  <DropdownMenuItem
-                    disabled={!task || isShared}
-                    onClick={handleShare}
-                  >
-                    {t('actionsMenu.share')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!canReassign}
-                    onClick={handleReassign}
-                  >
-                    {t('actionsMenu.reassign')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!canStopShare}
-                    onClick={handleStopShare}
-                    className="text-destructive"
-                  >
-                    {t('actionsMenu.stopShare')}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem
-                disabled={!projectId || !canEditShared}
-                onClick={handleEdit}
-              >
-                {t('common:buttons.edit')}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={!projectId} onClick={handleDuplicate}>
-                {t('actionsMenu.duplicate')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!projectId || !canEditShared}
-                onClick={handleDelete}
-                className="text-destructive"
-              >
-                {t('common:buttons.delete')}
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </>
+        {hasTaskActions && (
+          <>
+            <DropdownMenuLabel>{t('actionsMenu.task')}</DropdownMenuLabel>
+            {remoteFeaturesEnabled && (
+              <>
+                <DropdownMenuItem
+                  disabled={!task || isShared}
+                  onClick={handleShare}
+                >
+                  {t('actionsMenu.share')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!canReassign}
+                  onClick={handleReassign}
+                >
+                  {t('actionsMenu.reassign')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!canStopShare}
+                  onClick={handleStopShare}
+                  className="text-destructive"
+                >
+                  {t('actionsMenu.stopShare')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem
+              disabled={!projectId || !canEditShared}
+              onClick={handleEdit}
+            >
+              {t('common:buttons.edit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!projectId} onClick={handleDuplicate}>
+              {t('actionsMenu.duplicate')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!projectId || !canEditShared}
+              onClick={handleDelete}
+              className="text-destructive"
+            >
+              {t('common:buttons.delete')}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

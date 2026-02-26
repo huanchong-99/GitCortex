@@ -784,6 +784,77 @@ function DisplayConversationEntry({
       </div>
     );
   }
+  const renderToolUseBody = (
+    toolEntry: Extract<NormalizedEntryType, { type: 'tool_use' }>,
+    isPendingApproval: boolean,
+    defaultExpanded: boolean,
+    statusAppearance: ToolStatusAppearance
+  ) => {
+    if (isFileEdit(toolEntry.action_type)) {
+      const fileEditAction = toolEntry.action_type;
+      return (
+        <div className="space-y-3">
+          {fileEditAction.changes.map((change, idx) => (
+            <FileChangeRenderer
+              key={`${fileEditAction.path}-${idx}`}
+              path={fileEditAction.path}
+              change={change}
+              expansionKey={`edit:${expansionKey}:${idx}`}
+              defaultExpanded={defaultExpanded}
+              statusAppearance={statusAppearance}
+              forceExpanded={isPendingApproval}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    if (toolEntry.action_type.action === 'plan_presentation') {
+      return (
+        <PlanPresentationCard
+          plan={toolEntry.action_type.plan}
+          expansionKey={expansionKey}
+          defaultExpanded={defaultExpanded}
+          statusAppearance={statusAppearance}
+          taskAttemptId={taskAttempt?.id}
+        />
+      );
+    }
+
+    if (
+      toolEntry.action_type.action === 'command_run' &&
+      SCRIPT_TOOL_NAMES.has(toolEntry.tool_name)
+    ) {
+      const actionType = toolEntry.action_type;
+      const exitCode =
+        actionType.result?.exit_status?.type === 'exit_code'
+          ? actionType.result.exit_status.code
+          : null;
+      const isFailed = exitCode !== null && exitCode !== 0;
+
+      return (
+        <ScriptToolCallCard
+          entry={entry}
+          expansionKey={expansionKey}
+          taskAttemptId={taskAttempt?.id}
+          sessionId={taskAttempt?.session?.id}
+          isFailed={isFailed}
+          toolName={toolEntry.tool_name}
+          forceExpanded={isPendingApproval}
+        />
+      );
+    }
+
+    return (
+      <ToolCallCard
+        entry={entry}
+        expansionKey={expansionKey}
+        forceExpanded={isPendingApproval}
+        taskAttemptId={taskAttempt?.id}
+      />
+    );
+  };
+
   const renderToolUse = () => {
     if (!isNormalizedEntry(entry)) return null;
     if (entryType.type !== 'tool_use') return null;
@@ -796,72 +867,12 @@ function DisplayConversationEntry({
     const isPendingApproval = status.status === 'pending_approval';
     const defaultExpanded = isPendingApproval || isPlanPresentation;
 
-    const body = (() => {
-      if (isFileEdit(toolEntry.action_type)) {
-        const fileEditAction = toolEntry.action_type;
-        return (
-          <div className="space-y-3">
-            {fileEditAction.changes.map((change, idx) => (
-              <FileChangeRenderer
-                key={`${fileEditAction.path}-${idx}`}
-                path={fileEditAction.path}
-                change={change}
-                expansionKey={`edit:${expansionKey}:${idx}`}
-                defaultExpanded={defaultExpanded}
-                statusAppearance={statusAppearance}
-                forceExpanded={isPendingApproval}
-              />
-            ))}
-          </div>
-        );
-      }
-
-      if (toolEntry.action_type.action === 'plan_presentation') {
-        return (
-          <PlanPresentationCard
-            plan={toolEntry.action_type.plan}
-            expansionKey={expansionKey}
-            defaultExpanded={defaultExpanded}
-            statusAppearance={statusAppearance}
-            taskAttemptId={taskAttempt?.id}
-          />
-        );
-      }
-
-      // Script entries (Setup Script, Cleanup Script, Tool Install Script)
-      if (
-        toolEntry.action_type.action === 'command_run' &&
-        SCRIPT_TOOL_NAMES.has(toolEntry.tool_name)
-      ) {
-        const actionType = toolEntry.action_type;
-        const exitCode =
-          actionType.result?.exit_status?.type === 'exit_code'
-            ? actionType.result.exit_status.code
-            : null;
-        const isFailed = exitCode !== null && exitCode !== 0;
-
-        return (
-          <ScriptToolCallCard
-            entry={entry}
-            expansionKey={expansionKey}
-            taskAttemptId={taskAttempt?.id}
-            sessionId={taskAttempt?.session?.id}
-            isFailed={isFailed}
-            toolName={toolEntry.tool_name}
-            forceExpanded={isPendingApproval}
-          />
-        );
-      }
-
-      return (
-        <ToolCallCard
-          entry={entry}
-          expansionKey={expansionKey}
-          forceExpanded={isPendingApproval}
-          taskAttemptId={taskAttempt?.id}
-        />
-      );
-    })();
+    const body = renderToolUseBody(
+      toolEntry,
+      isPendingApproval,
+      defaultExpanded,
+      statusAppearance
+    );
 
     const content = (
       <div

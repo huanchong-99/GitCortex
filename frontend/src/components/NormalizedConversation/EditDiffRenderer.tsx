@@ -135,14 +135,12 @@ function EditDiffRenderer({
               diffViewFontSize={12}
             />
           ) : (
-            <>
-              <pre
-                className="px-4 pb-4 text-xs font-mono overflow-x-auto whitespace-pre-wrap"
-                style={{ color: 'hsl(var(--muted-foreground) / 0.9)' }}
-              >
-                {unifiedDiff}
-              </pre>
-            </>
+            <pre
+              className="px-4 pb-4 text-xs font-mono overflow-x-auto whitespace-pre-wrap"
+              style={{ color: 'hsl(var(--muted-foreground) / 0.9)' }}
+            >
+              {unifiedDiff}
+            </pre>
           )}
         </div>
       )}

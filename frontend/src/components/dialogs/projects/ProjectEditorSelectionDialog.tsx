@@ -60,14 +60,14 @@ const ProjectEditorSelectionDialogImpl =
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Editor</label>
+              <label htmlFor="project-editor-select" className="text-sm font-medium">Editor</label>
               <Select
                 value={selectedEditor}
                 onValueChange={(value) =>
                   setSelectedEditor(value as EditorType)
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="project-editor-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

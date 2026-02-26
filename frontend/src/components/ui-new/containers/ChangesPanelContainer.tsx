@@ -53,7 +53,7 @@ function useInViewObserver(
   // Helper to handle intersection observer entries
   const handleIntersectionEntries = useCallback((entries: IntersectionObserverEntry[]) => {
     entries.forEach((entry) => {
-      const path = entry.target.getAttribute('data-diff-path');
+      const path = (entry.target as HTMLElement).dataset.diffPath;
       if (!path) return;
 
       if (entry.isIntersecting) {
@@ -123,7 +123,7 @@ function useInViewObserver(
       }
 
       if (el) {
-        el.setAttribute('data-diff-path', path);
+        el.dataset.diffPath = path;
         observerRef.current.observe(el);
       }
     },

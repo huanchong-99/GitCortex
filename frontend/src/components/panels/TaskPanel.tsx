@@ -100,84 +100,82 @@ const TaskPanel = ({ task }: Readonly<TaskPanelProps>) => {
   ];
 
   return (
-    <>
-      <NewCardContent>
-        <div className="p-6 flex flex-col h-full max-h-[calc(100vh-8rem)]">
-          <div className="space-y-3 overflow-y-auto flex-shrink min-h-0">
-            <WYSIWYGEditor value={titleContent} disabled />
-            {descriptionContent && (
-              <WYSIWYGEditor value={descriptionContent} disabled />
-            )}
-          </div>
-
-          <div className="mt-6 flex-shrink-0 space-y-4">
-            {task.parentWorkspaceId && (
-              <DataTable
-                data={parentAttempt ? [parentAttempt] : []}
-                columns={attemptColumns}
-                keyExtractor={(attempt) => attempt.id}
-                onRowClick={(attempt) => {
-                  if (config?.beta_workspaces) {
-                    navigate(`/workspaces/${attempt.id}`);
-                  } else if (projectId) {
-                    navigate(
-                      paths.attempt(projectId, attempt.taskId, attempt.id)
-                    );
-                  }
-                }}
-                isLoading={isParentLoading}
-                headerContent="Parent Attempt"
-              />
-            )}
-
-            {isAttemptsLoading ? (
-              <div className="text-muted-foreground">
-                {t('taskPanel.loadingAttempts')}
-              </div>
-            ) : isAttemptsError ? (
-              <div className="text-destructive">
-                {t('taskPanel.errorLoadingAttempts')}
-              </div>
-            ) : (
-              <DataTable
-                data={displayedAttempts}
-                columns={attemptColumns}
-                keyExtractor={(attempt) => attempt.id}
-                onRowClick={(attempt) => {
-                  if (config?.beta_workspaces) {
-                    navigate(`/workspaces/${attempt.id}`);
-                  } else if (projectId && task.id) {
-                    navigate(paths.attempt(projectId, task.id, attempt.id));
-                  }
-                }}
-                emptyState={t('taskPanel.noAttempts')}
-                headerContent={
-                  <div className="w-full flex text-left">
-                    <span className="flex-1">
-                      {t('taskPanel.attemptsCount', {
-                        count: displayedAttempts.length,
-                      })}
-                    </span>
-                    <span>
-                      <Button
-                        variant="icon"
-                        onClick={() =>
-                          CreateAttemptDialog.show({
-                            taskId: task.id,
-                          })
-                        }
-                      >
-                        <PlusIcon size={16} />
-                      </Button>
-                    </span>
-                  </div>
-                }
-              />
-            )}
-          </div>
+    <NewCardContent>
+      <div className="p-6 flex flex-col h-full max-h-[calc(100vh-8rem)]">
+        <div className="space-y-3 overflow-y-auto flex-shrink min-h-0">
+          <WYSIWYGEditor value={titleContent} disabled />
+          {descriptionContent && (
+            <WYSIWYGEditor value={descriptionContent} disabled />
+          )}
         </div>
-      </NewCardContent>
-    </>
+
+        <div className="mt-6 flex-shrink-0 space-y-4">
+          {task.parentWorkspaceId && (
+            <DataTable
+              data={parentAttempt ? [parentAttempt] : []}
+              columns={attemptColumns}
+              keyExtractor={(attempt) => attempt.id}
+              onRowClick={(attempt) => {
+                if (config?.beta_workspaces) {
+                  navigate(`/workspaces/${attempt.id}`);
+                } else if (projectId) {
+                  navigate(
+                    paths.attempt(projectId, attempt.taskId, attempt.id)
+                  );
+                }
+              }}
+              isLoading={isParentLoading}
+              headerContent="Parent Attempt"
+            />
+          )}
+
+          {isAttemptsLoading ? (
+            <div className="text-muted-foreground">
+              {t('taskPanel.loadingAttempts')}
+            </div>
+          ) : isAttemptsError ? (
+            <div className="text-destructive">
+              {t('taskPanel.errorLoadingAttempts')}
+            </div>
+          ) : (
+            <DataTable
+              data={displayedAttempts}
+              columns={attemptColumns}
+              keyExtractor={(attempt) => attempt.id}
+              onRowClick={(attempt) => {
+                if (config?.beta_workspaces) {
+                  navigate(`/workspaces/${attempt.id}`);
+                } else if (projectId && task.id) {
+                  navigate(paths.attempt(projectId, task.id, attempt.id));
+                }
+              }}
+              emptyState={t('taskPanel.noAttempts')}
+              headerContent={
+                <div className="w-full flex text-left">
+                  <span className="flex-1">
+                    {t('taskPanel.attemptsCount', {
+                      count: displayedAttempts.length,
+                    })}
+                  </span>
+                  <span>
+                    <Button
+                      variant="icon"
+                      onClick={() =>
+                        CreateAttemptDialog.show({
+                          taskId: task.id,
+                        })
+                      }
+                    >
+                      <PlusIcon size={16} />
+                    </Button>
+                  </span>
+                </div>
+              }
+            />
+          )}
+        </div>
+      </div>
+    </NewCardContent>
   );
 };
 

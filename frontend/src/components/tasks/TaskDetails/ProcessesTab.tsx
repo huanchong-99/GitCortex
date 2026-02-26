@@ -23,6 +23,101 @@ interface ProcessesTabProps {
   readonly sessionId?: string;
 }
 
+const ProcessListEmptyState: React.FC<{
+  processesLoading: boolean;
+  hasProcesses: boolean;
+  t: (key: string) => string;
+}> = ({ processesLoading, hasProcesses, t }) => {
+  if (processesLoading && !hasProcesses) {
+    return (
+      <div className="flex items-center justify-center text-muted-foreground py-10">
+        <p>{t('processes.loading')}</p>
+      </div>
+    );
+  }
+
+  if (!hasProcesses) {
+    return (
+      <div className="flex items-center justify-center text-muted-foreground py-10">
+        <div className="text-center">
+          <Cog className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>{t('processes.noProcesses')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+const getProcessClassName = (
+  processId: string,
+  loadingProcessId: string | null,
+  isProcessGreyed: (id: string) => boolean
+): string => {
+  const baseClasses =
+    'border rounded-lg p-4 hover:bg-muted/30 cursor-pointer transition-colors';
+
+  if (loadingProcessId === processId) {
+    return `${baseClasses} opacity-50 cursor-wait`;
+  }
+
+  if (isProcessGreyed(processId)) {
+    return `${baseClasses} opacity-50`;
+  }
+
+  return baseClasses;
+};
+
+const getCopyButtonClassName = (copied: boolean, hasLogs: boolean): string => {
+  const baseClasses =
+    'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-border transition-colors';
+
+  if (copied) {
+    return `${baseClasses} text-success`;
+  }
+
+  if (!hasLogs) {
+    return `${baseClasses} text-muted-foreground opacity-50 cursor-not-allowed`;
+  }
+
+  return `${baseClasses} text-muted-foreground hover:text-foreground hover:bg-muted/50`;
+};
+
+const ProcessDetailsContent: React.FC<{
+  selectedProcess: ExecutionProcess | null;
+  loadingProcessId: string | null;
+  selectedProcessId: string | null;
+  logs: Array<{ content: string }>;
+  logsError: Error | null;
+  t: (key: string) => string;
+}> = ({
+  selectedProcess,
+  loadingProcessId,
+  selectedProcessId,
+  logs,
+  logsError,
+  t,
+}) => {
+  if (selectedProcess) {
+    return <ProcessLogsViewerContent logs={logs} error={logsError} />;
+  }
+
+  if (loadingProcessId === selectedProcessId) {
+    return (
+      <div className="text-center text-muted-foreground">
+        <p>{t('processes.loadingDetails')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-center text-muted-foreground">
+      <p>{t('processes.errorLoadingDetails')}</p>
+    </div>
+  );
+};
+
 function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
   const { t } = useTranslation('tasks');
   const {
@@ -173,39 +268,22 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
               {!isConnected && ` ${t('processes.reconnecting')}`}
             </div>
           )}
-          {(() => {
-            if (processesLoading && executionProcesses.length === 0) {
-              return (
-                <div className="flex items-center justify-center text-muted-foreground py-10">
-                  <p>{t('processes.loading')}</p>
-                </div>
-              );
-            } else if (executionProcesses.length === 0) {
-              return (
-                <div className="flex items-center justify-center text-muted-foreground py-10">
-                  <div className="text-center">
-                    <Cog className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>{t('processes.noProcesses')}</p>
-                  </div>
-                </div>
-              );
-            } else {
-              return (
-                <div className="space-y-3">
-                  {executionProcesses.map((process) => (
-                    <div
-                      key={process.id}
-                      className={(() => {
-                        const baseClasses = 'border rounded-lg p-4 hover:bg-muted/30 cursor-pointer transition-colors';
-                        if (loadingProcessId === process.id) {
-                          return `${baseClasses} opacity-50 cursor-wait`;
-                        } else if (isProcessGreyed(process.id)) {
-                          return `${baseClasses} opacity-50`;
-                        } else {
-                          return baseClasses;
-                        }
-                      })()}
-                      onClick={() => handleProcessClick(process)}
+          <ProcessListEmptyState
+            processesLoading={processesLoading}
+            hasProcesses={executionProcesses.length > 0}
+            t={t}
+          />
+          {executionProcesses.length > 0 && (
+            <div className="space-y-3">
+              {executionProcesses.map((process) => (
+                <div
+                  key={process.id}
+                  className={getProcessClassName(
+                    process.id,
+                    loadingProcessId,
+                    isProcessGreyed
+                  )}
+                  onClick={() => handleProcessClick(process)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3 min-w-0">
@@ -285,7 +363,6 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
               ))}
             </div>
           )}
-        </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between px-4 py-2 border-b flex-shrink-0">
@@ -296,16 +373,7 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
               <button
                 onClick={handleCopyLogs}
                 disabled={logs.length === 0}
-                className={(() => {
-                  const baseClasses = 'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-border transition-colors';
-                  if (copied) {
-                    return `${baseClasses} text-success`;
-                  } else if (logs.length === 0) {
-                    return `${baseClasses} text-muted-foreground opacity-50 cursor-not-allowed`;
-                  } else {
-                    return `${baseClasses} text-muted-foreground hover:text-foreground hover:bg-muted/50`;
-                  }
-                })()}
+                className={getCopyButtonClassName(copied, logs.length > 0)}
               >
                 {copied ? t('processes.logsCopied') : t('processes.copyLogs')}
               </button>
@@ -319,23 +387,14 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
             </div>
           </div>
           <div className="flex-1">
-            {(() => {
-              if (selectedProcess) {
-                return <ProcessLogsViewerContent logs={logs} error={logsError} />;
-              } else if (loadingProcessId === selectedProcessId) {
-                return (
-                  <div className="text-center text-muted-foreground">
-                    <p>{t('processes.loadingDetails')}</p>
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="text-center text-muted-foreground">
-                    <p>{t('processes.errorLoadingDetails')}</p>
-                  </div>
-                );
-              }
-            })()}
+            <ProcessDetailsContent
+              selectedProcess={selectedProcess}
+              loadingProcessId={loadingProcessId}
+              selectedProcessId={selectedProcessId}
+              logs={logs}
+              logsError={logsError}
+              t={t}
+            />
           </div>
         </div>
       )}

@@ -8,14 +8,12 @@ export function NormalLayout() {
   const shouldHideNavbar = view === 'preview' || view === 'diffs';
 
   return (
-    <>
-      <div className="flex flex-col h-screen">
-        <DevBanner />
-        {!shouldHideNavbar && <Navbar />}
-        <div className="flex-1 overflow-auto">
-          <Outlet />
-        </div>
+    <div className="flex flex-col h-screen">
+      <DevBanner />
+      {!shouldHideNavbar && <Navbar />}
+      <div className="flex-1 overflow-auto">
+        <Outlet />
       </div>
-    </>
+    </div>
   );
 }

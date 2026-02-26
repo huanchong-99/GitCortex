@@ -1127,7 +1127,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 25.2 Non-interactive elements should not be assigned mouse or keyboard event listeners.
+### 25.2 Non-interactive elements should not be assigned mouse or keyboard event listeners. ✅ 已修复
 
 - **问题ID**: `AZyVweYOZ9DOUQdEsGeZ`
 - **项目**: huanchong-99
@@ -1153,7 +1153,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 25.4 A fragment with only one child is redundant.
+### 25.4 A fragment with only one child is redundant. ✅ 已修复
 
 - **问题ID**: `AZyVweYOZ9DOUQdEsGeb`
 - **项目**: huanchong-99
@@ -1185,7 +1185,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 26.2 Non-interactive elements should not be assigned mouse or keyboard event listeners.
+### 26.2 Non-interactive elements should not be assigned mouse or keyboard event listeners. ✅ 已修复
 
 - **问题ID**: `AZyVweYXZ9DOUQdEsGed`
 - **项目**: huanchong-99
@@ -1475,7 +1475,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 31.1 A form label must be associated with a control.
+### 31.1 A form label must be associated with a control. ✅ 已修复
 
 - **问题ID**: `AZyVweQ5Z9DOUQdEsGbu`
 - **项目**: huanchong-99
@@ -1712,7 +1712,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 36.2 Prefer `.dataset` over `getAttribute(…)`.
+### 36.2 Prefer `.dataset` over `getAttribute(…)`. ✅ 已修复
 
 - **问题ID**: `AZyVwejOZ9DOUQdEsGhp`
 - **项目**: huanchong-99
@@ -1725,7 +1725,7 @@
 - **创建时间**: 1 month ago
 - **标签**: api, dom, ...
 
-### 36.3 Prefer `.dataset` over `setAttribute(…)`.
+### 36.3 Prefer `.dataset` over `setAttribute(…)`. ✅ 已修复
 
 - **问题ID**: `AZyVwejOZ9DOUQdEsGhq`
 - **项目**: huanchong-99
@@ -1808,7 +1808,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 39.2 Move this component definition out of the parent component and pass data as props.
+### 39.2 Move this component definition out of the parent component and pass data as props. ✅ 已修复
 
 - **问题ID**: `AZyVwekwZ9DOUQdEsGiA`
 - **项目**: huanchong-99
@@ -1821,7 +1821,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 39.3 Move this component definition out of the parent component and pass data as props.
+### 39.3 Move this component definition out of the parent component and pass data as props. ✅ 已修复
 
 - **问题ID**: `AZyVwekwZ9DOUQdEsGiB`
 - **项目**: huanchong-99
@@ -2463,7 +2463,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 53.4 Move this component definition out of the parent component and pass data as props.
+### 53.4 Move this component definition out of the parent component and pass data as props. ✅ 已修复
 
 - **问题ID**: `AZyVweirZ9DOUQdEsGhi`
 - **项目**: huanchong-99
@@ -3345,7 +3345,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 83.2 Move this component definition out of the parent component and pass data as props.
+### 83.2 Move this component definition out of the parent component and pass data as props. ✅ 已修复
 
 - **问题ID**: `AZyVwegQZ9DOUQdEsGg1`
 - **项目**: huanchong-99
@@ -6214,7 +6214,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 152.3 A fragment with only one child is redundant.
+### 152.3 A fragment with only one child is redundant. ✅ 已修复
 
 - **问题ID**: `AZyVweSCZ9DOUQdEsGcG`
 - **项目**: huanchong-99
@@ -6246,7 +6246,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 153.1 A form label must be associated with a control.
+### 153.1 A form label must be associated with a control. ✅ 已修复
 
 - **问题ID**: `AZyVweRXZ9DOUQdEsGb7`
 - **项目**: huanchong-99
@@ -6948,7 +6948,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 166.1 A fragment with only one child is redundant.
+### 166.1 A fragment with only one child is redundant. ✅ 已修复
 
 - **问题ID**: `AZyVwerhZ9DOUQdEsGkN`
 - **项目**: huanchong-99
@@ -7269,7 +7269,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 174.3 A fragment with only one child is redundant.
+### 174.3 A fragment with only one child is redundant. ✅ 已修复
 
 - **问题ID**: `AZyVweXbZ9DOUQdEsGd7`
 - **项目**: huanchong-99
@@ -7550,7 +7550,7 @@
 - **创建时间**: 1 month ago
 - **标签**: clumsy
 
-### 184.3 Move this component definition out of the parent component and pass data as props.
+### 184.3 Move this component definition out of the parent component and pass data as props. ✅ 已修复
 
 - **问题ID**: `AZyVweZgZ9DOUQdEsGe6`
 - **项目**: huanchong-99
@@ -9154,7 +9154,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 216.2 A fragment with only one child is redundant.
+### 216.2 A fragment with only one child is redundant. ✅ 已修复
 
 - **问题ID**: `AZyVweQbZ9DOUQdEsGbj`
 - **项目**: huanchong-99
@@ -9977,7 +9977,7 @@
 - **创建时间**: 27 days ago
 - **标签**: react, type-dependent
 
-### 232.2 A form label must be associated with a control.
+### 232.2 A form label must be associated with a control. ✅ 已修复
 
 - **问题ID**: `AZyVweNHZ9DOUQdEsGad`
 - **项目**: huanchong-99
@@ -9990,7 +9990,7 @@
 - **创建时间**: 27 days ago
 - **标签**: accessibility, react
 
-### 232.3 A form label must be associated with a control.
+### 232.3 A form label must be associated with a control. ✅ 已修复
 
 - **问题ID**: `AZyVweNHZ9DOUQdEsGae`
 - **项目**: huanchong-99
