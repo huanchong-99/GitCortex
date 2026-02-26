@@ -171,16 +171,14 @@ export function SessionChatBox({
   const isInApprovalMode = approvalMode?.isActive ?? false;
 
   // Key to force editor remount when entering feedback/edit/approval mode (triggers auto-focus)
-  let focusKey: string;
-  if (isInFeedbackMode) {
-    focusKey = 'feedback';
-  } else if (isInEditMode) {
-    focusKey = 'edit';
-  } else if (isInApprovalMode) {
-    focusKey = 'approval';
-  } else {
-    focusKey = 'normal';
-  }
+  const getFocusKey = (): string => {
+    if (isInFeedbackMode) return 'feedback';
+    if (isInEditMode) return 'edit';
+    if (isInApprovalMode) return 'approval';
+    return 'normal';
+  };
+
+  const focusKey = getFocusKey();
 
   // Derived state from status
   const isDisabled =
@@ -200,18 +198,15 @@ export function SessionChatBox({
     !isInApprovalMode &&
     editor.value.trim().length === 0;
 
-  let placeholder: string;
-  if (isInFeedbackMode) {
-    placeholder = 'Provide feedback for the plan...';
-  } else if (isInEditMode) {
-    placeholder = 'Edit your message...';
-  } else if (isInApprovalMode) {
-    placeholder = 'Provide feedback to request changes...';
-  } else if (session.isNewSessionMode) {
-    placeholder = 'Start a new conversation...';
-  } else {
-    placeholder = 'Continue working on this task...';
-  }
+  const getPlaceholder = (): string => {
+    if (isInFeedbackMode) return 'Provide feedback for the plan...';
+    if (isInEditMode) return 'Edit your message...';
+    if (isInApprovalMode) return 'Provide feedback to request changes...';
+    if (session.isNewSessionMode) return 'Start a new conversation...';
+    return 'Continue working on this task...';
+  };
+
+  const placeholder = getPlaceholder();
 
   // Cmd+Enter handler
   const handleCmdEnter = () => {
@@ -259,109 +254,106 @@ export function SessionChatBox({
   } = session;
   const isLatestSelected =
     sessions.length > 0 && selectedSessionId === sessions[0].id;
-  let sessionLabel: string;
-  if (isNewSessionMode) {
-    sessionLabel = t('conversation.sessions.newSession');
-  } else if (isLatestSelected) {
-    sessionLabel = t('conversation.sessions.latest');
-  } else {
-    sessionLabel = t('conversation.sessions.previous');
-  }
+
+  const getSessionLabel = (): string => {
+    if (isNewSessionMode) return t('conversation.sessions.newSession');
+    if (isLatestSelected) return t('conversation.sessions.latest');
+    return t('conversation.sessions.previous');
+  };
+
+  const sessionLabel = getSessionLabel();
 
   // Stats
   const filesChanged = stats?.filesChanged ?? 0;
   const linesAdded = stats?.linesAdded;
   const linesRemoved = stats?.linesRemoved;
 
-  // Render action buttons based on status
-  const renderActionButtons = () => {
-    // Feedback mode takes precedence
-    if (isInFeedbackMode) {
-      if (feedbackMode?.isTimedOut) {
-        return (
-          <PrimaryButton
-            variant="secondary"
-            onClick={feedbackMode.onCancel}
-            value={t('conversation.actions.cancel')}
-          />
-        );
-      }
+  // Helper functions for rendering action buttons
+  const renderFeedbackModeButtons = () => {
+    if (feedbackMode?.isTimedOut) {
       return (
-        <>
-          <PrimaryButton
-            variant="secondary"
-            onClick={feedbackMode?.onCancel}
-            value={t('conversation.actions.cancel')}
-          />
-          <PrimaryButton
-            onClick={feedbackMode?.onSubmitFeedback}
-            disabled={!canSend || feedbackMode?.isSubmitting}
-            actionIcon={feedbackMode?.isSubmitting ? 'spinner' : undefined}
-            value={t('conversation.actions.submitFeedback')}
-          />
-        </>
+        <PrimaryButton
+          variant="secondary"
+          onClick={feedbackMode.onCancel}
+          value={t('conversation.actions.cancel')}
+        />
+      );
+    }
+    return (
+      <>
+        <PrimaryButton
+          variant="secondary"
+          onClick={feedbackMode?.onCancel}
+          value={t('conversation.actions.cancel')}
+        />
+        <PrimaryButton
+          onClick={feedbackMode?.onSubmitFeedback}
+          disabled={!canSend || feedbackMode?.isSubmitting}
+          actionIcon={feedbackMode?.isSubmitting ? 'spinner' : undefined}
+          value={t('conversation.actions.submitFeedback')}
+        />
+      </>
+    );
+  };
+
+  const renderEditModeButtons = () => {
+    return (
+      <>
+        <PrimaryButton
+          variant="secondary"
+          onClick={editMode?.onCancel}
+          value={t('conversation.actions.cancel')}
+        />
+        <PrimaryButton
+          onClick={editMode?.onSubmitEdit}
+          disabled={!canSend || editMode?.isSubmitting}
+          actionIcon={editMode?.isSubmitting ? 'spinner' : undefined}
+          value={t('conversation.retry')}
+        />
+      </>
+    );
+  };
+
+  const renderApprovalModeButtons = () => {
+    if (approvalMode?.isTimedOut) {
+      return (
+        <PrimaryButton
+          variant="secondary"
+          onClick={actions.onStop}
+          value={t('conversation.actions.stop')}
+        />
       );
     }
 
-    // Edit mode
-    if (isInEditMode) {
-      return (
-        <>
-          <PrimaryButton
-            variant="secondary"
-            onClick={editMode?.onCancel}
-            value={t('conversation.actions.cancel')}
-          />
-          <PrimaryButton
-            onClick={editMode?.onSubmitEdit}
-            disabled={!canSend || editMode?.isSubmitting}
-            actionIcon={editMode?.isSubmitting ? 'spinner' : undefined}
-            value={t('conversation.retry')}
-          />
-        </>
-      );
-    }
+    const hasMessage = editor.value.trim().length > 0;
 
-    // Approval mode
-    if (isInApprovalMode) {
-      if (approvalMode?.isTimedOut) {
-        return (
+    return (
+      <>
+        <PrimaryButton
+          variant="secondary"
+          onClick={actions.onStop}
+          value={t('conversation.actions.stop')}
+        />
+        {hasMessage ? (
           <PrimaryButton
-            variant="secondary"
-            onClick={actions.onStop}
-            value={t('conversation.actions.stop')}
+            onClick={approvalMode?.onRequestChanges}
+            disabled={approvalMode?.isSubmitting}
+            actionIcon={approvalMode?.isSubmitting ? 'spinner' : undefined}
+            value={t('conversation.actions.requestChanges')}
           />
-        );
-      }
-
-      const hasMessage = editor.value.trim().length > 0;
-
-      return (
-        <>
+        ) : (
           <PrimaryButton
-            variant="secondary"
-            onClick={actions.onStop}
-            value={t('conversation.actions.stop')}
+            onClick={approvalMode?.onApprove}
+            disabled={approvalMode?.isSubmitting}
+            actionIcon={approvalMode?.isSubmitting ? 'spinner' : undefined}
+            value={t('conversation.actions.approve')}
           />
-          {hasMessage ? (
-            <PrimaryButton
-              onClick={approvalMode?.onRequestChanges}
-              disabled={approvalMode?.isSubmitting}
-              actionIcon={approvalMode?.isSubmitting ? 'spinner' : undefined}
-              value={t('conversation.actions.requestChanges')}
-            />
-          ) : (
-            <PrimaryButton
-              onClick={approvalMode?.onApprove}
-              disabled={approvalMode?.isSubmitting}
-              actionIcon={approvalMode?.isSubmitting ? 'spinner' : undefined}
-              value={t('conversation.actions.approve')}
-            />
-          )}
-        </>
-      );
-    }
+        )}
+      </>
+    );
+  };
 
+  const renderStatusButtons = () => {
     switch (status) {
       case 'idle':
         return (
@@ -435,6 +427,14 @@ export function SessionChatBox({
       case 'edit':
         return null;
     }
+  };
+
+  // Render action buttons based on status
+  const renderActionButtons = () => {
+    if (isInFeedbackMode) return renderFeedbackModeButtons();
+    if (isInEditMode) return renderEditModeButtons();
+    if (isInApprovalMode) return renderApprovalModeButtons();
+    return renderStatusButtons();
   };
 
   // Banner content
