@@ -13533,7 +13533,7 @@
 - **创建时间**: 17 days ago
 - **标签**: brain-overload
 
-### 311.10 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 311.10 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoU`
 - **项目**: huanchong-99
@@ -13572,7 +13572,7 @@
 - **创建时间**: 17 days ago
 - **标签**: brain-overload
 
-### 311.13 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 311.13 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoX`
 - **项目**: huanchong-99
@@ -13598,7 +13598,7 @@
 - **创建时间**: 17 days ago
 - **标签**: brain-overload
 
-### 311.15 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 311.15 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoZ`
 - **项目**: huanchong-99
@@ -13611,7 +13611,7 @@
 - **创建时间**: 17 days ago
 - **标签**: type-dependent
 
-### 311.16 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 311.16 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoa`
 - **项目**: huanchong-99
@@ -13815,7 +13815,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 319.1 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 319.1 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwe1WZ9DOUQdEsGnc`
 - **项目**: huanchong-99
