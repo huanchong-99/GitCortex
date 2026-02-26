@@ -9276,7 +9276,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 219.3 Comments inside children section of tag should be placed inside braces
+### 219.3 Comments inside children section of tag should be placed inside braces ✅ 已修复
 
 - **问题ID**: `AZyVwePhZ9DOUQdEsGbS`
 - **项目**: huanchong-99
@@ -9501,7 +9501,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es6, readability
 
-### 224.4 Remove this useless assignment to variable "maxHeight".
+### 224.4 Remove this useless assignment to variable "maxHeight". ✅ 已修复
 
 - **问题ID**: `AZyVweQvZ9DOUQdEsGbr`
 - **项目**: huanchong-99
@@ -9856,7 +9856,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 229.1 Remove this redundant type alias and replace its occurrences with "string".
+### 229.1 Remove this redundant type alias and replace its occurrences with "string". ✅ 已修复
 
 - **问题ID**: `AZyVweQRZ9DOUQdEsGbd`
 - **项目**: huanchong-99
@@ -9907,7 +9907,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 229.5 The array passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 229.5 The array passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVweQRZ9DOUQdEsGbh`
 - **项目**: huanchong-99
