@@ -10283,7 +10283,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 242.1 Prefer `Number.parseInt` over `parseInt`.
+### 242.1 Prefer `Number.parseInt` over `parseInt`. ✅ 已修复
 
 - **问题ID**: `AZyVweVpZ9DOUQdEsGdX`
 - **项目**: huanchong-99
