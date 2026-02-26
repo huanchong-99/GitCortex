@@ -58,7 +58,7 @@ describe('StepIndicator', () => {
       />
     );
 
-    const connectors = container.querySelectorAll('.flex-1.h-0\\.5');
+    const connectors = container.querySelectorAll(String.raw`.flex-1.h-0\.5`);
     expect(connectors[0]).toHaveClass('bg-brand');
     expect(connectors[1]).toHaveClass('bg-brand');
     expect(connectors[2]).toHaveClass('bg-muted');

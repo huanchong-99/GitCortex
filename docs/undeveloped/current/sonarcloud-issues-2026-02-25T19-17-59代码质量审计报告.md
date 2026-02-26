@@ -10808,7 +10808,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 254.10 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 254.10 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGnB`
 - **项目**: huanchong-99
@@ -12846,7 +12846,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 302.2 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 302.2 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGkp`
 - **项目**: huanchong-99
