@@ -48,7 +48,7 @@ function handleSearchChange(
 }
 
 function handleGoBack(state: CommandBarState): [CommandBarState, CommandBarEffect] {
-  const prevPage = state.stack[state.stack.length - 1];
+  const prevPage = state.stack.at(-1);
   if (state.status === 'browsing' && !prevPage) return [state, noEffect];
   return [browsing(prevPage ?? 'root', state.stack.slice(0, -1)), noEffect];
 }
