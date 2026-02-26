@@ -44,22 +44,25 @@ const TaskPanel = ({ task }: Readonly<TaskPanelProps>) => {
         ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
         : null;
 
-    const to = (value: number, unit: Intl.RelativeTimeFormatUnit) =>
-      rtf
-        ? rtf.format(-value, unit)
-        : `${value} ${unit}${value !== 1 ? 's' : ''} ago`;
+    const formatUnit = (value: number, unit: Intl.RelativeTimeFormatUnit): string => {
+      if (rtf) {
+        return rtf.format(-value, unit);
+      }
+      const plural = value !== 1 ? 's' : '';
+      return `${value} ${unit}${plural} ago`;
+    };
 
-    if (absSec < 60) return to(Math.round(absSec), 'second');
+    if (absSec < 60) return formatUnit(Math.round(absSec), 'second');
     const mins = Math.round(absSec / 60);
-    if (mins < 60) return to(mins, 'minute');
+    if (mins < 60) return formatUnit(mins, 'minute');
     const hours = Math.round(mins / 60);
-    if (hours < 24) return to(hours, 'hour');
+    if (hours < 24) return formatUnit(hours, 'hour');
     const days = Math.round(hours / 24);
-    if (days < 30) return to(days, 'day');
+    if (days < 30) return formatUnit(days, 'day');
     const months = Math.round(days / 30);
-    if (months < 12) return to(months, 'month');
+    if (months < 12) return formatUnit(months, 'month');
     const years = Math.round(months / 12);
-    return to(years, 'year');
+    return formatUnit(years, 'year');
   };
 
   const displayedAttempts = [...attempts].sort(
@@ -129,50 +132,58 @@ const TaskPanel = ({ task }: Readonly<TaskPanelProps>) => {
             />
           )}
 
-          {isAttemptsLoading ? (
-            <div className="text-muted-foreground">
-              {t('taskPanel.loadingAttempts')}
-            </div>
-          ) : isAttemptsError ? (
-            <div className="text-destructive">
-              {t('taskPanel.errorLoadingAttempts')}
-            </div>
-          ) : (
-            <DataTable
-              data={displayedAttempts}
-              columns={attemptColumns}
-              keyExtractor={(attempt) => attempt.id}
-              onRowClick={(attempt) => {
-                if (config?.beta_workspaces) {
-                  navigate(`/workspaces/${attempt.id}`);
-                } else if (projectId && task.id) {
-                  navigate(paths.attempt(projectId, task.id, attempt.id));
-                }
-              }}
-              emptyState={t('taskPanel.noAttempts')}
-              headerContent={
-                <div className="w-full flex text-left">
-                  <span className="flex-1">
-                    {t('taskPanel.attemptsCount', {
-                      count: displayedAttempts.length,
-                    })}
-                  </span>
-                  <span>
-                    <Button
-                      variant="icon"
-                      onClick={() =>
-                        CreateAttemptDialog.show({
-                          taskId: task.id,
-                        })
-                      }
-                    >
-                      <PlusIcon size={16} />
-                    </Button>
-                  </span>
+          {(() => {
+            if (isAttemptsLoading) {
+              return (
+                <div className="text-muted-foreground">
+                  {t('taskPanel.loadingAttempts')}
                 </div>
-              }
-            />
-          )}
+              );
+            }
+            if (isAttemptsError) {
+              return (
+                <div className="text-destructive">
+                  {t('taskPanel.errorLoadingAttempts')}
+                </div>
+              );
+            }
+            return (
+              <DataTable
+                data={displayedAttempts}
+                columns={attemptColumns}
+                keyExtractor={(attempt) => attempt.id}
+                onRowClick={(attempt) => {
+                  if (config?.beta_workspaces) {
+                    navigate(`/workspaces/${attempt.id}`);
+                  } else if (projectId && task.id) {
+                    navigate(paths.attempt(projectId, task.id, attempt.id));
+                  }
+                }}
+                emptyState={t('taskPanel.noAttempts')}
+                headerContent={
+                  <div className="w-full flex text-left">
+                    <span className="flex-1">
+                      {t('taskPanel.attemptsCount', {
+                        count: displayedAttempts.length,
+                      })}
+                    </span>
+                    <span>
+                      <Button
+                        variant="icon"
+                        onClick={() =>
+                          CreateAttemptDialog.show({
+                            taskId: task.id,
+                          })
+                        }
+                      >
+                        <PlusIcon size={16} />
+                      </Button>
+                    </span>
+                  </div>
+                }
+              />
+            );
+          })()}
         </div>
       </div>
     </NewCardContent>
