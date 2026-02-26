@@ -365,37 +365,37 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         <div className="p-4 border-b">
           <h3 className="font-semibold">{t('terminalDebug.listTitle')}</h3>
         </div>
-        <div role="list" className="p-2">
+        <ul className="p-2">
           {allTerminals.map((terminal) => {
             const terminalLabel = getTerminalLabel(terminal);
             const statusLabel = getStatusLabel(terminal.status);
 
             return (
-              <button
-                key={terminal.id}
-                role="listitem"
-                aria-pressed={selectedTerminalId === terminal.id}
-                aria-label={`${terminalLabel} - ${statusLabel}`}
-                className={cn(
-                  'w-full p-3 rounded-lg text-left mb-2 transition-colors',
-                  selectedTerminalId === terminal.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-muted'
-                )}
-                onClick={() => {
-                  setSelectedTerminalId(terminal.id);
-                }}
-              >
-                <div className="font-medium text-sm">{terminalLabel}</div>
-                <div className="text-xs opacity-70">{terminal.taskName}</div>
-                <div className="flex items-center gap-2 mt-1">
-                  <StatusDot status={terminal.status} />
-                  <span className="text-xs">{statusLabel}</span>
-                </div>
-              </button>
+              <li key={terminal.id}>
+                <button
+                  aria-label={`${terminalLabel} - ${statusLabel}`}
+                  aria-current={selectedTerminalId === terminal.id ? 'true' : 'false'}
+                  className={cn(
+                    'w-full p-3 rounded-lg text-left mb-2 transition-colors',
+                    selectedTerminalId === terminal.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  )}
+                  onClick={() => {
+                    setSelectedTerminalId(terminal.id);
+                  }}
+                >
+                  <div className="font-medium text-sm">{terminalLabel}</div>
+                  <div className="text-xs opacity-70">{terminal.taskName}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <StatusDot status={terminal.status} />
+                    <span className="text-xs">{statusLabel}</span>
+                  </div>
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </div>
 
       <div className="flex-1 flex flex-col">

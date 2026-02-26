@@ -8184,7 +8184,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 195.14 Use <li> instead of the "listitem" role to ensure accessibility across all devices.
+### 195.14 Use <li> instead of the "listitem" role to ensure accessibility across all devices. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj6`
 - **项目**: huanchong-99
@@ -8197,7 +8197,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 195.15 The attribute aria-pressed is not supported by the role listitem.
+### 195.15 The attribute aria-pressed is not supported by the role listitem. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj7`
 - **项目**: huanchong-99
@@ -8210,7 +8210,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 195.16 Interactive elements should not be assigned non-interactive roles.
+### 195.16 Interactive elements should not be assigned non-interactive roles. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj8`
 - **项目**: huanchong-99
@@ -8468,7 +8468,7 @@
 - **工作量**: 3085min effort
 - **创建时间**: 15 days ago
 
-### 197.6 Elements with ARIA roles must use a valid, non-abstract ARIA role.
+### 197.6 Elements with ARIA roles must use a valid, non-abstract ARIA role. ✅ 已修复
 
 - **问题ID**: `AZyVwepzZ9DOUQdEsGjk`
 - **项目**: huanchong-99
