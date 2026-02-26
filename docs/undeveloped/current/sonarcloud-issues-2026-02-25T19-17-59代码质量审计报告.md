@@ -1494,7 +1494,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 32.1 Handle this exception or don't catch it at all.
+### 32.1 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVweS7Z9DOUQdEsGc0`
 - **项目**: huanchong-99
@@ -5129,7 +5129,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 129.1 Handle this exception or don't catch it at all.
+### 129.1 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwerFZ9DOUQdEsGkK`
 - **项目**: huanchong-99
@@ -7884,7 +7884,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 192.2 Handle this exception or don't catch it at all.
+### 192.2 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwealZ9DOUQdEsGfT`
 - **项目**: huanchong-99
@@ -7909,7 +7909,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 192.4 Handle this exception or don't catch it at all.
+### 192.4 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwealZ9DOUQdEsGfV`
 - **项目**: huanchong-99
@@ -7966,7 +7966,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 193.3 Handle this exception or don't catch it at all.
+### 193.3 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVweaJZ9DOUQdEsGfG`
 - **项目**: huanchong-99
@@ -10412,7 +10412,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 244.1 Handle this exception or don't catch it at all.
+### 244.1 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVweVzZ9DOUQdEsGdZ`
 - **项目**: huanchong-99
@@ -10424,7 +10424,7 @@
 - **创建时间**: 25 days ago
 - **标签**: cwe, error-handling, ...
 
-### 244.2 Handle this exception or don't catch it at all.
+### 244.2 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVweVzZ9DOUQdEsGda`
 - **项目**: huanchong-99
@@ -11345,7 +11345,7 @@
 - **工作量**: 4775min effort
 - **创建时间**: 1 month ago
 
-### 270.8 Handle this exception or don't catch it at all.
+### 270.8 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGmA`
 - **项目**: huanchong-99
@@ -12834,7 +12834,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 302.1 Handle this exception or don't catch it at all.
+### 302.1 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGko`
 - **项目**: huanchong-99
@@ -12859,7 +12859,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 302.3 Handle this exception or don't catch it at all.
+### 302.3 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGkq`
 - **项目**: huanchong-99
@@ -12871,7 +12871,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 302.4 Handle this exception or don't catch it at all.
+### 302.4 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGkr`
 - **项目**: huanchong-99
@@ -13018,7 +13018,7 @@
 - **创建时间**: 1 month ago
 - **标签**: async, promise, ...
 
-### 305.3 Handle this exception or don't catch it at all.
+### 305.3 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGkz`
 - **项目**: huanchong-99
@@ -13030,7 +13030,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 305.4 Handle this exception or don't catch it at all.
+### 305.4 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk0`
 - **项目**: huanchong-99
@@ -14281,7 +14281,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, html5, ...
 
-### 323.15 Handle this exception or don't catch it at all.
+### 323.15 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnw`
 - **项目**: huanchong-99
@@ -14345,7 +14345,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, html5, ...
 
-### 323.20 Handle this exception or don't catch it at all.
+### 323.20 Handle this exception or don't catch it at all. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGn2`
 - **项目**: huanchong-99

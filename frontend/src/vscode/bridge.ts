@@ -11,7 +11,8 @@
 export function inIframe(): boolean {
   try {
     return globalThis.self !== globalThis.top;
-  } catch {
+  } catch (error) {
+    console.debug('Cannot access window.top, assuming iframe', error);
     return true;
   }
 }
@@ -102,10 +103,12 @@ async function writeClipboardText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
-  } catch {
+  } catch (error) {
+    console.debug('Clipboard write failed, trying execCommand fallback', error);
     try {
       return document.execCommand('copy');
-    } catch {
+    } catch (fallbackError) {
+      console.debug('execCommand copy also failed', fallbackError);
       return false;
     }
   }
@@ -115,7 +118,8 @@ async function writeClipboardText(text: string): Promise<boolean> {
 async function readClipboardText(): Promise<string> {
   try {
     return await navigator.clipboard.readText();
-  } catch {
+  } catch (error) {
+    console.debug('Clipboard read failed', error);
     return '';
   }
 }
@@ -217,7 +221,8 @@ function insertTextAtCaretGeneric(text: string) {
     try {
       document.execCommand('insertText', false, text);
       el.dispatchEvent(new Event('input', { bubbles: true }));
-    } catch {
+    } catch (error) {
+      console.debug('insertText command failed, using innerText fallback', error);
       (el as HTMLElement).innerText += text;
     }
   }
@@ -274,8 +279,8 @@ export function parentClipboardWrite(text: string) {
       { type: 'vscode-iframe-clipboard-copy', text },
       '*'
     );
-  } catch (_err) {
-    void 0;
+  } catch (error) {
+    console.debug('Failed to post clipboard copy message to parent', error);
   }
 }
 
@@ -289,7 +294,8 @@ export function parentClipboardRead(): Promise<string> {
         { type: 'vscode-iframe-clipboard-paste-request', requestId },
         '*'
       );
-    } catch {
+    } catch (error) {
+      console.debug('Failed to post clipboard paste request to parent', error);
       resolve('');
     }
   });
@@ -334,8 +340,8 @@ export function installVSCodeIframeKeyboardBridge() {
   const forward = (type: string, e: KeyboardEvent) => {
     try {
       globalThis.parent.postMessage({ type, event: serializeKeyEvent(e) }, '*');
-    } catch (_err) {
-      void 0;
+    } catch (error) {
+      console.debug('Failed to forward key event to parent', error);
     }
   };
 
@@ -366,8 +372,8 @@ export function installVSCodeIframeKeyboardBridge() {
       e.stopPropagation();
       try {
         document.execCommand('undo');
-      } catch {
-        /* empty */
+      } catch (error) {
+        console.debug('Undo command failed', error);
       }
       return;
     } else if (isRedo(e)) {
@@ -375,8 +381,8 @@ export function installVSCodeIframeKeyboardBridge() {
       e.stopPropagation();
       try {
         document.execCommand('redo');
-      } catch {
-        /* empty */
+      } catch (error) {
+        console.debug('Redo command failed', error);
       }
       return;
     } else if (isPaste(e)) {
@@ -415,7 +421,8 @@ export async function writeClipboardViaBridge(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
-  } catch {
+  } catch (error) {
+    console.debug('Clipboard write via bridge failed, using fallback', error);
     parentClipboardWrite(text);
     return false;
   }
@@ -425,7 +432,8 @@ export async function writeClipboardViaBridge(text: string): Promise<boolean> {
 export async function readClipboardViaBridge(): Promise<string> {
   try {
     return await navigator.clipboard.readText();
-  } catch {
+  } catch (error) {
+    console.debug('Clipboard read via bridge failed, using fallback', error);
     return await parentClipboardRead();
   }
 }
