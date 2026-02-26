@@ -31,6 +31,11 @@ export function ConfigSelector({
   const configOptions = configs ? Object.keys(configs).sort((a, b) => a.localeCompare(b)) : [];
   const selectedVariant = selectedExecutorProfile?.variant || 'DEFAULT';
 
+  const getVariantClassName = (variant: string): string => {
+    const normalizedVariant = variant === 'DEFAULT' ? null : variant;
+    return normalizedVariant === selectedExecutorProfile?.variant ? 'bg-accent' : '';
+  };
+
   if (
     !selectedAgent ||
     !profiles ||
@@ -72,12 +77,7 @@ export function ConfigSelector({
                   variant: variant === 'DEFAULT' ? null : variant,
                 });
               }}
-              className={
-                (variant === 'DEFAULT' ? null : variant) ===
-                selectedExecutorProfile?.variant
-                  ? 'bg-accent'
-                  : ''
-              }
+              className={getVariantClassName(variant)}
             >
               {variant}
             </DropdownMenuItem>

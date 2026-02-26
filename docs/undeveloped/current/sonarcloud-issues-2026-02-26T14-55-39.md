@@ -2659,7 +2659,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 72.1 Extract this nested ternary operation into an independent statement.
+### 72.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweoGZ9DOUQdEsGjG`
 - **项目**: huanchong-99
@@ -2672,7 +2672,7 @@
 - **创建时间**: 22 days ago
 - **标签**: confusing
 
-### 72.2 Extract this nested ternary operation into an independent statement.
+### 72.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweoGZ9DOUQdEsGjH`
 - **项目**: huanchong-99
@@ -2742,7 +2742,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 75.1 Extract this nested ternary operation into an independent statement.
+### 75.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZxZ9DOUQdEsGe_`
 - **项目**: huanchong-99
@@ -3255,7 +3255,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 89.1 Extract this nested ternary operation into an independent statement.
+### 89.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwehWZ9DOUQdEsGhK`
 - **项目**: huanchong-99

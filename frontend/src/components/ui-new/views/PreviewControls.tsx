@@ -83,13 +83,19 @@ export function PreviewControls({
           )}
 
           <div className="flex-1 min-h-0 overflow-hidden">
-            {isLoading && devServerProcesses.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-low">
-                <SpinnerIcon className="size-icon-sm animate-spin" />
-              </div>
-            ) : devServerProcesses.length > 0 ? (
-              <VirtualizedProcessLogs logs={logs} error={logsError} />
-            ) : null}
+            {(() => {
+              if (isLoading && devServerProcesses.length === 0) {
+                return (
+                  <div className="h-full flex items-center justify-center text-low">
+                    <SpinnerIcon className="size-icon-sm animate-spin" />
+                  </div>
+                );
+              }
+              if (devServerProcesses.length > 0) {
+                return <VirtualizedProcessLogs logs={logs} error={logsError} />;
+              }
+              return null;
+            })()}
           </div>
         </div>
       </CollapsibleSectionHeader>

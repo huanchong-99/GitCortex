@@ -29,6 +29,22 @@ function getStatusClasses(status: string): string {
   }
 }
 
+/**
+ * Get status badge classes for terminal node
+ */
+function getStatusBadgeClasses(status: string): string {
+  if (status === 'running' || status === 'working') {
+    return 'bg-green-500/20 text-green-600';
+  }
+  if (status === 'failed') {
+    return 'bg-red-500/20 text-red-600';
+  }
+  if (status === 'completed') {
+    return 'bg-gray-500/20 text-gray-600';
+  }
+  return 'bg-blue-500/20 text-blue-600';
+}
+
 export function TerminalNode({ terminal, taskName }: Readonly<TerminalNodeProps>) {
   const [expanded, setExpanded] = useState(false);
 
@@ -47,13 +63,12 @@ export function TerminalNode({ terminal, taskName }: Readonly<TerminalNodeProps>
             {terminal.role}
           </div>
         )}
-        <div className={cn(
-          'text-xs px-2 py-0.5 rounded-full',
-          terminal.status === 'running' || terminal.status === 'working' ? 'bg-green-500/20 text-green-600' :
-          terminal.status === 'failed' ? 'bg-red-500/20 text-red-600' :
-          terminal.status === 'completed' ? 'bg-gray-500/20 text-gray-600' :
-          'bg-blue-500/20 text-blue-600'
-        )}>
+        <div
+          className={cn(
+            'text-xs px-2 py-0.5 rounded-full',
+            getStatusBadgeClasses(terminal.status)
+          )}
+        >
           {terminal.status}
         </div>
       </button>
