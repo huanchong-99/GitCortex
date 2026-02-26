@@ -253,14 +253,14 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
           localProjectId: projectId,
           data: { remote_project_id: currentProjectId },
         });
-      } else if (!newProjectName.trim()) {
-        setError(t('linkDialog.errors.enterProjectName'));
-        return;
-      } else {
+      } else if (newProjectName.trim()) {
         createAndLink.mutate({
           localProjectId: projectId,
           data: { organization_id: currentOrgId, name: newProjectName.trim() },
         });
+      } else {
+        setError(t('linkDialog.errors.enterProjectName'));
+        return;
       }
     };
 
