@@ -5568,7 +5568,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 165.1 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 165.1 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGps`
 - **项目**: huanchong-99
@@ -5581,7 +5581,7 @@
 - **创建时间**: 2 days ago
 - **标签**: bash, best-practices, ...
 
-### 165.2 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich.
+### 165.2 Use '[[' instead of '[' for conditional tests. The '[[' construct is safer and more feature-rich. ✅ 已修复
 
 - **问题ID**: `AZyVwe6yZ9DOUQdEsGpt`
 - **项目**: huanchong-99

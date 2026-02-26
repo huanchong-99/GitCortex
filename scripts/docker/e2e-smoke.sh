@@ -51,7 +51,7 @@ echo "OK frontend 200"
 echo "Testing restart persistence..."
 docker compose -f "$COMPOSE_FILE" restart
 elapsed=0
-while [ $elapsed -lt 30 ]; do
+while [[ $elapsed -lt 30 ]]; do
     if curl -sf "$BASE_URL/healthz" > /dev/null 2>&1; then
         echo "OK recovered after restart (${elapsed}s)"
         break
@@ -59,7 +59,7 @@ while [ $elapsed -lt 30 ]; do
     sleep 2
     elapsed=$((elapsed + 2))
 done
-if [ $elapsed -ge 30 ]; then
+if [[ $elapsed -ge 30 ]]; then
     echo "FAIL: No recovery after restart"
     docker compose -f "$COMPOSE_FILE" logs
     exit 1
