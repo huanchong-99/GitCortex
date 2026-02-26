@@ -128,9 +128,7 @@ export class ClickToComponentListener {
    * Send a message to the iframe (if needed)
    */
   sendToIframe(iframe: HTMLIFrameElement, message: unknown): void {
-    if (iframe.contentWindow) {
-      iframe.contentWindow.postMessage(message, '*');
-    }
+    iframe.contentWindow?.postMessage(message, '*');
   }
 }
 
