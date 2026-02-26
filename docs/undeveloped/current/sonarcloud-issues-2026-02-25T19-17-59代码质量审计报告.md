@@ -3840,7 +3840,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 94.3 Prefer `.dataset` over `setAttribute(…)`.
+### 94.3 Prefer `.dataset` over `setAttribute(…)`. ✅ 已修复
 
 - **问题ID**: `AZyVweOOZ9DOUQdEsGav`
 - **项目**: huanchong-99

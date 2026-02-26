@@ -79,7 +79,7 @@ const config: DecoratorNodeConfig<NormalizedComment> = {
   component: PrCommentComponent,
   exportDOM: (data) => {
     const span = document.createElement('span');
-    span.setAttribute('data-pr-comment-id', data.id);
+    span.dataset.prCommentId = data.id;
     span.textContent = `PR comment by @${data.author}: ${data.body}`;
     return span;
   },

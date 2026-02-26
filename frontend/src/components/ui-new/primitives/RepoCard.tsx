@@ -119,6 +119,76 @@ export function RepoCard({
   const effectiveSelectedAction =
     hasPrOpen && selectedAction === 'pull-request' ? 'merge' : selectedAction;
 
+  const getPrStatusDisplay = () => {
+    if (!prNumber) return null;
+
+    const isMerged = prStatus === 'merged';
+    const icon = isMerged ? (
+      <CheckCircleIcon className="size-icon-xs" weight="fill" />
+    ) : (
+      <GitPullRequestIcon className="size-icon-xs" weight="fill" />
+    );
+    const text = isMerged
+      ? t('git.pr.merged', { prNumber })
+      : t('git.pr.open', { number: prNumber });
+    const textColor = isMerged ? 'text-success' : 'text-normal';
+
+    if (prUrl) {
+      return (
+        <button
+          onClick={() => openExternalLink(prUrl)}
+          className={`inline-flex items-center gap-half px-base py-half rounded-sm bg-panel ${textColor} hover:bg-tertiary text-sm font-medium transition-colors`}
+        >
+          {icon}
+          {text}
+          <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
+        </button>
+      );
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-half px-base py-half rounded-sm bg-panel ${textColor} text-sm font-medium`}>
+        {icon}
+        {text}
+      </span>
+    );
+  };
+
+  const getPushButtonIcon = () => {
+    if (isPushPending) {
+      return <SpinnerGapIcon className="size-icon-xs animate-spin" />;
+    }
+    if (isPushSuccess) {
+      return <CheckCircleIcon className="size-icon-xs" weight="fill" />;
+    }
+    if (isPushError) {
+      return <WarningCircleIcon className="size-icon-xs" weight="fill" />;
+    }
+    return <ArrowUpIcon className="size-icon-xs" weight="bold" />;
+  };
+
+  const getPushButtonText = () => {
+    if (isPushPending) return t('git.states.pushing');
+    if (isPushSuccess) return t('git.states.pushed');
+    if (isPushError) return t('git.states.pushFailed');
+    return t('git.states.push');
+  };
+
+  const getPushButtonClassName = () => {
+    const baseClasses =
+      'inline-flex items-center gap-half px-base py-half rounded-sm text-sm font-medium transition-colors disabled:cursor-not-allowed';
+    if (isPushSuccess) {
+      return `${baseClasses} bg-success/20 text-success`;
+    }
+    if (isPushError) {
+      return `${baseClasses} bg-error/20 text-error`;
+    }
+    return `${baseClasses} bg-panel text-normal hover:bg-tertiary disabled:opacity-50`;
+  };
+
+  const showPushButtonControl =
+    showPushButton || isPushPending || isPushSuccess || isPushError;
+
   return (
     <CollapsibleSection
       persistKey={PERSIST_KEYS.repoCard(repoId)}
@@ -220,79 +290,16 @@ export function RepoCard({
       {/* PR status row */}
       {prNumber && (
         <div className="flex items-center gap-half my-base">
-          {(() => {
-            const isMerged = prStatus === 'merged';
-            const icon = isMerged ? (
-              <CheckCircleIcon className="size-icon-xs" weight="fill" />
-            ) : (
-              <GitPullRequestIcon className="size-icon-xs" weight="fill" />
-            );
-            const text = isMerged
-              ? t('git.pr.merged', { prNumber })
-              : t('git.pr.open', { number: prNumber });
-            const textColor = isMerged ? 'text-success' : 'text-normal';
-
-            if (prUrl) {
-              return (
-                <button
-                  onClick={() => openExternalLink(prUrl)}
-                  className={`inline-flex items-center gap-half px-base py-half rounded-sm bg-panel ${textColor} hover:bg-tertiary text-sm font-medium transition-colors`}
-                >
-                  {icon}
-                  {text}
-                  <ArrowSquareOutIcon className="size-icon-xs" weight="bold" />
-                </button>
-              );
-            } else {
-              return (
-                <span className={`inline-flex items-center gap-half px-base py-half rounded-sm bg-panel ${textColor} text-sm font-medium`}>
-                  {icon}
-                  {text}
-                </span>
-              );
-            }
-          })()}
+          {getPrStatusDisplay()}
           {/* Push button - shows loading/success/error state */}
-          {(showPushButton ||
-            isPushPending ||
-            isPushSuccess ||
-            isPushError) && (
+          {showPushButtonControl && (
             <button
               onClick={onPushClick}
               disabled={isPushPending || isPushSuccess || isPushError}
-              className={(() => {
-                const baseClasses = 'inline-flex items-center gap-half px-base py-half rounded-sm text-sm font-medium transition-colors disabled:cursor-not-allowed';
-                if (isPushSuccess) {
-                  return `${baseClasses} bg-success/20 text-success`;
-                } else if (isPushError) {
-                  return `${baseClasses} bg-error/20 text-error`;
-                } else {
-                  return `${baseClasses} bg-panel text-normal hover:bg-tertiary disabled:opacity-50`;
-                }
-              })()}
+              className={getPushButtonClassName()}
             >
-              {(() => {
-                if (isPushPending) {
-                  return <SpinnerGapIcon className="size-icon-xs animate-spin" />;
-                } else if (isPushSuccess) {
-                  return <CheckCircleIcon className="size-icon-xs" weight="fill" />;
-                } else if (isPushError) {
-                  return <WarningCircleIcon className="size-icon-xs" weight="fill" />;
-                } else {
-                  return <ArrowUpIcon className="size-icon-xs" weight="bold" />;
-                }
-              })()}
-              {(() => {
-                if (isPushPending) {
-                  return t('git.states.pushing');
-                } else if (isPushSuccess) {
-                  return t('git.states.pushed');
-                } else if (isPushError) {
-                  return t('git.states.pushFailed');
-                } else {
-                  return t('git.states.push');
-                }
-              })()}
+              {getPushButtonIcon()}
+              {getPushButtonText()}
             </button>
           )}
         </div>
