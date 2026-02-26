@@ -44,6 +44,63 @@ export type ScriptFixerDialogResult = {
 
 type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
 
+// Helper to get update data based on script type
+function getScriptUpdateData(scriptType: ScriptType, script: string): Partial<UpdateRepo> {
+  const scriptValue = script.trim() || null;
+
+  if (scriptType === 'setup') {
+    return { setupScript: scriptValue };
+  }
+  if (scriptType === 'cleanup') {
+    return { cleanupScript: scriptValue };
+  }
+  return { devServerScript: scriptValue };
+}
+
+// Helper to run script based on type
+async function runScriptByType(scriptType: ScriptType, workspaceId: string) {
+  if (scriptType === 'setup') {
+    await attemptsApi.runSetupScript(workspaceId);
+  } else if (scriptType === 'cleanup') {
+    await attemptsApi.runCleanupScript(workspaceId);
+  } else {
+    await attemptsApi.startDevServer(workspaceId);
+  }
+}
+
+// Helper to get dialog title
+function getDialogTitle(scriptType: ScriptType, t: any): string {
+  if (scriptType === 'setup') {
+    return t('scriptFixer.setupScriptTitle');
+  }
+  if (scriptType === 'cleanup') {
+    return t('scriptFixer.cleanupScriptTitle');
+  }
+  return t('scriptFixer.devServerTitle');
+}
+
+// Helper to get placeholder text
+function getPlaceholderText(scriptType: ScriptType): string {
+  if (scriptType === 'setup') {
+    return '#!/bin/bash\nnpm install';
+  }
+  if (scriptType === 'cleanup') {
+    return '#!/bin/bash\nrm -rf node_modules';
+  }
+  return '#!/bin/bash\nnpm run dev';
+}
+
+// Helper to get script content from repo
+function getScriptContent(repo: any, scriptType: ScriptType): string {
+  if (scriptType === 'setup') {
+    return repo.setupScript ?? '';
+  }
+  if (scriptType === 'cleanup') {
+    return repo.cleanupScript ?? '';
+  }
+  return repo.devServerScript ?? '';
+}
+
 const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
   ({ scriptType, repos, workspaceId, sessionId, initialRepoId }) => {
     const modal = useModal();
@@ -122,15 +179,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
           const repo = await repoApi.getById(selectedRepoId);
           if (cancelled) return;
 
-          let scriptContent: string;
-          if (scriptType === 'setup') {
-            scriptContent = repo.setupScript ?? '';
-          } else if (scriptType === 'cleanup') {
-            scriptContent = repo.cleanupScript ?? '';
-          } else {
-            scriptContent = repo.devServerScript ?? '';
-          }
-
+          const scriptContent = getScriptContent(repo, scriptType);
           setScript(scriptContent);
           setOriginalScript(scriptContent);
         } catch (err) {
@@ -168,17 +217,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
       setError(null);
 
       try {
-        // Only send the field being edited - other fields will be preserved by the backend
-        const scriptValue = script.trim() || null;
-        let updateData: Partial<UpdateRepo>;
-        if (scriptType === 'setup') {
-          updateData = { setupScript: scriptValue };
-        } else if (scriptType === 'cleanup') {
-          updateData = { cleanupScript: scriptValue };
-        } else {
-          updateData = { devServerScript: scriptValue };
-        }
-
+        const updateData = getScriptUpdateData(scriptType, script);
         await repoApi.update(selectedRepoId, updateData as UpdateRepo);
 
         // Invalidate repos cache
@@ -203,17 +242,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
       setError(null);
 
       try {
-        // Only send the field being edited - other fields will be preserved by the backend
-        const scriptValue = script.trim() || null;
-        let updateData: Partial<UpdateRepo>;
-        if (scriptType === 'setup') {
-          updateData = { setupScript: scriptValue };
-        } else if (scriptType === 'cleanup') {
-          updateData = { cleanupScript: scriptValue };
-        } else {
-          updateData = { devServerScript: scriptValue };
-        }
-
+        const updateData = getScriptUpdateData(scriptType, script);
         await repoApi.update(selectedRepoId, updateData as UpdateRepo);
 
         // Invalidate repos cache
@@ -222,14 +251,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
         setOriginalScript(script);
 
         // Then run the script
-        if (scriptType === 'setup') {
-          await attemptsApi.runSetupScript(workspaceId);
-        } else if (scriptType === 'cleanup') {
-          await attemptsApi.runCleanupScript(workspaceId);
-        } else {
-          // Start the dev server
-          await attemptsApi.startDevServer(workspaceId);
-        }
+        await runScriptByType(scriptType, workspaceId);
 
         // Keep dialog open so user can see the new execution logs
         // The logs will update automatically via useLogStream/useExecutionProcesses
@@ -242,24 +264,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
       }
     }, [selectedRepoId, script, scriptType, workspaceId, queryClient, t]);
 
-    const getPlaceholderText = () => {
-      if (scriptType === 'setup') {
-        return '#!/bin/bash\nnpm install';
-      } else if (scriptType === 'cleanup') {
-        return '#!/bin/bash\nrm -rf node_modules';
-      } else {
-        return '#!/bin/bash\nnpm run dev';
-      }
-    };
-
-    let dialogTitle: string;
-    if (scriptType === 'setup') {
-      dialogTitle = t('scriptFixer.setupScriptTitle');
-    } else if (scriptType === 'cleanup') {
-      dialogTitle = t('scriptFixer.cleanupScriptTitle');
-    } else {
-      dialogTitle = t('scriptFixer.devServerTitle');
-    }
+    const dialogTitle = getDialogTitle(scriptType, t);
 
     return (
       <Dialog
@@ -310,7 +315,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
                     value={script}
                     onChange={(e) => setScript(e.target.value)}
                     className="font-mono text-sm p-3 border-0 min-h-full bg-panel"
-                    placeholder={getPlaceholderText()}
+                    placeholder={getPlaceholderText(scriptType)}
                     disableInternalScroll
                   />
                 )}

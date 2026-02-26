@@ -39,6 +39,38 @@ export type RestoreLogsDialogResult = {
   forceWhenDirty?: boolean;
 };
 
+// Helper to get container className for reset section
+function getResetContainerClassName(worktreeResetOn: boolean, hasRisk: boolean): string {
+  if (!worktreeResetOn) {
+    return 'flex items-start gap-3 rounded-md border p-3';
+  }
+  if (hasRisk) {
+    return 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3';
+  }
+  return 'flex items-start gap-3 rounded-md border p-3 border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20';
+}
+
+// Helper to get icon className for reset section
+function getResetIconClassName(worktreeResetOn: boolean, hasRisk: boolean): string {
+  if (!worktreeResetOn) {
+    return 'h-4 w-4 text-muted-foreground mt-0.5';
+  }
+  if (hasRisk) {
+    return 'h-4 w-4 text-destructive mt-0.5';
+  }
+  return 'h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5';
+}
+
+// Helper to get toggle label text
+function getToggleLabelText(forceReset: boolean, worktreeResetOn: boolean, t: any): string {
+  if (forceReset) {
+    return worktreeResetOn
+      ? t('restoreLogsDialog.resetWorktree.enabled')
+      : t('restoreLogsDialog.resetWorktree.disabled');
+  }
+  return t('restoreLogsDialog.resetWorktree.disabledUncommitted');
+}
+
 const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
   ({
     executionProcessId,
@@ -312,28 +344,8 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                   )}
 
                   {needGitReset && canGitReset && (
-                    <div
-                      className={(() => {
-                        if (!worktreeResetOn) {
-                          return 'flex items-start gap-3 rounded-md border p-3';
-                        }
-                        if (hasRisk) {
-                          return 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3';
-                        }
-                        return 'flex items-start gap-3 rounded-md border p-3 border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20';
-                      })()}
-                    >
-                      <AlertTriangle
-                        className={(() => {
-                          if (!worktreeResetOn) {
-                            return 'h-4 w-4 text-muted-foreground mt-0.5';
-                          }
-                          if (hasRisk) {
-                            return 'h-4 w-4 text-destructive mt-0.5';
-                          }
-                          return 'h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5';
-                        })()}
-                      />
+                    <div className={getResetContainerClassName(worktreeResetOn, hasRisk)}>
+                      <AlertTriangle className={getResetIconClassName(worktreeResetOn, hasRisk)} />
                       <div className="text-sm min-w-0 w-full break-words">
                         <p className="font-medium mb-2">
                           {t('restoreLogsDialog.resetWorktree.title')}
@@ -448,15 +460,7 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                           }}
                         >
                           <div className="text-xs text-muted-foreground flex-1 min-w-0 break-words">
-                            {(() => {
-                              if (forceReset) {
-                                if (worktreeResetOn) {
-                                  return t('restoreLogsDialog.resetWorktree.enabled');
-                                }
-                                return t('restoreLogsDialog.resetWorktree.disabled');
-                              }
-                              return t('restoreLogsDialog.resetWorktree.disabledUncommitted');
-                            })()}
+                            {getToggleLabelText(forceReset, worktreeResetOn, t)}
                           </div>
                           <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
                             <span

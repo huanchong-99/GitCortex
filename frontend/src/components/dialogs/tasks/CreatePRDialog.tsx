@@ -46,6 +46,91 @@ export type CreatePRDialogResult = {
   error?: string;
 };
 
+// Helper to get provider name from error
+function getProviderName(provider: string): string {
+  if (provider === 'git_hub') return 'GitHub';
+  if (provider === 'azure_dev_ops') return 'Azure DevOps';
+  return 'Git host';
+}
+
+// Helper to get action text from error type
+function getActionText(errorType: string): string {
+  return errorType === 'cli_not_installed' ? 'not installed' : 'not logged in';
+}
+
+// Helper to handle CLI not installed/logged in errors
+function handleCliError(
+  error: GhCliSetupError,
+  isMacEnvironment: boolean,
+  showGhCliSetupDialog: () => Promise<void>,
+  setError: (error: string) => void,
+  setGhCliHelp: (help: GhCliSupportContent | null) => void
+): boolean {
+  if (
+    error.type !== 'cli_not_installed' &&
+    error.type !== 'cli_not_logged_in'
+  ) {
+    return false;
+  }
+
+  // Only show setup dialog for GitHub CLI on Mac
+  if (error.provider === 'git_hub' && isMacEnvironment) {
+    showGhCliSetupDialog();
+    return true;
+  }
+
+  const providerName = getProviderName(error.provider);
+  const action = getActionText(error.type);
+  setError(`${providerName} CLI is ${action}`);
+  setGhCliHelp(null);
+  return true;
+}
+
+// Helper to handle git CLI errors
+function handleGitCliError(
+  error: GhCliSetupError,
+  result: any,
+  t: any,
+  setError: (error: string) => void,
+  setGhCliHelp: (help: GhCliSupportContent | null) => void
+): boolean {
+  if (
+    error.type !== 'git_cli_not_installed' &&
+    error.type !== 'git_cli_not_logged_in'
+  ) {
+    return false;
+  }
+
+  const gitCliErrorKey =
+    error.type === 'git_cli_not_logged_in'
+      ? 'createPrDialog.errors.gitCliNotLoggedIn'
+      : 'createPrDialog.errors.gitCliNotInstalled';
+
+  setError(result.message || t(gitCliErrorKey));
+  setGhCliHelp(null);
+  return true;
+}
+
+// Helper to handle target branch not found error
+function handleTargetBranchError(
+  error: GhCliSetupError,
+  t: any,
+  setError: (error: string) => void,
+  setGhCliHelp: (help: GhCliSupportContent | null) => void
+): boolean {
+  if (error.type !== 'target_branch_not_found') {
+    return false;
+  }
+
+  setError(
+    t('createPrDialog.errors.targetBranchNotFound', {
+      branch: error.branch,
+    })
+  );
+  setGhCliHelp(null);
+  return true;
+}
+
 const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
   ({ attempt, task, repoId, targetBranch }) => {
     const modal = useModal();
@@ -176,47 +261,35 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
       };
 
       if (result.error) {
-        if (
-          result.error.type === 'cli_not_installed' ||
-          result.error.type === 'cli_not_logged_in'
-        ) {
-          // Only show setup dialog for GitHub CLI on Mac
-          if (result.error.provider === 'git_hub' && isMacEnvironment) {
-            await showGhCliSetupDialog();
-          } else {
-            const providerName =
-              result.error.provider === 'git_hub'
-                ? 'GitHub'
-                : result.error.provider === 'azure_dev_ops'
-                  ? 'Azure DevOps'
-                  : 'Git host';
-            const action =
-              result.error.type === 'cli_not_installed'
-                ? 'not installed'
-                : 'not logged in';
-            setError(`${providerName} CLI is ${action}`);
-            setGhCliHelp(null);
-          }
+        // Handle CLI not installed/logged in errors
+        if (handleCliError(
+          result.error,
+          isMacEnvironment,
+          showGhCliSetupDialog,
+          setError,
+          setGhCliHelp
+        )) {
           return;
-        } else if (
-          result.error.type === 'git_cli_not_installed' ||
-          result.error.type === 'git_cli_not_logged_in'
-        ) {
-          const gitCliErrorKey =
-            result.error.type === 'git_cli_not_logged_in'
-              ? 'createPrDialog.errors.gitCliNotLoggedIn'
-              : 'createPrDialog.errors.gitCliNotInstalled';
+        }
 
-          setError(result.message || t(gitCliErrorKey));
-          setGhCliHelp(null);
+        // Handle git CLI errors
+        if (handleGitCliError(
+          result.error,
+          result,
+          t,
+          setError,
+          setGhCliHelp
+        )) {
           return;
-        } else if (result.error.type === 'target_branch_not_found') {
-          setError(
-            t('createPrDialog.errors.targetBranchNotFound', {
-              branch: result.error.branch,
-            })
-          );
-          setGhCliHelp(null);
+        }
+
+        // Handle target branch not found error
+        if (handleTargetBranchError(
+          result.error,
+          t,
+          setError,
+          setGhCliHelp
+        )) {
           return;
         }
       }

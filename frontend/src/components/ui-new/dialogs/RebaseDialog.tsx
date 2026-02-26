@@ -20,6 +20,63 @@ import { useAttempt } from '@/hooks/useAttempt';
 import { attemptsApi, type Result } from '@/lib/api';
 import { ResolveConflictsDialog } from './ResolveConflictsDialog';
 
+// Helper to extract error type from Result
+function getErrorType(err: unknown): string | undefined {
+  const resultErr = err as Result<void, GitOperationError> | undefined;
+  if (resultErr && !resultErr.success) {
+    return resultErr.error?.type;
+  }
+  return undefined;
+}
+
+// Helper to check if error is a conflict error
+function isConflictError(errorType: string | undefined): boolean {
+  return errorType === 'merge_conflicts' || errorType === 'rebase_in_progress';
+}
+
+// Helper to extract error message from various error structures
+function extractErrorMessage(err: unknown): string {
+  if (!err || typeof err !== 'object') {
+    return 'Failed to rebase';
+  }
+
+  // Handle Result<void, GitOperationError> structure
+  if ('error' in err && err.error && typeof err.error === 'object' && 'message' in err.error) {
+    return String(err.error.message);
+  }
+
+  if ('message' in err && err.message) {
+    return String(err.message);
+  }
+
+  return 'Failed to rebase';
+}
+
+// Helper to handle conflict errors
+async function handleConflictError(
+  attemptId: string,
+  repoId: string,
+  workspace: any,
+  modal: any
+): Promise<void> {
+  modal.hide();
+
+  // Fetch fresh branch status to get conflict details
+  const branchStatus = await attemptsApi.getBranchStatus(attemptId);
+  const repoStatus = branchStatus?.find((s) => s.repo_id === repoId);
+
+  if (repoStatus) {
+    await ResolveConflictsDialog.show({
+      workspaceId: attemptId,
+      conflictOp: repoStatus.conflict_op ?? 'rebase',
+      sourceBranch: workspace?.branch ?? null,
+      targetBranch: repoStatus.target_branch_name,
+      conflictedFiles: repoStatus.conflicted_files ?? [],
+      repoName: repoStatus.repo_name,
+    });
+  }
+}
+
 export interface RebaseDialogProps {
   attemptId: string;
   repoId: string;
@@ -73,54 +130,15 @@ function RebaseDialogContent({
       });
       modal.hide();
     } catch (err) {
-      // Check if this is a conflict error (Result type with success=false)
-      const resultErr = err as Result<void, GitOperationError> | undefined;
-      let errorType: string | undefined;
-      if (resultErr && !resultErr.success) {
-        errorType = resultErr.error?.type;
-      } else {
-        errorType = undefined;
-      }
+      const errorType = getErrorType(err);
 
-      if (
-        errorType === 'merge_conflicts' ||
-        errorType === 'rebase_in_progress'
-      ) {
-        // Hide this dialog and show the resolve conflicts dialog
-        modal.hide();
-
-        // Fetch fresh branch status to get conflict details
-        const branchStatus = await attemptsApi.getBranchStatus(attemptId);
-        const repoStatus = branchStatus?.find((s) => s.repo_id === repoId);
-
-        if (repoStatus) {
-          await ResolveConflictsDialog.show({
-            workspaceId: attemptId,
-            conflictOp: repoStatus.conflict_op ?? 'rebase',
-            sourceBranch: workspace?.branch ?? null,
-            targetBranch: repoStatus.target_branch_name,
-            conflictedFiles: repoStatus.conflicted_files ?? [],
-            repoName: repoStatus.repo_name,
-          });
-        }
+      if (isConflictError(errorType)) {
+        await handleConflictError(attemptId, repoId, workspace, modal);
         return;
       }
 
       // Handle other errors
-      let message = 'Failed to rebase';
-      if (err && typeof err === 'object') {
-        // Handle Result<void, GitOperationError> structure
-        if (
-          'error' in err &&
-          err.error &&
-          typeof err.error === 'object' &&
-          'message' in err.error
-        ) {
-          message = String(err.error.message);
-        } else if ('message' in err && err.message) {
-          message = String(err.message);
-        }
-      }
+      const message = extractErrorMessage(err);
       setError(message);
     }
   };

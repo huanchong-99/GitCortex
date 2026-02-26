@@ -146,6 +146,40 @@ function useDiffData(input: DiffInput): DiffData {
   }, [input]);
 }
 
+// Helper to handle keyboard events for toggle
+function handleToggleKeyDown(e: React.KeyboardEvent, onToggle: () => void) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    onToggle();
+  }
+}
+
+// Helper to get header interactive props
+function getHeaderProps(onToggle?: () => void) {
+  if (!onToggle) {
+    return { role: undefined, tabIndex: undefined, onKeyDown: undefined };
+  }
+  return {
+    role: 'button' as const,
+    tabIndex: 0,
+    onKeyDown: (e: React.KeyboardEvent) => handleToggleKeyDown(e, onToggle),
+  };
+}
+
+// Helper component for diff stats
+function DiffStats({ additions, deletions }: { additions: number; deletions: number }) {
+  const hasStats = additions > 0 || deletions > 0;
+  if (!hasStats) return null;
+
+  return (
+    <span className="text-sm shrink-0">
+      {additions > 0 && <span className="text-success">+{additions}</span>}
+      {additions > 0 && deletions > 0 && ' '}
+      {deletions > 0 && <span className="text-error">-{deletions}</span>}
+    </span>
+  );
+}
+
 export function DiffViewCard({
   input,
   expanded = false,
@@ -166,7 +200,7 @@ export function DiffViewCard({
   } = useDiffData(input);
 
   const FileIcon = getFileIcon(filePath, actualTheme);
-  const hasStats = additions > 0 || deletions > 0;
+  const headerProps = getHeaderProps(onToggle);
 
   return (
     <div className={cn('rounded-sm border overflow-hidden', className)}>
@@ -177,9 +211,7 @@ export function DiffViewCard({
           onToggle && 'cursor-pointer'
         )}
         onClick={onToggle}
-        role={onToggle ? 'button' : undefined}
-        tabIndex={onToggle ? 0 : undefined}
-        onKeyDown={onToggle ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
+        {...headerProps}
       >
         <div className="flex-1 flex items-center gap-base min-w-0">
           <span className="relative shrink-0">
@@ -194,17 +226,7 @@ export function DiffViewCard({
           <span className="text-sm text-normal truncate font-ibm-plex-mono">
             {filePath}
           </span>
-          {hasStats && (
-            <span className="text-sm shrink-0">
-              {additions > 0 && (
-                <span className="text-success">+{additions}</span>
-              )}
-              {additions > 0 && deletions > 0 && ' '}
-              {deletions > 0 && (
-                <span className="text-error">-{deletions}</span>
-              )}
-            </span>
-          )}
+          <DiffStats additions={additions} deletions={deletions} />
         </div>
         {onToggle && (
           <CaretDownIcon

@@ -4244,7 +4244,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 105.1 Refactor this function to reduce its Cognitive Complexity from 32 to the 15 allowed.
+### 105.1 Refactor this function to reduce its Cognitive Complexity from 32 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweluZ9DOUQdEsGia`
 - **项目**: huanchong-99
@@ -4738,7 +4738,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 118.1 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.
+### 118.1 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwebUZ9DOUQdEsGfj`
 - **项目**: huanchong-99
@@ -5782,7 +5782,7 @@
 
 > 该文件共有 **11** 个问题
 
-### 147.1 Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed.
+### 147.1 Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc1`
 - **项目**: huanchong-99
@@ -6188,7 +6188,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 152.1 Refactor this function to reduce its Cognitive Complexity from 30 to the 15 allowed.
+### 152.1 Refactor this function to reduce its Cognitive Complexity from 30 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweSCZ9DOUQdEsGcE`
 - **项目**: huanchong-99
@@ -6342,7 +6342,7 @@
 
 > 该文件共有 **17** 个问题
 
-### 156.1 Refactor this function to reduce its Cognitive Complexity from 46 to the 15 allowed.
+### 156.1 Refactor this function to reduce its Cognitive Complexity from 46 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcS`
 - **项目**: huanchong-99
@@ -8570,7 +8570,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 201.2 Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed.
+### 201.2 Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwemBZ9DOUQdEsGie`
 - **项目**: huanchong-99
