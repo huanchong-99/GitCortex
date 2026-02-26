@@ -952,7 +952,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 24.2 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.
+### 24.2 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeH`
 - **项目**: huanchong-99
@@ -1004,7 +1004,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 24.6 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.
+### 24.6 Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeL`
 - **项目**: huanchong-99
