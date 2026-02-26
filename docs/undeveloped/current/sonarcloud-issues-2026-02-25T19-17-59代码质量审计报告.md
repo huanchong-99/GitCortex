@@ -2070,7 +2070,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 46.2 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 46.2 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwelCZ9DOUQdEsGiE`
 - **项目**: huanchong-99
@@ -11569,7 +11569,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 275.5 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 275.5 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwevTZ9DOUQdEsGlb`
 - **项目**: huanchong-99
@@ -12789,7 +12789,7 @@
 - **创建时间**: 23 days ago
 - **标签**: redundant, type-dependent
 
-### 301.6 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 301.6 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGkg`
 - **项目**: huanchong-99
@@ -12883,7 +12883,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 302.5 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 302.5 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGks`
 - **项目**: huanchong-99
@@ -12896,7 +12896,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 302.6 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 302.6 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGkt`
 - **项目**: huanchong-99
@@ -12922,7 +12922,7 @@
 - **创建时间**: 1 month ago
 - **标签**: object, string, ...
 
-### 302.8 Prefer using an optional chain expression instead, as it's more concise and easier to read.
+### 302.8 Prefer using an optional chain expression instead, as it's more concise and easier to read. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGkv`
 - **项目**: huanchong-99
