@@ -8,9 +8,8 @@ type AgentIconProps = Readonly<{
 
 function getResolvedTheme(theme: ThemeMode): 'light' | 'dark' {
   if (theme === ThemeMode.SYSTEM) {
-    return globalThis.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
+    const prefersDark = globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
   }
   return theme === ThemeMode.DARK ? 'dark' : 'light';
 }
