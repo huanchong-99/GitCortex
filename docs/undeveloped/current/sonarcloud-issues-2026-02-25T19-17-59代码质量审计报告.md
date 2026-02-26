@@ -2584,7 +2584,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 58.3 Promise-returning function provided to property where a void return was expected.
+### 58.3 Promise-returning function provided to property where a void return was expected. ✅ 已修复
 
 - **问题ID**: `AZyVwei1Z9DOUQdEsGhl`
 - **项目**: huanchong-99
@@ -8660,7 +8660,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 203.1 Simplify this regular expression to reduce its complexity from 21 to the 20 allowed.
+### 203.1 Simplify this regular expression to reduce its complexity from 21 to the 20 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwempZ9DOUQdEsGin`
 - **项目**: huanchong-99
@@ -9811,7 +9811,7 @@
 - **创建时间**: 23 days ago
 - **标签**: react, type-dependent
 
-### 228.2 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 228.2 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwePrZ9DOUQdEsGbW`
 - **项目**: huanchong-99
@@ -10519,7 +10519,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 247.1 Provide multiple methods instead of using "enabled" to determine which action to take.
+### 247.1 Provide multiple methods instead of using "enabled" to determine which action to take. ✅ 已修复
 
 - **问题ID**: `AZyVweWHZ9DOUQdEsGdk`
 - **项目**: huanchong-99
@@ -10538,7 +10538,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 248.1 Provide multiple methods instead of using "enabled" to determine which action to take.
+### 248.1 Provide multiple methods instead of using "enabled" to determine which action to take. ✅ 已修复
 
 - **问题ID**: `AZyVweVQZ9DOUQdEsGdU`
 - **项目**: huanchong-99
@@ -10756,7 +10756,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 254.6 'value' will use Object's default stringification format ('[object Object]') when stringified.
+### 254.6 'value' will use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm9`
 - **项目**: huanchong-99
@@ -10769,7 +10769,7 @@
 - **创建时间**: 1 month ago
 - **标签**: object, string, ...
 
-### 254.7 'value' will use Object's default stringification format ('[object Object]') when stringified.
+### 254.7 'value' will use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm-`
 - **项目**: huanchong-99
@@ -10821,7 +10821,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 254.11 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 254.11 The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGnC`
 - **项目**: huanchong-99
@@ -11382,7 +11382,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 272.1 Simplify this regular expression to reduce its complexity from 21 to the 20 allowed.
+### 272.1 Simplify this regular expression to reduce its complexity from 21 to the 20 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwewEZ9DOUQdEsGlr`
 - **项目**: huanchong-99
@@ -13005,7 +13005,7 @@
 - **创建时间**: 17 days ago
 - **标签**: brain-overload
 
-### 305.2 Promise-returning function provided to property where a void return was expected.
+### 305.2 Promise-returning function provided to property where a void return was expected. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGky`
 - **项目**: huanchong-99
@@ -14125,7 +14125,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 323.3 Replace this union type with a type alias.
+### 323.3 Replace this union type with a type alias. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnk`
 - **项目**: huanchong-99
@@ -14177,7 +14177,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 323.7 Replace this union type with a type alias.
+### 323.7 Replace this union type with a type alias. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGno`
 - **项目**: huanchong-99

@@ -606,8 +606,12 @@ export function SessionChatBoxContainer({
         onChange: handleEditorChange,
       }}
       actions={{
-        onSend: () => void handleSend(),
-        onQueue: () => void handleQueueMessage(),
+        onSend: () => {
+          void handleSend();
+        },
+        onQueue: () => {
+          void handleQueueMessage();
+        },
         onCancelQueue: cancelQueue,
         onStop: stopExecution,
         onPasteFiles: uploadFiles,

@@ -45,6 +45,9 @@ function serializeKeyEvent(e: KeyboardEvent): KeyPayload {
   };
 }
 
+/** Type alias for editable elements to reduce union type repetition */
+type EditableElement = HTMLInputElement | HTMLTextAreaElement | (HTMLElement & { isContentEditable: boolean });
+
 /** Platform check used for shortcut detection. */
 const isMac = () => navigator.platform.toUpperCase().includes('MAC');
 
@@ -83,11 +86,7 @@ const isRedo = (e: KeyboardEvent) =>
  * Returns the currently focused editable element (input/textarea/contentEditable)
  * or null when focus is not within an editable.
  */
-function activeEditable():
-  | HTMLInputElement
-  | HTMLTextAreaElement
-  | (HTMLElement & { isContentEditable: boolean })
-  | null {
+function activeEditable(): EditableElement | null {
   const el = document.activeElement as HTMLElement | null;
   if (!el) return null;
   const tag = el.tagName?.toLowerCase();
@@ -128,11 +127,7 @@ async function readClipboardText(): Promise<string> {
 
 /** Best-effort selection extractor for inputs, textareas, and contentEditable. */
 function getSelectedText(): string {
-  const el = activeEditable() as
-    | HTMLInputElement
-    | HTMLTextAreaElement
-    | (HTMLElement & { isContentEditable: boolean })
-    | null;
+  const el = activeEditable() as EditableElement | null;
   if (el && (el as HTMLInputElement).selectionStart !== undefined) {
     const input = el as HTMLInputElement | HTMLTextAreaElement;
     const start = input.selectionStart ?? 0;
@@ -208,11 +203,7 @@ function pasteIntoInput(
  */
 function insertTextAtCaretGeneric(text: string) {
   const el =
-    (activeEditable() as
-      | HTMLInputElement
-      | HTMLTextAreaElement
-      | (HTMLElement & { isContentEditable: boolean })
-      | null) ||
+    (activeEditable() as EditableElement | null) ||
     (document.querySelector(
       'textarea, input:not([type=checkbox]):not([type=radio])'
     ) as HTMLTextAreaElement | HTMLInputElement | null);
@@ -434,11 +425,7 @@ function handleRedoShortcut(e: KeyboardEvent): boolean {
 
 // Helper to handle paste shortcut
 async function handlePasteShortcut(e: KeyboardEvent): Promise<boolean> {
-  const el = activeEditable() as
-    | HTMLInputElement
-    | HTMLTextAreaElement
-    | (HTMLElement & { isContentEditable: boolean })
-    | null;
+  const el = activeEditable() as EditableElement | null;
   if (!el) return false;
 
   e.preventDefault();

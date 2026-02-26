@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { stripAnsi } from 'fancy-ansi';
 
+// Simplified regex patterns to reduce complexity
+const ipv4Pattern = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/;
+const hostnamePattern = /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]+\])/;
+
 const urlPatterns = [
   // Match full URLs with various hostname formats
-  /(https?:\/\/(?:\[[0-9a-f:]+\]|(?:localhost|127\.0\.0\.1|0\.0\.0\.0)|\d{1,3}(?:\.\d{1,3}){3})(?::\d{2,5})?(?:\/\S*)?)/i,
+  /(https?:\/\/(?:\[[0-9a-f:]+\]|localhost|127\.0\.0\.1|0\.0\.0\.0|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d{2,5})?(?:\/\S*)?)/i,
   // Match host:port patterns
-  /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]+\]|(?:\d{1,3}\.){3}\d{1,3}):(\d{2,5})/i,
+  /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]+\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{2,5})/i,
 ];
 
 export type DevserverUrlInfo = {

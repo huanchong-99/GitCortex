@@ -5,6 +5,7 @@ import {
   ReactNode,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 import type {
   OpenInEditorPayload,
@@ -132,10 +133,10 @@ function formatLoc(path: string, line?: number, col?: number) {
 function formatDomBits(ce?: OpenInEditorPayload['clickedElement']) {
   const bits: string[] = [];
   if (ce?.tag) bits.push(ce.tag.toLowerCase());
-  if (ce?.id) bits.push(`#${ce.id}`);
+  if (ce?.id) bits.push(`#${String(ce.id)}`);
   const classes = normalizeClassName(ce?.className);
   if (classes) bits.push(`.${classes}`);
-  if (ce?.role) bits.push(`@${ce.role}`);
+  if (ce?.role) bits.push(`@${String(ce.role)}`);
   return bits.join('') || '(unknown)';
 }
 
@@ -156,10 +157,10 @@ function makeDedupeKey(
 
   const domBits: string[] = [];
   if (ce?.tag) domBits.push(ce.tag.toLowerCase());
-  if (ce?.id) domBits.push(`#${ce.id}`);
+  if (ce?.id) domBits.push(`#${String(ce.id)}`);
   const normalizedClasses = normalizeClassName(ce?.className);
   if (normalizedClasses) domBits.push(`.${normalizedClasses}`);
-  if (ce?.role) domBits.push(`@${ce.role}`);
+  if (ce?.role) domBits.push(`@${String(ce.role)}`);
 
   const locKey = [
     rel,
@@ -413,17 +414,21 @@ export function ClickedElementsProvider({
     return header + body;
   }, [elements, workspaceRoot]);
 
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      elements,
+      addElement,
+      removeElement,
+      clearElements,
+      selectComponent,
+      generateMarkdown,
+    }),
+    [elements, addElement, removeElement, clearElements, selectComponent, generateMarkdown]
+  );
+
   return (
-    <ClickedElementsContext.Provider
-      value={{
-        elements,
-        addElement,
-        removeElement,
-        clearElements,
-        selectComponent,
-        generateMarkdown,
-      }}
-    >
+    <ClickedElementsContext.Provider value={contextValue}>
       {children}
     </ClickedElementsContext.Provider>
   );

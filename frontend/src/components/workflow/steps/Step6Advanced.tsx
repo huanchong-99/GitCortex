@@ -63,12 +63,12 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
     updateOrchestrator({ modelConfigId });
   };
 
-  const handleErrorTerminalEnabledChange = (enabled: boolean) => {
-    if (!enabled) {
-      updateErrorTerminal({ enabled, cliTypeId: undefined, modelConfigId: undefined });
-    } else {
-      updateErrorTerminal({ enabled });
-    }
+  const handleErrorTerminalEnable = () => {
+    updateErrorTerminal({ enabled: true });
+  };
+
+  const handleErrorTerminalDisable = () => {
+    updateErrorTerminal({ enabled: false, cliTypeId: undefined, modelConfigId: undefined });
   };
 
   const handleErrorTerminalCliChange = (cliTypeId: string) => {
@@ -149,7 +149,11 @@ export const Step6Advanced: React.FC<Step6AdvancedProps> = ({
             id="errorTerminalEnabled"
             checked={advancedConfig.errorTerminal.enabled}
             onChange={(e) => {
-              handleErrorTerminalEnabledChange(e.target.checked);
+              if (e.target.checked) {
+                handleErrorTerminalEnable();
+              } else {
+                handleErrorTerminalDisable();
+              }
             }}
             className="size-icon-sm accent-brand"
           />

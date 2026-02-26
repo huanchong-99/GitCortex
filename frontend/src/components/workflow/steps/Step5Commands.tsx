@@ -358,12 +358,12 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
   );
 
   // Handlers
-  const handleEnabledChange = (enabled: boolean) => {
-    if (enabled) {
-      onUpdate({ enabled: true });
-    } else {
-      onUpdate({ enabled: false, presetIds: [] });
-    }
+  const handleEnable = () => {
+    onUpdate({ enabled: true });
+  };
+
+  const handleDisable = () => {
+    onUpdate({ enabled: false, presetIds: [] });
   };
 
   const addPreset = (presetId: string) => {
@@ -479,9 +479,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
               type="radio"
               name="commandsEnabled"
               checked={config.enabled}
-              onChange={() => {
-                handleEnabledChange(true);
-              }}
+              onChange={handleEnable}
               className="size-icon-sm accent-brand"
             />
             <span className="text-base text-normal">
@@ -493,9 +491,7 @@ export const Step5Commands: React.FC<Step5CommandsProps> = ({
               type="radio"
               name="commandsEnabled"
               checked={!config.enabled}
-              onChange={() => {
-                handleEnabledChange(false);
-              }}
+              onChange={handleDisable}
               className="size-icon-sm accent-brand"
             />
             <span className="text-base text-normal">

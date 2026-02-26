@@ -43,6 +43,7 @@ export function ToastProvider({ children }: Readonly<ToastProviderProps>) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  // Memoize the context value to prevent unnecessary re-renders
   const value = React.useMemo(
     () => ({ toasts, showToast, dismissToast }),
     [toasts, showToast, dismissToast]

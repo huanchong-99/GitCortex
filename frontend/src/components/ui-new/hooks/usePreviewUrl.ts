@@ -7,11 +7,12 @@ export interface PreviewUrlInfo {
   scheme: 'http' | 'https';
 }
 
+// Simplified regex patterns to reduce complexity
 const urlPatterns = [
   // Full URL pattern (e.g., http://localhost:3000, https://127.0.0.1:8080)
-  /(https?:\/\/(?:\[[0-9a-f:]+\]|(?:localhost|127\.0\.0\.1|0\.0\.0\.0)|\d{1,3}(?:\.\d{1,3}){3})(?::\d{2,5})?(?:\/\S*)?)/i,
+  /(https?:\/\/(?:\[[0-9a-f:]+\]|localhost|127\.0\.0\.1|0\.0\.0\.0|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::\d{2,5})?(?:\/\S*)?)/i,
   // Host:port pattern (e.g., localhost:3000, 0.0.0.0:8080)
-  /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]+\]|(?:\d{1,3}\.){3}\d{1,3}):(\d{2,5})/i,
+  /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]+\]|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{2,5})/i,
 ];
 
 // Get the hostname from the current browser location, falling back to 'localhost'
