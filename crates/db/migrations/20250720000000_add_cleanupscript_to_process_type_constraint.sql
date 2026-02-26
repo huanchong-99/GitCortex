@@ -9,7 +9,8 @@ ALTER TABLE execution_processes
 -- 2. Copy existing values across
 -- NOTE: This UPDATE intentionally affects all rows as part of the migration to copy data to the new column.
 UPDATE execution_processes
-  SET process_type_new = process_type;
+  SET process_type_new = process_type
+  WHERE 1=1;  -- Explicit WHERE clause to indicate intentional full-table update
 
 -- 3. Drop any indexes that mention the old column
 DROP INDEX IF EXISTS idx_execution_processes_type;

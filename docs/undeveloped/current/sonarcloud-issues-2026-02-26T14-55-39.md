@@ -162,7 +162,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 4.1 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 4.1 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe6ZZ9DOUQdEsGpl`
 - **项目**: huanchong-99
