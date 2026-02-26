@@ -608,8 +608,8 @@ function extractWorkflowIdFromMessage(message: WsMessage): string | null {
 const LEGACY_CONNECTION_ID = '__legacy__';
 
 function buildWorkflowEventsUrl(workflowId: string): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host;
+  const protocol = globalThis.window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = globalThis.window.location.host;
   return `${protocol}//${host}/api/ws/workflow/${workflowId}/events`;
 }
 
