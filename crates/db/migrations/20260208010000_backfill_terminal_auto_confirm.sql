@@ -6,15 +6,17 @@ SET auto_confirm = 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE auto_confirm = 0;
 
--- NOTE: EXISTS subquery is acceptable here for a one-time migration to clean up orphaned foreign key references.
+-- Clean up orphaned foreign key references using LEFT JOIN instead of EXISTS.
 UPDATE terminal
-SET vk_session_id = NULL
-WHERE vk_session_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1
-      FROM sessions
-      WHERE sessions.id = terminal.vk_session_id
-  );
+SET vk_session_id = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id IN (
+    SELECT t.id
+    FROM terminal t
+    LEFT JOIN sessions s ON s.id = t.vk_session_id
+    WHERE t.vk_session_id IS NOT NULL
+      AND s.id IS NULL
+);
 
 DROP INDEX IF EXISTS idx_terminal_auto_confirm;
 
