@@ -1,6 +1,69 @@
 import type { Diff } from 'shared/types';
 import type { TreeNode } from '@/components/ui-new/types/fileTree';
 
+// Helper to create a tree node
+function createTreeNode(
+  path: string,
+  name: string,
+  isFile: boolean,
+  diff?: Diff
+): TreeNode {
+  const node: TreeNode = {
+    id: path,
+    name,
+    path,
+    type: isFile ? 'file' : 'folder',
+    children: isFile ? undefined : [],
+  };
+
+  if (isFile && diff) {
+    node.diff = diff;
+    node.changeKind = diff.change;
+    node.additions = diff.additions;
+    node.deletions = diff.deletions;
+  }
+
+  return node;
+}
+
+// Helper to build child map from existing children
+function buildChildMap(children: TreeNode[]): Map<string, TreeNode> {
+  const childMap = new Map<string, TreeNode>();
+  for (const child of children) {
+    childMap.set(child.name, child);
+  }
+  return childMap;
+}
+
+// Helper to process next level in tree
+function processNextLevel(
+  node: TreeNode,
+  parts: string[],
+  currentIndex: number,
+  diff: Diff
+): Map<string, TreeNode> {
+  if (!node.children) {
+    return new Map();
+  }
+
+  const childMap = buildChildMap(node.children);
+  const nextIndex = currentIndex + 1;
+
+  if (nextIndex < parts.length) {
+    const nextPart = parts[nextIndex];
+    const nextPath = parts.slice(0, nextIndex + 1).join('/');
+    const nextIsFile = nextIndex === parts.length - 1;
+
+    if (!childMap.has(nextPart)) {
+      const nextNode = createTreeNode(nextPath, nextPart, nextIsFile, nextIsFile ? diff : undefined);
+      childMap.set(nextPart, nextNode);
+      node.children.push(nextNode);
+    }
+  }
+
+  return childMap;
+}
+
 /**
  * Transforms flat Diff[] into hierarchical TreeNode[]
  */
@@ -21,61 +84,14 @@ export function buildFileTree(diffs: Diff[]): TreeNode[] {
       const currentPath = parts.slice(0, i + 1).join('/');
 
       if (!currentMap.has(part)) {
-        const node: TreeNode = {
-          id: currentPath,
-          name: part,
-          path: currentPath,
-          type: isFile ? 'file' : 'folder',
-          children: isFile ? undefined : [],
-        };
-
-        if (isFile) {
-          node.diff = diff;
-          node.changeKind = diff.change;
-          node.additions = diff.additions;
-          node.deletions = diff.deletions;
-        }
-
+        const node = createTreeNode(currentPath, part, isFile, isFile ? diff : undefined);
         currentMap.set(part, node);
       }
 
       const node = currentMap.get(part)!;
 
       if (!isFile && node.children) {
-        // Build map for next level from existing children
-        const childMap = new Map<string, TreeNode>();
-        for (const child of node.children) {
-          childMap.set(child.name, child);
-        }
-
-        // Process remaining parts, then sync back to children array
-        if (i < parts.length - 1) {
-          const nextPart = parts[i + 1];
-          const nextPath = parts.slice(0, i + 2).join('/');
-          const nextIsFile = i + 1 === parts.length - 1;
-
-          if (!childMap.has(nextPart)) {
-            const nextNode: TreeNode = {
-              id: nextPath,
-              name: nextPart,
-              path: nextPath,
-              type: nextIsFile ? 'file' : 'folder',
-              children: nextIsFile ? undefined : [],
-            };
-
-            if (nextIsFile) {
-              nextNode.diff = diff;
-              nextNode.changeKind = diff.change;
-              nextNode.additions = diff.additions;
-              nextNode.deletions = diff.deletions;
-            }
-
-            childMap.set(nextPart, nextNode);
-            node.children.push(nextNode);
-          }
-
-          currentMap = childMap;
-        }
+        currentMap = processNextLevel(node, parts, i, diff);
       }
     }
   }

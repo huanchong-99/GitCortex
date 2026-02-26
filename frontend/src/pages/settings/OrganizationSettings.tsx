@@ -45,6 +45,203 @@ import { isRemoteProjectCapabilityUnsupported } from './organizationRemoteCapabi
 
 const REMOTE_PROJECT_API_UNSUPPORTED_STATUS = 501;
 
+// Helper component for invitation list content
+function InvitationListContent({
+  loadingInvitations,
+  invitations,
+  onRevoke,
+  isRevoking,
+  t,
+}: {
+  loadingInvitations: boolean;
+  invitations: any[];
+  onRevoke: (id: string) => void;
+  isRevoking: boolean;
+  t: any;
+}) {
+  if (loadingInvitations) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="ml-2">{t('invitationList.loading')}</span>
+      </div>
+    );
+  }
+
+  if (invitations.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        {t('invitationList.none')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {invitations.map((invitation) => (
+        <PendingInvitationItem
+          key={invitation.id}
+          invitation={invitation}
+          onRevoke={onRevoke}
+          isRevoking={isRevoking}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Helper component for member list content
+function MemberListContent({
+  loadingMembers,
+  members,
+  currentUserId,
+  isAdmin,
+  onRemove,
+  onRoleChange,
+  isRemoving,
+  isRoleChanging,
+  t,
+}: {
+  loadingMembers: boolean;
+  members: any[];
+  currentUserId: string | null;
+  isAdmin: boolean;
+  onRemove: (userId: string) => void;
+  onRoleChange: (userId: string, role: MemberRole) => void;
+  isRemoving: boolean;
+  isRoleChanging: boolean;
+  t: any;
+}) {
+  if (loadingMembers) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="ml-2">{t('memberList.loading')}</span>
+      </div>
+    );
+  }
+
+  if (members.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        {t('memberList.none')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {members.map((member) => (
+        <MemberListItem
+          key={member.user_id}
+          member={member}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onRemove={onRemove}
+          onRoleChange={onRoleChange}
+          isRemoving={isRemoving}
+          isRoleChanging={isRoleChanging}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Helper component for remote projects content
+function RemoteProjectsContent({
+  loadingProjects,
+  loadingRemoteProjects,
+  isRemoteProjectUnsupported,
+  remoteProjectsError,
+  remoteProjects,
+  allProjects,
+  availableLocalProjects,
+  onLink,
+  onUnlink,
+  isLinking,
+  isUnlinking,
+  remoteProjectUnsupportedMessage,
+  loadRemoteProjectsErrorMessage,
+  t,
+}: {
+  loadingProjects: boolean;
+  loadingRemoteProjects: boolean;
+  isRemoteProjectUnsupported: boolean;
+  remoteProjectsError: any;
+  remoteProjects: any[];
+  allProjects: any[];
+  availableLocalProjects: any[];
+  onLink: (remoteId: string, localId: string) => void;
+  onUnlink: (projectId: string) => void;
+  isLinking: boolean;
+  isUnlinking: boolean;
+  remoteProjectUnsupportedMessage: string;
+  loadRemoteProjectsErrorMessage: string;
+  t: any;
+}) {
+  if (loadingProjects || loadingRemoteProjects) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="ml-2">{t('sharedProjects.loading')}</span>
+      </div>
+    );
+  }
+
+  if (isRemoteProjectUnsupported) {
+    return (
+      <Alert>
+        <AlertDescription>{remoteProjectUnsupportedMessage}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (remoteProjectsError) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {remoteProjectsError instanceof Error
+            ? remoteProjectsError.message
+            : loadRemoteProjectsErrorMessage}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (remoteProjects.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        {t('sharedProjects.noProjects')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {remoteProjects.map((remoteProject) => {
+        const linkedLocalProject = allProjects.find(
+          (p) => p.remoteProjectId === remoteProject.id
+        );
+
+        return (
+          <RemoteProjectItem
+            key={remoteProject.id}
+            remoteProject={remoteProject}
+            linkedLocalProject={linkedLocalProject}
+            availableLocalProjects={availableLocalProjects}
+            onLink={onLink}
+            onUnlink={onUnlink}
+            isLinking={isLinking}
+            isUnlinking={isUnlinking}
+            disabled={isRemoteProjectUnsupported}
+            disabledReason={remoteProjectUnsupportedMessage}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function OrganizationSettings() {
   const { t } = useTranslation('organization');
   const {
@@ -429,35 +626,13 @@ export function OrganizationSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {(() => {
-              if (loadingInvitations) {
-                return (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="ml-2">{t('invitationList.loading')}</span>
-                  </div>
-                );
-              } else if (invitations.length === 0) {
-                return (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {t('invitationList.none')}
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="space-y-3">
-                    {invitations.map((invitation) => (
-                      <PendingInvitationItem
-                        key={invitation.id}
-                        invitation={invitation}
-                        onRevoke={handleRevokeInvitation}
-                        isRevoking={revokeInvitation.isPending}
-                      />
-                    ))}
-                  </div>
-                );
-              }
-            })()}
+            <InvitationListContent
+              loadingInvitations={loadingInvitations}
+              invitations={invitations}
+              onRevoke={handleRevokeInvitation}
+              isRevoking={revokeInvitation.isPending}
+              t={t}
+            />
           </CardContent>
         </Card>
       )}
@@ -483,39 +658,17 @@ export function OrganizationSettings() {
             </div>
           </CardHeader>
           <CardContent>
-            {(() => {
-              if (loadingMembers) {
-                return (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="ml-2">{t('memberList.loading')}</span>
-                  </div>
-                );
-              } else if (members.length === 0) {
-                return (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {t('memberList.none')}
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="space-y-3">
-                    {members.map((member) => (
-                      <MemberListItem
-                        key={member.user_id}
-                        member={member}
-                        currentUserId={currentUserId}
-                        isAdmin={isAdmin}
-                        onRemove={handleRemoveMember}
-                        onRoleChange={handleRoleChange}
-                        isRemoving={removeMember.isPending}
-                        isRoleChanging={updateMemberRole.isPending}
-                      />
-                    ))}
-                  </div>
-                );
-              }
-            })()}
+            <MemberListContent
+              loadingMembers={loadingMembers}
+              members={members}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+              onRemove={handleRemoveMember}
+              onRoleChange={handleRoleChange}
+              isRemoving={removeMember.isPending}
+              isRoleChanging={updateMemberRole.isPending}
+              t={t}
+            />
           </CardContent>
         </Card>
       )}
@@ -529,66 +682,22 @@ export function OrganizationSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {(() => {
-              if (loadingProjects || loadingRemoteProjects) {
-                return (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="ml-2">{t('sharedProjects.loading')}</span>
-                  </div>
-                );
-              } else if (isRemoteProjectUnsupported) {
-                return (
-                  <Alert>
-                    <AlertDescription>
-                      {remoteProjectUnsupportedMessage}
-                    </AlertDescription>
-                  </Alert>
-                );
-              } else if (remoteProjectsError) {
-                return (
-                  <Alert variant="destructive">
-                    <AlertDescription>
-                      {remoteProjectsError instanceof Error
-                        ? remoteProjectsError.message
-                        : loadRemoteProjectsErrorMessage}
-                    </AlertDescription>
-                  </Alert>
-                );
-              } else if (remoteProjects.length === 0) {
-                return (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {t('sharedProjects.noProjects')}
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="space-y-3">
-                    {remoteProjects.map((remoteProject) => {
-                      // Find the local project linked to this remote project
-                      const linkedLocalProject = allProjects.find(
-                        (p) => p.remoteProjectId === remoteProject.id
-                      );
-
-                      return (
-                        <RemoteProjectItem
-                          key={remoteProject.id}
-                          remoteProject={remoteProject}
-                          linkedLocalProject={linkedLocalProject}
-                          availableLocalProjects={availableLocalProjects}
-                          onLink={handleLinkProject}
-                          onUnlink={handleUnlinkProject}
-                          isLinking={linkToExisting.isPending}
-                          isUnlinking={unlinkProject.isPending}
-                          disabled={isRemoteProjectUnsupported}
-                          disabledReason={remoteProjectUnsupportedMessage}
-                        />
-                      );
-                    })}
-                  </div>
-                );
-              }
-            })()}
+            <RemoteProjectsContent
+              loadingProjects={loadingProjects}
+              loadingRemoteProjects={loadingRemoteProjects}
+              isRemoteProjectUnsupported={isRemoteProjectUnsupported}
+              remoteProjectsError={remoteProjectsError}
+              remoteProjects={remoteProjects}
+              allProjects={allProjects}
+              availableLocalProjects={availableLocalProjects}
+              onLink={handleLinkProject}
+              onUnlink={handleUnlinkProject}
+              isLinking={linkToExisting.isPending}
+              isUnlinking={unlinkProject.isPending}
+              remoteProjectUnsupportedMessage={remoteProjectUnsupportedMessage}
+              loadRemoteProjectsErrorMessage={loadRemoteProjectsErrorMessage}
+              t={t}
+            />
           </CardContent>
         </Card>
       )}

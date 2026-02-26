@@ -12992,7 +12992,7 @@
 
 > 该文件共有 **11** 个问题
 
-### 305.1 Refactor this function to reduce its Cognitive Complexity from 29 to the 15 allowed.
+### 305.1 Refactor this function to reduce its Cognitive Complexity from 29 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGkx`
 - **项目**: huanchong-99
@@ -13796,7 +13796,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 318.1 Refactor this function to reduce its Cognitive Complexity from 55 to the 15 allowed.
+### 318.1 Refactor this function to reduce its Cognitive Complexity from 55 to the 15 allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwe1fZ9DOUQdEsGnf`
 - **项目**: huanchong-99
