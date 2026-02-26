@@ -96,7 +96,7 @@ export function WorkspacesLayout() {
     const seenFeatures = config?.showcases?.seen_features ?? [];
     if (configLoading || seenFeatures.includes(WORKSPACES_GUIDE_ID)) return;
 
-    void updateAndSaveConfig({
+    updateAndSaveConfig({
       showcases: { seen_features: [...seenFeatures, WORKSPACES_GUIDE_ID] },
     });
     WorkspacesGuideDialog.show().finally(() => WorkspacesGuideDialog.hide());

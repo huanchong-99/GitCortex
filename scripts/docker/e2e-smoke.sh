@@ -7,7 +7,7 @@ COMPOSE_FILE="docker/compose/docker-compose.dev.yml"
 BASE_URL="http://localhost:23456"
 MAX_WAIT=120
 
-cleanup() { docker compose -f "$COMPOSE_FILE" down 2>/dev/null; }
+cleanup() { docker compose -f "$COMPOSE_FILE" down 2>/dev/null; return 0; }
 trap cleanup EXIT
 
 echo "Building and starting container..."

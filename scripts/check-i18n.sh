@@ -105,7 +105,7 @@ check_key_consistency() {
   while IFS= read -r ns; do
     namespaces+=("$ns")
   done < <(find "$locales_dir/en" -maxdepth 1 -type f -name "*.json" -exec basename {} .json \; 2>/dev/null | LC_ALL=C sort)
-  
+
   # Compute languages from locales
   local languages=()
   while IFS= read -r lang; do
@@ -133,7 +133,7 @@ check_key_consistency() {
       local tgt_keys
       local missing
       local extra
-      
+
       if ! tgt_keys=$(get_json_keys "$tgt_file"); then
         echo "❌ [$lang/$ns] Missing or invalid JSON: $tgt_file"
         echo "   All keys from en/$ns are considered missing."

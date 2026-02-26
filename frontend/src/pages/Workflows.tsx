@@ -431,7 +431,7 @@ export function Workflows() {
       decision={activePromptDecision}
       submitError={promptSubmitError}
       isSubmitting={isSubmittingActivePrompt}
-      onSubmit={(response) => void handleSubmitPromptResponse(response)}
+      onSubmit={(response) => handleSubmitPromptResponse(response)}
     />
   ) : null;
 
@@ -843,7 +843,7 @@ export function Workflows() {
           onTerminalClick={undefined}
           onMergeTerminalClick={
             canTriggerMerge
-              ? () => void handleMergeWorkflow(selectedWorkflowDetail.id)
+              ? () => handleMergeWorkflow(selectedWorkflowDetail.id)
               : undefined
           }
         />
@@ -880,13 +880,13 @@ export function Workflows() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => void handleCreateProject()}>
+            <Button variant="outline" onClick={() => handleCreateProject()}>
               <Plus className="w-4 h-4 mr-2" />
               Create Project
             </Button>
             <Button
               variant="outline"
-              onClick={() => void handleDeleteProject()}
+              onClick={() => handleDeleteProject()}
               disabled={!validProjectId || projects.length <= 1 || isDeletingProject}
             >
               <Trash2 className="w-4 h-4 mr-2" />

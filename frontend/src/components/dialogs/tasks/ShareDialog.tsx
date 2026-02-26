@@ -81,7 +81,7 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
         const result = await OAuthDialog.show();
         // If user successfully authenticated, re-show this dialog
         if (result) {
-          void ShareDialog.show({ task });
+          ShareDialog.show({ task });
         }
         return;
       }
@@ -93,7 +93,7 @@ const ShareDialogImpl = NiceModal.create<ShareDialogProps>(({ task }) => {
     if (!project) return;
     if (!remoteFeaturesEnabled && !systemLoading) return;
 
-    void LinkProjectDialog.show({
+    LinkProjectDialog.show({
       projectId: project.id,
       projectName: project.name,
     });

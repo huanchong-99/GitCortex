@@ -20,7 +20,7 @@ export function useAuthStatus(options: UseAuthStatusOptions) {
   const { isSignedIn } = useAuth();
   useEffect(() => {
     if (!options.enabled) return;
-    void query.refetch();
+    query.refetch();
   }, [isSignedIn, options.enabled, query.refetch]);
 
   return query;

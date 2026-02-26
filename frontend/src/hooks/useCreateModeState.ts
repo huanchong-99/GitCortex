@@ -234,8 +234,8 @@ export function useCreateModeState({
       // Auto-select the first project (sorted by created_at desc)
       const sortedProjects = [...projectsList].sort(
         (a, b) =>
-          new Date(b.createdAt as unknown as string).getTime() -
-          new Date(a.createdAt as unknown as string).getTime()
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
       );
       setSelectedProjectId(sortedProjects[0].id);
     } else {

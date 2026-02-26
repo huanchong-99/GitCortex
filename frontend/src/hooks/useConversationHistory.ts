@@ -185,9 +185,9 @@ export const useConversationHistory = ({
       .sort(
         (a, b) =>
           new Date(
-            a.executionProcess.createdAt as unknown as string
+            a.executionProcess.createdAt
           ).getTime() -
-          new Date(b.executionProcess.createdAt as unknown as string).getTime()
+          new Date(b.executionProcess.createdAt).getTime()
       )
       .flatMap((p) => p.entries);
   };
@@ -216,10 +216,10 @@ export const useConversationHistory = ({
         .sort(
           (a, b) =>
             new Date(
-              a.executionProcess.createdAt as unknown as string
+              a.executionProcess.createdAt
             ).getTime() -
             new Date(
-              b.executionProcess.createdAt as unknown as string
+              b.executionProcess.createdAt
             ).getTime()
         )
         .flatMap((p, index) => {
@@ -489,7 +489,8 @@ export const useConversationHistory = ({
         try {
           await loadRunningAndEmit(executionProcess);
           break;
-        } catch (_) {
+        } catch (error) {
+          console.debug('Failed to load running process, retrying...', error);
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }

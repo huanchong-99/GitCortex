@@ -46,8 +46,8 @@ export function useDevserverPreview(
 
     return devserverProcesses.sort(
       (a, b) =>
-        new Date(b.createdAt as unknown as string).getTime() -
-        new Date(a.createdAt as unknown as string).getTime()
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
     )[0];
   }, [executionProcesses]);
 

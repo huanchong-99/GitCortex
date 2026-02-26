@@ -50,6 +50,32 @@ function useInViewObserver(
   const observerRef = useRef<IntersectionObserver | null>(null);
   const visiblePathsRef = useRef<Set<string>>(new Set());
 
+  // Helper to handle intersection observer entries
+  const handleIntersectionEntries = useCallback((entries: IntersectionObserverEntry[]) => {
+    entries.forEach((entry) => {
+      const path = entry.target.getAttribute('data-diff-path');
+      if (!path) return;
+
+      if (entry.isIntersecting) {
+        visiblePathsRef.current.add(path);
+      } else {
+        visiblePathsRef.current.delete(path);
+      }
+    });
+
+    // Report the first visible path (topmost in the list)
+    if (visiblePathsRef.current.size > 0 && onFileInViewChange) {
+      // Get all visible paths and find the one that appears first in the DOM
+      const allRefs = diffRefs.current;
+      for (const [path] of allRefs) {
+        if (visiblePathsRef.current.has(path)) {
+          onFileInViewChange(path);
+          break;
+        }
+      }
+    }
+  }, [diffRefs, onFileInViewChange]);
+
   useEffect(() => {
     if (!onFileInViewChange) return;
 
@@ -59,30 +85,7 @@ function useInViewObserver(
 
       // Create observer that tracks which diffs are in the top portion of the container
       observerRef.current = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            const path = entry.target.getAttribute('data-diff-path');
-            if (!path) return;
-
-            if (entry.isIntersecting) {
-              visiblePathsRef.current.add(path);
-            } else {
-              visiblePathsRef.current.delete(path);
-            }
-          });
-
-          // Report the first visible path (topmost in the list)
-          if (visiblePathsRef.current.size > 0) {
-            // Get all visible paths and find the one that appears first in the DOM
-            const allRefs = diffRefs.current;
-            for (const [path] of allRefs) {
-              if (visiblePathsRef.current.has(path)) {
-                onFileInViewChange(path);
-                break;
-              }
-            }
-          }
-        },
+        handleIntersectionEntries,
         {
           // Use the scrollable container as root (null = viewport)
           root: containerRef.current,
@@ -106,7 +109,7 @@ function useInViewObserver(
     return () => {
       observerRef.current?.disconnect();
     };
-  }, [onFileInViewChange, diffRefs, containerRef]);
+  }, [onFileInViewChange, diffRefs, containerRef, handleIntersectionEntries]);
 
   // Callback to observe/unobserve elements
   const observeElement = useCallback(

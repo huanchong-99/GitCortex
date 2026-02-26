@@ -54,8 +54,8 @@ export const useExecutionProcesses = (
   const executionProcessesById = data?.execution_processes || {};
   const executionProcesses = Object.values(executionProcessesById).sort(
     (a, b) =>
-      new Date(a.createdAt as unknown as string).getTime() -
-      new Date(b.createdAt as unknown as string).getTime()
+      new Date(a.createdAt).getTime() -
+      new Date(b.createdAt).getTime()
   );
   const isAttemptRunning = executionProcesses.some(
     (process) =>

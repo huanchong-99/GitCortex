@@ -57,6 +57,7 @@ const buildOptimizedImageUrl = (rawUrl?: string | null) => {
     url.searchParams.set('quality', '80');
     return url.toString();
   } catch (error) {
+    console.debug('Invalid image URL, using fallback', error);
     const separator = rawUrl.includes('?') ? '&' : '?';
     return `${rawUrl}${separator}width=64&height=64&fit=crop&quality=80`;
   }

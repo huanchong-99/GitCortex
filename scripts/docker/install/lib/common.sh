@@ -9,14 +9,15 @@ readonly _GITCORTEX_COMMON_SH_LOADED=1
 
 # --- Logging ---
 
-log_info()  { printf '[INFO]  %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
-log_warn()  { printf '[WARN]  %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
-log_error() { printf '[ERROR] %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
+log_info()  { printf '[INFO]  %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; return 0; }
+log_warn()  { printf '[WARN]  %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; return 0; }
+log_error() { printf '[ERROR] %s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; return 0; }
 
 # --- Utilities ---
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || { log_error "Required command not found: $1"; exit 1; }
+    return 0
 }
 
 # --- npm install with retry + exponential backoff ---
@@ -24,6 +25,7 @@ require_command() {
 sha512_sri_for_file() {
     local file_path="$1"
     node -e 'const fs=require("fs");const crypto=require("crypto");const buf=fs.readFileSync(process.argv[1]);process.stdout.write("sha512-"+crypto.createHash("sha512").update(buf).digest("base64"));' "$file_path"
+    return 0
 }
 
 npm_install_global() {

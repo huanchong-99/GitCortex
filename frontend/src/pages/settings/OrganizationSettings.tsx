@@ -228,7 +228,7 @@ export function OrganizationSettings() {
         setTimeout(() => setSuccess(null), 3000);
       }
     } catch (err) {
-      // Dialog error
+      console.debug('Organization dialog cancelled or error occurred', err);
     }
   };
 
@@ -246,7 +246,7 @@ export function OrganizationSettings() {
         setTimeout(() => setSuccess(null), 3000);
       }
     } catch (err) {
-      // Dialog error
+      console.debug('Organization dialog cancelled or error occurred', err);
     }
   };
 

@@ -159,6 +159,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       );
       setAvailableModels(models);
     } catch (error) {
+      console.debug('Failed to fetch models, using defaults', error);
       // Fallback to default models on error
       const defaultModels = API_TYPES[formData.apiType].defaultModels;
       setAvailableModels([...defaultModels]);
@@ -203,6 +204,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
         setFormErrors({ verify: t('step3.errors.verifyFailed') });
       }
     } catch (error) {
+      console.error('Model verification failed', error);
       setIsFormVerified(false);
       setFormErrors({ verify: t('step3.errors.verifyFailed') });
     } finally {

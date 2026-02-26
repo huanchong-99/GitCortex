@@ -41,6 +41,7 @@ Examples:
   $0 --apply --db ./gitcortex.db --yes
   $0 ./gitcortex.db
 EOF
+  return 0
 }
 
 while [[ $# -gt 0 ]]; do
@@ -109,15 +110,18 @@ extract_sql_section() {
     $0 == "-- " section "-END"   { in_section=0; next }
     in_section { print }
   ' "$SQL_FILE"
+  return 0
 }
 
 run_sql_section() {
   local section="$1"
   extract_sql_section "$section" | sqlite3 -header -column "$DB_PATH"
+  return 0
 }
 
 count_pending() {
   sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM terminal WHERE auto_confirm = 0;"
+  return 0
 }
 
 echo "📦 Database: $DB_PATH"

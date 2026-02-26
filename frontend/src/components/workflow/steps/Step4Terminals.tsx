@@ -190,11 +190,11 @@ export const Step4Terminals: React.FC<Step4TerminalsProps> = ({
   }, [notifyError]);
 
   useEffect(() => {
-    void detectCliTypes();
+    detectCliTypes();
   }, [detectCliTypes]);
 
   const handleRefreshCli = () => {
-    void detectCliTypes(true);
+    detectCliTypes(true);
   };
 
   const updateTerminal = (terminalId: string, updates: Partial<TerminalConfig>) => {

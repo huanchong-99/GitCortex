@@ -48,11 +48,11 @@ function labelAndIcon(diff: Diff) {
   if (c === 'deleted') return { label: 'Deleted', Icon: Trash2 };
   if (c === 'renamed') return { label: 'Renamed', Icon: ArrowLeftRight };
   if (c === 'added')
-    return { label: undefined as string | undefined, Icon: FilePlus2 };
+    return { label: undefined, Icon: FilePlus2 };
   if (c === 'copied') return { label: 'Copied', Icon: Copy };
   if (c === 'permissionChange')
     return { label: 'Permission Changed', Icon: Key };
-  return { label: undefined as string | undefined, Icon: PencilLine };
+  return { label: undefined, Icon: PencilLine };
 }
 
 function readPlainLine(

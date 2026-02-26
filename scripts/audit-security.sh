@@ -8,11 +8,13 @@ failures=0
 
 note() {
   echo "==> $*"
+  return 0
 }
 
 fail() {
   echo "FAIL: $*"
   failures=$((failures + 1))
+  return 0
 }
 
 SEARCH_TOOL="rg"
@@ -28,6 +30,7 @@ search() {
   else
     grep -R -n -E "$pattern" "$@"
   fi
+  return 0
 }
 
 note "Check: API key encryption"

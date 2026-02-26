@@ -89,7 +89,7 @@ function GitOperations({
         await handleChangeTargetBranchClick(result.branchName);
       }
     } catch (error) {
-      // User cancelled - do nothing
+      console.debug('User cancelled branch change dialog', error);
     }
   };
 
@@ -241,7 +241,7 @@ function GitOperations({
         );
       }
     } catch (error) {
-      // User cancelled - do nothing
+      console.debug('User cancelled branch change dialog', error);
     }
   };
 

@@ -27,8 +27,8 @@ export function useProjects(): UseProjectsResult {
   const projects = useMemo(() => {
     return Object.values(projectsById).sort(
       (a, b) =>
-        new Date(b.createdAt as unknown as string).getTime() -
-        new Date(a.createdAt as unknown as string).getTime()
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
     );
   }, [projectsById]);
 

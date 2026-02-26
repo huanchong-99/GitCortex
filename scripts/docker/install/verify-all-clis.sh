@@ -16,12 +16,14 @@ check_required() {
     else
         REQUIRED_FAIL=$((REQUIRED_FAIL + 1))
     fi
+    return 0
 }
 
 check_optional() {
     local name="$1"; shift
     TOTAL=$((TOTAL + 1))
     if verify_cli "$name" "$@"; then OK=$((OK + 1)); fi
+    return 0
 }
 
 check_required "Claude Code"  claude --version

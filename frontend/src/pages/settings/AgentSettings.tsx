@@ -173,7 +173,7 @@ export function AgentSettings() {
         );
       }
     } catch (error) {
-      // User cancelled - do nothing
+      console.debug('User cancelled configuration creation', error);
     }
   };
 
@@ -221,7 +221,7 @@ export function AgentSettings() {
         await handleDeleteConfiguration(configName);
       }
     } catch (error) {
-      // User cancelled - do nothing
+      console.debug('User cancelled configuration creation', error);
     }
   };
 
@@ -313,6 +313,7 @@ export function AgentSettings() {
         const parsed = JSON.parse(value);
         setLocalParsedProfiles(parsed);
       } catch (err) {
+        console.debug('Invalid JSON in profiles editor', err);
         // Invalid JSON, keep local content but clear parsed
         setLocalParsedProfiles(null);
       }

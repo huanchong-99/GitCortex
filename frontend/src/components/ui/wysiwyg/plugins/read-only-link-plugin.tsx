@@ -34,6 +34,35 @@ function isExternalHref(href?: string): boolean {
 }
 
 /**
+ * Apply security attributes to a link element
+ */
+function applyLinkSecurity(link: HTMLAnchorElement, href: string | null) {
+  const safeHref = sanitizeHref(href ?? undefined);
+
+  if (!safeHref) {
+    link.removeAttribute('href');
+    link.style.cursor = 'not-allowed';
+    link.style.pointerEvents = 'none';
+    return;
+  }
+
+  const isExternal = isExternalHref(safeHref);
+
+  if (isExternal) {
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+    link.onclick = (e) => e.stopPropagation();
+  } else {
+    link.removeAttribute('href');
+    link.style.cursor = 'not-allowed';
+    link.style.pointerEvents = 'none';
+    link.setAttribute('role', 'link');
+    link.setAttribute('aria-disabled', 'true');
+    link.title = href ?? '';
+  }
+}
+
+/**
  * Plugin that handles link sanitization and security attributes in read-only mode.
  * - Blocks dangerous protocols (javascript:, vbscript:, data:)
  * - External HTTPS links: clickable with target="_blank" and rel="noopener noreferrer"
@@ -54,32 +83,7 @@ export function ReadOnlyLinkPlugin() {
           if (!dom || !(dom instanceof HTMLAnchorElement)) continue;
 
           const href = dom.getAttribute('href');
-          const safeHref = sanitizeHref(href ?? undefined);
-
-          if (!safeHref) {
-            // Dangerous protocol - remove href entirely
-            dom.removeAttribute('href');
-            dom.style.cursor = 'not-allowed';
-            dom.style.pointerEvents = 'none';
-            continue;
-          }
-
-          const isExternal = isExternalHref(safeHref);
-
-          if (isExternal) {
-            // External HTTPS link - add security attributes
-            dom.setAttribute('target', '_blank');
-            dom.setAttribute('rel', 'noopener noreferrer');
-            dom.onclick = (e) => e.stopPropagation();
-          } else {
-            // Internal/relative link - disable clicking
-            dom.removeAttribute('href');
-            dom.style.cursor = 'not-allowed';
-            dom.style.pointerEvents = 'none';
-            dom.setAttribute('role', 'link');
-            dom.setAttribute('aria-disabled', 'true');
-            dom.title = href ?? '';
-          }
+          applyLinkSecurity(dom, href);
         }
       }
     );
@@ -92,29 +96,7 @@ export function ReadOnlyLinkPlugin() {
       const links = root.querySelectorAll('a');
       links.forEach((link) => {
         const href = link.getAttribute('href');
-        const safeHref = sanitizeHref(href ?? undefined);
-
-        if (!safeHref) {
-          link.removeAttribute('href');
-          link.style.cursor = 'not-allowed';
-          link.style.pointerEvents = 'none';
-          return;
-        }
-
-        const isExternal = isExternalHref(safeHref);
-
-        if (isExternal) {
-          link.setAttribute('target', '_blank');
-          link.setAttribute('rel', 'noopener noreferrer');
-          link.onclick = (e) => e.stopPropagation();
-        } else {
-          link.removeAttribute('href');
-          link.style.cursor = 'not-allowed';
-          link.style.pointerEvents = 'none';
-          link.setAttribute('role', 'link');
-          link.setAttribute('aria-disabled', 'true');
-          link.title = href ?? '';
-        }
+        applyLinkSecurity(link, href);
       });
     });
 

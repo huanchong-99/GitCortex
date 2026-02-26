@@ -323,7 +323,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
   // Keyboard shortcuts
   const primaryAction = useCallback(() => {
     if (isSubmitting || !canSubmit) return;
-    void form.handleSubmit();
+    form.handleSubmit();
   }, [form, isSubmitting, canSubmit]);
 
   const shortcutsEnabled =

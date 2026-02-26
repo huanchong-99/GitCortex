@@ -278,7 +278,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
       autoStartedRef.current.delete(selectedTerminalId);
       forceUpdate({});
       // Start the terminal
-      void startTerminal(selectedTerminalId);
+      startTerminal(selectedTerminalId);
     }
   }, [selectedTerminal?.status, selectedTerminalId, shouldAutoRecoverTerminal, startTerminal]);
 
@@ -292,7 +292,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
     if (autoStartedRef.current.has(selectedTerminalId)) return;
 
     // Note: autoStartedRef is updated inside startTerminal after confirming it can start
-    void startTerminal(selectedTerminalId);
+    startTerminal(selectedTerminalId);
   }, [selectedTerminalId, selectedTerminal?.status, startTerminal]);
 
   // Clear ready state and autoStarted when terminal status changes to failed or not_started
@@ -325,7 +325,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
       return;
     }
 
-    void loadTerminalHistory(selectedTerminalId);
+    loadTerminalHistory(selectedTerminalId);
   }, [
     historyByTerminalId,
     isHistoricalTerminalStatus,
@@ -450,7 +450,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
                                   if (!selectedTerminalId) {
                                     return;
                                   }
-                                  void loadTerminalHistory(selectedTerminalId);
+                                  loadTerminalHistory(selectedTerminalId);
                                 }}
                               >
                                 {t('terminalDebug.reloadHistory', {
