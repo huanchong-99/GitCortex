@@ -152,7 +152,7 @@ export function DiffViewCard({
   onToggle,
   status,
   className,
-}: DiffViewCardProps) {
+}: Readonly<DiffViewCardProps>) {
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
   const {

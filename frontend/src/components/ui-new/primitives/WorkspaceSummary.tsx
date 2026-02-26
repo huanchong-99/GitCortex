@@ -55,7 +55,7 @@ export function WorkspaceSummary({
   className,
   summary = false,
   isDraft = false,
-}: WorkspaceSummaryProps) {
+}: Readonly<WorkspaceSummaryProps>) {
   const { t } = useTranslation('common');
   const hasChanges = filesChanged !== undefined && filesChanged > 0;
   const isFailed =

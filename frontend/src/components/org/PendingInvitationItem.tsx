@@ -15,7 +15,7 @@ export function PendingInvitationItem({
   invitation,
   onRevoke,
   isRevoking,
-}: PendingInvitationItemProps) {
+}: Readonly<PendingInvitationItemProps>) {
   const { t } = useTranslation('organization');
 
   const handleRevoke = () => {

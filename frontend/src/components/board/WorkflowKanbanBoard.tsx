@@ -35,7 +35,7 @@ interface KanbanColumnProps {
 /**
  * Droppable column for the Kanban board
  */
-function KanbanColumn({ column, tasks, workflowId }: KanbanColumnProps) {
+function KanbanColumn({ column, tasks, workflowId }: Readonly<KanbanColumnProps>) {
   const { t } = useTranslation('workflow');
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const columnTasks = tasks.filter((task) => task.status === column.id);
@@ -61,7 +61,7 @@ function KanbanColumn({ column, tasks, workflowId }: KanbanColumnProps) {
   );
 }
 
-export function WorkflowKanbanBoard({ workflowId }: WorkflowKanbanBoardProps) {
+export function WorkflowKanbanBoard({ workflowId }: Readonly<WorkflowKanbanBoardProps>) {
   const { t } = useTranslation('workflow');
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');
   const updateTaskStatus = useUpdateTaskStatus();

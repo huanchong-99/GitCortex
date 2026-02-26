@@ -28,7 +28,7 @@ export function TaskCard({
   isOpen,
   projectId,
   sharedTask,
-}: TaskCardProps) {
+}: Readonly<TaskCardProps>) {
   const { t } = useTranslation('tasks');
   const navigate = useNavigateWithSearch();
   const [isNavigatingToParent, setIsNavigatingToParent] = useState(false);

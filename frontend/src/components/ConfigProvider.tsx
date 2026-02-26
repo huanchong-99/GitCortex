@@ -64,7 +64,7 @@ interface UserSystemProviderProps {
   readonly children: ReactNode;
 }
 
-export function UserSystemProvider({ children }: UserSystemProviderProps) {
+export function UserSystemProvider({ children }: Readonly<UserSystemProviderProps>) {
   const queryClient = useQueryClient();
 
   const { data: userSystemInfo, isLoading } = useQuery({

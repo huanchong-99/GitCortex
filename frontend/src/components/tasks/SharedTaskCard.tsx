@@ -17,7 +17,7 @@ export function SharedTaskCard({
   status,
   onViewDetails,
   isSelected,
-}: SharedTaskCardProps) {
+}: Readonly<SharedTaskCardProps>) {
   const localRef = useRef<HTMLDivElement>(null);
 
   const handleClick = useCallback(() => {

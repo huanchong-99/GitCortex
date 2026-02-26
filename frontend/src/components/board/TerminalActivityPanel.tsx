@@ -102,7 +102,7 @@ function StatusIndicator({ status }: { status: string }) {
   );
 }
 
-export function TerminalActivityPanel({ workflowId }: TerminalActivityPanelProps) {
+export function TerminalActivityPanel({ workflowId }: Readonly<TerminalActivityPanelProps>) {
   const { t } = useTranslation('workflow');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');

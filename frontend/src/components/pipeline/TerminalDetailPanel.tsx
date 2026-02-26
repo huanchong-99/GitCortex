@@ -4,7 +4,7 @@ interface TerminalDetailPanelProps {
   model: string;
 }
 
-export function TerminalDetailPanel({ role, status, model }: TerminalDetailPanelProps) {
+export function TerminalDetailPanel({ role, status, model }: Readonly<TerminalDetailPanelProps>) {
   return (
     <div className="p-3 bg-panel border border-border rounded">
       <div className="text-sm font-semibold">{role}</div>

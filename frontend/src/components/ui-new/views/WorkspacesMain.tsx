@@ -41,7 +41,7 @@ export function WorkspacesMain({
   isNewSessionMode,
   onStartNewSession,
   diffStats,
-}: WorkspacesMainProps) {
+}: Readonly<WorkspacesMainProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const { session } = workspaceWithSession ?? {};
 

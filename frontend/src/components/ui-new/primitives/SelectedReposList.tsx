@@ -17,7 +17,7 @@ export function SelectedReposList({
   branchesByRepo,
   selectedBranches,
   onBranchChange,
-}: SelectedReposListProps) {
+}: Readonly<SelectedReposListProps>) {
   const { t } = useTranslation('common');
 
   if (repos.length === 0) {

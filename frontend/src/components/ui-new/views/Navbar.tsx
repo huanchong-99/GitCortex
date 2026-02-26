@@ -35,7 +35,7 @@ function NavbarIconButton({
   tooltip,
   className,
   ...props
-}: NavbarIconButtonProps) {
+}: Readonly<NavbarIconButtonProps>) {
   const button = (
     <button
       type="button"
@@ -77,7 +77,7 @@ export function Navbar({
   actionContext,
   onExecuteAction,
   className,
-}: NavbarProps) {
+}: Readonly<NavbarProps>) {
   const renderItem = (item: NavbarItem, key: string) => {
     // Render divider
     if (isDivider(item)) {

@@ -39,7 +39,7 @@ export function ActionsDropdown({
   task,
   attempt,
   sharedTask,
-}: ActionsDropdownProps) {
+}: Readonly<ActionsDropdownProps>) {
   const { t } = useTranslation('tasks');
   const { projectId } = useProject();
   const openInEditor = useOpenInEditor(attempt?.id);

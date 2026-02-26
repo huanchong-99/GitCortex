@@ -32,7 +32,7 @@ interface FeatureShowcaseDialogProps {
  * ```
  */
 const FeatureShowcaseDialogImpl = NiceModal.create<FeatureShowcaseDialogProps>(
-  ({ config }: FeatureShowcaseDialogProps) => {
+  ({ config }: Readonly<FeatureShowcaseDialogProps>) => {
     const modal = useModal();
     const [currentStage, setCurrentStage] = useState(0);
     const { t } = useTranslation('tasks');

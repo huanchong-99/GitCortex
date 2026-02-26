@@ -20,7 +20,7 @@ export function RecentReposList({
   loading,
   error,
   onSelect,
-}: RecentReposListProps) {
+}: Readonly<RecentReposListProps>) {
   const { t } = useTranslation('common');
 
   return (

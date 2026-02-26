@@ -21,7 +21,7 @@ interface ShowcaseStageMediaProps {
  *
  * @param media - ShowcaseMedia object with type ('image' or 'video') and src URL
  */
-export function ShowcaseStageMedia({ media }: ShowcaseStageMediaProps) {
+export function ShowcaseStageMedia({ media }: Readonly<ShowcaseStageMediaProps>) {
   const { t } = useTranslation('common');
   const videoRef = useRef<HTMLVideoElement>(null);
   const { isLoading, playedPercent, bufferedPercent } =

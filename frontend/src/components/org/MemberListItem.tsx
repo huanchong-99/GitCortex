@@ -31,7 +31,7 @@ export function MemberListItem({
   onRoleChange,
   isRemoving,
   isRoleChanging,
-}: MemberListItemProps) {
+}: Readonly<MemberListItemProps>) {
   const { t } = useTranslation('organization');
   const isSelf = member.user_id === currentUserId;
   const canRemove = isAdmin && !isSelf;

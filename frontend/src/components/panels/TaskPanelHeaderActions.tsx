@@ -16,7 +16,7 @@ export const TaskPanelHeaderActions = ({
   task,
   sharedTask,
   onClose,
-}: TaskPanelHeaderActionsProps) => {
+}: Readonly<TaskPanelHeaderActionsProps>) => {
   return (
     <>
       <ActionsDropdown task={task} sharedTask={sharedTask} />

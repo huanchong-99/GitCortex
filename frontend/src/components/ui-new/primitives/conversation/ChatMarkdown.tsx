@@ -14,7 +14,7 @@ export function ChatMarkdown({
   maxWidth = '800px',
   className,
   workspaceId,
-}: ChatMarkdownProps) {
+}: Readonly<ChatMarkdownProps>) {
   const { viewFileInChanges, findMatchingDiffPath } = useChangesView();
 
   return (

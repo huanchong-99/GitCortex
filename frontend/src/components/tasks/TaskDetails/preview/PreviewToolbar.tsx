@@ -33,7 +33,7 @@ export function PreviewToolbar({
   customUrl,
   detectedUrl,
   onUrlChange,
-}: PreviewToolbarProps) {
+}: Readonly<PreviewToolbarProps>) {
   const { t } = useTranslation('tasks');
   const [isEditing, setIsEditing] = useState(false);
   const [urlInput, setUrlInput] = useState('');

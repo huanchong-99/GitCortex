@@ -19,7 +19,7 @@ export function ViewHeader({
   children,
   className,
   ...props
-}: ViewHeaderProps) {
+}: Readonly<ViewHeaderProps>) {
   return (
     <div
       className={cn(

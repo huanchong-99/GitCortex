@@ -21,7 +21,7 @@ export function ChatScriptEntry({
   className,
   status,
   onFix,
-}: ChatScriptEntryProps) {
+}: Readonly<ChatScriptEntryProps>) {
   const { t } = useTranslation('tasks');
   const { viewProcessInPanel } = useLogsPanel();
   const isRunning = status.status === 'created';

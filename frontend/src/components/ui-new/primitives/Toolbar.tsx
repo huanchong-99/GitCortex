@@ -21,7 +21,7 @@ interface ToolbarProps extends React.HTMLAttributes<HTMLDivElement> {
   readonly children: React.ReactNode;
 }
 
-function Toolbar({ children, className, ...props }: ToolbarProps) {
+function Toolbar({ children, className, ...props }: Readonly<ToolbarProps>) {
   return (
     <div className={cn('flex items-center gap-base', className)} {...props}>
       {children}
@@ -39,7 +39,7 @@ function ToolbarIconButton({
   className,
   disabled,
   ...props
-}: ToolbarIconButtonProps) {
+}: Readonly<ToolbarIconButtonProps>) {
   return (
     <button
       className={cn(
@@ -69,7 +69,7 @@ function ToolbarDropdown({
   children,
   className,
   disabled,
-}: ToolbarDropdownProps) {
+}: Readonly<ToolbarDropdownProps>) {
   const { t } = useTranslation('common');
 
   return (

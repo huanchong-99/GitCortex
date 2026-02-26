@@ -22,7 +22,7 @@ export function ThemeProvider({
   children,
   initialTheme = ThemeMode.SYSTEM,
   ...props
-}: ThemeProviderProps) {
+}: Readonly<ThemeProviderProps>) {
   const [theme, setThemeState] = useState<ThemeMode>(initialTheme);
 
   // Update theme when initialTheme changes

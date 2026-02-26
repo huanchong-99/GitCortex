@@ -33,7 +33,7 @@ export function RemoteProjectItem({
   isUnlinking,
   disabled = false,
   disabledReason,
-}: RemoteProjectItemProps) {
+}: Readonly<RemoteProjectItemProps>) {
   const { t } = useTranslation('organization');
   const handleUnlinkClick = () => {
     if (!linkedLocalProject || disabled) return;

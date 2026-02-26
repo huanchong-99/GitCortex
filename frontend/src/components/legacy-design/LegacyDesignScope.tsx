@@ -8,7 +8,7 @@ interface LegacyDesignScopeProps {
   children: ReactNode;
 }
 
-export function LegacyDesignScope({ children }: LegacyDesignScopeProps) {
+export function LegacyDesignScope({ children }: Readonly<LegacyDesignScopeProps>) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div ref={ref} className="legacy-design min-h-screen">

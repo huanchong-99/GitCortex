@@ -34,7 +34,7 @@ interface GitActionsDialogContentProps {
 function GitActionsDialogContent({
   attempt,
   task,
-}: GitActionsDialogContentProps) {
+}: Readonly<GitActionsDialogContentProps>) {
   const { t } = useTranslation('tasks');
   const { data: branchStatus, error: branchStatusError } = useBranchStatus(
     attempt.id

@@ -12,7 +12,7 @@ interface EditorAvailabilityIndicatorProps {
  */
 export function EditorAvailabilityIndicator({
   availability,
-}: EditorAvailabilityIndicatorProps) {
+}: Readonly<EditorAvailabilityIndicatorProps>) {
   const { t } = useTranslation('settings');
 
   if (!availability) return null;

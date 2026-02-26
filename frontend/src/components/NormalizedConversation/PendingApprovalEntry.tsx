@@ -172,7 +172,7 @@ const PendingApprovalEntry = ({
   pendingStatus,
   executionProcessId,
   children,
-}: PendingApprovalEntryProps) => {
+}: Readonly<PendingApprovalEntryProps>) => {
   const [isResponding, setIsResponding] = useState(false);
   const [hasResponded, setHasResponded] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -40,7 +40,7 @@ export function GitPanelCreate({
   onBranchChange,
   registeredRepoPaths,
   onRepoRegistered,
-}: GitPanelCreateProps) {
+}: Readonly<GitPanelCreateProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const hasNoRepos = repos.length === 0;
 

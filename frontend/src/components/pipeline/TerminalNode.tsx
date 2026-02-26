@@ -29,7 +29,7 @@ function getStatusClasses(status: string): string {
   }
 }
 
-export function TerminalNode({ terminal, taskName }: TerminalNodeProps) {
+export function TerminalNode({ terminal, taskName }: Readonly<TerminalNodeProps>) {
   const [expanded, setExpanded] = useState(false);
 
   return (

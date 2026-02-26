@@ -21,7 +21,7 @@ interface ClickableCodePluginProps {
 export function ClickableCodePlugin({
   findMatchingDiffPath,
   onCodeClick,
-}: ClickableCodePluginProps) {
+}: Readonly<ClickableCodePluginProps>) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {

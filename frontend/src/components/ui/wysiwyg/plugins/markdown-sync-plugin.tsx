@@ -26,7 +26,7 @@ export function MarkdownSyncPlugin({
   onEditorStateChange,
   editable,
   transformers,
-}: MarkdownSyncPluginProps) {
+}: Readonly<MarkdownSyncPluginProps>) {
   const [editor] = useLexicalComposerContext();
   const lastSerializedRef = useRef<string | undefined>(undefined);
 

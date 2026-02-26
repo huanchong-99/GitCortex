@@ -47,7 +47,7 @@ const BranchRow = memo(function BranchRow({
   onHover,
   onSelect,
   disabledTooltip,
-}: RowProps) {
+}: Readonly<RowProps>) {
   const { t } = useTranslation(['common']);
   const classes =
     (isSelected ? 'bg-accent text-accent-foreground ' : '') +

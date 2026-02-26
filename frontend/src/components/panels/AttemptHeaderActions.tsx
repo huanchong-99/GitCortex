@@ -32,7 +32,7 @@ export const AttemptHeaderActions = ({
   task,
   attempt,
   sharedTask,
-}: AttemptHeaderActionsProps) => {
+}: Readonly<AttemptHeaderActionsProps>) => {
   const { t } = useTranslation('tasks');
   const posthog = usePostHog();
 

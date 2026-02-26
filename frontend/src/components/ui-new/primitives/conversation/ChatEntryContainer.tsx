@@ -69,7 +69,7 @@ export function ChatEntryContainer({
   className,
   status,
   isGreyed,
-}: ChatEntryContainerProps) {
+}: Readonly<ChatEntryContainerProps>) {
   // Special case for plan denied
   const config =
     variant === 'plan' && status?.status === 'denied'

@@ -12,7 +12,7 @@ export function ChatThinkingMessage({
   content,
   className,
   taskAttemptId,
-}: ChatThinkingMessageProps) {
+}: Readonly<ChatThinkingMessageProps>) {
   return (
     <div
       className={cn('flex items-start gap-base text-sm text-low', className)}

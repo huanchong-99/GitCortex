@@ -38,7 +38,7 @@ export function WorkspacesSidebar({
   onSelectCreate,
   showArchive = false,
   onShowArchiveChange,
-}: WorkspacesSidebarProps) {
+}: Readonly<WorkspacesSidebarProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const searchLower = searchQuery.toLowerCase();
   const isSearching = searchQuery.length > 0;

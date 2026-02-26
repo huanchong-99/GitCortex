@@ -9,7 +9,7 @@ interface ProfileVariantBadgeProps {
 export function ProfileVariantBadge({
   profileVariant,
   className,
-}: ProfileVariantBadgeProps) {
+}: Readonly<ProfileVariantBadgeProps>) {
   if (!profileVariant) {
     return null;
   }

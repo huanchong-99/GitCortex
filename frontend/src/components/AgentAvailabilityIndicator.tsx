@@ -8,7 +8,7 @@ interface AgentAvailabilityIndicatorProps {
 
 export function AgentAvailabilityIndicator({
   availability,
-}: AgentAvailabilityIndicatorProps) {
+}: Readonly<AgentAvailabilityIndicatorProps>) {
   const { t } = useTranslation('settings');
 
   if (!availability) return null;

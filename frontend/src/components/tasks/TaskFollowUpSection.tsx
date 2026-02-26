@@ -69,7 +69,7 @@ interface TaskFollowUpSectionProps {
 export function TaskFollowUpSection({
   task,
   session,
-}: TaskFollowUpSectionProps) {
+}: Readonly<TaskFollowUpSectionProps>) {
   const { t } = useTranslation('tasks');
   const { projectId } = useProject();
 

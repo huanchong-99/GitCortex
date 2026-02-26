@@ -38,7 +38,7 @@ function getStatusColor(status: TerminalStatus): string {
   }
 }
 
-export function TerminalDots({ terminalCount, terminals }: TerminalDotsProps) {
+export function TerminalDots({ terminalCount, terminals }: Readonly<TerminalDotsProps>) {
   // If terminals array is provided, use status-based coloring
   if (terminals && terminals.length > 0) {
     return (

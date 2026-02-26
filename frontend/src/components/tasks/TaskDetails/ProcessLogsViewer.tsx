@@ -98,7 +98,7 @@ export function ProcessLogsViewerContent({
 
 export default function ProcessLogsViewer({
   processId,
-}: ProcessLogsViewerProps) {
+}: Readonly<ProcessLogsViewerProps>) {
   const { logs, error } = useLogStream(processId);
   return <ProcessLogsViewerContent logs={logs} error={error} />;
 }

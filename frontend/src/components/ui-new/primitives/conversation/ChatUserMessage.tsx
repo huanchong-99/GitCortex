@@ -21,7 +21,7 @@ export function ChatUserMessage({
   workspaceId,
   onEdit,
   isGreyed,
-}: ChatUserMessageProps) {
+}: Readonly<ChatUserMessageProps>) {
   const { t } = useTranslation('tasks');
 
   return (

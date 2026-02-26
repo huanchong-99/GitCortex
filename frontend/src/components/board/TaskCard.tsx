@@ -12,7 +12,7 @@ interface TaskCardProps {
   readonly workflowId: string;
 }
 
-export function TaskCard({ task, workflowId }: TaskCardProps) {
+export function TaskCard({ task, workflowId }: Readonly<TaskCardProps>) {
   const navigate = useNavigate();
   const { t } = useTranslation('workflow');
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({

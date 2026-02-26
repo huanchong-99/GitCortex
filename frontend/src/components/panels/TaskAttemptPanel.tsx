@@ -16,7 +16,7 @@ const TaskAttemptPanel = ({
   attempt,
   task,
   children,
-}: TaskAttemptPanelProps) => {
+}: Readonly<TaskAttemptPanelProps>) => {
   if (!attempt) {
     return <div className="p-6 text-muted-foreground">Loading attempt...</div>;
   }

@@ -39,7 +39,7 @@ function RebaseDialogContent({
   repoId,
   branches,
   initialTargetBranch,
-}: RebaseDialogContentProps) {
+}: Readonly<RebaseDialogContentProps>) {
   const modal = useModal();
   const { t } = useTranslation(['tasks', 'common']);
   const [selectedBranch, setSelectedBranch] = useState<string>(

@@ -7,7 +7,7 @@ interface TerminalSidebarProps {
   readonly onSelect: (terminalId: string) => void;
 }
 
-export function TerminalSidebar({ terminals, selectedTerminalId, onSelect }: TerminalSidebarProps) {
+export function TerminalSidebar({ terminals, selectedTerminalId, onSelect }: Readonly<TerminalSidebarProps>) {
   return (
     <aside className="w-64 bg-panel border-r border-border p-4">
       <div className="text-sm font-semibold mb-3">Terminals</div>

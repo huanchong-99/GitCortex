@@ -22,7 +22,7 @@ export function TaskCardHeader({
   right,
   className,
   titleClassName,
-}: TaskCardHeaderProps) {
+}: Readonly<TaskCardHeaderProps>) {
   return (
     <div className={`flex items-start gap-3 min-w-0 ${className ?? ''}`}>
       <h4

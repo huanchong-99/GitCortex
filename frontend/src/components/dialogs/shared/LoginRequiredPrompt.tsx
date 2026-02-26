@@ -29,7 +29,7 @@ export function LoginRequiredPrompt({
   actionLabel,
   onAction,
   icon,
-}: LoginRequiredPromptProps) {
+}: Readonly<LoginRequiredPromptProps>) {
   const { t } = useTranslation('tasks');
 
   const handleRedirect = useCallback(() => {

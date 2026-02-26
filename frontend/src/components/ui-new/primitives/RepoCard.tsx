@@ -93,7 +93,7 @@ export function RepoCard({
   onOpenInEditor,
   onCopyPath,
   onOpenSettings,
-}: RepoCardProps) {
+}: Readonly<RepoCardProps>) {
   const { t } = useTranslation('tasks');
   const { t: tCommon } = useTranslation('common');
   const [selectedAction, setSelectedAction] = useRepoAction(repoId);

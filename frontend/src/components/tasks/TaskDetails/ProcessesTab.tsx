@@ -23,7 +23,7 @@ interface ProcessesTabProps {
   readonly sessionId?: string;
 }
 
-function ProcessesTab({ sessionId }: ProcessesTabProps) {
+function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
   const { t } = useTranslation('tasks');
   const {
     executionProcesses,

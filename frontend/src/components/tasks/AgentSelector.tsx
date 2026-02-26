@@ -25,7 +25,7 @@ export function AgentSelector({
   disabled,
   className = '',
   showLabel = false,
-}: AgentSelectorProps) {
+}: Readonly<AgentSelectorProps>) {
   const agents = profiles
     ? (Object.keys(profiles).sort() as BaseCodingAgent[])
     : [];

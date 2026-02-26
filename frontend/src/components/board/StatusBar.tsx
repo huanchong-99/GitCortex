@@ -5,7 +5,7 @@ interface StatusBarProps {
   readonly workflowId: string | null;
 }
 
-export function StatusBar({ workflowId }: StatusBarProps) {
+export function StatusBar({ workflowId }: Readonly<StatusBarProps>) {
   const workflow = useWorkflowStore((state) =>
     workflowId ? state.workflows.get(workflowId) : undefined
   );

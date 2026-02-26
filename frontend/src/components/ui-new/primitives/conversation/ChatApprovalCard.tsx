@@ -20,7 +20,7 @@ export function ChatApprovalCard({
   className,
   workspaceId,
   status,
-}: ChatApprovalCardProps) {
+}: Readonly<ChatApprovalCardProps>) {
   return (
     <ChatEntryContainer
       variant="plan"

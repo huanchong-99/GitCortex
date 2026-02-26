@@ -47,7 +47,7 @@ const exceedsMaxLineCount = (d: Diff, maxLines: number): boolean => {
 const getDiffId = ({ diff, index }: { diff: Diff; index: number }) =>
   `${diff.newPath || diff.oldPath || index}`;
 
-export function DiffsPanel({ selectedAttempt, gitOps }: DiffsPanelProps) {
+export function DiffsPanel({ selectedAttempt, gitOps }: Readonly<DiffsPanelProps>) {
   const { t } = useTranslation('tasks');
   const [loadingState, setLoadingState] = useState<
     'loading' | 'loaded' | 'timed-out'
@@ -170,7 +170,7 @@ function DiffsPanelContent({
   gitOps,
   loading,
   t,
-}: DiffsPanelContentProps) {
+}: Readonly<DiffsPanelContentProps>) {
   return (
     <div className="h-full flex flex-col relative">
       {diffs.length > 0 && (

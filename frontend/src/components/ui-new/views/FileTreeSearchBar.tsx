@@ -16,7 +16,7 @@ export function FileTreeSearchBar({
   isAllExpanded,
   onToggleExpandAll,
   className,
-}: FileTreeSearchBarProps) {
+}: Readonly<FileTreeSearchBarProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const ExpandIcon = isAllExpanded ? ArrowsInSimpleIcon : ArrowsOutSimpleIcon;
 

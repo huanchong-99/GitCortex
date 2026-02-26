@@ -13,7 +13,7 @@ export function OpenInIdeButton({
   onClick,
   disabled = false,
   className,
-}: OpenInIdeButtonProps) {
+}: Readonly<OpenInIdeButtonProps>) {
   const { config } = useUserSystem();
   const editorType = config?.editor?.editor_type ?? null;
 

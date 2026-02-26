@@ -13,7 +13,7 @@ export function ChatErrorMessage({
   className,
   expanded,
   onToggle,
-}: ChatErrorMessageProps) {
+}: Readonly<ChatErrorMessageProps>) {
   return (
     <div
       className={cn(

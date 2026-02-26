@@ -20,7 +20,7 @@ export function DevServerLogsView({
   onToggle,
   height = 'h-60',
   showToggleText = true,
-}: DevServerLogsViewProps) {
+}: Readonly<DevServerLogsViewProps>) {
   const { t } = useTranslation('tasks');
   const [activeProcessId, setActiveProcessId] = useState<string | null>(null);
 

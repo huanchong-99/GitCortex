@@ -68,7 +68,7 @@ export const UserAvatar = ({
   username,
   imageUrl,
   className,
-}: UserAvatarProps) => {
+}: Readonly<UserAvatarProps>) => {
   const [imageError, setImageError] = useState(false);
 
   const effectiveFirstName = firstName ?? null;

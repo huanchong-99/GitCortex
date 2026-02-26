@@ -13,7 +13,7 @@ interface WorkflowSidebarProps {
 export function WorkflowSidebar({
   selectedWorkflowId,
   onSelectWorkflow,
-}: WorkflowSidebarProps) {
+}: Readonly<WorkflowSidebarProps>) {
   const navigate = useNavigate();
   const { projects } = useProjects();
   const activeProjectId = projects[0]?.id ?? '';

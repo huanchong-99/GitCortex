@@ -36,7 +36,7 @@ export function MultiFileSearchTextarea({
   repoId,
   onKeyDown,
   maxRows = 10,
-}: MultiFileSearchTextareaProps) {
+}: Readonly<MultiFileSearchTextareaProps>) {
   // Require at least one of projectId or repoId
   const searchId = projectId || repoId;
   const searchType = projectId ? 'project' : 'repo';

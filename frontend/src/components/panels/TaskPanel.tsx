@@ -18,7 +18,7 @@ interface TaskPanelProps {
   task: TaskWithAttemptStatus | null;
 }
 
-const TaskPanel = ({ task }: TaskPanelProps) => {
+const TaskPanel = ({ task }: Readonly<TaskPanelProps>) => {
   const { t } = useTranslation('tasks');
   const navigate = useNavigateWithSearch();
   const { projectId } = useProject();

@@ -32,7 +32,7 @@ export function ChatFileEntry({
   status,
   diffContent,
   onOpenInChanges,
-}: ChatFileEntryProps) {
+}: Readonly<ChatFileEntryProps>) {
   const { t } = useTranslation('tasks');
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);

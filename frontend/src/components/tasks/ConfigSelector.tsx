@@ -25,7 +25,7 @@ export function ConfigSelector({
   disabled,
   className = '',
   showLabel = false,
-}: ConfigSelectorProps) {
+}: Readonly<ConfigSelectorProps>) {
   const selectedAgent = selectedExecutorProfile?.executor;
   const configs = selectedAgent && profiles ? profiles[selectedAgent] : null;
   const configOptions = configs ? Object.keys(configs).sort() : [];

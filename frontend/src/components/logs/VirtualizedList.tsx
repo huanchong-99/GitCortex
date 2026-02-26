@@ -76,7 +76,7 @@ const computeItemKey: VirtuosoMessageListProps<
   MessageListContext
 >['computeItemKey'] = ({ data }) => `l-${data.patchKey}`;
 
-const VirtualizedList = ({ attempt, task }: VirtualizedListProps) => {
+const VirtualizedList = ({ attempt, task }: Readonly<VirtualizedListProps>) => {
   const [channelData, setChannelData] =
     useState<DataWithScrollModifier<PatchTypeWithKey> | null>(null);
   const [loading, setLoading] = useState(true);

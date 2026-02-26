@@ -10,7 +10,7 @@ export function ReadyContent({
   url,
   iframeKey,
   onIframeError,
-}: ReadyContentProps) {
+}: Readonly<ReadyContentProps>) {
   const { t } = useTranslation('tasks');
 
   return (

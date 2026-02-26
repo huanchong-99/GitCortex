@@ -4,7 +4,7 @@ interface MergeTerminalNodeProps {
   workflowId: string;
 }
 
-export function MergeTerminalNode({ workflowId }: MergeTerminalNodeProps) {
+export function MergeTerminalNode({ workflowId }: Readonly<MergeTerminalNodeProps>) {
   const { data: workflow } = useWorkflow(workflowId);
 
   if (!workflow) return null;

@@ -27,7 +27,7 @@ export function ProjectSelectorContainer({
   selectedProjectName,
   onProjectSelect,
   onCreateProject,
-}: ProjectSelectorContainerProps) {
+}: Readonly<ProjectSelectorContainerProps>) {
   const { t } = useTranslation('common');
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);

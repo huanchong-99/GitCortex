@@ -41,7 +41,7 @@ export function getAgentName(
   }
 }
 
-export function AgentIcon({ agent, className = 'h-4 w-4' }: AgentIconProps) {
+export function AgentIcon({ agent, className = 'h-4 w-4' }: Readonly<AgentIconProps>) {
   const { theme } = useTheme();
   const resolvedTheme = getResolvedTheme(theme);
   const isDark = resolvedTheme === 'dark';

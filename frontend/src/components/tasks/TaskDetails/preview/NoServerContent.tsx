@@ -38,7 +38,7 @@ export function NoServerContent({
   project,
   hasFailedDevServer,
   onFixDevScript,
-}: NoServerContentProps) {
+}: Readonly<NoServerContentProps>) {
   const { t } = useTranslation('tasks');
   const navigate = useNavigate();
   const { config } = useUserSystem();

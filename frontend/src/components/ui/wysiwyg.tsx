@@ -100,7 +100,7 @@ function WYSIWYGEditor({
   autoFocus = false,
   findMatchingDiffPath,
   onCodeClick,
-}: WysiwygProps) {
+}: Readonly<WysiwygProps>) {
   // Copy button state
   const [copied, setCopied] = useState(false);
   const handleCopy = useCallback(async () => {

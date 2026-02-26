@@ -90,7 +90,7 @@ export function PreviewBrowser({
   hasFailedDevServer,
   mobileScale,
   className,
-}: PreviewBrowserProps) {
+}: Readonly<PreviewBrowserProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const isLoading = isStarting || (isServerRunning && !url);
   const showIframe = url && !isLoading && isServerRunning;

@@ -20,7 +20,7 @@ function formatTokens(tokens: number | null | undefined): string {
   return tokens.toString();
 }
 
-export function OrchestratorHeader({ name, status, model, tokensUsed }: OrchestratorHeaderProps) {
+export function OrchestratorHeader({ name, status, model, tokensUsed }: Readonly<OrchestratorHeaderProps>) {
   return (
     <div className="h-16 bg-panel border-b border-border px-6 flex items-center">
       <div className="flex-1">

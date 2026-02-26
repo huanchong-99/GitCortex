@@ -23,7 +23,7 @@ export function KanbanCard({
   forwardedRef,
   dragDisabled: _dragDisabled,
   ...props
-}: KanbanCardProps) {
+}: Readonly<KanbanCardProps>) {
   return (
     <div
       ref={forwardedRef}

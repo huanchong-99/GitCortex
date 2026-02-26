@@ -14,7 +14,7 @@ export function Tooltip({
   content,
   side = 'bottom',
   className,
-}: TooltipProps) {
+}: Readonly<TooltipProps>) {
   const container = usePortalContainer();
   return (
     <TooltipPrimitive.Provider delayDuration={300}>

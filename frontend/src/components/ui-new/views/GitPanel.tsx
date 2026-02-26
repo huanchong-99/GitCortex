@@ -54,7 +54,7 @@ export function GitPanel({
   onOpenSettings,
   className,
   error,
-}: GitPanelProps) {
+}: Readonly<GitPanelProps>) {
   const { t } = useTranslation(['tasks', 'common']);
 
   return (

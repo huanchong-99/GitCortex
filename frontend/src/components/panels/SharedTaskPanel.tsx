@@ -6,7 +6,7 @@ interface SharedTaskPanelProps {
   task: SharedTaskRecord;
 }
 
-const SharedTaskPanel = ({ task }: SharedTaskPanelProps) => {
+const SharedTaskPanel = ({ task }: Readonly<SharedTaskPanelProps>) => {
   return (
     <NewCardContent>
       <div className="p-6 flex flex-col gap-6">

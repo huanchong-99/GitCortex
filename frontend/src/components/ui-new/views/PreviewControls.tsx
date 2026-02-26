@@ -31,7 +31,7 @@ export function PreviewControls({
   isStarting,
   isServerRunning,
   className,
-}: PreviewControlsProps) {
+}: Readonly<PreviewControlsProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const isLoading = isStarting || isServerRunning;
 

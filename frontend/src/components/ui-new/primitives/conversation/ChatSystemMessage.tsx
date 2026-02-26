@@ -13,7 +13,7 @@ export function ChatSystemMessage({
   className,
   expanded,
   onToggle,
-}: ChatSystemMessageProps) {
+}: Readonly<ChatSystemMessageProps>) {
   return (
     <div
       className={cn(

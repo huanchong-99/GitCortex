@@ -139,7 +139,7 @@ interface ChangesPanelContainerProps {
 export function ChangesPanelContainer({
   className,
   attemptId,
-}: ChangesPanelContainerProps) {
+}: Readonly<ChangesPanelContainerProps>) {
   const { diffs, workspace } = useWorkspaceContext();
   const { data: task } = useTask(workspace?.taskId, {
     enabled: !!workspace?.taskId,

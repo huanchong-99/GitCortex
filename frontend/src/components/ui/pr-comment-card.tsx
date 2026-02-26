@@ -71,7 +71,7 @@ function CompactCard({
   onClick,
   onDoubleClick,
   className,
-}: PrCommentCardProps) {
+}: Readonly<PrCommentCardProps>) {
   const { t } = useTranslation('tasks');
   const isReview = commentType === 'review';
   const Icon = isReview ? Code : MessageSquare;
@@ -113,7 +113,7 @@ function FullCard({
   onClick,
   variant,
   className,
-}: PrCommentCardProps) {
+}: Readonly<PrCommentCardProps>) {
   const { t } = useTranslation('tasks');
   const isReview = commentType === 'review';
   const Icon = isReview ? Code : MessageSquare;

@@ -22,7 +22,7 @@ export function RepoCardSimple({
   branches,
   selectedBranch,
   onBranchChange,
-}: RepoCardSimpleProps) {
+}: Readonly<RepoCardSimpleProps>) {
   return (
     <div
       className={cn('flex flex-col gap-half bg-tertiary rounded-sm', className)}

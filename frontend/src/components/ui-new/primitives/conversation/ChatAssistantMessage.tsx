@@ -8,6 +8,6 @@ interface ChatAssistantMessageProps {
 export function ChatAssistantMessage({
   content,
   workspaceId,
-}: ChatAssistantMessageProps) {
+}: Readonly<ChatAssistantMessageProps>) {
   return <ChatMarkdown content={content} workspaceId={workspaceId} />;
 }

@@ -7,7 +7,7 @@ interface WorkflowCardProps {
   readonly onClick: () => void;
 }
 
-export function WorkflowCard({ name, status, selected, onClick }: WorkflowCardProps) {
+export function WorkflowCard({ name, status, selected, onClick }: Readonly<WorkflowCardProps>) {
   return (
     <button
       onClick={onClick}

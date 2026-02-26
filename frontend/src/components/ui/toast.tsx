@@ -31,7 +31,7 @@ interface ToastProviderProps {
   children: React.ReactNode;
 }
 
-export function ToastProvider({ children }: ToastProviderProps) {
+export function ToastProvider({ children }: Readonly<ToastProviderProps>) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3000) => {
@@ -56,7 +56,7 @@ interface ToastContainerProps {
   onDismiss: (id: string) => void;
 }
 
-function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
+function ToastContainer({ toasts, onDismiss }: Readonly<ToastContainerProps>) {
   if (toasts.length === 0) return null;
 
   return (
@@ -73,7 +73,7 @@ interface ToastItemProps {
   onDismiss: (id: string) => void;
 }
 
-function ToastItem({ toast, onDismiss }: ToastItemProps) {
+function ToastItem({ toast, onDismiss }: Readonly<ToastItemProps>) {
   useEffect(() => {
     if (toast.duration && toast.duration > 0) {
       const timer = setTimeout(() => {

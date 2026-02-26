@@ -46,7 +46,7 @@ export function FileTree({
   onToggleGitHubComments,
   getGitHubCommentCountForFile,
   isGitHubCommentsLoading,
-}: FileTreeProps) {
+}: Readonly<FileTreeProps>) {
   const { t } = useTranslation(['tasks', 'common']);
 
   const renderNodes = (nodeList: TreeNode[], depth = 0) => {

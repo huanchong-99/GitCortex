@@ -32,7 +32,7 @@ function ChangeTargetDialogContent({
   attemptId,
   repoId,
   branches,
-}: ChangeTargetDialogContentProps) {
+}: Readonly<ChangeTargetDialogContentProps>) {
   const modal = useModal();
   const { t } = useTranslation(['tasks', 'common']);
   const [selectedBranch, setSelectedBranch] = useState<string>('');

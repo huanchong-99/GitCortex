@@ -51,7 +51,7 @@ function GitOperations({
   isAttemptRunning,
   selectedBranch,
   layout = 'horizontal',
-}: GitOperationsProps) {
+}: Readonly<GitOperationsProps>) {
   const { t } = useTranslation('tasks');
 
   const { repos, selectedRepoId, setSelectedRepoId } = useAttemptRepo(

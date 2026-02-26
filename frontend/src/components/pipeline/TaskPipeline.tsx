@@ -55,7 +55,7 @@ function TaskColumn({ task, isLast }: { task: WorkflowTaskDto; isLast: boolean }
   );
 }
 
-export function TaskPipeline({ workflowId }: TaskPipelineProps) {
+export function TaskPipeline({ workflowId }: Readonly<TaskPipelineProps>) {
   const { t } = useTranslation('workflow');
   const { data: workflow } = useWorkflow(workflowId);
   const tasks = workflow?.tasks ?? [];

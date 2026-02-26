@@ -54,7 +54,7 @@ export function NextActionCard({
   execution_processes,
   task,
   needsSetup,
-}: NextActionCardProps) {
+}: Readonly<NextActionCardProps>) {
   const { t } = useTranslation('tasks');
   const { config } = useUserSystem();
   const { projectId } = useProject();

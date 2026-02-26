@@ -7,7 +7,7 @@ interface TerminalDebugViewProps {
   readonly onClose: () => void;
 }
 
-export function TerminalDebugView({ terminalId, terminals, onClose }: TerminalDebugViewProps) {
+export function TerminalDebugView({ terminalId, terminals, onClose }: Readonly<TerminalDebugViewProps>) {
   const terminal = terminals.find((t) => t.id === terminalId);
 
   if (!terminalId || !terminal) {

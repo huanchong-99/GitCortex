@@ -22,7 +22,7 @@ const RawLogText = memo(
     linkifyUrls = false,
     searchQuery,
     isCurrentMatch = false,
-  }: RawLogTextProps) => {
+  }: Readonly<RawLogTextProps>) => {
     // Only apply stderr fallback color when no ANSI codes are present
     const hasAnsiCodes = hasAnsi(content);
     const shouldApplyStderrFallback = channel === 'stderr' && !hasAnsiCodes;

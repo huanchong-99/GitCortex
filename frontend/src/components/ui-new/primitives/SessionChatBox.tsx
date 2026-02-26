@@ -161,7 +161,7 @@ export function SessionChatBox({
   inProgressTodo,
   localImages,
   onViewCode,
-}: SessionChatBoxProps) {
+}: Readonly<SessionChatBoxProps>) {
   const { t } = useTranslation('tasks');
   const fileInputRef = useRef<HTMLInputElement>(null);
 

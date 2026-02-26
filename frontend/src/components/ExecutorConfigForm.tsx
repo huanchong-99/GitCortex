@@ -34,7 +34,7 @@ export function ExecutorConfigForm({
   disabled = false,
   isSaving = false,
   isDirty = false,
-}: ExecutorConfigFormProps) {
+}: Readonly<ExecutorConfigFormProps>) {
   const [formData, setFormData] = useState<unknown>(value || {});
   const [validationErrors, setValidationErrors] = useState<
     RJSFValidationError[]

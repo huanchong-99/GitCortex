@@ -5,7 +5,7 @@ interface FileTreePlaceholderProps {
   className?: string;
 }
 
-export function FileTreePlaceholder({ className }: FileTreePlaceholderProps) {
+export function FileTreePlaceholder({ className }: Readonly<FileTreePlaceholderProps>) {
   const { t } = useTranslation(['tasks', 'common']);
 
   return (
