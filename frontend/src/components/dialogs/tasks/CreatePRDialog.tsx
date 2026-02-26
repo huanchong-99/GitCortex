@@ -331,24 +331,19 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
     }, [modal, config?.pr_auto_description_enabled, error]);
 
     return (
-      <>
-        <Dialog
-          open={modal.visible}
-          onOpenChange={() => handleCancelCreatePR()}
-        >
-          <DialogContent className="sm:max-w-[525px]">
-            <DialogHeader>
-              <DialogTitle>{t('createPrDialog.title')}</DialogTitle>
-              <DialogDescription>
-                {t('createPrDialog.description')}
-              </DialogDescription>
-            </DialogHeader>
-            {!isLoaded ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="space-y-4 py-4">
+      <Dialog
+        open={modal.visible}
+        onOpenChange={() => handleCancelCreatePR()}
+      >
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>{t('createPrDialog.title')}</DialogTitle>
+            <DialogDescription>
+              {t('createPrDialog.description')}
+            </DialogDescription>
+          </DialogHeader>
+          {isLoaded ? (
+            <div className="space-y-4 py-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="pr-auto-generate"
@@ -443,6 +438,10 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
                 )}
                 {error && <Alert variant="destructive">{error}</Alert>}
               </div>
+            ) : (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={handleCancelCreatePR}>
@@ -465,7 +464,6 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </>
     );
   }
 );

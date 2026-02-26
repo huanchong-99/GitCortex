@@ -32,6 +32,118 @@ function getCommentId(comment: UnifiedPrComment): string {
     : comment.id.toString();
 }
 
+function getCommentPath(comment: UnifiedPrComment): string | undefined {
+  return comment.comment_type === 'review' ? comment.path : undefined;
+}
+
+function getCommentLine(comment: UnifiedPrComment): number | undefined {
+  if (comment.comment_type === 'review' && comment.line != null) {
+    return Number(comment.line);
+  }
+  return undefined;
+}
+
+function getCommentDiffHunk(comment: UnifiedPrComment): string | undefined {
+  return comment.comment_type === 'review' ? comment.diff_hunk : undefined;
+}
+
+// Content renderer component
+function DialogContentRenderer({
+  errorMessage,
+  isLoading,
+  comments,
+  selectedIds,
+  isAllSelected,
+  selectAll,
+  deselectAll,
+  toggleSelection,
+  t,
+}: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  comments: UnifiedPrComment[];
+  selectedIds: Set<string>;
+  isAllSelected: boolean;
+  selectAll: () => void;
+  deselectAll: () => void;
+  toggleSelection: (id: string) => void;
+  t: any;
+}) {
+  if (errorMessage) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{errorMessage}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (comments.length === 0) {
+    return (
+      <p className="text-center text-muted-foreground py-8">
+        {t('tasks:prComments.dialog.noComments')}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-muted-foreground">
+          {t('tasks:prComments.dialog.selectedCount', {
+            selected: selectedIds.size,
+            total: comments.length,
+          })}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={isAllSelected ? deselectAll : selectAll}
+        >
+          {isAllSelected
+            ? t('tasks:prComments.dialog.deselectAll')
+            : t('tasks:prComments.dialog.selectAll')}
+        </Button>
+      </div>
+      <div className="space-y-3">
+        {comments.map((comment) => {
+          const id = getCommentId(comment);
+          return (
+            <div key={id} className="flex items-start gap-3 min-w-0">
+              <Checkbox
+                checked={selectedIds.has(id)}
+                onCheckedChange={() => toggleSelection(id)}
+                className="mt-3"
+              />
+              <PrCommentCard
+                author={comment.author}
+                body={comment.body}
+                createdAt={comment.created_at}
+                url={comment.url}
+                commentType={comment.comment_type}
+                path={getCommentPath(comment)}
+                line={getCommentLine(comment)}
+                diffHunk={getCommentDiffHunk(comment)}
+                variant="list"
+                onClick={() => toggleSelection(id)}
+                className="flex-1 min-w-0"
+              />
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 const PrCommentsDialogImpl = NiceModal.create<PrCommentsDialogProps>(
   ({ attemptId, repoId }) => {
     const { t } = useTranslation(['tasks', 'common']);
@@ -115,83 +227,17 @@ const PrCommentsDialogImpl = NiceModal.create<PrCommentsDialogProps>(
 
           <div className="max-h-[70vh] flex flex-col min-h-0">
             <div className="p-4 overflow-auto flex-1 min-h-0">
-              {errorMessage ? (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{errorMessage}</AlertDescription>
-                </Alert>
-              ) : isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : comments.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  {t('tasks:prComments.dialog.noComments')}
-                </p>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-muted-foreground">
-                      {t('tasks:prComments.dialog.selectedCount', {
-                        selected: selectedIds.size,
-                        total: comments.length,
-                      })}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={isAllSelected ? deselectAll : selectAll}
-                    >
-                      {isAllSelected
-                        ? t('tasks:prComments.dialog.deselectAll')
-                        : t('tasks:prComments.dialog.selectAll')}
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    {comments.map((comment) => {
-                      const id = getCommentId(comment);
-                      return (
-                        <div
-                          key={id}
-                          className="flex items-start gap-3 min-w-0"
-                        >
-                          <Checkbox
-                            checked={selectedIds.has(id)}
-                            onCheckedChange={() => toggleSelection(id)}
-                            className="mt-3"
-                          />
-                          <PrCommentCard
-                            author={comment.author}
-                            body={comment.body}
-                            createdAt={comment.created_at}
-                            url={comment.url}
-                            commentType={comment.comment_type}
-                            path={
-                              comment.comment_type === 'review'
-                                ? comment.path
-                                : undefined
-                            }
-                            line={
-                              comment.comment_type === 'review' &&
-                              comment.line != null
-                                ? Number(comment.line)
-                                : undefined
-                            }
-                            diffHunk={
-                              comment.comment_type === 'review'
-                                ? comment.diff_hunk
-                                : undefined
-                            }
-                            variant="list"
-                            onClick={() => toggleSelection(id)}
-                            className="flex-1 min-w-0"
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+              <DialogContentRenderer
+                errorMessage={errorMessage}
+                isLoading={isLoading}
+                comments={comments}
+                selectedIds={selectedIds}
+                isAllSelected={isAllSelected}
+                selectAll={selectAll}
+                deselectAll={deselectAll}
+                toggleSelection={toggleSelection}
+                t={t}
+              />
             </div>
           </div>
 
