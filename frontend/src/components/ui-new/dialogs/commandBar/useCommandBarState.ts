@@ -171,7 +171,7 @@ export function useCommandBarState(initialPage: PageId, repoCount: number) {
   // Stable dispatch that doesn't change on every render
   const dispatch = useCallback(
     (event: CommandBarEvent): CommandBarEffect => {
-      const [, effect] = reducer(stateRef.current, event, repoCountRef.current);
+      const [nextState, effect] = reducer(stateRef.current, event, repoCountRef.current);
       rawDispatch(event);
       return effect;
     },

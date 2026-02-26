@@ -41,7 +41,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
   const [historyByTerminalId, setHistoryByTerminalId] = useState<Record<string, TerminalHistoryState>>({});
   const readyTerminalIdsRef = useRef<Set<string>>(new Set());
-  const [, setForceUpdateState] = useState({});
+  const [forceUpdateState, setForceUpdateState] = useState({});
   const startingTerminalIdsRef = useRef<Set<string>>(new Set());
   const terminalRef = useRef<TerminalEmulatorRef>(null);
   const autoStartedRef = useRef<Set<string>>(new Set());
