@@ -57,58 +57,56 @@ const renderJson = (v: JsonValue) => (
   <pre className="whitespace-pre-wrap">{JSON.stringify(v, null, 2)}</pre>
 );
 
+// Helper function to check if it's a task management tool
+const isTaskManagementTool = (action: string, toolName?: string): boolean => {
+  if (action === 'todo_management') return true;
+  if (!toolName) return false;
+  const lowerName = toolName.toLowerCase();
+  return ['todowrite', 'todoread', 'todo_write', 'todo_read', 'todo'].includes(
+    lowerName
+  );
+};
+
 const getEntryIcon = (entryType: NormalizedEntryType) => {
   const iconSize = 'h-3 w-3';
-  if (entryType.type === 'user_message' || entryType.type === 'user_feedback') {
-    return <User className={iconSize} />;
+
+  // Simple type mappings
+  const typeIconMap: Record<string, JSX.Element> = {
+    user_message: <User className={iconSize} />,
+    user_feedback: <User className={iconSize} />,
+    assistant_message: <Bot className={iconSize} />,
+    system_message: <Settings className={iconSize} />,
+    thinking: <Brain className={iconSize} />,
+    error_message: <AlertCircle className={iconSize} />,
+  };
+
+  if (entryType.type in typeIconMap) {
+    return typeIconMap[entryType.type];
   }
-  if (entryType.type === 'assistant_message') {
-    return <Bot className={iconSize} />;
-  }
-  if (entryType.type === 'system_message') {
-    return <Settings className={iconSize} />;
-  }
-  if (entryType.type === 'thinking') {
-    return <Brain className={iconSize} />;
-  }
-  if (entryType.type === 'error_message') {
-    return <AlertCircle className={iconSize} />;
-  }
+
   if (entryType.type === 'tool_use') {
     const { action_type, tool_name } = entryType;
 
-    // Special handling for TODO tools
-    if (
-      action_type.action === 'todo_management' ||
-      (tool_name &&
-        (tool_name.toLowerCase() === 'todowrite' ||
-          tool_name.toLowerCase() === 'todoread' ||
-          tool_name.toLowerCase() === 'todo_write' ||
-          tool_name.toLowerCase() === 'todo_read' ||
-          tool_name.toLowerCase() === 'todo'))
-    ) {
+    // Check for task management tools first
+    if (isTaskManagementTool(action_type.action, tool_name)) {
       return <CheckSquare className={iconSize} />;
     }
 
-    if (action_type.action === 'file_read') {
-      return <Eye className={iconSize} />;
-    } else if (action_type.action === 'file_edit') {
-      return <Edit className={iconSize} />;
-    } else if (action_type.action === 'command_run') {
-      return <Terminal className={iconSize} />;
-    } else if (action_type.action === 'search') {
-      return <Search className={iconSize} />;
-    } else if (action_type.action === 'web_fetch') {
-      return <Globe className={iconSize} />;
-    } else if (action_type.action === 'task_create') {
-      return <Plus className={iconSize} />;
-    } else if (action_type.action === 'plan_presentation') {
-      return <CheckSquare className={iconSize} />;
-    } else if (action_type.action === 'tool') {
-      return <Hammer className={iconSize} />;
-    }
-    return <Settings className={iconSize} />;
+    // Action type mappings
+    const actionIconMap: Record<string, JSX.Element> = {
+      file_read: <Eye className={iconSize} />,
+      file_edit: <Edit className={iconSize} />,
+      command_run: <Terminal className={iconSize} />,
+      search: <Search className={iconSize} />,
+      web_fetch: <Globe className={iconSize} />,
+      task_create: <Plus className={iconSize} />,
+      plan_presentation: <CheckSquare className={iconSize} />,
+      tool: <Hammer className={iconSize} />,
+    };
+
+    return actionIconMap[action_type.action] || <Settings className={iconSize} />;
   }
+
   return <Settings className={iconSize} />;
 };
 

@@ -40,15 +40,16 @@ const RawLogText = memo(
       const regex = new RegExp(`(${escapedQuery})`, 'gi');
       const parts = text.split(regex);
 
-      return parts.map((part, idx) => {
+      return parts.map((part) => {
+        const partKey = `${key}-${part}`;
         if (part.toLowerCase() === searchQuery.toLowerCase()) {
           return (
-            <mark key={`${key}-${idx}`} className={highlightClass}>
+            <mark key={partKey} className={highlightClass}>
               <AnsiHtml text={part} />
             </mark>
           );
         }
-        return <AnsiHtml key={`${key}-${idx}`} text={part} />;
+        return <AnsiHtml key={partKey} text={part} />;
       });
     };
 
@@ -76,7 +77,8 @@ const RawLogText = memo(
           );
         }
         // For non-URL parts, apply ANSI formatting with highlighting
-        return highlightMatches(part, `part-${part.slice(0, 20)}`);
+        const partKey = `part-${part.slice(0, 20)}`;
+        return highlightMatches(part, partKey);
       });
     };
 

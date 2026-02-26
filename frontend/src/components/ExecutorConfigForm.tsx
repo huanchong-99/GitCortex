@@ -154,11 +154,14 @@ export function ExecutorConfigForm({
         <Alert variant="destructive">
           <AlertDescription>
             <ul className="list-disc list-inside space-y-1">
-              {validationErrors.map((error) => (
-                <li key={`${error.property}-${error.message}`}>
-                  {error.property}: {error.message}
-                </li>
-              ))}
+              {validationErrors.map((error) => {
+                const errorKey = `${error.property}-${error.message}`;
+                return (
+                  <li key={errorKey}>
+                    {error.property}: {error.message}
+                  </li>
+                );
+              })}
             </ul>
           </AlertDescription>
         </Alert>
