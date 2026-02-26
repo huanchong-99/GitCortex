@@ -40,7 +40,8 @@ function filterNavbarItems(
   for (const item of filtered) {
     if (isDivider(item)) {
       // Only add divider if we have items before it and last item wasn't a divider
-      if (result.length > 0 && !isDivider(result.at(-1))) {
+      const lastItem = result.at(-1);
+      if (result.length > 0 && lastItem && !isDivider(lastItem)) {
         result.push(item);
       }
     } else {
@@ -49,7 +50,8 @@ function filterNavbarItems(
   }
 
   // Remove trailing divider
-  if (result.length > 0 && isDivider(result.at(-1))) {
+  const lastItem = result.at(-1);
+  if (result.length > 0 && lastItem && isDivider(lastItem)) {
     result.pop();
   }
 

@@ -55,6 +55,26 @@ function labelAndIcon(diff: Diff) {
   return { label: undefined, Icon: PencilLine };
 }
 
+function getEmptyDiffMessage(
+  isOmitted: boolean,
+  isContentEqual: boolean,
+  change: Diff['change']
+): string {
+  if (isOmitted) {
+    return 'Content omitted due to file size. Open in editor to view.';
+  }
+  if (isContentEqual) {
+    if (change === 'renamed') {
+      return 'File renamed with no content changes.';
+    }
+    if (change === 'permissionChange') {
+      return 'File permission changed.';
+    }
+    return 'No content changes to display.';
+  }
+  return 'Failed to render diff for this file.';
+}
+
 function readPlainLine(
   diffFile: DiffFile | null,
   lineNumber: number,
@@ -323,15 +343,7 @@ export default function DiffCard({
           className="px-4 pb-4 text-xs font-mono"
           style={{ color: 'hsl(var(--muted-foreground) / 0.9)' }}
         >
-          {isOmitted
-            ? 'Content omitted due to file size. Open in editor to view.'
-            : !isContentEqual
-              ? 'Failed to render diff for this file.'
-              : diff.change === 'renamed'
-                ? 'File renamed with no content changes.'
-                : diff.change === 'permissionChange'
-                  ? 'File permission changed.'
-                  : 'No content changes to display.'}
+          {getEmptyDiffMessage(isOmitted, isContentEqual, diff.change)}
         </div>
       )}
     </div>

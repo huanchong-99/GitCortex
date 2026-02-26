@@ -154,8 +154,8 @@ export function ExecutorConfigForm({
         <Alert variant="destructive">
           <AlertDescription>
             <ul className="list-disc list-inside space-y-1">
-              {validationErrors.map((error, idx) => (
-                <li key={`error-${idx}`}>
+              {validationErrors.map((error) => (
+                <li key={`${error.property}-${error.message}`}>
                   {error.property}: {error.message}
                 </li>
               ))}

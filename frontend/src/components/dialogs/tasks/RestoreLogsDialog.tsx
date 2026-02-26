@@ -74,11 +74,9 @@ function getToggleLabelText(forceReset: boolean, worktreeResetOn: boolean, t: an
 // Toggle switch component
 function ToggleSwitch({
   enabled,
-  onClick,
   enabledColor = 'bg-emerald-500',
 }: {
   enabled: boolean;
-  onClick: () => void;
   enabledColor?: string;
 }) {
   return (

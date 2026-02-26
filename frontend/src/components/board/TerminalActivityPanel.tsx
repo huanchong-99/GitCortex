@@ -48,10 +48,10 @@ function useFormatRelativeTime() {
 function TerminalActivityItem({
   item,
   workflowId
-}: {
+}: Readonly<{
   item: ActivityItem;
   workflowId: string;
-}) {
+}>) {
   const recentOutput = useRecentTerminalOutput(item.id, 3);
   const formatRelativeTime = useFormatRelativeTime();
 
@@ -71,7 +71,7 @@ function TerminalActivityItem({
       {recentOutput.length > 0 && (
         <div className="mt-1 pl-4 text-[10px] font-mono text-low max-h-12 overflow-hidden">
           {recentOutput.slice(-3).map((line, idx) => (
-            <div key={`output-${idx}`} className="truncate">{line || '\u00A0'}</div>
+            <div key={`${item.id}-output-${idx}`} className="truncate">{line || '\u00A0'}</div>
           ))}
         </div>
       )}
