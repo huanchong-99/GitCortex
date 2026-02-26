@@ -887,8 +887,8 @@ describe('Workflows Page', () => {
       const passwordDialog = await screen.findByTestId('workflow-prompt-dialog');
       const passwordInput = within(passwordDialog).getByTestId(
         'workflow-prompt-input'
-      ) as HTMLInputElement;
-      expect(passwordInput.type).toBe('password');
+      );
+      expect((passwordInput as HTMLInputElement).type).toBe('password');
 
       fireEvent.change(passwordInput, {
         target: { value: 'secret-token' },
