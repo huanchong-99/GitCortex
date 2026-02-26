@@ -823,7 +823,7 @@ export const useWsStore = create<WsState>((set, get) => ({
 
   connectToWorkflow: (workflowId: string) => {
     // Helper: Create heartbeat interval handler
-    const createHeartbeatHandler = (targetWorkflowId: string, ws: WebSocket) => {
+    const createHeartbeatHandler = (targetWorkflowId: string) => {
       return () => {
         const latest = get()._workflowConnections.get(targetWorkflowId);
         if (latest?.ws?.readyState !== WebSocket.OPEN) return;

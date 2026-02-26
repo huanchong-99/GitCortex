@@ -12,7 +12,7 @@ export function useCommandBarShortcut(
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       // CMD+K (Mac) or Ctrl+K (Windows/Linux)
-      const platform = navigator.userAgentData?.platform ?? navigator.platform;
+      const platform = (navigator as any).userAgentData?.platform ?? navigator.platform;
       const isMac = platform.toUpperCase().includes('MAC');
       const modifier = isMac ? event.metaKey : event.ctrlKey;
 

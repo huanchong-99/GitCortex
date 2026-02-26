@@ -214,7 +214,7 @@ export function McpSettings() {
     try {
       const existing = mcpServers.trim() ? JSON.parse(mcpServers) : {};
       const updated = McpConfigStrategyGeneral.addPreconfiguredToConfig(
-        mcpConfig,
+        mcpConfig!,
         existing,
         key
       );

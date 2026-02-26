@@ -36,6 +36,7 @@ import {
   useTaskMutations,
   useProjectRepos,
   useRepoBranchSelection,
+  type RepoBranchConfig,
 } from '@/hooks';
 import {
   useKeySubmitTask,
@@ -92,7 +93,7 @@ const SingleRepoBranchField = ({
   branchesLoading,
   t,
 }: {
-  config: { repoId: string; targetBranch: string | null; branches: string[] };
+  config: RepoBranchConfig;
   fieldValue: RepoBranch[];
   onFieldChange: (value: RepoBranch[]) => void;
   isSubmitting: boolean;
@@ -128,7 +129,7 @@ const MultiRepoBranchField = ({
   isSubmitting,
   branchesLoading,
 }: {
-  repoBranchConfigs: Array<{ repoId: string; targetBranch: string | null; branches: string[] }>;
+  repoBranchConfigs: RepoBranchConfig[];
   fieldValue: RepoBranch[];
   onFieldChange: (value: RepoBranch[]) => void;
   isSubmitting: boolean;

@@ -331,9 +331,13 @@ export const useConversationHistory = ({
         const entries: PatchTypeWithKey[] = [];
 
         // Add user message
+        const typ = p.executionProcess.executorAction.typ;
+        const prompt = (typ.type === 'CodingAgentInitialRequest' || typ.type === 'CodingAgentFollowUpRequest')
+          ? typ.prompt
+          : '';
         const userPatch = createUserMessagePatch(
           p.executionProcess.id,
-          p.executionProcess.executorAction.typ.prompt,
+          prompt,
           patchWithKey
         );
         entries.push(userPatch);
@@ -389,9 +393,9 @@ export const useConversationHistory = ({
         isProcessRunning: boolean;
         processFailedOrKilled: boolean;
       } => {
-        const toolName = getScriptToolName(
-          p.executionProcess.executorAction.typ.context
-        );
+        const typ = p.executionProcess.executorAction.typ;
+        const context = typ.type === 'ScriptRequest' ? typ.context : null;
+        const toolName = context ? getScriptToolName(context) : null;
         if (!toolName) return { entries: [], isProcessRunning: false, processFailedOrKilled: false };
 
         const executionProcess = getLiveExecutionProcess(p.executionProcess.id);
@@ -401,11 +405,12 @@ export const useConversationHistory = ({
             executionProcess?.status === ExecutionProcessStatus.killed) &&
           index === totalProcesses - 1;
 
+        const script = typ.type === 'ScriptRequest' ? typ.script : '';
         const toolPatch = createScriptToolPatch(
           executionProcess,
           p.executionProcess.id,
           toolName,
-          p.executionProcess.executorAction.typ.script,
+          script,
           p.entries,
           patchWithKey
         );

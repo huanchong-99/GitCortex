@@ -50,7 +50,7 @@ type EditableElement = HTMLInputElement | HTMLTextAreaElement | (HTMLElement & {
 
 /** Platform check used for shortcut detection. */
 const isMac = () => {
-  const platform = navigator.userAgentData?.platform ?? navigator.platform;
+  const platform = (navigator as any).userAgentData?.platform ?? navigator.platform;
   return platform.toUpperCase().includes('MAC');
 };
 
