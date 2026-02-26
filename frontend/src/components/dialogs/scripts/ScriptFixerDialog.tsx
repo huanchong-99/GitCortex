@@ -26,7 +26,7 @@ import { defineModal } from '@/lib/modals';
 import { repoApi, attemptsApi } from '@/lib/api';
 import { useLogStream } from '@/hooks/useLogStream';
 import { useExecutionProcesses } from '@/hooks/useExecutionProcesses';
-import type { RepoWithTargetBranch, PatchType, UpdateRepo } from 'shared/types';
+import type { RepoWithTargetBranch, PatchType, UpdateRepo, ExecutionProcess } from 'shared/types';
 
 export type ScriptType = 'setup' | 'cleanup' | 'dev_server';
 
