@@ -210,6 +210,16 @@ export const useUiPreferencesStore = create<State>()(
           DEFAULT_WORKSPACE_PANEL_STATE;
         const isCurrentlyActive = wsState.rightMainPanelMode === mode;
 
+        const getLeftSidebarVisibility = (): boolean => {
+          if (isCurrentlyActive) {
+            return true;
+          }
+          if (isWideScreen()) {
+            return state.isLeftSidebarVisible;
+          }
+          return false;
+        };
+
         set({
           workspacePanelStates: {
             ...state.workspacePanelStates,
@@ -218,11 +228,7 @@ export const useUiPreferencesStore = create<State>()(
               rightMainPanelMode: isCurrentlyActive ? null : mode,
             },
           },
-          isLeftSidebarVisible: isCurrentlyActive
-            ? true
-            : isWideScreen()
-              ? state.isLeftSidebarVisible
-              : false,
+          isLeftSidebarVisible: getLeftSidebarVisibility(),
         });
       },
 

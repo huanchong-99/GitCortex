@@ -61,25 +61,33 @@ export function WorkspacesMain({
         >
           {/* Conversation content - conditional based on loading/workspace state */}
           <MessageEditProvider>
-            {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-low">{t('common:workspaces.loading')}</p>
-              </div>
-            ) : !workspaceWithSession ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-low">
-                  {t('common:workspaces.selectToStart')}
-                </p>
-              </div>
-            ) : (
-              <div className="flex-1 min-h-0 overflow-hidden flex justify-center">
-                <div className="w-chat max-w-full h-full">
-                  <RetryUiProvider>
-                    <ConversationList attempt={workspaceWithSession} />
-                  </RetryUiProvider>
+            {(() => {
+              if (isLoading) {
+                return (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-low">{t('common:workspaces.loading')}</p>
+                  </div>
+                );
+              }
+              if (!workspaceWithSession) {
+                return (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-low">
+                      {t('common:workspaces.selectToStart')}
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex-1 min-h-0 overflow-hidden flex justify-center">
+                  <div className="w-chat max-w-full h-full">
+                    <RetryUiProvider>
+                      <ConversationList attempt={workspaceWithSession} />
+                    </RetryUiProvider>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {/* Chat box - always rendered to prevent flash during workspace switch */}
             <div className="flex justify-center @container pl-px">
               <SessionChatBoxContainer

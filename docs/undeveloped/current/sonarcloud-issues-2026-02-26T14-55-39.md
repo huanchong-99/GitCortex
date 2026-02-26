@@ -3274,7 +3274,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 90.1 Extract this nested ternary operation into an independent statement.
+### 90.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwehPZ9DOUQdEsGhI`
 - **项目**: huanchong-99
@@ -5106,7 +5106,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 155.1 Extract this nested ternary operation into an independent statement.
+### 155.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwe2gZ9DOUQdEsGoc`
 - **项目**: huanchong-99
