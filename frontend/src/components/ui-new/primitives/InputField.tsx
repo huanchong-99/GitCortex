@@ -8,14 +8,14 @@ import {
 import { cn } from '@/lib/utils';
 
 interface InputFieldProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  className?: string;
-  variant?: 'editable' | 'search';
-  actionIcon?: Icon;
-  onAction?: () => void;
-  disabled?: boolean;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly placeholder?: string;
+  readonly className?: string;
+  readonly variant?: 'editable' | 'search';
+  readonly actionIcon?: Icon;
+  readonly onAction?: () => void;
+  readonly disabled?: boolean;
 }
 
 export function InputField({
@@ -156,9 +156,17 @@ export function InputField({
       )}
       {variant === 'editable' && !isEditing && !justSaved && (
         <PencilSimpleLineIcon
+          role="button"
+          tabIndex={0}
           className="size-icon-sm text-low shrink-0 cursor-pointer hover:text-normal"
           weight="regular"
           onClick={() => setIsEditing(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsEditing(true);
+            }
+          }}
         />
       )}
 

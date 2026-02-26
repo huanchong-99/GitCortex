@@ -2,9 +2,9 @@ import type { TerminalDto } from 'shared/types';
 import { X } from 'lucide-react';
 
 interface TerminalDebugViewProps {
-  terminalId: string | null;
-  terminals: TerminalDto[];
-  onClose: () => void;
+  readonly terminalId: string | null;
+  readonly terminals: TerminalDto[];
+  readonly onClose: () => void;
 }
 
 export function TerminalDebugView({ terminalId, terminals, onClose }: TerminalDebugViewProps) {

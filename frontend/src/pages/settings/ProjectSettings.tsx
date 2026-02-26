@@ -183,8 +183,8 @@ export function ProjectSettings() {
         e.returnValue = '';
       }
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    globalThis.addEventListener('beforeunload', handler);
+    return () => globalThis.removeEventListener('beforeunload', handler);
   }, [hasUnsavedChanges]);
 
   // Fetch repositories when project changes

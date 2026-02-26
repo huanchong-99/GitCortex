@@ -6,8 +6,8 @@ import { WorkflowCard } from './WorkflowCard';
 import { Button } from '@/components/ui-new/primitives/Button';
 
 interface WorkflowSidebarProps {
-  selectedWorkflowId: string | null;
-  onSelectWorkflow: (id: string) => void;
+  readonly selectedWorkflowId: string | null;
+  readonly onSelectWorkflow: (id: string) => void;
 }
 
 export function WorkflowSidebar({

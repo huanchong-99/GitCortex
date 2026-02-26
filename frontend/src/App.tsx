@@ -102,7 +102,6 @@ function AppContent() {
           await updateAndSaveConfig({ show_release_notes: false });
         }
         ReleaseNotesDialog.hide();
-        return;
       }
     };
 

@@ -6,15 +6,15 @@ import { useTask } from '@/hooks/useTask';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
 
 interface WorkspacesMainContainerProps {
-  selectedWorkspace: Workspace | null;
-  selectedSession: Session | undefined;
-  sessions: Session[];
-  onSelectSession: (sessionId: string) => void;
-  isLoading: boolean;
+  readonly selectedWorkspace: Workspace | null;
+  readonly selectedSession: Session | undefined;
+  readonly sessions: Session[];
+  readonly onSelectSession: (sessionId: string) => void;
+  readonly isLoading: boolean;
   /** Whether user is creating a new session */
-  isNewSessionMode?: boolean;
+  readonly isNewSessionMode?: boolean;
   /** Callback to start new session mode */
-  onStartNewSession?: () => void;
+  readonly onStartNewSession?: () => void;
 }
 
 export function WorkspacesMainContainer({

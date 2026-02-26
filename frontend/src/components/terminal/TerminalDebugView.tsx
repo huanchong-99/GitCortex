@@ -29,8 +29,8 @@ const CONTROL_CHARACTERS_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]
 
 const sanitizeTerminalHistoryContent = (content: string) =>
   stripAnsi(content)
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
     .replace(CONTROL_CHARACTERS_REGEX, '');
 
 /**

@@ -2,12 +2,12 @@ import { SpinnerIcon, type Icon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 interface IconListItemProps {
-  icon: Icon;
-  label: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  loading?: boolean;
-  className?: string;
+  readonly icon: Icon;
+  readonly label: string;
+  readonly onClick?: () => void;
+  readonly disabled?: boolean;
+  readonly loading?: boolean;
+  readonly className?: string;
 }
 
 export function IconListItem({

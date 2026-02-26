@@ -6,12 +6,12 @@ import {
 } from '@/stores/useUiPreferencesStore';
 
 interface CollapsibleSectionProps {
-  persistKey: PersistKey;
-  title: string;
-  defaultExpanded?: boolean;
-  children?: React.ReactNode;
-  className?: string;
-  contentClassName?: string;
+  readonly persistKey: PersistKey;
+  readonly title: string;
+  readonly defaultExpanded?: boolean;
+  readonly children?: React.ReactNode;
+  readonly className?: string;
+  readonly contentClassName?: string;
 }
 
 export function CollapsibleSection({

@@ -31,8 +31,8 @@ const statusPillVariants = cva(
 export interface StatusPillProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof statusPillVariants> {
-  icon?: LucideIcon;
-  label?: React.ReactNode;
+  readonly icon?: LucideIcon;
+  readonly label?: React.ReactNode;
 }
 
 export function StatusPill({
@@ -48,31 +48,40 @@ export function StatusPill({
   const content = label ?? children;
   const isInteractive = typeof onClick === 'function';
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLSpanElement>) => {
-    if (!isInteractive) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onClick?.(event as unknown as React.MouseEvent<HTMLSpanElement>);
-    }
-  };
+  const sharedClassName = cn(
+    statusPillVariants({ tone, size }),
+    isInteractive && 'cursor-pointer hover:opacity-90',
+    className
+  );
 
-  return (
-    <span
-      role={isInteractive ? 'button' : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      className={cn(
-        statusPillVariants({ tone, size }),
-        isInteractive && 'cursor-pointer hover:opacity-90',
-        className
-      )}
-      {...props}
-    >
+  const inner = (
+    <>
       {Icon ? (
         <Icon className={cn(size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5')} />
       ) : null}
       {content}
+    </>
+  );
+
+  if (isInteractive) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={sharedClassName}
+        {...props}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <span
+      className={sharedClassName}
+      {...props}
+    >
+      {inner}
     </span>
   );
 }

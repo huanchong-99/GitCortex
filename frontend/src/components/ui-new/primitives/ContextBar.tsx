@@ -94,17 +94,17 @@ function DragHandle({
 }
 
 export interface ContextBarProps {
-  containerRef: RefObject<HTMLElement | null>;
+  readonly containerRef: RefObject<HTMLElement | null>;
   // Items for primary group (top section)
-  primaryItems?: ContextBarItem[];
+  readonly primaryItems?: ContextBarItem[];
   // Items for secondary group (below divider)
-  secondaryItems?: ContextBarItem[];
+  readonly secondaryItems?: ContextBarItem[];
   // Context for deriving action state
-  actionContext: ActionVisibilityContext;
+  readonly actionContext: ActionVisibilityContext;
   // Handler to execute an action
-  onExecuteAction: (action: ActionDefinition) => void;
+  readonly onExecuteAction: (action: ActionDefinition) => void;
   // IDE editor type for rendering IdeIcon
-  editorType?: EditorType | null;
+  readonly editorType?: EditorType | null;
 }
 
 /**

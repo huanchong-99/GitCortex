@@ -19,9 +19,8 @@ import { useDiffSummary } from '@/hooks/useDiffSummary';
 import { useDevServer } from '@/hooks/useDevServer';
 import { useHasDevServerScript } from '@/hooks/useHasDevServerScript';
 import { Button } from '@/components/ui/button';
-import { IdeIcon } from '@/components/ide/IdeIcon';
+import { IdeIcon, getIdeName } from '@/components/ide/IdeIcon';
 import { useUserSystem } from '@/components/ConfigProvider';
-import { getIdeName } from '@/components/ide/IdeIcon';
 import { useProject } from '@/contexts/ProjectContext';
 import { useQuery } from '@tanstack/react-query';
 import { attemptsApi } from '@/lib/api';
@@ -329,11 +328,12 @@ export function NextActionCard({
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {!projectHasDevScript
-                    ? t('attempt.devScriptMissingTooltip')
-                    : hasRunningDevServer
-                      ? t('attempt.pauseDev')
-                      : t('attempt.startDev')}
+                  {(() => {
+                    if (!projectHasDevScript) {
+                      return t('attempt.devScriptMissingTooltip');
+                    }
+                    return hasRunningDevServer ? t('attempt.pauseDev') : t('attempt.startDev');
+                  })()}
                 </TooltipContent>
               </Tooltip>
 

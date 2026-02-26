@@ -13,14 +13,14 @@ import { BaseCodingAgent } from 'shared/types';
 // Using custom shadcn/ui widgets instead of @rjsf/shadcn theme
 
 interface ExecutorConfigFormProps {
-  executor: BaseCodingAgent;
-  value: unknown;
-  onSubmit?: (formData: unknown) => void;
-  onChange?: (formData: unknown) => void;
-  onSave?: (formData: unknown) => Promise<void>;
-  disabled?: boolean;
-  isSaving?: boolean;
-  isDirty?: boolean;
+  readonly executor: BaseCodingAgent;
+  readonly value: unknown;
+  readonly onSubmit?: (formData: unknown) => void;
+  readonly onChange?: (formData: unknown) => void;
+  readonly onSave?: (formData: unknown) => Promise<void>;
+  readonly disabled?: boolean;
+  readonly isSaving?: boolean;
+  readonly isDirty?: boolean;
 }
 
 import schemas from 'virtual:executor-schemas';
@@ -154,8 +154,8 @@ export function ExecutorConfigForm({
         <Alert variant="destructive">
           <AlertDescription>
             <ul className="list-disc list-inside space-y-1">
-              {validationErrors.map((error, index) => (
-                <li key={index}>
+              {validationErrors.map((error) => (
+                <li key={`${error.property}-${error.message}`}>
                   {error.property}: {error.message}
                 </li>
               ))}

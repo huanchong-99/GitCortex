@@ -12,10 +12,10 @@ import { useChangesView } from '@/contexts/ChangesViewContext';
 import type { Diff } from 'shared/types';
 
 interface FileTreeContainerProps {
-  workspaceId?: string;
-  diffs: Diff[];
-  onSelectFile?: (path: string, diff: Diff) => void;
-  className?: string;
+  readonly workspaceId?: string;
+  readonly diffs: Diff[];
+  readonly onSelectFile?: (path: string, diff: Diff) => void;
+  readonly className?: string;
 }
 
 export function FileTreeContainer({

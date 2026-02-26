@@ -28,10 +28,10 @@ export function useCommandBarShortcut(
     if (!enabled) return;
 
     // Use capture phase to intercept before other handlers (like Lexical editor)
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    globalThis.addEventListener('keydown', handleKeyDown, { capture: true });
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      globalThis.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
   }, [handleKeyDown, enabled]);
 }

@@ -4,7 +4,7 @@ import { formatRelativeTime } from '@/utils/date';
 import type { NormalizedGitHubComment } from '@/contexts/WorkspaceContext';
 
 interface GitHubCommentRendererProps {
-  comment: NormalizedGitHubComment;
+  readonly comment: NormalizedGitHubComment;
 }
 
 /**

@@ -51,8 +51,8 @@ const WorkspacesGuideDialogImpl = NiceModal.create<NoProps>(() => {
         handleClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [handleClose]);
 
   if (!container) return null;

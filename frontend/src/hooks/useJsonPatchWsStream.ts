@@ -54,7 +54,7 @@ export const useJsonPatchWsStream = <T extends object>(
     // Exponential backoff with cap: 1s, 2s, 4s, 8s (max), then stay at 8s
     const attempt = retryAttemptsRef.current;
     const delay = Math.min(8000, 1000 * Math.pow(2, attempt));
-    retryTimerRef.current = window.setTimeout(() => {
+    retryTimerRef.current = globalThis.setTimeout(() => {
       retryTimerRef.current = null;
       setRetryNonce((n) => n + 1);
     }, delay);
@@ -93,7 +93,7 @@ export const useJsonPatchWsStream = <T extends object>(
         wsRef.current = null;
       }
       if (retryTimerRef.current) {
-        window.clearTimeout(retryTimerRef.current);
+        globalThis.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
       retryAttemptsRef.current = 0;
@@ -205,7 +205,7 @@ export const useJsonPatchWsStream = <T extends object>(
         wsRef.current = null;
       }
       if (retryTimerRef.current) {
-        window.clearTimeout(retryTimerRef.current);
+        globalThis.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
       finishedRef.current = false;

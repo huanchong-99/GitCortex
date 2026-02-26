@@ -12,48 +12,48 @@ import {
 
 interface SearchableDropdownProps<T> {
   /** Array of filtered items to display */
-  filteredItems: T[];
+  readonly filteredItems: T[];
   /** Currently selected value (matched against getItemKey) */
-  selectedValue?: string | null;
+  readonly selectedValue?: string | null;
 
   /** Extract unique key from item */
-  getItemKey: (item: T) => string;
+  readonly getItemKey: (item: T) => string;
   /** Extract display label from item */
-  getItemLabel: (item: T) => string;
+  readonly getItemLabel: (item: T) => string;
 
   /** Called when an item is selected */
-  onSelect: (item: T) => void;
+  readonly onSelect: (item: T) => void;
 
   /** Trigger element (uses asChild pattern) */
-  trigger: React.ReactNode;
+  readonly trigger: React.ReactNode;
 
   /** Search state */
-  searchTerm: string;
-  onSearchTermChange: (value: string) => void;
+  readonly searchTerm: string;
+  readonly onSearchTermChange: (value: string) => void;
 
   /** Highlight state */
-  highlightedIndex: number | null;
-  onHighlightedIndexChange: (index: number | null) => void;
+  readonly highlightedIndex: number | null;
+  readonly onHighlightedIndexChange: (index: number | null) => void;
 
   /** Open state */
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
 
   /** Keyboard handler */
-  onKeyDown: (e: React.KeyboardEvent) => void;
+  readonly onKeyDown: (e: React.KeyboardEvent) => void;
 
   /** Virtuoso ref for scrolling */
-  virtuosoRef: RefObject<VirtuosoHandle | null>;
+  readonly virtuosoRef: RefObject<VirtuosoHandle | null>;
 
   /** Class name for dropdown content */
-  contentClassName?: string;
+  readonly contentClassName?: string;
   /** Placeholder text for search input */
-  placeholder?: string;
+  readonly placeholder?: string;
   /** Message shown when no items match */
-  emptyMessage?: string;
+  readonly emptyMessage?: string;
 
   /** Optional badge text for each item */
-  getItemBadge?: (item: T) => string | undefined;
+  readonly getItemBadge?: (item: T) => string | undefined;
 }
 
 export function SearchableDropdown<T>({

@@ -9,10 +9,10 @@ export interface RecentRepoEntry {
 }
 
 interface RecentReposListProps {
-  repos: RecentRepoEntry[];
-  loading: boolean;
-  error: string | null;
-  onSelect: (entry: RecentRepoEntry) => void;
+  readonly repos: RecentRepoEntry[];
+  readonly loading: boolean;
+  readonly error: string | null;
+  readonly onSelect: (entry: RecentRepoEntry) => void;
 }
 
 export function RecentReposList({

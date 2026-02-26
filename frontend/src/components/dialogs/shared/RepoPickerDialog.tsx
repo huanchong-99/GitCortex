@@ -194,8 +194,16 @@ const RepoPickerDialogImpl = NiceModal.create<RepoPickerDialogProps>(
               {stage === 'options' && (
                 <>
                   <div
+                    role="button"
+                    tabIndex={0}
                     className="p-4 border cursor-pointer hover:shadow-md transition-shadow rounded-lg bg-card"
                     onClick={() => setStage('existing')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setStage('existing');
+                      }
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       <FolderGit className="h-5 w-5 mt-0.5 flex-shrink-0 text-muted-foreground" />
@@ -211,8 +219,16 @@ const RepoPickerDialogImpl = NiceModal.create<RepoPickerDialogProps>(
                   </div>
 
                   <div
+                    role="button"
+                    tabIndex={0}
                     className="p-4 border cursor-pointer hover:shadow-md transition-shadow rounded-lg bg-card"
                     onClick={() => setStage('new')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setStage('new');
+                      }
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       <FolderPlus className="h-5 w-5 mt-0.5 flex-shrink-0 text-muted-foreground" />
@@ -268,8 +284,16 @@ const RepoPickerDialogImpl = NiceModal.create<RepoPickerDialogProps>(
                         .map((repo) => (
                           <div
                             key={repo.path}
+                            role="button"
+                            tabIndex={0}
                             className="p-4 border cursor-pointer hover:shadow-md transition-shadow rounded-lg bg-card"
                             onClick={() => !isWorking && handleSelectRepo(repo)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (!isWorking) handleSelectRepo(repo);
+                              }
+                            }}
                           >
                             <div className="flex items-start gap-3">
                               <FolderGit className="h-5 w-5 mt-0.5 flex-shrink-0 text-muted-foreground" />
@@ -325,8 +349,16 @@ const RepoPickerDialogImpl = NiceModal.create<RepoPickerDialogProps>(
                     )}
 
                   <div
+                    role="button"
+                    tabIndex={0}
                     className="p-4 border border-dashed cursor-pointer hover:shadow-md transition-shadow rounded-lg bg-card"
                     onClick={() => !isWorking && handleBrowseForRepo()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (!isWorking) handleBrowseForRepo();
+                      }
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       <Search className="h-5 w-5 mt-0.5 flex-shrink-0 text-muted-foreground" />

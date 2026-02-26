@@ -129,8 +129,8 @@ export function GeneralSettings() {
         e.returnValue = '';
       }
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    globalThis.addEventListener('beforeunload', handler);
+    return () => globalThis.removeEventListener('beforeunload', handler);
   }, [hasUnsavedChanges]);
 
   const playSound = async (soundFile: SoundFile) => {

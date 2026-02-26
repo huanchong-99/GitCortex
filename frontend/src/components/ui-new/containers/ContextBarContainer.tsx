@@ -56,7 +56,7 @@ function filterContextBarItems(
 }
 
 export interface ContextBarContainerProps {
-  containerRef: RefObject<HTMLElement | null>;
+  readonly containerRef: RefObject<HTMLElement | null>;
 }
 
 export function ContextBarContainer({

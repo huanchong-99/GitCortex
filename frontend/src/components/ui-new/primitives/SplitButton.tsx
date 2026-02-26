@@ -14,11 +14,11 @@ export interface SplitButtonOption<T extends string> {
 }
 
 interface SplitButtonProps<T extends string = string> {
-  options: SplitButtonOption<T>[];
-  selectedValue: T;
-  onSelectionChange: (value: T) => void;
-  onAction: (value: T) => void;
-  className?: string;
+  readonly options: SplitButtonOption<T>[];
+  readonly selectedValue: T;
+  readonly onSelectionChange: (value: T) => void;
+  readonly onAction: (value: T) => void;
+  readonly className?: string;
 }
 
 export function SplitButton<T extends string>({

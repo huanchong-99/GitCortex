@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { EditorAvailabilityState } from '@/hooks/useEditorAvailability';
 
 interface EditorAvailabilityIndicatorProps {
-  availability: EditorAvailabilityState;
+  readonly availability: EditorAvailabilityState;
 }
 
 /**

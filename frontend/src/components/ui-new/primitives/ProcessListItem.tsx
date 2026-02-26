@@ -13,12 +13,12 @@ import type {
 } from 'shared/types';
 
 interface ProcessListItemProps {
-  runReason: ExecutionProcessRunReason;
-  status: ExecutionProcessStatus;
-  startedAt: string;
-  selected?: boolean;
-  onClick?: () => void;
-  className?: string;
+  readonly runReason: ExecutionProcessRunReason;
+  readonly status: ExecutionProcessStatus;
+  readonly startedAt: string;
+  readonly selected?: boolean;
+  readonly onClick?: () => void;
+  readonly className?: string;
 }
 
 const RUN_REASON_LABELS: Record<ExecutionProcessRunReason, string> = {

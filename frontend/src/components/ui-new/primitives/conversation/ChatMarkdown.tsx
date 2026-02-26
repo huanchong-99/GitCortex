@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { useChangesView } from '@/contexts/ChangesViewContext';
 
 interface ChatMarkdownProps {
-  content: string;
-  maxWidth?: string;
-  className?: string;
-  workspaceId?: string;
+  readonly content: string;
+  readonly maxWidth?: string;
+  readonly className?: string;
+  readonly workspaceId?: string;
 }
 
 export function ChatMarkdown({

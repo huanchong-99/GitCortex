@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ThemeMode } from 'shared/types';
 
-type ThemeProviderProps = {
+type ThemeProviderProps = Readonly<{
   children: React.ReactNode;
   initialTheme?: ThemeMode;
-};
+}>;
 
 type ThemeProviderState = {
   theme: ThemeMode;
@@ -31,12 +31,12 @@ export function ThemeProvider({
   }, [initialTheme]);
 
   useEffect(() => {
-    const root = window.document.documentElement;
+    const root = globalThis.document.documentElement;
 
     root.classList.remove('light', 'dark');
 
     if (theme === ThemeMode.SYSTEM) {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+      const systemTheme = globalThis.matchMedia('(prefers-color-scheme: dark)')
         .matches
         ? 'dark'
         : 'light';
@@ -48,14 +48,14 @@ export function ThemeProvider({
     root.classList.add(theme.toLowerCase());
   }, [theme]);
 
-  const setTheme = (newTheme: ThemeMode) => {
+  const setTheme = useCallback((newTheme: ThemeMode) => {
     setThemeState(newTheme);
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     theme,
     setTheme,
-  };
+  }), [theme, setTheme]);
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>

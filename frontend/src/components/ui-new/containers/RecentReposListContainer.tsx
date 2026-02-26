@@ -7,8 +7,8 @@ import {
 import type { DirectoryEntry, Repo } from 'shared/types';
 
 interface RecentReposListContainerProps {
-  registeredRepoPaths: string[];
-  onRepoRegistered: (repo: Repo) => void;
+  readonly registeredRepoPaths: string[];
+  readonly onRepoRegistered: (repo: Repo) => void;
 }
 
 export function RecentReposListContainer({

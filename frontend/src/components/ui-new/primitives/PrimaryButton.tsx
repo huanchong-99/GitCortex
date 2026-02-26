@@ -2,12 +2,12 @@ import { cn } from '@/lib/utils';
 import { SpinnerIcon, type Icon } from '@phosphor-icons/react';
 
 interface PrimaryButtonProps {
-  variant?: 'default' | 'secondary' | 'tertiary';
-  actionIcon?: Icon | 'spinner';
-  value?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  children?: React.ReactNode;
+  readonly variant?: 'default' | 'secondary' | 'tertiary';
+  readonly actionIcon?: Icon | 'spinner';
+  readonly value?: string;
+  readonly onClick?: () => void;
+  readonly disabled?: boolean;
+  readonly children?: React.ReactNode;
 }
 
 export function PrimaryButton({
@@ -18,13 +18,13 @@ export function PrimaryButton({
   disabled,
   children,
 }: PrimaryButtonProps) {
-  const variantStyles = disabled
-    ? 'cursor-not-allowed bg-panel'
-    : variant === 'default'
-      ? 'bg-brand hover:bg-brand-hover text-on-brand'
-      : variant === 'secondary'
-        ? 'bg-brand-secondary hover:bg-brand-hover text-on-brand'
-        : 'bg-panel hover:bg-secondary text-normal';
+  const getVariantStyles = () => {
+    if (disabled) return 'cursor-not-allowed bg-panel';
+    if (variant === 'default') return 'bg-brand hover:bg-brand-hover text-on-brand';
+    if (variant === 'secondary') return 'bg-brand-secondary hover:bg-brand-hover text-on-brand';
+    return 'bg-panel hover:bg-secondary text-normal';
+  };
+  const variantStyles = getVariantStyles();
 
   return (
     <button
@@ -37,13 +37,13 @@ export function PrimaryButton({
     >
       {value}
       {children}
-      {ActionIcon ? (
-        ActionIcon === 'spinner' ? (
-          <SpinnerIcon className={'size-icon-sm animate-spin'} weight="bold" />
-        ) : (
-          <ActionIcon className={'size-icon-xs'} weight="bold" />
-        )
-      ) : null}
+      {(() => {
+        if (!ActionIcon) return null;
+        if (ActionIcon === 'spinner') {
+          return <SpinnerIcon className={'size-icon-sm animate-spin'} weight="bold" />;
+        }
+        return <ActionIcon className={'size-icon-xs'} weight="bold" />;
+      })()}
     </button>
   );
 }

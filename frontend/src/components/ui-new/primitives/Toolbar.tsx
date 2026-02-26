@@ -18,7 +18,7 @@ import {
 } from './Dropdown';
 
 interface ToolbarProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 function Toolbar({ children, className, ...props }: ToolbarProps) {
@@ -31,7 +31,7 @@ function Toolbar({ children, className, ...props }: ToolbarProps) {
 
 interface ToolbarIconButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  icon: Icon;
+  readonly icon: Icon;
 }
 
 function ToolbarIconButton({
@@ -56,11 +56,11 @@ function ToolbarIconButton({
 }
 
 interface ToolbarDropdownProps {
-  label: string;
-  icon?: Icon;
-  children?: React.ReactNode;
-  className?: string;
-  disabled?: boolean;
+  readonly label: string;
+  readonly icon?: Icon;
+  readonly children?: React.ReactNode;
+  readonly className?: string;
+  readonly disabled?: boolean;
 }
 
 function ToolbarDropdown({

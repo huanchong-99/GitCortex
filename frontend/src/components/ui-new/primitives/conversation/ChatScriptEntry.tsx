@@ -6,12 +6,12 @@ import { ToolStatusDot } from './ToolStatusDot';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
 
 interface ChatScriptEntryProps {
-  title: string;
-  processId: string;
-  exitCode?: number | null;
-  className?: string;
-  status: ToolStatus;
-  onFix?: () => void;
+  readonly title: string;
+  readonly processId: string;
+  readonly exitCode?: number | null;
+  readonly className?: string;
+  readonly status: ToolStatus;
+  readonly onFix?: () => void;
 }
 
 export function ChatScriptEntry({

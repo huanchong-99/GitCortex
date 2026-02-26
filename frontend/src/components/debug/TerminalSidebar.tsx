@@ -2,9 +2,9 @@ import type { TerminalDto } from 'shared/types';
 import { cn } from '@/lib/utils';
 
 interface TerminalSidebarProps {
-  terminals: TerminalDto[];
-  selectedTerminalId: string | null;
-  onSelect: (terminalId: string) => void;
+  readonly terminals: TerminalDto[];
+  readonly selectedTerminalId: string | null;
+  readonly onSelect: (terminalId: string) => void;
 }
 
 export function TerminalSidebar({ terminals, selectedTerminalId, onSelect }: TerminalSidebarProps) {

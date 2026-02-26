@@ -14,10 +14,10 @@ import {
 } from '@/stores/useUiPreferencesStore';
 
 export interface RightSidebarProps {
-  isCreateMode: boolean;
-  rightMainPanelMode: RightMainPanelMode | null;
-  selectedWorkspace: Workspace | undefined;
-  repos: RepoWithTargetBranch[];
+  readonly isCreateMode: boolean;
+  readonly rightMainPanelMode: RightMainPanelMode | null;
+  readonly selectedWorkspace: Workspace | undefined;
+  readonly repos: RepoWithTargetBranch[];
 }
 
 export function RightSidebar({

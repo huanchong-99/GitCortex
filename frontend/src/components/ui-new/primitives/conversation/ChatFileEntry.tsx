@@ -9,17 +9,17 @@ import { ToolStatusDot } from './ToolStatusDot';
 import { DiffViewBody, useDiffData, type DiffInput } from './DiffViewCard';
 
 interface ChatFileEntryProps {
-  filename: string;
-  additions?: number;
-  deletions?: number;
-  expanded?: boolean;
-  onToggle?: () => void;
-  className?: string;
-  status?: ToolStatus;
+  readonly filename: string;
+  readonly additions?: number;
+  readonly deletions?: number;
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
+  readonly className?: string;
+  readonly status?: ToolStatus;
   /** Optional diff content for expanded view */
-  diffContent?: DiffInput;
+  readonly diffContent?: DiffInput;
   /** Optional callback to open file in changes panel */
-  onOpenInChanges?: () => void;
+  readonly onOpenInChanges?: () => void;
 }
 
 export function ChatFileEntry({
@@ -58,12 +58,20 @@ export function ChatFileEntry({
       >
         {/* Header */}
         <div
+          role={onToggle ? "button" : undefined}
+          tabIndex={onToggle ? 0 : undefined}
           className={cn(
             'flex items-center p-base w-full',
             isDenied ? 'bg-error/20' : 'bg-panel',
             onToggle && 'cursor-pointer'
           )}
           onClick={onToggle}
+          onKeyDown={onToggle ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggle();
+            }
+          } : undefined}
         >
           <div className="flex-1 flex items-center gap-base min-w-0">
             <span className="relative shrink-0">
@@ -128,6 +136,8 @@ export function ChatFileEntry({
   // Original header-only rendering (no diff content)
   return (
     <div
+      role={onToggle ? "button" : undefined}
+      tabIndex={onToggle ? 0 : undefined}
       className={cn(
         'flex items-center border rounded-sm p-base w-full',
         isDenied ? 'bg-error/20 border-error' : 'bg-panel',
@@ -135,6 +145,12 @@ export function ChatFileEntry({
         className
       )}
       onClick={onToggle}
+      onKeyDown={onToggle ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle();
+        }
+      } : undefined}
     >
       <div className="flex-1 flex items-center gap-base min-w-0">
         <span className="relative shrink-0">

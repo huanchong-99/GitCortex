@@ -3,11 +3,11 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 interface ViewHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  eyebrow?: React.ReactNode;
-  actions?: React.ReactNode;
-  meta?: React.ReactNode;
+  readonly title?: React.ReactNode;
+  readonly description?: React.ReactNode;
+  readonly eyebrow?: React.ReactNode;
+  readonly actions?: React.ReactNode;
+  readonly meta?: React.ReactNode;
 }
 
 export function ViewHeader({

@@ -102,7 +102,15 @@ function EditDiffRenderer({
       <div className={headerClass}>
         <SquarePen className="h-3 w-3" />
         <p
+          role="button"
+          tabIndex={0}
           onClick={() => setExpanded()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setExpanded();
+            }
+          }}
           className="text-sm font-mono overflow-x-auto flex-1 cursor-pointer"
         >
           {path}{' '}

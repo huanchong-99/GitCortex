@@ -2,7 +2,7 @@ import { useWorkflowStore } from '@/stores/workflowStore';
 import { useWsStore } from '@/stores/wsStore';
 
 interface StatusBarProps {
-  workflowId: string | null;
+  readonly workflowId: string | null;
 }
 
 export function StatusBar({ workflowId }: StatusBarProps) {

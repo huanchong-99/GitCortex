@@ -6,7 +6,7 @@ import { CreateRepoDialog } from '@/components/ui-new/dialogs/CreateRepoDialog';
 import type { Repo } from 'shared/types';
 
 interface CreateRepoButtonContainerProps {
-  onRepoCreated: (repo: Repo) => void;
+  readonly onRepoCreated: (repo: Repo) => void;
 }
 
 export function CreateRepoButtonContainer({

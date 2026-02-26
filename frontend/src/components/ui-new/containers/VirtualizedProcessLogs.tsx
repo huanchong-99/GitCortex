@@ -18,11 +18,11 @@ export type LogEntry = Extract<
 >;
 
 export interface VirtualizedProcessLogsProps {
-  logs: LogEntry[];
-  error: string | null;
-  searchQuery?: string;
-  matchIndices?: number[];
-  currentMatchIndex?: number;
+  readonly logs: LogEntry[];
+  readonly error: string | null;
+  readonly searchQuery?: string;
+  readonly matchIndices?: number[];
+  readonly currentMatchIndex?: number;
 }
 
 type LogEntryWithKey = LogEntry & { key: string; originalIndex: number };

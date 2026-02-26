@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils';
 import type { TodoItem } from 'shared/types';
 
 interface ChatTodoListProps {
-  todos: TodoItem[];
-  expanded?: boolean;
-  onToggle?: () => void;
+  readonly todos: TodoItem[];
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
 }
 
 function getStatusIcon(status?: string) {
@@ -26,10 +26,10 @@ export function ChatTodoList({ todos, expanded, onToggle }: ChatTodoListProps) {
 
   return (
     <div className="text-sm">
-      <div
-        className="flex items-center gap-base text-low cursor-pointer"
+      <button
+        type="button"
+        className="flex items-center gap-base text-low cursor-pointer w-full"
         onClick={onToggle}
-        role="button"
       >
         <ListChecksIcon className="shrink-0 size-icon-base" />
         <span className="flex-1">{t('conversation.updatedTodos')}</span>
@@ -39,7 +39,7 @@ export function ChatTodoList({ todos, expanded, onToggle }: ChatTodoListProps) {
             expanded && 'rotate-180'
           )}
         />
-      </div>
+      </button>
       {expanded && todos.length > 0 && (
         <ul className="mt-base ml-6 space-y-1">
           {todos.map((todo, index) => (

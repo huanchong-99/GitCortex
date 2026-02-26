@@ -75,7 +75,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
 
     const clearKeepAliveTimer = useCallback(() => {
       if (keepAliveTimerRef.current) {
-        window.clearInterval(keepAliveTimerRef.current);
+        globalThis.clearInterval(keepAliveTimerRef.current);
         keepAliveTimerRef.current = null;
       }
     }, []);
@@ -97,7 +97,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       reconnectAttemptsRef.current = attempt;
       const delay = AUTO_RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt - 1);
 
-      reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = globalThis.setTimeout(() => {
         reconnectTimerRef.current = null;
         if (!wsUrl) {
           return;
@@ -200,10 +200,10 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         handleResize(cols, rows);
       };
 
-      window.addEventListener('resize', handleWindowResize);
+      globalThis.addEventListener('resize', handleWindowResize);
 
       return () => {
-        window.removeEventListener('resize', handleWindowResize);
+        globalThis.removeEventListener('resize', handleWindowResize);
         terminalReadyRef.current = false;
         terminal.dispose();
       };
@@ -247,7 +247,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         logInfo('Terminal WebSocket connected');
 
         clearKeepAliveTimer();
-        keepAliveTimerRef.current = window.setInterval(() => {
+        keepAliveTimerRef.current = globalThis.setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(WS_KEEPALIVE_MESSAGE);
           }
@@ -305,7 +305,12 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         if (isActive) {
           const reason = event?.reason?.trim();
           const showCode = typeof code === 'number' && code !== 1000 && code !== 1005;
-          const detail = reason ? reason : showCode ? `code ${code}` : '';
+          let detail = '';
+          if (reason) {
+            detail = reason;
+          } else if (showCode) {
+            detail = `code ${code}`;
+          }
           markDisconnected(detail ? `${DISCONNECTED_HINT} (${detail})` : DISCONNECTED_HINT);
           if (!isExpectedClose && !skipNextAutoReconnectRef.current) {
             scheduleAutoReconnect();

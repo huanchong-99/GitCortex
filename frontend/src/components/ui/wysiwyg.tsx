@@ -107,10 +107,10 @@ function WYSIWYGEditor({
     if (!value) return;
     try {
       // Unescape markdown-escaped underscores for cleaner clipboard output
-      const unescaped = value.replace(/\\_/g, '_');
+      const unescaped = value.replaceAll('\\_', '_');
       await writeClipboardViaBridge(unescaped);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 400);
+      globalThis.setTimeout(() => setCopied(false), 400);
     } catch {
       // noop – bridge handles fallback
     }

@@ -3,13 +3,13 @@ import { ChatEntryContainer } from './ChatEntryContainer';
 import { ToolStatus } from 'shared/types';
 
 interface ChatApprovalCardProps {
-  title: string;
-  content: string;
-  expanded?: boolean;
-  onToggle?: () => void;
-  className?: string;
-  workspaceId?: string;
-  status: ToolStatus;
+  readonly title: string;
+  readonly content: string;
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
+  readonly className?: string;
+  readonly workspaceId?: string;
+  readonly status: ToolStatus;
 }
 
 export function ChatApprovalCard({

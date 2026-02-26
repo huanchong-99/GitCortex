@@ -60,10 +60,10 @@ const CreateOrganizationDialogImpl = NiceModal.create<NoProps>(() => {
       const generatedSlug = name
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
+        .replaceAll(/[^a-z0-9\s-]/g, '')
+        .replaceAll(/\s+/g, '-')
+        .replaceAll(/-+/g, '-')
+        .replaceAll(/^-|-$/g, '');
       setSlug(generatedSlug);
     }
   }, [name, isManualSlug]);

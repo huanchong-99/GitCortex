@@ -340,12 +340,20 @@ export function DiffViewCardWithComments({
     <div className={cn('my-base rounded-sm border', className)}>
       {/* Header */}
       <div
+        role={onToggle ? "button" : undefined}
+        tabIndex={onToggle ? 0 : undefined}
         className={cn(
           'w-full flex items-center bg-primary px-base gap-base sticky top-0 z-10 border-b border-transparent ',
           onToggle && 'cursor-pointer',
           expanded && 'border-inherit rounded-t-sm'
         )}
         onClick={onToggle}
+        onKeyDown={onToggle ? (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        } : undefined}
       >
         <span className="relative shrink-0">
           <FileIcon className="size-icon-base" />

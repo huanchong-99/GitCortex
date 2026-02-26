@@ -225,10 +225,18 @@ const MessageCard: React.FC<{
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={`${frameBase} ${
         variant === 'system' ? systemTheme : errorTheme
       }`}
       onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle?.();
+        }
+      }}
     >
       <div className="flex items-center gap-1.5">
         <div className="min-w-0 flex-1">{children}</div>
@@ -262,7 +270,15 @@ const ExpandChevron: React.FC<{
 
   return (
     <ChevronDown
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={`h-4 w-4 cursor-pointer transition-transform ${color} ${
         expanded ? '' : '-rotate-90'
       }`}

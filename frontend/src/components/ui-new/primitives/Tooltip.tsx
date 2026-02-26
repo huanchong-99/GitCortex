@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { usePortalContainer } from '@/contexts/PortalContainerContext';
 
 interface TooltipProps {
-  children: React.ReactNode;
-  content: string;
-  side?: 'top' | 'bottom' | 'left' | 'right';
-  className?: string;
+  readonly children: React.ReactNode;
+  readonly content: string;
+  readonly side?: 'top' | 'bottom' | 'left' | 'right';
+  readonly className?: string;
 }
 
 export function Tooltip({

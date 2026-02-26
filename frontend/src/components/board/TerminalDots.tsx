@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-type TerminalStatus = 'not_started' | 'starting' | 'waiting' | 'working' | 'completed' | 'failed' | string;
+type TerminalStatus = 'not_started' | 'starting' | 'waiting' | 'working' | 'completed' | 'failed' | (string & Record<never, never>);
 
 interface TerminalInfo {
   id: string;
@@ -9,9 +9,9 @@ interface TerminalInfo {
 
 interface TerminalDotsProps {
   /** Simple count for backwards compatibility */
-  terminalCount?: number;
+  readonly terminalCount?: number;
   /** Terminal info with status for differentiated display */
-  terminals?: TerminalInfo[];
+  readonly terminals?: TerminalInfo[];
 }
 
 /**
@@ -61,7 +61,7 @@ export function TerminalDots({ terminalCount, terminals }: TerminalDotsProps) {
     <div className="flex gap-1" aria-label="terminal-count">
       {Array.from({ length: count }).map((_, index) => (
         <span
-          key={index}
+          key={`dot-${index}`}
           data-testid="terminal-dot"
           className="h-2 w-2 rounded-full bg-brand"
         />

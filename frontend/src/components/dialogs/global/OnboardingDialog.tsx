@@ -109,7 +109,7 @@ const OnboardingDialogImpl = NiceModal.create<NoProps>(() => {
                 <SelectContent>
                   {profiles &&
                     (Object.keys(profiles) as BaseCodingAgent[])
-                      .sort()
+                      .sort((a, b) => a.localeCompare(b))
                       .map((agent) => (
                         <SelectItem key={agent} value={agent}>
                           {agent}

@@ -6,7 +6,7 @@ import { useCreateMode } from '@/contexts/CreateModeContext';
 import { CreateProjectDialog } from '@/components/ui-new/dialogs/CreateProjectDialog';
 
 interface GitPanelCreateContainerProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function GitPanelCreateContainer({

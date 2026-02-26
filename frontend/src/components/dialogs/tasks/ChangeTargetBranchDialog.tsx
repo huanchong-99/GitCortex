@@ -15,8 +15,8 @@ import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
 
 export interface ChangeTargetBranchDialogProps {
-  branches: GitBranch[];
-  isChangingTargetBranch?: boolean;
+  readonly branches: GitBranch[];
+  readonly isChangingTargetBranch?: boolean;
 }
 
 export type ChangeTargetBranchDialogResult = {
@@ -26,7 +26,7 @@ export type ChangeTargetBranchDialogResult = {
 
 const ChangeTargetBranchDialogImpl =
   NiceModal.create<ChangeTargetBranchDialogProps>(
-    ({ branches, isChangingTargetBranch: isChangingTargetBranch = false }) => {
+    ({ branches, isChangingTargetBranch = false }) => {
       const modal = useModal();
       const { t } = useTranslation(['tasks', 'common']);
       const [selectedBranch, setSelectedBranch] = useState<string>('');

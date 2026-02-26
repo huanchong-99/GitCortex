@@ -1,14 +1,14 @@
 import { BaseCodingAgent, ThemeMode } from 'shared/types';
 import { useTheme } from '@/components/ThemeProvider';
 
-type AgentIconProps = {
+type AgentIconProps = Readonly<{
   agent: BaseCodingAgent | null | undefined;
   className?: string;
-};
+}>;
 
 function getResolvedTheme(theme: ThemeMode): 'light' | 'dark' {
   if (theme === ThemeMode.SYSTEM) {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
+    return globalThis.matchMedia('(prefers-color-scheme: dark)').matches
       ? 'dark'
       : 'light';
   }

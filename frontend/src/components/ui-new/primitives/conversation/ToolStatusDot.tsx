@@ -2,8 +2,8 @@ import { cn } from '@/lib/utils';
 import { ToolStatus } from 'shared/types';
 
 interface ToolStatusDotProps {
-  status: ToolStatus;
-  className?: string;
+  readonly status: ToolStatus;
+  readonly className?: string;
 }
 
 export function ToolStatusDot({ status, className }: ToolStatusDotProps) {

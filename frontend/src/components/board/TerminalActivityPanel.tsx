@@ -7,20 +7,20 @@ import { useRecentTerminalOutput } from '@/stores/terminalStore';
 import { cn } from '@/lib/utils';
 
 interface TerminalActivityPanelProps {
-  workflowId: string | null;
+  readonly workflowId: string | null;
 }
 
 interface ActivityItem {
-  id: string;
-  taskId: string;
-  label: string;
-  status: string;
-  orderIndex: number;
-  lastActivity?: Date | null;
+  readonly id: string;
+  readonly taskId: string;
+  readonly label: string;
+  readonly status: string;
+  readonly orderIndex: number;
+  readonly lastActivity?: Date | null;
 }
 
 /** Status values that indicate active terminals */
-const ACTIVE_STATUSES = ['working', 'waiting', 'running', 'starting'];
+const ACTIVE_STATUSES = new Set(['working', 'waiting', 'running', 'starting']);
 
 /**
  * Format relative time for last activity
@@ -70,8 +70,8 @@ function TerminalActivityItem({
       </div>
       {recentOutput.length > 0 && (
         <div className="mt-1 pl-4 text-[10px] font-mono text-low max-h-12 overflow-hidden">
-          {recentOutput.slice(-3).map((line, i) => (
-            <div key={i} className="truncate">{line || '\u00A0'}</div>
+          {recentOutput.slice(-3).map((line) => (
+            <div key={line || '\u00A0'} className="truncate">{line || '\u00A0'}</div>
           ))}
         </div>
       )}
@@ -90,10 +90,12 @@ function StatusIndicator({ status }: { status: string }) {
     <span
       className={cn(
         'inline-block w-2 h-2 rounded-full',
-        status === 'working' || status === 'running' ? 'bg-green-500 animate-pulse' :
-        status === 'waiting' ? 'bg-blue-500' :
-        status === 'starting' ? 'bg-yellow-500' :
-        'bg-gray-400'
+        (() => {
+          if (status === 'working' || status === 'running') return 'bg-green-500 animate-pulse';
+          if (status === 'waiting') return 'bg-blue-500';
+          if (status === 'starting') return 'bg-yellow-500';
+          return 'bg-gray-400';
+        })()
       )}
       title={t(statusKey, { defaultValue: status })}
     />
@@ -111,7 +113,7 @@ export function TerminalActivityPanel({ workflowId }: TerminalActivityPanelProps
 
     return workflow.tasks.flatMap((task) =>
       task.terminals
-        .filter((terminal) => ACTIVE_STATUSES.includes(terminal.status))
+        .filter((terminal) => ACTIVE_STATUSES.has(terminal.status))
         .map((terminal) => ({
           id: terminal.id,
           taskId: task.id,

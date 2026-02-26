@@ -15,9 +15,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-type Props = {
+type Props = Readonly<{
   className?: string;
-};
+}>;
 
 export default function DiffViewSwitch({ className }: Props) {
   const { t } = useTranslation('tasks');

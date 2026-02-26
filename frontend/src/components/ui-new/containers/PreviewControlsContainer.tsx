@@ -9,9 +9,9 @@ import {
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
 
 interface PreviewControlsContainerProps {
-  attemptId?: string;
-  onViewProcessInPanel?: (processId: string) => void;
-  className?: string;
+  readonly attemptId?: string;
+  readonly onViewProcessInPanel?: (processId: string) => void;
+  readonly className?: string;
 }
 
 export function PreviewControlsContainer({

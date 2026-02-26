@@ -13,7 +13,7 @@ export type LogsPanelContent =
   | { type: 'tool'; toolName: string; content: string; command?: string };
 
 interface LogsContentContainerProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function LogsContentContainer({ className }: LogsContentContainerProps) {

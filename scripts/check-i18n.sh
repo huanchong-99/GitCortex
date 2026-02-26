@@ -16,7 +16,7 @@ lint_count() {
   
   (
     set -eo pipefail
-    cd "$dir/frontend"
+    cd "$dir/frontend" || exit 1
     # Lint current directory using ESLint from PR workspace
     LINT_I18N=true npx --prefix "$REPO_ROOT/frontend" eslint . \
       --ext ts,tsx \
@@ -80,7 +80,7 @@ check_duplicate_json_keys() {
       : # No duplicates found
     else
       echo "❌ [$rel_path] Duplicate keys found:"
-      printf '   - %s\n' $duplicates
+      printf '   - %s\n' "$duplicates"
       echo "   JSON silently overwrites duplicate keys - only the last occurrence is used!"
       exit_code=1
     fi
@@ -149,9 +149,9 @@ check_key_consistency() {
       if [ -n "$missing" ]; then
         echo "❌ [$lang/$ns] Missing keys:"
         if [ "$verbose" = "1" ]; then
-          printf '   - %s\n' $missing
+          printf '   - %s\n' "$missing"
         else
-          printf '   - %s\n' $(echo "$missing" | head -n 50)
+          printf '   - %s\n' "$(echo "$missing" | head -n 50)"
           local total_missing
           total_missing=$(printf "%s\n" "$missing" | wc -l | tr -d ' ')
           if [ "$total_missing" -gt 50 ]; then
@@ -164,11 +164,11 @@ check_key_consistency() {
       if [ -n "$extra" ]; then
         if [ "$fail_on_extra" = "1" ]; then
           echo "❌ [$lang/$ns] Extra keys (not in en):"
-          [ "$verbose" = "1" ] && printf '   - %s\n' $extra || printf '   - %s\n' $(echo "$extra" | head -n 50)
+          [ "$verbose" = "1" ] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
           exit_code=1
         else
           echo "⚠️  [$lang/$ns] Extra keys (not in en):"
-          [ "$verbose" = "1" ] && printf '   - %s\n' $extra || printf '   - %s\n' $(echo "$extra" | head -n 50)
+          [ "$verbose" = "1" ] && printf '   - %s\n' "$extra" || printf '   - %s\n' "$(echo "$extra" | head -n 50)"
         fi
       fi
     done

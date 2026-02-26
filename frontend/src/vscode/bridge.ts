@@ -251,17 +251,17 @@ function enqueueInsert(text: string) {
         insertTextAtCaretGeneric(insertQueue.shift() as string);
       }
       if (insertRetryTimer != null) {
-        window.clearInterval(insertRetryTimer);
+        globalThis.clearInterval(insertRetryTimer);
         insertRetryTimer = null;
       }
       return;
     }
     if (attempts >= MAX_RETRY_ATTEMPTS && insertRetryTimer != null) {
-      window.clearInterval(insertRetryTimer);
+      globalThis.clearInterval(insertRetryTimer);
       insertRetryTimer = null;
     }
   };
-  insertRetryTimer = window.setInterval(run, RETRY_INTERVAL_MS);
+  insertRetryTimer = globalThis.setInterval(run, RETRY_INTERVAL_MS);
 }
 
 /** Request map to resolve clipboard paste requests from the extension. */
@@ -304,7 +304,7 @@ type IframeMessage = {
 };
 
 // Handle messages from the parent webview (clipboard, add-to input)
-window.addEventListener('message', (e: MessageEvent) => {
+globalThis.addEventListener('message', (e: MessageEvent) => {
   const data: unknown = e?.data;
   if (!data || typeof data !== 'object') return;
   const msg = data as IframeMessage;
@@ -402,9 +402,9 @@ export function installVSCodeIframeKeyboardBridge() {
   const onKeyPress = (e: KeyboardEvent) => forward('vscode-iframe-keypress', e);
 
   // Capture phase to run before app handlers
-  window.addEventListener('keydown', onKeyDown, true);
-  window.addEventListener('keyup', onKeyUp, true);
-  window.addEventListener('keypress', onKeyPress, true);
+  globalThis.addEventListener('keydown', onKeyDown, true);
+  globalThis.addEventListener('keyup', onKeyUp, true);
+  globalThis.addEventListener('keypress', onKeyPress, true);
   document.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('keyup', onKeyUp, true);
   document.addEventListener('keypress', onKeyPress, true);

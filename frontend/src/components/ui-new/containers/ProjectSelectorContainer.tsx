@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { VirtuosoHandle } from 'react-virtuoso';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { PlusIcon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import {
@@ -11,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui-new/primitives/Dropdown';
-import { Virtuoso } from 'react-virtuoso';
 import type { Project } from 'shared/types';
 
 interface ProjectSelectorContainerProps {

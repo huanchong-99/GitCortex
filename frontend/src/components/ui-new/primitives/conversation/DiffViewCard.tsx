@@ -36,15 +36,15 @@ export type DiffInput =
 
 interface DiffViewCardProps {
   /** Diff data - either raw content or unified diff string */
-  input: DiffInput;
+  readonly input: DiffInput;
   /** Expansion state */
-  expanded?: boolean;
+  readonly expanded?: boolean;
   /** Toggle expansion callback */
-  onToggle?: () => void;
+  readonly onToggle?: () => void;
   /** Optional status indicator */
-  status?: ToolStatus;
+  readonly status?: ToolStatus;
   /** Additional className */
-  className?: string;
+  readonly className?: string;
 }
 
 interface DiffData {
@@ -61,102 +61,88 @@ interface DiffData {
   hideLineNumbers: boolean;
 }
 
+const EMPTY_DIFF: DiffData = {
+  diffFile: null,
+  diffData: null,
+  additions: 0,
+  deletions: 0,
+  filePath: '',
+  isValid: false,
+  hideLineNumbers: false,
+};
+
+function processContentDiff(input: Extract<DiffInput, { type: 'content' }>): DiffData {
+  const filePath = input.newPath || input.oldPath || 'unknown';
+  const oldLang = getHighLightLanguageFromPath(input.oldPath || filePath) || 'plaintext';
+  const newLang = getHighLightLanguageFromPath(input.newPath || filePath) || 'plaintext';
+  const oldContent = input.oldContent || '';
+  const newContent = input.newContent || '';
+
+  if (oldContent === newContent) {
+    return { ...EMPTY_DIFF, filePath };
+  }
+
+  try {
+    const file = generateDiffFile(
+      input.oldPath || filePath, oldContent,
+      input.newPath || filePath, newContent,
+      oldLang, newLang
+    );
+    file.initRaw();
+    return {
+      diffFile: file, diffData: null,
+      additions: file.additionLength ?? 0,
+      deletions: file.deletionLength ?? 0,
+      filePath, isValid: true, hideLineNumbers: false,
+    };
+  } catch (e) {
+    console.error('Failed to generate diff:', e);
+    return { ...EMPTY_DIFF, filePath };
+  }
+}
+
+function processUnifiedDiff(input: Extract<DiffInput, { type: 'unified' }>): DiffData {
+  const { path, unifiedDiff, hasLineNumbers = true } = input;
+  const lang = getHighLightLanguageFromPath(path) || 'plaintext';
+  let additions = 0;
+  let deletions = 0;
+  let isValid = false;
+
+  try {
+    const parsed = parseInstance.parse(unifiedDiff);
+    for (const hunk of parsed.hunks) {
+      for (const line of hunk.lines) {
+        if (line.type === DiffLineType.Add) additions++;
+        else if (line.type === DiffLineType.Delete) deletions++;
+      }
+    }
+    isValid = parsed.hunks.length > 0;
+  } catch (e) {
+    console.error('Failed to parse unified diff:', e);
+  }
+
+  return {
+    diffFile: null,
+    diffData: {
+      hunks: [unifiedDiff],
+      oldFile: { fileName: path, fileLang: lang },
+      newFile: { fileName: path, fileLang: lang },
+    },
+    additions, deletions,
+    filePath: path, isValid,
+    hideLineNumbers: !hasLineNumbers,
+  };
+}
+
 /**
  * Process input to get diff data and statistics
  */
 function useDiffData(input: DiffInput): DiffData {
   return useMemo(() => {
     if (input.type === 'content') {
-      // Handle Diff object with oldContent/newContent
-      const filePath = input.newPath || input.oldPath || 'unknown';
-      const oldLang =
-        getHighLightLanguageFromPath(input.oldPath || filePath) || 'plaintext';
-      const newLang =
-        getHighLightLanguageFromPath(input.newPath || filePath) || 'plaintext';
-
-      const oldContent = input.oldContent || '';
-      const newContent = input.newContent || '';
-
-      if (oldContent === newContent) {
-        return {
-          diffFile: null,
-          diffData: null,
-          additions: 0,
-          deletions: 0,
-          filePath,
-          isValid: false,
-          hideLineNumbers: false,
-        };
-      }
-
-      try {
-        const file = generateDiffFile(
-          input.oldPath || filePath,
-          oldContent,
-          input.newPath || filePath,
-          newContent,
-          oldLang,
-          newLang
-        );
-        file.initRaw();
-
-        return {
-          diffFile: file,
-          diffData: null,
-          additions: file.additionLength ?? 0,
-          deletions: file.deletionLength ?? 0,
-          filePath,
-          isValid: true,
-          hideLineNumbers: false,
-        };
-      } catch (e) {
-        console.error('Failed to generate diff:', e);
-        return {
-          diffFile: null,
-          diffData: null,
-          additions: 0,
-          deletions: 0,
-          filePath,
-          isValid: false,
-          hideLineNumbers: false,
-        };
-      }
-    } else {
-      // Handle unified diff string
-      const { path, unifiedDiff, hasLineNumbers = true } = input;
-      const lang = getHighLightLanguageFromPath(path) || 'plaintext';
-
-      let additions = 0;
-      let deletions = 0;
-      let isValid = false;
-
-      try {
-        const parsed = parseInstance.parse(unifiedDiff);
-        for (const hunk of parsed.hunks) {
-          for (const line of hunk.lines) {
-            if (line.type === DiffLineType.Add) additions++;
-            else if (line.type === DiffLineType.Delete) deletions++;
-          }
-        }
-        isValid = parsed.hunks.length > 0;
-      } catch (e) {
-        console.error('Failed to parse unified diff:', e);
-      }
-
-      return {
-        diffFile: null,
-        diffData: {
-          hunks: [unifiedDiff],
-          oldFile: { fileName: path, fileLang: lang },
-          newFile: { fileName: path, fileLang: lang },
-        },
-        additions,
-        deletions,
-        filePath: path,
-        isValid,
-        hideLineNumbers: !hasLineNumbers,
-      };
+      return processContentDiff(input);
     }
+    return processUnifiedDiff(input);
   }, [input]);
 }
 
@@ -191,6 +177,9 @@ export function DiffViewCard({
           onToggle && 'cursor-pointer'
         )}
         onClick={onToggle}
+        role={onToggle ? 'button' : undefined}
+        tabIndex={onToggle ? 0 : undefined}
+        onKeyDown={onToggle ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
       >
         <div className="flex-1 flex items-center gap-base min-w-0">
           <span className="relative shrink-0">
@@ -251,7 +240,7 @@ export function DiffViewBody({
   isValid,
   hideLineNumbers,
   theme,
-}: {
+}: Readonly<{
   diffFile: DiffFile | null;
   diffData: {
     hunks: string[];
@@ -261,7 +250,7 @@ export function DiffViewBody({
   isValid: boolean;
   hideLineNumbers?: boolean;
   theme: 'light' | 'dark';
-}) {
+}>) {
   const { t } = useTranslation('tasks');
   const globalMode = useDiffViewMode();
   const diffMode =

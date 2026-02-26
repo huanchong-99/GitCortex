@@ -4,13 +4,13 @@ import { hasAnsi } from 'fancy-ansi';
 import { clsx } from 'clsx';
 
 interface RawLogTextProps {
-  content: string;
-  channel?: 'stdout' | 'stderr';
-  as?: 'div' | 'span';
-  className?: string;
-  linkifyUrls?: boolean;
-  searchQuery?: string;
-  isCurrentMatch?: boolean;
+  readonly content: string;
+  readonly channel?: 'stdout' | 'stderr';
+  readonly as?: 'div' | 'span';
+  readonly className?: string;
+  readonly linkifyUrls?: boolean;
+  readonly searchQuery?: string;
+  readonly isCurrentMatch?: boolean;
 }
 
 const RawLogText = memo(
@@ -37,7 +37,7 @@ const RawLogText = memo(
       }
 
       const regex = new RegExp(
-        `(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
+        `(${searchQuery.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
         'gi'
       );
       const parts = text.split(regex);
@@ -66,7 +66,7 @@ const RawLogText = memo(
         if (/^https?:\/\/\S+$/.test(part)) {
           return (
             <a
-              key={index}
+              key={`url-${part}`}
               href={part}
               target="_blank"
               rel="noopener noreferrer"
@@ -78,7 +78,7 @@ const RawLogText = memo(
           );
         }
         // For non-URL parts, apply ANSI formatting with highlighting
-        return highlightMatches(part, index);
+        return highlightMatches(part, `part-${index}`);
       });
     };
 

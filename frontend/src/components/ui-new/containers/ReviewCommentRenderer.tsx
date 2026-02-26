@@ -6,8 +6,8 @@ import WYSIWYGEditor from '@/components/ui/wysiwyg';
 import { useReview, type ReviewComment } from '@/contexts/ReviewProvider';
 
 interface ReviewCommentRendererProps {
-  comment: ReviewComment;
-  projectId?: string;
+  readonly comment: ReviewComment;
+  readonly projectId?: string;
 }
 
 export function ReviewCommentRenderer({

@@ -2,8 +2,8 @@ import type { ExecutorProfileId } from 'shared/types';
 import { cn } from '@/lib/utils';
 
 interface ProfileVariantBadgeProps {
-  profileVariant: ExecutorProfileId | null;
-  className?: string;
+  readonly profileVariant: ExecutorProfileId | null;
+  readonly className?: string;
 }
 
 export function ProfileVariantBadge({

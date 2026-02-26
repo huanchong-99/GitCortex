@@ -2,8 +2,8 @@ import { cn } from '@/lib/utils';
 import { splitLines } from '@/utils/string';
 
 interface ErrorAlertProps {
-  message: string;
-  className?: string;
+  readonly message: string;
+  readonly className?: string;
 }
 
 export function ErrorAlert({ message, className }: ErrorAlertProps) {
@@ -16,7 +16,7 @@ export function ErrorAlert({ message, className }: ErrorAlertProps) {
       )}
     >
       {splitLines(message).map((line, i, lines) => (
-        <span key={i}>
+        <span key={`error-line-${line.slice(0, 20)}-${i}`}>
           {line}
           {i < lines.length - 1 && <br />}
         </span>

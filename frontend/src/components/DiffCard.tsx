@@ -36,12 +36,12 @@ import {
 } from '@/stores/useDiffViewStore';
 import { useProject } from '@/contexts/ProjectContext';
 
-type Props = {
+type Props = Readonly<{
   diff: Diff;
   expanded: boolean;
   onToggle: () => void;
   selectedAttempt: Workspace | null;
-};
+}>;
 
 function labelAndIcon(diff: Diff) {
   const c = diff.change;
@@ -181,7 +181,7 @@ export default function DiffCard({
       side,
       lineNumber,
       text: '',
-      ...(codeLine !== undefined ? { codeLine } : {}),
+      ...(codeLine === undefined ? {} : { codeLine }),
     };
     setDraft(widgetKey, draft);
   };
@@ -323,15 +323,13 @@ export default function DiffCard({
           className="px-4 pb-4 text-xs font-mono"
           style={{ color: 'hsl(var(--muted-foreground) / 0.9)' }}
         >
-          {isOmitted
-            ? 'Content omitted due to file size. Open in editor to view.'
-            : isContentEqual
-              ? diff.change === 'renamed'
-                ? 'File renamed with no content changes.'
-                : diff.change === 'permissionChange'
-                  ? 'File permission changed.'
-                  : 'No content changes to display.'
-              : 'Failed to render diff for this file.'}
+          {(() => {
+            if (isOmitted) return 'Content omitted due to file size. Open in editor to view.';
+            if (!isContentEqual) return 'Failed to render diff for this file.';
+            if (diff.change === 'renamed') return 'File renamed with no content changes.';
+            if (diff.change === 'permissionChange') return 'File permission changed.';
+            return 'No content changes to display.';
+          })()}
         </div>
       )}
     </div>

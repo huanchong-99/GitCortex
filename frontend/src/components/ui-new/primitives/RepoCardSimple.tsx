@@ -5,13 +5,13 @@ import { DropdownMenuTriggerButton } from '@/components/ui-new/primitives/Dropdo
 import type { GitBranch } from 'shared/types';
 
 interface RepoCardSimpleProps {
-  name: string;
-  path: string;
-  onRemove?: () => void;
-  className?: string;
-  branches?: GitBranch[];
-  selectedBranch?: string | null;
-  onBranchChange?: (branch: string) => void;
+  readonly name: string;
+  readonly path: string;
+  readonly onRemove?: () => void;
+  readonly className?: string;
+  readonly branches?: GitBranch[];
+  readonly selectedBranch?: string | null;
+  readonly onBranchChange?: (branch: string) => void;
 }
 
 export function RepoCardSimple({

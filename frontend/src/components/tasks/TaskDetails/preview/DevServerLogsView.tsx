@@ -60,11 +60,12 @@ export function DevServerLogsView({
             <ChevronDown
               className={`h-4 w-4 mr-1 ${showToggleText ? 'transition-transform' : ''} ${showLogs ? '' : 'rotate-180'}`}
             />
-            {showToggleText
-              ? showLogs
-                ? t('preview.logs.hide')
-                : t('preview.logs.show')
-              : t('preview.logs.hide')}
+            {(() => {
+              if (!showToggleText) {
+                return t('preview.logs.hide');
+              }
+              return showLogs ? t('preview.logs.hide') : t('preview.logs.show');
+            })()}
           </div>
         </div>
       </summary>

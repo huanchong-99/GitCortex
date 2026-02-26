@@ -5,12 +5,12 @@ import type { WorkflowTaskDto } from 'shared/types';
 import { TaskCard } from './TaskCard';
 
 interface WorkflowKanbanBoardProps {
-  workflowId: string | null;
+  readonly workflowId: string | null;
 }
 
 interface Column {
-  id: string;
-  titleKey: string;
+  readonly id: string;
+  readonly titleKey: string;
 }
 
 /**
@@ -27,9 +27,9 @@ const columns: Column[] = [
 ];
 
 interface KanbanColumnProps {
-  column: Column;
-  tasks: WorkflowTaskDto[];
-  workflowId: string;
+  readonly column: Column;
+  readonly tasks: WorkflowTaskDto[];
+  readonly workflowId: string;
 }
 
 /**

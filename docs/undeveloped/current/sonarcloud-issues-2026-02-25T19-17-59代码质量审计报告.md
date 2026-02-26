@@ -1217,7 +1217,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 27.1 '@/components/ide/IdeIcon' imported multiple times.
+### 27.1 '@/components/ide/IdeIcon' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweYgZ9DOUQdEsGef`
 - **项目**: huanchong-99
@@ -1230,7 +1230,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 27.2 '@/components/ide/IdeIcon' imported multiple times.
+### 27.2 '@/components/ide/IdeIcon' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweYgZ9DOUQdEsGeg`
 - **项目**: huanchong-99
@@ -1282,7 +1282,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 27.6 Extract this nested ternary operation into an independent statement.
+### 27.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweYgZ9DOUQdEsGek`
 - **项目**: huanchong-99
@@ -2424,7 +2424,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 53.1 'react-virtuoso' imported multiple times.
+### 53.1 'react-virtuoso' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweirZ9DOUQdEsGhf`
 - **项目**: huanchong-99
@@ -2437,7 +2437,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 53.2 'react-virtuoso' imported multiple times.
+### 53.2 'react-virtuoso' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweirZ9DOUQdEsGhg`
 - **项目**: huanchong-99
@@ -4007,7 +4007,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 98.2 Prefer `globalThis` over `window`.
+### 98.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweNpZ9DOUQdEsGam`
 - **项目**: huanchong-99
@@ -4155,7 +4155,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 101.2 Extract this nested ternary operation into an independent statement.
+### 101.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweY_Z9DOUQdEsGeq`
 - **项目**: huanchong-99
@@ -4828,7 +4828,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 120.1 Prefer `String#replaceAll()` over `String#replace()`.
+### 120.1 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweNRZ9DOUQdEsGaf`
 - **项目**: huanchong-99
@@ -4841,7 +4841,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 120.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 120.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweNRZ9DOUQdEsGag`
 - **项目**: huanchong-99
@@ -5584,7 +5584,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 140.1 Prefer `String#replaceAll()` over `String#replace()`.
+### 140.1 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwesZZ9DOUQdEsGkU`
 - **项目**: huanchong-99
@@ -5724,7 +5724,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 146.1 Prefer `String#replaceAll()` over `String#replace()`.
+### 146.1 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweUiZ9DOUQdEsGdD`
 - **项目**: huanchong-99
@@ -5737,7 +5737,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 146.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 146.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweUiZ9DOUQdEsGdE`
 - **项目**: huanchong-99
@@ -5750,7 +5750,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 146.3 Prefer `String#replaceAll()` over `String#replace()`.
+### 146.3 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweUiZ9DOUQdEsGdF`
 - **项目**: huanchong-99
@@ -5763,7 +5763,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 146.4 Prefer `String#replaceAll()` over `String#replace()`.
+### 146.4 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweUiZ9DOUQdEsGdG`
 - **项目**: huanchong-99
@@ -8016,7 +8016,7 @@
 
 > 该文件共有 **21** 个问题
 
-### 195.1 Prefer `String#replaceAll()` over `String#replace()`.
+### 195.1 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGjt`
 - **项目**: huanchong-99
@@ -8029,7 +8029,7 @@
 - **创建时间**: 14 days ago
 - **标签**: es2021, readability
 
-### 195.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 195.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGju`
 - **项目**: huanchong-99
@@ -8042,7 +8042,7 @@
 - **创建时间**: 14 days ago
 - **标签**: es2021, readability
 
-### 195.3 Prefer `String#replaceAll()` over `String#replace()`.
+### 195.3 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGjv`
 - **项目**: huanchong-99
@@ -8404,7 +8404,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 197.1 Prefer `globalThis` over `window`.
+### 197.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepzZ9DOUQdEsGjf`
 - **项目**: huanchong-99
@@ -8417,7 +8417,7 @@
 - **创建时间**: 3 days ago
 - **标签**: es2020, portability
 
-### 197.2 Prefer `globalThis` over `window`.
+### 197.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepzZ9DOUQdEsGjg`
 - **项目**: huanchong-99
@@ -8430,7 +8430,7 @@
 - **创建时间**: 12 days ago
 - **标签**: es2020, portability
 
-### 197.3 Prefer `globalThis` over `window`.
+### 197.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwepzZ9DOUQdEsGjh`
 - **项目**: huanchong-99
@@ -8443,7 +8443,7 @@
 - **创建时间**: 3 days ago
 - **标签**: es2020, portability
 
-### 197.4 Extract this nested ternary operation into an independent statement.
+### 197.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwepzZ9DOUQdEsGjj`
 - **项目**: huanchong-99
@@ -9881,7 +9881,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 229.3 Prefer `String#replaceAll()` over `String#replace()`.
+### 229.3 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweQRZ9DOUQdEsGbf`
 - **项目**: huanchong-99
@@ -10315,7 +10315,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 243.1 Prefer `String#replaceAll()` over `String#replace()`.
+### 243.1 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweV8Z9DOUQdEsGdc`
 - **项目**: huanchong-99
@@ -10328,7 +10328,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 243.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 243.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweV8Z9DOUQdEsGdd`
 - **项目**: huanchong-99
@@ -10341,7 +10341,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 243.3 Prefer `String#replaceAll()` over `String#replace()`.
+### 243.3 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVweV8Z9DOUQdEsGde`
 - **项目**: huanchong-99
@@ -11063,7 +11063,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 264.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 264.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwezSZ9DOUQdEsGmx`
 - **项目**: huanchong-99
@@ -11440,7 +11440,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 273.1 Prefer `globalThis` over `window`.
+### 273.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwexlZ9DOUQdEsGmR`
 - **项目**: huanchong-99
@@ -11453,7 +11453,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 273.2 Prefer `globalThis` over `window`.
+### 273.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwexlZ9DOUQdEsGmS`
 - **项目**: huanchong-99
@@ -12460,7 +12460,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 296.2 Extract this nested ternary operation into an independent statement.
+### 296.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweuNZ9DOUQdEsGlC`
 - **项目**: huanchong-99
@@ -13139,7 +13139,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 306.1 Prefer `globalThis` over `window`.
+### 306.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweuDZ9DOUQdEsGk8`
 - **项目**: huanchong-99
@@ -13152,7 +13152,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 306.2 Prefer `globalThis` over `window`.
+### 306.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweuDZ9DOUQdEsGk9`
 - **项目**: huanchong-99
@@ -13210,7 +13210,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 307.1 Prefer `globalThis` over `window`.
+### 307.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwetQZ9DOUQdEsGkj`
 - **项目**: huanchong-99
@@ -13223,7 +13223,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 307.2 Prefer `globalThis` over `window`.
+### 307.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwetQZ9DOUQdEsGkk`
 - **项目**: huanchong-99
@@ -13416,7 +13416,7 @@
 
 > 该文件共有 **16** 个问题
 
-### 311.1 Prefer `String#replaceAll()` over `String#replace()`.
+### 311.1 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoL`
 - **项目**: huanchong-99
@@ -13429,7 +13429,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2021, readability
 
-### 311.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 311.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoM`
 - **项目**: huanchong-99
@@ -13442,7 +13442,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2021, readability
 
-### 311.3 Prefer `String#replaceAll()` over `String#replace()`.
+### 311.3 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoN`
 - **项目**: huanchong-99
@@ -13873,7 +13873,7 @@
 - **创建时间**: 1 month ago
 - **标签**: performance, readability
 
-### 320.2 Prefer `String#replaceAll()` over `String#replace()`.
+### 320.2 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwe1AZ9DOUQdEsGnW`
 - **项目**: huanchong-99
@@ -13886,7 +13886,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 320.3 Prefer `String#replaceAll()` over `String#replace()`.
+### 320.3 Prefer `String#replaceAll()` over `String#replace()`. ✅ 已修复
 
 - **问题ID**: `AZyVwe1AZ9DOUQdEsGnX`
 - **项目**: huanchong-99
@@ -14099,7 +14099,7 @@
 
 > 该文件共有 **26** 个问题
 
-### 323.1 Prefer `globalThis` over `window`.
+### 323.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGni`
 - **项目**: huanchong-99

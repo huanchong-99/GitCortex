@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils';
 
 interface WorkflowCardProps {
-  name: string;
-  status: string;
-  selected: boolean;
-  onClick: () => void;
+  readonly name: string;
+  readonly status: string;
+  readonly selected: boolean;
+  readonly onClick: () => void;
 }
 
 export function WorkflowCard({ name, status, selected, onClick }: WorkflowCardProps) {

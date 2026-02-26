@@ -5,15 +5,15 @@ export type CommentCardVariant = 'user' | 'github' | 'input';
 
 interface CommentCardProps {
   /** Determines the visual styling */
-  variant: CommentCardVariant;
+  readonly variant: CommentCardVariant;
   /** Main content (editor, text, etc.) */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Optional header (author, timestamp) */
-  header?: ReactNode;
+  readonly header?: ReactNode;
   /** Optional action buttons */
-  actions?: ReactNode;
+  readonly actions?: ReactNode;
   /** Additional className for the outer wrapper */
-  className?: string;
+  readonly className?: string;
 }
 
 const variantStyles: Record<CommentCardVariant, string> = {

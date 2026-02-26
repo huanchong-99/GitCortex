@@ -2,10 +2,10 @@ import type { Icon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 interface SectionHeaderProps {
-  title: string;
-  icon?: Icon;
-  onIconClick?: () => void;
-  className?: string;
+  readonly title: string;
+  readonly icon?: Icon;
+  readonly onIconClick?: () => void;
+  readonly className?: string;
 }
 
 export function SectionHeader({

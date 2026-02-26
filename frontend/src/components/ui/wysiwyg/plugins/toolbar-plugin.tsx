@@ -163,12 +163,12 @@ export function ToolbarPlugin() {
       requestAnimationFrame(updatePosition);
     };
 
-    window.addEventListener('scroll', handleUpdate, true);
-    window.addEventListener('resize', handleUpdate);
+    globalThis.addEventListener('scroll', handleUpdate, true);
+    globalThis.addEventListener('resize', handleUpdate);
 
     return () => {
-      window.removeEventListener('scroll', handleUpdate, true);
-      window.removeEventListener('resize', handleUpdate);
+      globalThis.removeEventListener('scroll', handleUpdate, true);
+      globalThis.removeEventListener('resize', handleUpdate);
     };
   }, [isVisible, updatePosition]);
 

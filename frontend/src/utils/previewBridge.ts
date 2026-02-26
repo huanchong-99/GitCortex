@@ -104,7 +104,7 @@ export class ClickToComponentListener {
       }
     };
 
-    window.addEventListener('message', this.messageListener);
+    globalThis.addEventListener('message', this.messageListener);
   }
 
   /**
@@ -112,7 +112,7 @@ export class ClickToComponentListener {
    */
   stop(): void {
     if (this.messageListener) {
-      window.removeEventListener('message', this.messageListener);
+      globalThis.removeEventListener('message', this.messageListener);
       this.messageListener = null;
     }
   }

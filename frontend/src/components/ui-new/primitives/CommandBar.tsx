@@ -40,19 +40,19 @@ interface ResolvedCommandBarPage {
 
 interface CommandBarProps {
   // Resolved page with groups already processed
-  page: ResolvedCommandBarPage;
+  readonly page: ResolvedCommandBarPage;
   // Whether back navigation is available
-  canGoBack: boolean;
+  readonly canGoBack: boolean;
   // Called when user clicks back
-  onGoBack: () => void;
+  readonly onGoBack: () => void;
   // Called when user selects an item (action or page)
-  onSelect: (item: ResolvedGroupItem) => void;
+  readonly onSelect: (item: ResolvedGroupItem) => void;
   // Get resolved label for an action
-  getLabel: (action: ActionDefinition) => string;
+  readonly getLabel: (action: ActionDefinition) => string;
   // Controlled search value
-  search: string;
+  readonly search: string;
   // Called when search changes
-  onSearchChange: (search: string) => void;
+  readonly onSearchChange: (search: string) => void;
 }
 
 export function CommandBar({

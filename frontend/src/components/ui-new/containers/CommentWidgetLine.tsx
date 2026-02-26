@@ -6,11 +6,11 @@ import WYSIWYGEditor from '@/components/ui/wysiwyg';
 import { useReview, type ReviewDraft } from '@/contexts/ReviewProvider';
 
 interface CommentWidgetLineProps {
-  draft: ReviewDraft;
-  widgetKey: string;
-  onSave: () => void;
-  onCancel: () => void;
-  projectId?: string;
+  readonly draft: ReviewDraft;
+  readonly widgetKey: string;
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+  readonly projectId?: string;
 }
 
 export function CommentWidgetLine({

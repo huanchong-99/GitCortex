@@ -161,9 +161,9 @@ function getBooleanField(
 function normalizeKeyToken(value: string): string {
   return value
     .trim()
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[\s-]+/g, '_')
-    .replace(/_+/g, '_')
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replaceAll(/[\s-]+/g, '_')
+    .replaceAll(/_+/g, '_')
     .toLowerCase();
 }
 

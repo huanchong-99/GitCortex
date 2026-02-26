@@ -62,12 +62,20 @@ export const FileTreeNode = forwardRef<HTMLDivElement, FileTreeNodeProps>(
     return (
       <div
         ref={ref}
+        role="button"
+        tabIndex={0}
         className={cn(
           'flex items-center h-[26px] cursor-pointer text-low hover:bg-panel rounded',
           'relative select-none',
           isSelected && 'bg-panel text-normal'
         )}
         onClick={handleClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
       >
         {/* Indentation guides */}
         {depth > 0 && (

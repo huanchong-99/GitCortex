@@ -306,7 +306,12 @@ function SlashCommandFormDialog({
                 {t('form.buttons.cancel')}
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? t('form.buttons.saving') : mode === 'create' ? t('form.buttons.create') : t('form.buttons.save')}
+                {(() => {
+                  if (isSubmitting) {
+                    return t('form.buttons.saving');
+                  }
+                  return mode === 'create' ? t('form.buttons.create') : t('form.buttons.save');
+                })()}
               </Button>
             </div>
           </form>

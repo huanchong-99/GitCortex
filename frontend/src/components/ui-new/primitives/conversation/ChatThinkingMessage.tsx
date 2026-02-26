@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils';
 import { ChatMarkdown } from './ChatMarkdown';
 
 interface ChatThinkingMessageProps {
-  content: string;
-  className?: string;
-  taskAttemptId?: string;
+  readonly content: string;
+  readonly className?: string;
+  readonly taskAttemptId?: string;
 }
 
 export function ChatThinkingMessage({

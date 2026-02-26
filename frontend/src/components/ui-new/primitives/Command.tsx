@@ -20,7 +20,7 @@ const Command = React.forwardRef<
 Command.displayName = CommandPrimitive.displayName;
 
 interface CommandDialogProps extends React.ComponentProps<typeof Dialog> {
-  onCloseAutoFocus?: (event: Event) => void;
+  readonly onCloseAutoFocus?: (event: Event) => void;
 }
 
 function CommandDialog({

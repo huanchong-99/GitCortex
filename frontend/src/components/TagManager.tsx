@@ -38,7 +38,7 @@ export function TagManager() {
           await fetchTags();
         }
       } catch (error) {
-        // User cancelled - do nothing
+        console.debug('Tag dialog cancelled by user', error);
       }
     },
     [fetchTags]

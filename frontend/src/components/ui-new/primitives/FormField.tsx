@@ -3,16 +3,16 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
-  label?: React.ReactNode;
-  description?: React.ReactNode;
-  error?: React.ReactNode;
-  required?: boolean;
-  id?: string;
-  labelClassName?: string;
-  descriptionClassName?: string;
-  errorClassName?: string;
-  contentClassName?: string;
-  children: React.ReactNode;
+  readonly label?: React.ReactNode;
+  readonly description?: React.ReactNode;
+  readonly error?: React.ReactNode;
+  readonly required?: boolean;
+  readonly id?: string;
+  readonly labelClassName?: string;
+  readonly descriptionClassName?: string;
+  readonly errorClassName?: string;
+  readonly contentClassName?: string;
+  readonly children: React.ReactNode;
 }
 
 export function FormField({

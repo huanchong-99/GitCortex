@@ -15,25 +15,25 @@ import { CommandBarDialog } from '@/components/ui-new/dialogs/CommandBarDialog';
 import { RunningDots } from './RunningDots';
 
 interface WorkspaceSummaryProps {
-  name: string;
-  workspaceId?: string;
-  filesChanged?: number;
-  linesAdded?: number;
-  linesRemoved?: number;
-  isActive?: boolean;
-  isRunning?: boolean;
-  isPinned?: boolean;
-  hasPendingApproval?: boolean;
-  hasRunningDevServer?: boolean;
-  hasUnseenActivity?: boolean;
-  latestProcessCompletedAt?: string;
-  latestProcessStatus?: 'running' | 'completed' | 'failed' | 'killed';
-  prStatus?: 'open' | 'merged' | 'closed' | 'unknown';
-  onClick?: () => void;
-  className?: string;
-  summary?: boolean;
+  readonly name: string;
+  readonly workspaceId?: string;
+  readonly filesChanged?: number;
+  readonly linesAdded?: number;
+  readonly linesRemoved?: number;
+  readonly isActive?: boolean;
+  readonly isRunning?: boolean;
+  readonly isPinned?: boolean;
+  readonly hasPendingApproval?: boolean;
+  readonly hasRunningDevServer?: boolean;
+  readonly hasUnseenActivity?: boolean;
+  readonly latestProcessCompletedAt?: string;
+  readonly latestProcessStatus?: 'running' | 'completed' | 'failed' | 'killed';
+  readonly prStatus?: 'open' | 'merged' | 'closed' | 'unknown';
+  readonly onClick?: () => void;
+  readonly className?: string;
+  readonly summary?: boolean;
   /** Whether this is a draft workspace (shows "Draft" instead of elapsed time) */
-  isDraft?: boolean;
+  readonly isDraft?: boolean;
 }
 
 export function WorkspaceSummary({

@@ -18,7 +18,7 @@ export const toPrettyCase = (value: string): string => {
  */
 export const generateProjectNameFromPath = (path: string): string => {
   const dirName = path.split('/').filter(Boolean).pop() || '';
-  return dirName.replace(/[-_]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  return dirName.replaceAll(/[-_]/g, ' ').replaceAll(/\b\w/g, (l) => l.toUpperCase());
 };
 
 /**

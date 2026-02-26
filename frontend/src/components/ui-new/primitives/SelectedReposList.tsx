@@ -4,11 +4,11 @@ import { RepoCardSimple } from './RepoCardSimple';
 import type { Repo, GitBranch } from 'shared/types';
 
 interface SelectedReposListProps {
-  repos: Repo[];
-  onRemove: (repoId: string) => void;
-  branchesByRepo?: Record<string, GitBranch[]>;
-  selectedBranches?: Record<string, string>;
-  onBranchChange?: (repoId: string, branch: string) => void;
+  readonly repos: Repo[];
+  readonly onRemove: (repoId: string) => void;
+  readonly branchesByRepo?: Record<string, GitBranch[]>;
+  readonly selectedBranches?: Record<string, string>;
+  readonly onBranchChange?: (repoId: string, branch: string) => void;
 }
 
 export function SelectedReposList({

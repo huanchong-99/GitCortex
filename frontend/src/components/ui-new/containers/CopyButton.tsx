@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 import { Tooltip } from '../primitives/Tooltip';
 
 interface CopyButtonProps {
-  onCopy: () => void;
-  disabled?: boolean;
+  readonly onCopy: () => void;
+  readonly disabled?: boolean;
 }
 
 /**

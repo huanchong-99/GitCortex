@@ -22,13 +22,13 @@ import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
 
 export interface GitActionsDialogProps {
-  attemptId: string;
-  task?: TaskWithAttemptStatus;
+  readonly attemptId: string;
+  readonly task?: TaskWithAttemptStatus;
 }
 
 interface GitActionsDialogContentProps {
-  attempt: WorkspaceWithSession;
-  task: TaskWithAttemptStatus;
+  readonly attempt: WorkspaceWithSession;
+  readonly task: TaskWithAttemptStatus;
 }
 
 function GitActionsDialogContent({

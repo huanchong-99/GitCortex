@@ -20,7 +20,7 @@ const TABLE_ROW_REG_EXP = /^(?:\|)(.+)(?:\|)\s?$/;
 const TABLE_ROW_DIVIDER_REG_EXP = /^(\| ?:?-+:? ?)+\|\s?$/;
 
 function $createTableCell(textContent: string): TableCellNode {
-  textContent = textContent.replace(/\\n/g, '\n');
+  textContent = textContent.replaceAll(String.raw`\n`, '\n');
   const cell = $createTableCellNode(TableCellHeaderStates.NO_STATUS);
   $convertFromMarkdownString(textContent, TRANSFORMERS, cell);
   return cell;
@@ -54,7 +54,7 @@ export const TABLE_TRANSFORMER: ElementTransformer = {
       const cells = row.getChildren();
       const cellTexts = cells.map((cell) => {
         if (!$isTableCellNode(cell)) return '';
-        return traverseChildren(cell).replace(/\n/g, '\\n');
+        return traverseChildren(cell).replaceAll('\n', String.raw`\n`);
       });
 
       output.push('| ' + cellTexts.join(' | ') + ' |');

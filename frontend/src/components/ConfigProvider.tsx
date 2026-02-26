@@ -13,8 +13,8 @@ import {
   type UserSystemInfo,
   type BaseAgentCapability,
   type LoginStatus,
+  type ExecutorConfig,
 } from 'shared/types';
-import type { ExecutorConfig } from 'shared/types';
 import { configApi } from '../lib/api';
 import { updateLanguageFromConfig } from '../i18n/config';
 
@@ -61,7 +61,7 @@ const UserSystemContext = createContext<UserSystemContextType | undefined>(
 );
 
 interface UserSystemProviderProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 export function UserSystemProvider({ children }: UserSystemProviderProps) {

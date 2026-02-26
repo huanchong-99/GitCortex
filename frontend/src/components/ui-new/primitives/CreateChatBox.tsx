@@ -29,18 +29,18 @@ export interface SaveAsDefaultProps {
 }
 
 interface CreateChatBoxProps {
-  editor: EditorProps;
-  onSend: () => void;
-  isSending: boolean;
-  executor: ExecutorProps;
-  variant?: VariantProps;
-  saveAsDefault?: SaveAsDefaultProps;
-  error?: string | null;
-  projectId?: string;
-  agent?: BaseCodingAgent | null;
-  onPasteFiles?: (files: File[]) => void;
+  readonly editor: EditorProps;
+  readonly onSend: () => void;
+  readonly isSending: boolean;
+  readonly executor: ExecutorProps;
+  readonly variant?: VariantProps;
+  readonly saveAsDefault?: SaveAsDefaultProps;
+  readonly error?: string | null;
+  readonly projectId?: string;
+  readonly agent?: BaseCodingAgent | null;
+  readonly onPasteFiles?: (files: File[]) => void;
   /** Local images for immediate preview (before saved to server) */
-  localImages?: LocalImageMetadata[];
+  readonly localImages?: LocalImageMetadata[];
 }
 
 /**

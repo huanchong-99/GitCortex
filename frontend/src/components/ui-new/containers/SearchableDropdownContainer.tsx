@@ -4,32 +4,32 @@ import { SearchableDropdown } from '@/components/ui-new/primitives/SearchableDro
 
 interface SearchableDropdownContainerProps<T> {
   /** Array of items to display */
-  items: T[];
+  readonly items: T[];
   /** Currently selected value (matched against getItemKey) */
-  selectedValue?: string | null;
+  readonly selectedValue?: string | null;
 
   /** Extract unique key from item */
-  getItemKey: (item: T) => string;
+  readonly getItemKey: (item: T) => string;
   /** Extract display label from item */
-  getItemLabel: (item: T) => string;
+  readonly getItemLabel: (item: T) => string;
   /** Custom filter function (defaults to label.includes(query)) */
-  filterItem?: (item: T, query: string) => boolean;
+  readonly filterItem?: (item: T, query: string) => boolean;
 
   /** Called when an item is selected */
-  onSelect: (item: T) => void;
+  readonly onSelect: (item: T) => void;
 
   /** Trigger element (uses asChild pattern) */
-  trigger: React.ReactNode;
+  readonly trigger: React.ReactNode;
 
   /** Class name for dropdown content */
-  contentClassName?: string;
+  readonly contentClassName?: string;
   /** Placeholder text for search input */
-  placeholder?: string;
+  readonly placeholder?: string;
   /** Message shown when no items match */
-  emptyMessage?: string;
+  readonly emptyMessage?: string;
 
   /** Optional badge text for each item */
-  getItemBadge?: (item: T) => string | undefined;
+  readonly getItemBadge?: (item: T) => string | undefined;
 }
 
 export function SearchableDropdownContainer<T>({

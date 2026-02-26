@@ -28,49 +28,49 @@ export enum VisualVariant {
 
 interface ChatBoxBaseProps {
   // Editor
-  editor: EditorProps;
-  placeholder: string;
-  onCmdEnter: () => void;
-  disabled?: boolean;
-  workspaceId?: string;
-  projectId?: string;
-  autoFocus?: boolean;
+  readonly editor: EditorProps;
+  readonly placeholder: string;
+  readonly onCmdEnter: () => void;
+  readonly disabled?: boolean;
+  readonly workspaceId?: string;
+  readonly projectId?: string;
+  readonly autoFocus?: boolean;
 
   // Variant selection
-  variant?: VariantProps;
+  readonly variant?: VariantProps;
 
   // Error display
-  error?: string | null;
+  readonly error?: string | null;
 
   // Header content (right side - session/executor dropdown)
-  headerRight?: ReactNode;
+  readonly headerRight?: ReactNode;
 
   // Header content (left side - stats)
-  headerLeft?: ReactNode;
+  readonly headerLeft?: ReactNode;
 
   // Footer left content (additional toolbar items like attach button)
-  footerLeft?: ReactNode;
+  readonly footerLeft?: ReactNode;
 
   // Footer right content (action buttons)
-  footerRight: ReactNode;
+  readonly footerRight: ReactNode;
 
   // Banner content (queued message indicator, feedback mode indicator)
-  banner?: ReactNode;
+  readonly banner?: ReactNode;
 
   // visualVariant
-  visualVariant: VisualVariant;
+  readonly visualVariant: VisualVariant;
 
   // File paste handler for attachments
-  onPasteFiles?: (files: File[]) => void;
+  readonly onPasteFiles?: (files: File[]) => void;
 
   // Whether the workspace is running (shows animated border)
-  isRunning?: boolean;
+  readonly isRunning?: boolean;
 
   // Key to force editor remount (e.g., when entering feedback mode to trigger auto-focus)
-  focusKey?: string;
+  readonly focusKey?: string;
 
   // Local images for immediate preview (before saved to server)
-  localImages?: LocalImageMetadata[];
+  readonly localImages?: LocalImageMetadata[];
 }
 
 /**

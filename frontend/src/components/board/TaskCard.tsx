@@ -8,8 +8,8 @@ import type { WorkflowTaskDto } from 'shared/types';
 import { TerminalDots } from './TerminalDots';
 
 interface TaskCardProps {
-  task: WorkflowTaskDto;
-  workflowId: string;
+  readonly task: WorkflowTaskDto;
+  readonly workflowId: string;
 }
 
 export function TaskCard({ task, workflowId }: TaskCardProps) {

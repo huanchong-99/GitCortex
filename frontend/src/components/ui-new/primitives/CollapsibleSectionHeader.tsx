@@ -7,14 +7,14 @@ import {
 } from '@/stores/useUiPreferencesStore';
 
 interface CollapsibleSectionHeaderProps {
-  persistKey: PersistKey;
-  title: string;
-  defaultExpanded?: boolean;
-  icon?: Icon;
-  onIconClick?: () => void;
-  children?: React.ReactNode;
-  className?: string;
-  contentClassName?: string;
+  readonly persistKey: PersistKey;
+  readonly title: string;
+  readonly defaultExpanded?: boolean;
+  readonly icon?: Icon;
+  readonly onIconClick?: () => void;
+  readonly children?: React.ReactNode;
+  readonly className?: string;
+  readonly contentClassName?: string;
 }
 
 export function CollapsibleSectionHeader({

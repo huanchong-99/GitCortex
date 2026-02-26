@@ -1,8 +1,8 @@
 import { ChatMarkdown } from './ChatMarkdown';
 
 interface ChatAssistantMessageProps {
-  content: string;
-  workspaceId?: string;
+  readonly content: string;
+  readonly workspaceId?: string;
 }
 
 export function ChatAssistantMessage({

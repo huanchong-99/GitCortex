@@ -46,16 +46,16 @@ const variantConfig: Record<Variant, VariantConfig> = {
 };
 
 interface ChatEntryContainerProps {
-  variant: Variant;
-  title?: React.ReactNode;
-  headerRight?: React.ReactNode;
-  expanded?: boolean;
-  onToggle?: () => void;
-  children?: React.ReactNode;
-  actions?: React.ReactNode;
-  className?: string;
-  status?: ToolStatus;
-  isGreyed?: boolean;
+  readonly variant: Variant;
+  readonly title?: React.ReactNode;
+  readonly headerRight?: React.ReactNode;
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
+  readonly children?: React.ReactNode;
+  readonly actions?: React.ReactNode;
+  readonly className?: string;
+  readonly status?: ToolStatus;
+  readonly isGreyed?: boolean;
 }
 
 export function ChatEntryContainer({
@@ -90,12 +90,20 @@ export function ChatEntryContainer({
     >
       {/* Header */}
       <div
+        role={onToggle ? "button" : undefined}
+        tabIndex={onToggle ? 0 : undefined}
         className={cn(
           'flex items-center px-double py-base gap-base rounded-sm overflow-hidden',
           config.headerBg,
           onToggle && 'cursor-pointer'
         )}
         onClick={onToggle}
+        onKeyDown={onToggle ? (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        } : undefined}
       >
         <Icon className="size-icon-xs shrink-0 text-low" />
         {title && (

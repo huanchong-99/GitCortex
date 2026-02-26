@@ -3,8 +3,8 @@ import type { Icon } from '@phosphor-icons/react';
 import { Tooltip } from './Tooltip';
 
 interface IconButtonGroupProps {
-  children: React.ReactNode;
-  className?: string;
+  readonly children: React.ReactNode;
+  readonly className?: string;
 }
 
 export function IconButtonGroup({ children, className }: IconButtonGroupProps) {
@@ -41,11 +41,12 @@ export function IconButtonGroupItem({
   title,
   className,
 }: IconButtonGroupItemProps) {
-  const stateStyles = disabled
-    ? 'opacity-40 cursor-not-allowed'
-    : active
-      ? 'bg-secondary text-normal'
-      : 'text-low hover:text-normal hover:bg-secondary/50';
+  const getStateStyles = () => {
+    if (disabled) return 'opacity-40 cursor-not-allowed';
+    if (active) return 'bg-secondary text-normal';
+    return 'text-low hover:text-normal hover:bg-secondary/50';
+  };
+  const stateStyles = getStateStyles();
 
   const button = (
     <button

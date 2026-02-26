@@ -8,15 +8,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface LoginRequiredPromptProps {
-  className?: string;
-  buttonVariant?: ComponentProps<typeof Button>['variant'];
-  buttonSize?: ComponentProps<typeof Button>['size'];
-  buttonClassName?: string;
-  title?: string;
-  description?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  icon?: LucideIcon;
+  readonly className?: string;
+  readonly buttonVariant?: ComponentProps<typeof Button>['variant'];
+  readonly buttonSize?: ComponentProps<typeof Button>['size'];
+  readonly buttonClassName?: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly actionLabel?: string;
+  readonly onAction?: () => void;
+  readonly icon?: LucideIcon;
 }
 
 export function LoginRequiredPrompt({
@@ -37,7 +37,7 @@ export function LoginRequiredPrompt({
       onAction();
       return;
     }
-    void OAuthDialog.show();
+    OAuthDialog.show().catch(() => { /* login dialog dismissed */ });
   }, [onAction]);
 
   const Icon = icon ?? LogIn;

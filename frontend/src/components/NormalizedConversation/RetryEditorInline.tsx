@@ -21,12 +21,12 @@ export function RetryEditorInline({
   executionProcessId,
   initialContent,
   onCancelled,
-}: {
+}: Readonly<{
   attempt: WorkspaceWithSession;
   executionProcessId: string;
   initialContent: string;
   onCancelled?: () => void;
-}) {
+}>) {
   const { t } = useTranslation(['common']);
   const attemptId = attempt.id;
   const { isAttemptRunning, attemptData } = useAttemptExecution(attemptId);

@@ -2,10 +2,10 @@ import { InfoIcon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 interface ChatSystemMessageProps {
-  content: string;
-  className?: string;
-  expanded?: boolean;
-  onToggle?: () => void;
+  readonly content: string;
+  readonly className?: string;
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
 }
 
 export function ChatSystemMessage({
@@ -22,6 +22,8 @@ export function ChatSystemMessage({
       )}
       onClick={onToggle}
       role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle?.(); } }}
     >
       <InfoIcon className="shrink-0 size-icon-base mt-0.5" />
       <span

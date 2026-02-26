@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { AgentAvailabilityState } from '@/hooks/useAgentAvailability';
 
 interface AgentAvailabilityIndicatorProps {
-  availability: AgentAvailabilityState;
+  readonly availability: AgentAvailabilityState;
 }
 
 export function AgentAvailabilityIndicator({

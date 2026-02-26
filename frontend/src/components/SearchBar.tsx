@@ -5,12 +5,11 @@ import { cn } from '@/lib/utils';
 import { Project } from 'shared/types';
 
 interface SearchBarProps {
-  className?: string;
-  value?: string;
-  onChange?: (value: string) => void;
-  disabled?: boolean;
-  onClear?: () => void;
-  project: Project | null;
+  readonly className?: string;
+  readonly value?: string;
+  readonly onChange?: (value: string) => void;
+  readonly disabled?: boolean;
+  readonly project: Project | null;
 }
 
 export const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(

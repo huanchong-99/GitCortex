@@ -2,13 +2,13 @@ import { cn } from '@/lib/utils';
 import type { Icon } from '@phosphor-icons/react';
 
 interface IconButtonProps {
-  icon: Icon;
-  onClick?: () => void;
-  disabled?: boolean;
-  variant?: 'default' | 'tertiary';
-  'aria-label': string;
-  title?: string;
-  className?: string;
+  readonly icon: Icon;
+  readonly onClick?: () => void;
+  readonly disabled?: boolean;
+  readonly variant?: 'default' | 'tertiary';
+  readonly 'aria-label': string;
+  readonly title?: string;
+  readonly className?: string;
 }
 
 export function IconButton({
@@ -20,11 +20,12 @@ export function IconButton({
   title,
   className,
 }: IconButtonProps) {
-  const variantStyles = disabled
-    ? 'opacity-40 cursor-not-allowed'
-    : variant === 'default'
-      ? 'text-low hover:text-normal hover:bg-secondary/50'
-      : 'bg-panel hover:bg-secondary text-normal';
+  const getVariantStyles = () => {
+    if (disabled) return 'opacity-40 cursor-not-allowed';
+    if (variant === 'default') return 'text-low hover:text-normal hover:bg-secondary/50';
+    return 'bg-panel hover:bg-secondary text-normal';
+  };
+  const variantStyles = getVariantStyles();
 
   return (
     <button

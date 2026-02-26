@@ -4,13 +4,13 @@ import { ChatEntryContainer } from './ChatEntryContainer';
 import { ChatMarkdown } from './ChatMarkdown';
 
 interface ChatUserMessageProps {
-  content: string;
-  expanded?: boolean;
-  onToggle?: () => void;
-  className?: string;
-  workspaceId?: string;
-  onEdit?: () => void;
-  isGreyed?: boolean;
+  readonly content: string;
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
+  readonly className?: string;
+  readonly workspaceId?: string;
+  readonly onEdit?: () => void;
+  readonly isGreyed?: boolean;
 }
 
 export function ChatUserMessage({
