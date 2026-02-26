@@ -5091,7 +5091,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 127.2 Do not use Array index in keys
+### 127.2 Do not use Array index in keys ✅ 已修复
 
 - **问题ID**: `AZyVwesHZ9DOUQdEsGkS`
 - **项目**: huanchong-99
@@ -5160,7 +5160,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 130.2 useState call is not destructured into value + setter pair
+### 130.2 useState call is not destructured into value + setter pair ✅ 已修复
 
 - **问题ID**: `AZyVwepIZ9DOUQdEsGjW`
 - **项目**: huanchong-99
@@ -5314,7 +5314,7 @@
 - **创建时间**: 25 days ago
 - **标签**: react, type-dependent
 
-### 134.3 Do not use Array index in keys
+### 134.3 Do not use Array index in keys ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGix`
 - **项目**: huanchong-99
@@ -7082,7 +7082,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability, style
 
-### 171.2 Remove this commented out code.
+### 171.2 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVweXrZ9DOUQdEsGeD`
 - **项目**: huanchong-99
@@ -8081,7 +8081,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 195.6 useState call is not destructured into value + setter pair
+### 195.6 useState call is not destructured into value + setter pair ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGjy`
 - **项目**: huanchong-99
@@ -8094,7 +8094,7 @@
 - **创建时间**: 22 days ago
 - **标签**: react
 
-### 195.7 Unnecessary use of conditional expression for default assignment.
+### 195.7 Unnecessary use of conditional expression for default assignment. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGjz`
 - **项目**: huanchong-99
@@ -8456,7 +8456,7 @@
 - **创建时间**: 15 days ago
 - **标签**: confusing
 
-### 197.5 Unnecessary use of conditional expression for default assignment.
+### 197.5 Unnecessary use of conditional expression for default assignment. ✅ 已修复
 
 - **问题ID**: `AZyVwepzZ9DOUQdEsGji`
 - **项目**: huanchong-99
@@ -10156,7 +10156,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2022
 
-### 238.3 Unnecessary use of conditional expression for default assignment.
+### 238.3 Unnecessary use of conditional expression for default assignment. ✅ 已修复
 
 - **问题ID**: `AZyVweXLZ9DOUQdEsGdx`
 - **项目**: huanchong-99
@@ -10296,7 +10296,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, es2015
 
-### 242.2 Prefer `Number.isNaN` over `isNaN`.
+### 242.2 Prefer `Number.isNaN` over `isNaN`. ✅ 已修复
 
 - **问题ID**: `AZyVweVpZ9DOUQdEsGdY`
 - **项目**: huanchong-99
@@ -10367,7 +10367,7 @@
 - **创建时间**: 25 days ago
 - **标签**: convention, es2015
 
-### 243.5 Prefer `Number.isNaN` over `isNaN`.
+### 243.5 Prefer `Number.isNaN` over `isNaN`. ✅ 已修复
 
 - **问题ID**: `AZyVweV8Z9DOUQdEsGdh`
 - **项目**: huanchong-99
@@ -10704,7 +10704,7 @@
 - **创建时间**: 1 month ago
 - **标签**: performance, readability
 
-### 254.2 Refactor this code to not use nested template literals.
+### 254.2 Refactor this code to not use nested template literals. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm6`
 - **项目**: huanchong-99
@@ -10782,7 +10782,7 @@
 - **创建时间**: 1 month ago
 - **标签**: object, string, ...
 
-### 254.8 Refactor this code to not use nested template literals.
+### 254.8 Refactor this code to not use nested template literals. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGm_`
 - **项目**: huanchong-99
@@ -10859,7 +10859,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 256.1 useState call is not destructured into value + setter pair
+### 256.1 useState call is not destructured into value + setter pair ✅ 已修复
 
 - **问题ID**: `AZyVwezDZ9DOUQdEsGmu`
 - **项目**: huanchong-99
@@ -11140,7 +11140,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 266.2 Complete the task associated to this "TODO" comment.
+### 266.2 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwey0Z9DOUQdEsGmr`
 - **项目**: huanchong-99
@@ -11178,7 +11178,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 268.1 'platform' is deprecated.
+### 268.1 'platform' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwevrZ9DOUQdEsGli`
 - **项目**: huanchong-99
@@ -11955,7 +11955,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 283.3 Expected the Promise rejection reason to be an Error.
+### 283.3 Expected the Promise rejection reason to be an Error. ✅ 已修复
 
 - **问题ID**: `AZyVwewxZ9DOUQdEsGmD`
 - **项目**: huanchong-99
@@ -12017,7 +12017,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 285.1 Complete the task associated to this "TODO" comment.
+### 285.1 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwev8Z9DOUQdEsGln`
 - **项目**: huanchong-99
@@ -12030,7 +12030,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 285.2 Complete the task associated to this "TODO" comment.
+### 285.2 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwev8Z9DOUQdEsGlo`
 - **项目**: huanchong-99
@@ -12056,7 +12056,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 285.4 Complete the task associated to this "TODO" comment.
+### 285.4 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVwev8Z9DOUQdEsGlq`
 - **项目**: huanchong-99
@@ -12088,7 +12088,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 286.2 useState call is not destructured into value + setter pair
+### 286.2 useState call is not destructured into value + setter pair ✅ 已修复
 
 - **问题ID**: `AZyVwex6Z9DOUQdEsGmc`
 - **项目**: huanchong-99
@@ -12255,7 +12255,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 290.1 Refactor this code to not use nested template literals.
+### 290.1 Refactor this code to not use nested template literals. ✅ 已修复
 
 - **问题ID**: `AZyVweykZ9DOUQdEsGmn`
 - **项目**: huanchong-99
@@ -12364,7 +12364,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 293.1 Remove this commented out code.
+### 293.1 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVweyrZ9DOUQdEsGmo`
 - **项目**: huanchong-99
@@ -12377,7 +12377,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 293.2 Complete the task associated to this "TODO" comment.
+### 293.2 Complete the task associated to this "TODO" comment. ✅ 已修复
 
 - **问题ID**: `AZyVweyrZ9DOUQdEsGmp`
 - **项目**: huanchong-99
@@ -13630,7 +13630,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 312.1 Remove this commented out code.
+### 312.1 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe3KZ9DOUQdEsGoo`
 - **项目**: huanchong-99
@@ -13643,7 +13643,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 312.2 Remove this commented out code.
+### 312.2 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe3KZ9DOUQdEsGop`
 - **项目**: huanchong-99
@@ -13662,7 +13662,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 313.1 export statement without specifiers is not allowed.
+### 313.1 export statement without specifiers is not allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwe1vZ9DOUQdEsGnh`
 - **项目**: huanchong-99
@@ -13700,7 +13700,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 315.1 export statement without specifiers is not allowed.
+### 315.1 export statement without specifiers is not allowed. ✅ 已修复
 
 - **问题ID**: `AZyVwe2-Z9DOUQdEsGon`
 - **项目**: huanchong-99
@@ -14112,7 +14112,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 323.2 'platform' is deprecated.
+### 323.2 'platform' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnj`
 - **项目**: huanchong-99
@@ -14978,7 +14978,7 @@
 - **创建时间**: 2 days ago
 - **标签**: best-practice, clarity, ...
 
-### 329.5 Assign this positional parameter to a local variable.
+### 329.5 Assign this positional parameter to a local variable. ✅ 已修复
 
 - **问题ID**: `AZyVwe66Z9DOUQdEsGpv`
 - **项目**: huanchong-99
@@ -14991,7 +14991,7 @@
 - **创建时间**: 2 days ago
 - **标签**: readability, shell
 
-### 329.6 Assign this positional parameter to a local variable.
+### 329.6 Assign this positional parameter to a local variable. ✅ 已修复
 
 - **问题ID**: `AZyVwe66Z9DOUQdEsGpw`
 - **项目**: huanchong-99
@@ -15197,7 +15197,7 @@
 - **创建时间**: 27 days ago
 - **标签**: convention, import, ...
 
-### 333.4 Prefer `node:net` over `net`.
+### 333.4 Prefer `node:net` over `net`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqZ`
 - **项目**: huanchong-99
@@ -15313,7 +15313,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 335.3 Prefer `node:net` over `net`.
+### 335.3 Prefer `node:net` over `net`. ✅ 已修复
 
 - **问题ID**: `AZyVwe78Z9DOUQdEsGqm`
 - **项目**: huanchong-99
