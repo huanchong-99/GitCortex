@@ -5199,7 +5199,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 130.5 The 'value' object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.
+### 130.5 The 'value' object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook. ✅ 已修复
 
 - **问题ID**: `AZyVwepIZ9DOUQdEsGjZ`
 - **项目**: huanchong-99
@@ -5597,7 +5597,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 140.2 `String.raw` should be used to avoid escaping `\`.
+### 140.2 `String.raw` should be used to avoid escaping `\`. ✅ 已修复
 
 - **问题ID**: `AZyVwesZZ9DOUQdEsGkV`
 - **项目**: huanchong-99
@@ -5705,7 +5705,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 145.1 Provide a compare function to avoid sorting elements alphabetically.
+### 145.1 Provide a compare function to avoid sorting elements alphabetically. ✅ 已修复
 
 - **问题ID**: `AZyVweUYZ9DOUQdEsGdC`
 - **项目**: huanchong-99
@@ -5808,7 +5808,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 147.3 Move this array "sort" operation to a separate statement or replace it with "toSorted".
+### 147.3 Move this array "sort" operation to a separate statement or replace it with "toSorted". ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc3`
 - **项目**: huanchong-99
@@ -6170,7 +6170,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 151.1 Destructuring assignment isChangingTargetBranch unnecessarily renamed.
+### 151.1 Destructuring assignment isChangingTargetBranch unnecessarily renamed. ✅ 已修复
 
 - **问题ID**: `AZyVweRoZ9DOUQdEsGb-`
 - **项目**: huanchong-99
@@ -6355,7 +6355,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 156.2 Passing a fragment to an HTML element is useless.
+### 156.2 Passing a fragment to an HTML element is useless. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcT`
 - **项目**: huanchong-99
@@ -6705,7 +6705,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 158.5 Prefer `.some(…)` over `.find(…)`.
+### 158.5 Prefer `.some(…)` over `.find(…)`. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcL`
 - **项目**: huanchong-99
@@ -7224,7 +7224,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 173.4 Ambiguous spacing after previous element a
+### 173.4 Ambiguous spacing after previous element a ✅ 已修复
 
 - **问题ID**: `AZyVweXTZ9DOUQdEsGd4`
 - **项目**: huanchong-99
@@ -7537,7 +7537,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 184.2 Expected a `for-of` loop instead of a `for` loop with this simple iteration.
+### 184.2 Expected a `for-of` loop instead of a `for` loop with this simple iteration. ✅ 已修复
 
 - **问题ID**: `AZyVweZgZ9DOUQdEsGe5`
 - **项目**: huanchong-99

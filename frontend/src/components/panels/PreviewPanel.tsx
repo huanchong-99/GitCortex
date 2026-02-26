@@ -254,6 +254,7 @@ export function PreviewPanel() {
                     <a
                       href="https://github.com/BloopAI/gitcortex-web-companion"
                       target="_blank"
+                      rel="noopener noreferrer"
                       className="underline font-bold"
                     >
                       {t('preview.troubleAlert.item3Link')}

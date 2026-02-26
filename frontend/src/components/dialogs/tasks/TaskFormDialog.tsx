@@ -144,7 +144,7 @@ const MultiRepoBranchField = ({
     const newValue = fieldValue.map((v) =>
       v.repoId === repoId ? { ...v, branch } : v
     );
-    if (!newValue.find((v) => v.repoId === repoId)) {
+    if (!newValue.some((v) => v.repoId === repoId)) {
       newValue.push({ repoId, branch });
     }
     onFieldChange(newValue);
