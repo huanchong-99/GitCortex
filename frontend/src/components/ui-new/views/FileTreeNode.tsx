@@ -80,9 +80,9 @@ export const FileTreeNode = forwardRef<HTMLDivElement, FileTreeNodeProps>(
         {/* Indentation guides */}
         {depth > 0 && (
           <div className="absolute left-0 top-0 bottom-0 flex">
-            {Array.from({ length: depth }).map((_, i) => (
+            {Array.from({ length: depth }, (_, i) => i).map((i) => (
               <div
-                key={i}
+                key={`indent-${i}`}
                 className="h-full w-3 flex justify-center"
                 style={{ marginLeft: i === 0 ? '6px' : '0' }}
               >

@@ -204,8 +204,8 @@ function FieldError({
     return (
       <ul className="ml-4 flex list-disc flex-col gap-1">
         {errors.map(
-          (error, index) =>
-            error?.message && <li key={`field-error-${error.message.slice(0, 30)}-${index}`}>{error.message}</li>
+          (error) =>
+            error?.message && <li key={`field-error-${error.message}`}>{error.message}</li>
         )}
       </ul>
     );

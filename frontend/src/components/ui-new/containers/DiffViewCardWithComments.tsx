@@ -266,10 +266,8 @@ export function DiffViewCardWithComments({
         if (!oldFileData[lineKey]) {
           oldFileData[lineKey] = { data: entry };
         }
-      } else {
-        if (!newFileData[lineKey]) {
-          newFileData[lineKey] = { data: entry };
-        }
+      } else if (!newFileData[lineKey]) {
+        newFileData[lineKey] = { data: entry };
       }
     });
 

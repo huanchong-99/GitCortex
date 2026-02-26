@@ -34,7 +34,6 @@ function PrCommentComponent({
   onDoubleClickEdit,
 }: {
   data: NormalizedComment;
-  nodeKey: NodeKey;
   onDoubleClickEdit: (event: React.MouseEvent) => void;
 }): JSX.Element {
   const handleClick = useCallback(

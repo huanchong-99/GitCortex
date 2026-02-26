@@ -80,10 +80,7 @@ function AppContent() {
           await updateAndSaveConfig({ disclaimer_acknowledged: true });
         }
         DisclaimerDialog.hide();
-        return;
-      }
-
-      if (!config.onboarding_acknowledged) {
+      } else if (!config.onboarding_acknowledged) {
         const result = await OnboardingDialog.show();
         if (!cancelled) {
           await updateAndSaveConfig({
@@ -93,10 +90,7 @@ function AppContent() {
           });
         }
         OnboardingDialog.hide();
-        return;
-      }
-
-      if (config.show_release_notes) {
+      } else if (config.show_release_notes) {
         await ReleaseNotesDialog.show();
         if (!cancelled) {
           await updateAndSaveConfig({ show_release_notes: false });

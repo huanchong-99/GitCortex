@@ -8,7 +8,6 @@ type Props = {
   workspaceId?: string;
   attemptBranch: string | null;
   branchStatus: RepoBranchStatus[] | undefined;
-  isEditable: boolean;
   onResolve?: () => void;
   enableResolve: boolean;
   enableAbort: boolean;

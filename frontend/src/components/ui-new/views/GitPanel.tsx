@@ -38,7 +38,6 @@ interface GitPanelProps {
   onOpenInEditor?: (repoId: string) => void;
   onCopyPath?: (repoId: string) => void;
   onOpenSettings?: (repoId: string) => void;
-  onAddRepo?: () => void;
   className?: string;
   error?: string | null;
 }

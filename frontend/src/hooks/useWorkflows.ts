@@ -5,14 +5,7 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 import { handleApiResponse, logApiError } from '@/lib/api';
-import type {
-  WorkflowDetailDto as Workflow,
-  WorkflowListItemDto,
-  WorkflowTaskDto,
-  TerminalDto,
-  WorkflowCommandDto,
-  SlashCommandPresetDto,
-} from 'shared/types';
+import type { WorkflowDetailDto as Workflow } from 'shared/types';
 
 // ============================================================================
 // Create Request Types (not in generated types yet)
@@ -709,11 +702,9 @@ export function useUpdateTaskStatus() {
 }
 
 // Export types for convenience
-export type {
-  Workflow,
-  WorkflowListItemDto,
-  WorkflowTaskDto,
-  TerminalDto,
-  WorkflowCommandDto,
-  SlashCommandPresetDto,
-};
+export type { Workflow };
+export type { WorkflowListItemDto } from 'shared/types';
+export type { WorkflowTaskDto } from 'shared/types';
+export type { TerminalDto } from 'shared/types';
+export type { WorkflowCommandDto } from 'shared/types';
+export type { SlashCommandPresetDto } from 'shared/types';

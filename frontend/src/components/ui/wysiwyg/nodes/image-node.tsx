@@ -39,7 +39,6 @@ function ImageComponent({
   onDoubleClickEdit,
 }: {
   data: ImageData;
-  nodeKey: NodeKey;
   onDoubleClickEdit: (event: React.MouseEvent) => void;
 }): JSX.Element {
   const { src, altText } = data;

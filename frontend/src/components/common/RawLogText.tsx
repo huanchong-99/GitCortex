@@ -37,7 +37,7 @@ const RawLogText = memo(
       }
 
       const regex = new RegExp(
-        `(${searchQuery.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
+        `(${searchQuery.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)})`,
         'gi'
       );
       const parts = text.split(regex);

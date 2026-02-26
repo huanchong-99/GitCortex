@@ -47,7 +47,7 @@ const CommandInput = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     className="flex flex-1 items-center border-b border-border px-base"
-    cmdk-input-wrapper=""
+    data-cmdk-input-wrapper=""
   >
     <MagnifyingGlassIcon
       className="mr-base h-4 w-4 shrink-0 text-low"

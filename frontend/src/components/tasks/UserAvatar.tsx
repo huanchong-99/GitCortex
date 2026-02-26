@@ -31,14 +31,14 @@ const buildLabel = (
   username?: string | null
 ) => {
   const name = [firstName, lastName]
-    .filter((value): value is string => Boolean(value && value.trim()))
+    .filter((value): value is string => Boolean(value?.trim()))
     .join(' ');
 
   if (name) {
     return name;
   }
 
-  if (username && username.trim()) {
+  if (username?.trim()) {
     return username;
   }
 

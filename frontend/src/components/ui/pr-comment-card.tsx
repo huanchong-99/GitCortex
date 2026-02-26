@@ -51,7 +51,7 @@ function DiffHunk({ diffHunk }: Readonly<{ diffHunk: string }>) {
           lineClass = 'block text-muted-foreground';
         }
         return (
-          <code key={i} className={lineClass}>
+          <code key={`diff-line-${i}-${line.slice(0, 20)}`} className={lineClass}>
             {line}
           </code>
         );
