@@ -7069,7 +7069,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 171.1 Compare with `undefined` directly instead of using `typeof`.
+### 171.1 Compare with `undefined` directly instead of using `typeof`. ✅ 已修复
 
 - **问题ID**: `AZyVweXrZ9DOUQdEsGeC`
 - **项目**: huanchong-99
@@ -7095,7 +7095,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 171.3 Compare with `undefined` directly instead of using `typeof`.
+### 171.3 Compare with `undefined` directly instead of using `typeof`. ✅ 已修复
 
 - **问题ID**: `AZyVweXrZ9DOUQdEsGeE`
 - **项目**: huanchong-99
