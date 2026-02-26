@@ -44,7 +44,7 @@ export function SearchableDropdownContainer<T>({
   placeholder = 'Search',
   emptyMessage = 'No items found',
   getItemBadge,
-}: SearchableDropdownContainerProps<T>) {
+}: Readonly<SearchableDropdownContainerProps<T>>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);

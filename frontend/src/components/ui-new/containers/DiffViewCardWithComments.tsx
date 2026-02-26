@@ -176,7 +176,7 @@ export function DiffViewCardWithComments({
   className,
   projectId,
   attemptId,
-}: DiffViewCardWithCommentsProps) {
+}: Readonly<DiffViewCardWithCommentsProps>) {
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
   const globalMode = useDiffViewMode();
@@ -462,7 +462,7 @@ function DiffViewBodyWithComments({
   onAddWidgetClick,
   renderWidgetLine,
   renderExtendLine,
-}: {
+}: Readonly<{
   diffFile: DiffFile | null;
   isValid: boolean;
   theme: 'light' | 'dark';
@@ -478,7 +478,7 @@ function DiffViewBodyWithComments({
     onClose: () => void;
   }) => React.ReactNode;
   renderExtendLine: (lineData: { data: ExtendLineData }) => React.ReactNode;
-}) {
+}>) {
   const { t } = useTranslation('tasks');
   if (!isValid || !diffFile) {
     return (

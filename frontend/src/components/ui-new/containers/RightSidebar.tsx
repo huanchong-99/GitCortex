@@ -25,7 +25,7 @@ export function RightSidebar({
   rightMainPanelMode,
   selectedWorkspace,
   repos,
-}: RightSidebarProps) {
+}: Readonly<RightSidebarProps>) {
   const { selectFile } = useChangesView();
   const { viewProcessInPanel } = useLogsPanel();
   const { diffs } = useWorkspaceContext();

@@ -32,7 +32,7 @@ const AutoExpandingTextarea = React.forwardRef<
         textarea.style.height = `${textarea.scrollHeight}px`;
       } else {
         // Calculate line height
-        const style = window.getComputedStyle(textarea);
+        const style = globalThis.getComputedStyle(textarea);
         const lineHeight = parseInt(style.lineHeight) || 20;
         const paddingTop = parseInt(style.paddingTop) || 0;
         const paddingBottom = parseInt(style.paddingBottom) || 0;

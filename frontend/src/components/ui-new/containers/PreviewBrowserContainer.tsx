@@ -34,7 +34,7 @@ interface PreviewBrowserContainerProps {
 export function PreviewBrowserContainer({
   attemptId,
   className,
-}: PreviewBrowserContainerProps) {
+}: Readonly<PreviewBrowserContainerProps>) {
   const navigate = useNavigate();
   const previewRefreshKey = useUiPreferencesStore((s) => s.previewRefreshKey);
   const triggerPreviewRefresh = useUiPreferencesStore(
@@ -290,9 +290,13 @@ export function PreviewBrowserContainer({
   );
 
   // Use previewRefreshKey from store to force iframe reload
-  const iframeUrl = effectiveUrl
-    ? `${effectiveUrl}${effectiveUrl.includes('?') ? '&' : '?'}_refresh=${previewRefreshKey}`
-    : undefined;
+  const iframeUrl = (() => {
+    if (!effectiveUrl) {
+      return undefined;
+    }
+    const separator = effectiveUrl.includes('?') ? '&' : '?';
+    return `${effectiveUrl}${separator}_refresh=${previewRefreshKey}`;
+  })();
 
   const handleEditDevScript = () => {
     if (repos.length === 1) {

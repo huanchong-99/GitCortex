@@ -16,7 +16,7 @@ interface LogsContentContainerProps {
   readonly className?: string;
 }
 
-export function LogsContentContainer({ className }: LogsContentContainerProps) {
+export function LogsContentContainer({ className }: Readonly<LogsContentContainerProps>) {
   const {
     logsPanelContent: content,
     logSearchQuery: searchQuery,

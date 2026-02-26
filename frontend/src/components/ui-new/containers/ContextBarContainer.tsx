@@ -61,7 +61,7 @@ export interface ContextBarContainerProps {
 
 export function ContextBarContainer({
   containerRef,
-}: ContextBarContainerProps) {
+}: Readonly<ContextBarContainerProps>) {
   const { executorContext } = useActions();
   const { config } = useUserSystem();
   const editorType = config?.editor?.editor_type ?? null;

@@ -13,7 +13,7 @@ interface CopyButtonProps {
  * Copy button with self-contained feedback state.
  * Shows a checkmark for 2 seconds after copying.
  */
-export function CopyButton({ onCopy, disabled }: CopyButtonProps) {
+export function CopyButton({ onCopy, disabled }: Readonly<CopyButtonProps>) {
   const { t } = useTranslation('common');
   const [copied, setCopied] = useState(false);
 

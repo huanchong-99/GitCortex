@@ -6,7 +6,7 @@ interface ToolStatusDotProps {
   readonly className?: string;
 }
 
-export function ToolStatusDot({ status, className }: ToolStatusDotProps) {
+export function ToolStatusDot({ status, className }: Readonly<ToolStatusDotProps>) {
   const statusType = status.status;
 
   // Map status to visual state

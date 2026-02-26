@@ -38,7 +38,7 @@ export function getIdeName(editorType: EditorType | undefined | null): string {
   }
 }
 
-export function IdeIcon({ editorType, className = 'h-4 w-4' }: IdeIconProps) {
+export function IdeIcon({ editorType, className = 'h-4 w-4' }: Readonly<IdeIconProps>) {
   const { theme } = useTheme();
   const resolvedTheme = getResolvedTheme(theme);
   const isDark = resolvedTheme === 'dark';

@@ -23,7 +23,7 @@ export function FileTreeContainer({
   diffs,
   onSelectFile,
   className,
-}: FileTreeContainerProps) {
+}: Readonly<FileTreeContainerProps>) {
   const { fileInView } = useChangesView();
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedPaths, setCollapsedPaths] =

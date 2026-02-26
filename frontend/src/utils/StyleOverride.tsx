@@ -148,8 +148,8 @@ export function AppWithStyleOverride({
       }
     }
 
-    window.addEventListener('message', handleStyleMessage);
-    return () => window.removeEventListener('message', handleStyleMessage);
+    globalThis.addEventListener('message', handleStyleMessage);
+    return () => globalThis.removeEventListener('message', handleStyleMessage);
   }, [setTheme]);
 
   // Send ready message to parent when component mounts

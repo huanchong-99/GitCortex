@@ -78,7 +78,7 @@ export function VirtualizedProcessLogs({
   searchQuery,
   matchIndices,
   currentMatchIndex,
-}: VirtualizedProcessLogsProps) {
+}: Readonly<VirtualizedProcessLogsProps>) {
   const { t } = useTranslation('tasks');
   const [channelData, setChannelData] =
     useState<DataWithScrollModifier<LogEntryWithKey> | null>(null);

@@ -17,7 +17,7 @@ export function IconListItem({
   disabled,
   loading,
   className,
-}: IconListItemProps) {
+}: Readonly<IconListItemProps>) {
   const content = (
     <div className="text-normal hover:text-high flex items-center gap-base">
       {loading ? (

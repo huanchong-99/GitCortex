@@ -21,7 +21,7 @@ function getStatusIcon(status?: string) {
   return <Circle aria-hidden className="h-4 w-4 text-muted-foreground" />;
 }
 
-export function ChatTodoList({ todos, expanded, onToggle }: ChatTodoListProps) {
+export function ChatTodoList({ todos, expanded, onToggle }: Readonly<ChatTodoListProps>) {
   const { t } = useTranslation('tasks');
 
   return (

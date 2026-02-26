@@ -13,7 +13,7 @@ export function SectionHeader({
   icon: IconComponent,
   onIconClick,
   className,
-}: SectionHeaderProps) {
+}: Readonly<SectionHeaderProps>) {
   return (
     <div
       className={cn(

@@ -39,13 +39,13 @@ import {
 } from '../primitives/conversation';
 import type { DiffInput } from '../primitives/conversation/DiffViewCard';
 
-type Props = {
+type Props = Readonly<{
   entry: NormalizedEntry;
   expansionKey: string;
   executionProcessId?: string;
   taskAttempt?: WorkspaceWithSession;
   task?: TaskWithAttemptStatus;
-};
+}>;
 
 type FileEditAction = Extract<ActionType, { action: 'file_edit' }>;
 
@@ -167,12 +167,12 @@ function renderToolUseEntry(
 
   // File edit - use ChatFileEntry
   if (action_type.action === 'file_edit') {
-    const fileEditAction = action_type as FileEditAction;
+    const fileEditAction = action_type;
     return (
       <>
         {fileEditAction.changes.map((change, idx) => (
           <FileEditEntry
-            key={idx}
+            key={`${fileEditAction.path}-change-${idx}`}
             path={fileEditAction.path}
             change={change}
             expansionKey={`edit:${expansionKey}:${idx}`}

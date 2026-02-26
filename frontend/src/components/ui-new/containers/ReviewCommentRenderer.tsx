@@ -13,7 +13,7 @@ interface ReviewCommentRendererProps {
 export function ReviewCommentRenderer({
   comment,
   projectId,
-}: ReviewCommentRendererProps) {
+}: Readonly<ReviewCommentRendererProps>) {
   const { t } = useTranslation('common');
   const { deleteComment, updateComment } = useReview();
   const [isEditing, setIsEditing] = useState(false);

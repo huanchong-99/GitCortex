@@ -11,7 +11,7 @@ interface GitHubCommentRendererProps {
  * Read-only renderer for GitHub PR comments.
  * Uses CommentCard primitive with 'github' variant for neutral styling.
  */
-export function GitHubCommentRenderer({ comment }: GitHubCommentRendererProps) {
+export function GitHubCommentRenderer({ comment }: Readonly<GitHubCommentRendererProps>) {
   const header = (
     <div className="flex items-center gap-half text-sm">
       <GithubLogoIcon className="size-icon-sm text-low" weight="fill" />

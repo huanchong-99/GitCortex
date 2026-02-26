@@ -43,14 +43,13 @@ import {
 } from '@/components/dialogs/scripts/ScriptFixerDialog';
 import { useAttemptRepo } from '@/hooks/useAttemptRepo';
 
-type Props = {
+type Props = Readonly<{
   entry: NormalizedEntry | ProcessStartPayload;
   expansionKey: string;
-  diffDeletable?: boolean;
   executionProcessId?: string;
   taskAttempt?: WorkspaceWithSession;
   task?: TaskWithAttemptStatus;
-};
+}>;
 
 type FileEditAction = Extract<ActionType, { action: 'file_edit' }>;
 
@@ -607,11 +606,11 @@ const ToolCallCard: React.FC<{
 };
 
 // Script tool names that can be fixed
-const SCRIPT_TOOL_NAMES = [
+const SCRIPT_TOOL_NAMES = new Set([
   'Setup Script',
   'Cleanup Script',
   'Tool Install Script',
-];
+]);
 
 const getScriptType = (toolName: string): ScriptType => {
   if (toolName === 'Setup Script') return 'setup';
@@ -763,10 +762,7 @@ function DisplayConversationEntry({
   }
 
   if (isUserFeedback) {
-    const feedbackEntry = entryType as Extract<
-      NormalizedEntryType,
-      { type: 'user_feedback' }
-    >;
+    const feedbackEntry = entryType;
     return (
       <div className="py-2">
         <div className="bg-background px-4 py-2 text-sm border-y border-dashed">
@@ -802,12 +798,12 @@ function DisplayConversationEntry({
 
     const body = (() => {
       if (isFileEdit(toolEntry.action_type)) {
-        const fileEditAction = toolEntry.action_type as FileEditAction;
+        const fileEditAction = toolEntry.action_type;
         return (
           <div className="space-y-3">
             {fileEditAction.changes.map((change, idx) => (
               <FileChangeRenderer
-                key={idx}
+                key={`${fileEditAction.path}-${idx}`}
                 path={fileEditAction.path}
                 change={change}
                 expansionKey={`edit:${expansionKey}:${idx}`}
@@ -835,7 +831,7 @@ function DisplayConversationEntry({
       // Script entries (Setup Script, Cleanup Script, Tool Install Script)
       if (
         toolEntry.action_type.action === 'command_run' &&
-        SCRIPT_TOOL_NAMES.includes(toolEntry.tool_name)
+        SCRIPT_TOOL_NAMES.has(toolEntry.tool_name)
       ) {
         const actionType = toolEntry.action_type;
         const exitCode =

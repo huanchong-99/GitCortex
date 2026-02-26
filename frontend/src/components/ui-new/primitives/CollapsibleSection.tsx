@@ -21,7 +21,7 @@ export function CollapsibleSection({
   children,
   className,
   contentClassName,
-}: CollapsibleSectionProps) {
+}: Readonly<CollapsibleSectionProps>) {
   const [expanded, toggle] = usePersistedExpanded(persistKey, defaultExpanded);
 
   return (

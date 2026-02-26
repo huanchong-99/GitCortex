@@ -21,8 +21,8 @@ import type { TaskWithAttemptStatus } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 
 interface ConversationListProps {
-  attempt: WorkspaceWithSession;
-  task?: TaskWithAttemptStatus;
+  readonly attempt: WorkspaceWithSession;
+  readonly task?: TaskWithAttemptStatus;
 }
 
 interface MessageListContext {
@@ -84,7 +84,7 @@ const computeItemKey: VirtuosoMessageListProps<
   MessageListContext
 >['computeItemKey'] = ({ data }) => `conv-${data.patchKey}`;
 
-export function ConversationList({ attempt, task }: ConversationListProps) {
+export function ConversationList({ attempt, task }: Readonly<ConversationListProps>) {
   const [channelData, setChannelData] =
     useState<DataWithScrollModifier<PatchTypeWithKey> | null>(null);
   const [loading, setLoading] = useState(true);

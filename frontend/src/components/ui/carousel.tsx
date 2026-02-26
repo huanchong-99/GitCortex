@@ -118,14 +118,20 @@ const Carousel = React.forwardRef<
       };
     }, [api, onSelect]);
 
+    const resolvedOrientation = (() => {
+      if (orientation) {
+        return orientation;
+      }
+      return opts?.axis === 'y' ? 'vertical' : 'horizontal';
+    })();
+
     return (
       <CarouselContext.Provider
         value={{
           carouselRef,
           api: api,
           opts,
-          orientation:
-            orientation || (opts?.axis === 'y' ? 'vertical' : 'horizontal'),
+          orientation: resolvedOrientation,
           scrollPrev,
           scrollNext,
           canScrollPrev,

@@ -27,7 +27,7 @@ function CommandDialog({
   children,
   onCloseAutoFocus,
   ...props
-}: CommandDialogProps) {
+}: Readonly<CommandDialogProps>) {
   return (
     <Dialog {...props}>
       <DialogContent

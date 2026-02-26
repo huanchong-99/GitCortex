@@ -43,7 +43,7 @@ function ModeProvider({
   isCreateMode,
   executionProps,
   children,
-}: ModeProviderProps) {
+}: Readonly<ModeProviderProps>) {
   if (isCreateMode) {
     return <CreateModeProvider>{children}</CreateModeProvider>;
   }

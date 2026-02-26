@@ -63,7 +63,7 @@ export function CommandBar({
   getLabel,
   search,
   onSearchChange,
-}: CommandBarProps) {
+}: Readonly<CommandBarProps>) {
   const { t } = useTranslation('common');
 
   return (

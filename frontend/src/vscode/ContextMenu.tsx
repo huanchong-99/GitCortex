@@ -107,11 +107,11 @@ export const WebviewContextMenu: React.FC = () => {
     const onClick = () => setVisible(false);
     document.addEventListener('contextmenu', onContext);
     document.addEventListener('click', onClick);
-    window.addEventListener('blur', onClick);
+    globalThis.addEventListener('blur', onClick);
     return () => {
       document.removeEventListener('contextmenu', onContext);
       document.removeEventListener('click', onClick);
-      window.removeEventListener('blur', onClick);
+      globalThis.removeEventListener('blur', onClick);
     };
   }, []);
 

@@ -939,7 +939,7 @@
 
 > 该文件共有 **13** 个问题
 
-### 24.1 'diffDeletable' PropType is defined but prop is never used
+### 24.1 'diffDeletable' PropType is defined but prop is never used ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeG`
 - **项目**: huanchong-99
@@ -1043,7 +1043,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 24.9 Mark the props of the component as read-only.
+### 24.9 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeO`
 - **项目**: huanchong-99
@@ -1056,7 +1056,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 24.10 This assertion is unnecessary since it does not change the type of the expression.
+### 24.10 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeP`
 - **项目**: huanchong-99
@@ -1069,7 +1069,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 24.11 This assertion is unnecessary since it does not change the type of the expression.
+### 24.11 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeQ`
 - **项目**: huanchong-99
@@ -1082,7 +1082,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 24.12 Do not use Array index in keys
+### 24.12 Do not use Array index in keys ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeR`
 - **项目**: huanchong-99
@@ -1114,7 +1114,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 25.1 Mark the props of the component as read-only.
+### 25.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweYOZ9DOUQdEsGeY`
 - **项目**: huanchong-99
@@ -1301,7 +1301,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 28.1 Prefer `globalThis` over `window`.
+### 28.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweYHZ9DOUQdEsGeT`
 - **项目**: huanchong-99
@@ -1314,7 +1314,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 28.2 Prefer `globalThis` over `window`.
+### 28.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweYHZ9DOUQdEsGeU`
 - **项目**: huanchong-99
@@ -1327,7 +1327,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 28.3 Prefer `globalThis` over `window`.
+### 28.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweYHZ9DOUQdEsGeV`
 - **项目**: huanchong-99
@@ -1340,7 +1340,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 28.4 Mark the props of the component as read-only.
+### 28.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweYHZ9DOUQdEsGeW`
 - **项目**: huanchong-99
@@ -1353,7 +1353,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 28.5 Mark the props of the component as read-only.
+### 28.5 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweYHZ9DOUQdEsGeX`
 - **项目**: huanchong-99
@@ -1512,7 +1512,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 33.1 Mark the props of the component as read-only.
+### 33.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZXZ9DOUQdEsGe1`
 - **项目**: huanchong-99
@@ -1538,7 +1538,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 33.3 Mark the props of the component as read-only.
+### 33.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZXZ9DOUQdEsGe3`
 - **项目**: huanchong-99
@@ -1570,7 +1570,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 34.2 Mark the props of the component as read-only.
+### 34.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGet`
 - **项目**: huanchong-99
@@ -1680,7 +1680,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 35.1 Mark the props of the component as read-only.
+### 35.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekfZ9DOUQdEsGh9`
 - **项目**: huanchong-99
@@ -1757,7 +1757,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 37.1 Mark the props of the component as read-only.
+### 37.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweiKZ9DOUQdEsGha`
 - **项目**: huanchong-99
@@ -1776,7 +1776,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 38.1 Mark the props of the component as read-only.
+### 38.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweiSZ9DOUQdEsGhb`
 - **项目**: huanchong-99
@@ -1795,7 +1795,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 39.1 Mark the props of the component as read-only.
+### 39.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekwZ9DOUQdEsGh_`
 - **项目**: huanchong-99
@@ -1840,7 +1840,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 40.1 Mark the props of the component as read-only.
+### 40.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekoZ9DOUQdEsGh-`
 - **项目**: huanchong-99
@@ -1891,7 +1891,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 42.1 Mark the props of the component as read-only.
+### 42.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwei-Z9DOUQdEsGhm`
 - **项目**: huanchong-99
@@ -1910,7 +1910,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 43.1 Mark the props of the component as read-only.
+### 43.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh1`
 - **项目**: huanchong-99
@@ -2019,7 +2019,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 44.1 Mark the props of the component as read-only.
+### 44.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwejGZ9DOUQdEsGhn`
 - **项目**: huanchong-99
@@ -2038,7 +2038,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 45.1 Mark the props of the component as read-only.
+### 45.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwejXZ9DOUQdEsGhs`
 - **项目**: huanchong-99
@@ -2057,7 +2057,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 46.1 Mark the props of the component as read-only.
+### 46.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelCZ9DOUQdEsGiD`
 - **项目**: huanchong-99
@@ -2089,7 +2089,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 47.1 Mark the props of the component as read-only.
+### 47.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwej-Z9DOUQdEsGhy`
 - **项目**: huanchong-99
@@ -2108,7 +2108,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 48.1 Mark the props of the component as read-only.
+### 48.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwej2Z9DOUQdEsGhx`
 - **项目**: huanchong-99
@@ -2140,7 +2140,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 49.2 This assertion is unnecessary since it does not change the type of the expression.
+### 49.2 This assertion is unnecessary since it does not change the type of the expression. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiI`
 - **项目**: huanchong-99
@@ -2153,7 +2153,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant, type-dependent
 
-### 49.3 Do not use Array index in keys
+### 49.3 Do not use Array index in keys ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiJ`
 - **项目**: huanchong-99
@@ -2179,7 +2179,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 49.5 Mark the props of the component as read-only.
+### 49.5 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiL`
 - **项目**: huanchong-99
@@ -2367,7 +2367,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 50.2 Extract this nested ternary operation into an independent statement.
+### 50.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweibZ9DOUQdEsGhd`
 - **项目**: huanchong-99
@@ -4911,7 +4911,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 123.1 'shared/types' imported multiple times.
+### 123.1 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweqoZ9DOUQdEsGkE`
 - **项目**: huanchong-99
@@ -4924,7 +4924,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 123.2 'shared/types' imported multiple times.
+### 123.2 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweqoZ9DOUQdEsGkF`
 - **项目**: huanchong-99
@@ -5686,7 +5686,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 144.1 Prefer `globalThis` over `window`.
+### 144.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweTNZ9DOUQdEsGdA`
 - **项目**: huanchong-99
@@ -6789,7 +6789,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 159.1 'shared/types' imported multiple times.
+### 159.1 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweRwZ9DOUQdEsGb_`
 - **项目**: huanchong-99
@@ -6802,7 +6802,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 159.2 'shared/types' imported multiple times.
+### 159.2 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweRwZ9DOUQdEsGcA`
 - **项目**: huanchong-99
@@ -7114,7 +7114,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 172.1 'shared/types' imported multiple times.
+### 172.1 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweXjZ9DOUQdEsGd9`
 - **项目**: huanchong-99
@@ -7127,7 +7127,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 172.2 'shared/types' imported multiple times.
+### 172.2 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweXjZ9DOUQdEsGd-`
 - **项目**: huanchong-99
@@ -7671,7 +7671,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 189.1 '@/hooks' imported multiple times.
+### 189.1 '@/hooks' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweZ6Z9DOUQdEsGfA`
 - **项目**: huanchong-99
@@ -7684,7 +7684,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 189.2 '@/hooks' imported multiple times.
+### 189.2 '@/hooks' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweZ6Z9DOUQdEsGfB`
 - **项目**: huanchong-99
@@ -7735,7 +7735,7 @@
 
 > 该文件共有 **10** 个问题
 
-### 191.1 'shared/types' imported multiple times.
+### 191.1 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfH`
 - **项目**: huanchong-99
@@ -7748,7 +7748,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 191.2 'shared/types' imported multiple times.
+### 191.2 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfI`
 - **项目**: huanchong-99
@@ -7761,7 +7761,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 191.3 '@/lib/api' imported multiple times.
+### 191.3 '@/lib/api' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfJ`
 - **项目**: huanchong-99
@@ -7774,7 +7774,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 191.4 'shared/types' imported multiple times.
+### 191.4 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfK`
 - **项目**: huanchong-99
@@ -7787,7 +7787,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 191.5 '@/lib/api' imported multiple times.
+### 191.5 '@/lib/api' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfL`
 - **项目**: huanchong-99
@@ -7800,7 +7800,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 191.6 'shared/types' imported multiple times.
+### 191.6 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfM`
 - **项目**: huanchong-99
@@ -8602,7 +8602,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 202.1 Prefer `globalThis` over `window`.
+### 202.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwemJZ9DOUQdEsGig`
 - **项目**: huanchong-99
@@ -8615,7 +8615,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 202.2 Prefer `globalThis` over `window`.
+### 202.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwemJZ9DOUQdEsGih`
 - **项目**: huanchong-99
@@ -9192,7 +9192,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 218.1 Prefer `globalThis` over `window`.
+### 218.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwePYZ9DOUQdEsGbM`
 - **项目**: huanchong-99
@@ -9894,7 +9894,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2021, readability
 
-### 229.4 Prefer `globalThis` over `window`.
+### 229.4 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVweQRZ9DOUQdEsGbg`
 - **项目**: huanchong-99
@@ -11204,7 +11204,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es6, readability
 
-### 268.3 Prefer `globalThis` over `window`.
+### 268.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevrZ9DOUQdEsGlk`
 - **项目**: huanchong-99
@@ -11217,7 +11217,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 268.4 Prefer `globalThis` over `window`.
+### 268.4 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwevrZ9DOUQdEsGll`
 - **项目**: huanchong-99
@@ -11466,7 +11466,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 273.3 Prefer `globalThis` over `window`.
+### 273.3 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwexlZ9DOUQdEsGmT`
 - **项目**: huanchong-99
@@ -11929,7 +11929,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 283.1 'shared/types' imported multiple times.
+### 283.1 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVwewxZ9DOUQdEsGmB`
 - **项目**: huanchong-99
@@ -11942,7 +11942,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 283.2 'shared/types' imported multiple times.
+### 283.2 'shared/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVwewxZ9DOUQdEsGmC`
 - **项目**: huanchong-99
@@ -12498,7 +12498,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 298.1 'react-router-dom' imported multiple times.
+### 298.1 'react-router-dom' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweu8Z9DOUQdEsGlR`
 - **项目**: huanchong-99
@@ -12511,7 +12511,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 298.2 'react-router-dom' imported multiple times.
+### 298.2 'react-router-dom' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVweu8Z9DOUQdEsGlS`
 - **项目**: huanchong-99
@@ -12724,7 +12724,7 @@
 
 > 该文件共有 **8** 个问题
 
-### 301.1 '@/components/workflow/types' imported multiple times.
+### 301.1 '@/components/workflow/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGkb`
 - **项目**: huanchong-99
@@ -12737,7 +12737,7 @@
 - **创建时间**: 26 days ago
 - **标签**: es2015
 
-### 301.2 '@/components/workflow/types' imported multiple times.
+### 301.2 '@/components/workflow/types' imported multiple times. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGkc`
 - **项目**: huanchong-99
@@ -13732,7 +13732,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 316.2 Prefer `globalThis` over `window`.
+### 316.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe04Z9DOUQdEsGnU`
 - **项目**: huanchong-99
@@ -13924,7 +13924,7 @@
 
 > 该文件共有 **13** 个问题
 
-### 322.1 Prefer `globalThis` over `window`.
+### 322.1 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGn9`
 - **项目**: huanchong-99
@@ -13937,7 +13937,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 322.2 Prefer `globalThis` over `window`.
+### 322.2 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGn-`
 - **项目**: huanchong-99
@@ -14151,7 +14151,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 323.5 Prefer `globalThis` over `window`.
+### 323.5 Prefer `globalThis` over `window`. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnm`
 - **项目**: huanchong-99

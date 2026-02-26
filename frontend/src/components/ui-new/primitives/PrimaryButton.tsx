@@ -17,7 +17,7 @@ export function PrimaryButton({
   onClick,
   disabled,
   children,
-}: PrimaryButtonProps) {
+}: Readonly<PrimaryButtonProps>) {
   const getVariantStyles = () => {
     if (disabled) return 'cursor-not-allowed bg-panel';
     if (variant === 'default') return 'bg-brand hover:bg-brand-hover text-on-brand';

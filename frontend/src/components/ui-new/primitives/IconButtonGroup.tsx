@@ -7,7 +7,7 @@ interface IconButtonGroupProps {
   readonly className?: string;
 }
 
-export function IconButtonGroup({ children, className }: IconButtonGroupProps) {
+export function IconButtonGroup({ children, className }: Readonly<IconButtonGroupProps>) {
   return (
     <div
       className={cn(
@@ -40,7 +40,7 @@ export function IconButtonGroupItem({
   'aria-label': ariaLabel,
   title,
   className,
-}: IconButtonGroupItemProps) {
+}: Readonly<IconButtonGroupItemProps>) {
   const getStateStyles = () => {
     if (disabled) return 'opacity-40 cursor-not-allowed';
     if (active) return 'bg-secondary text-normal';

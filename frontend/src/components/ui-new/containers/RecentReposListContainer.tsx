@@ -14,7 +14,7 @@ interface RecentReposListContainerProps {
 export function RecentReposListContainer({
   registeredRepoPaths,
   onRepoRegistered,
-}: RecentReposListContainerProps) {
+}: Readonly<RecentReposListContainerProps>) {
   const [recentRepos, setRecentRepos] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

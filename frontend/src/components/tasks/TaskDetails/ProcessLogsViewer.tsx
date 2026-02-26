@@ -8,16 +8,16 @@ import type { PatchType } from 'shared/types';
 type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
 
 interface ProcessLogsViewerProps {
-  processId: string;
+  readonly processId: string;
 }
 
 export function ProcessLogsViewerContent({
   logs,
   error,
-}: {
+}: Readonly<{
   logs: LogEntry[];
   error: string | null;
-}) {
+}>) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const didInitScroll = useRef(false);
   const prevLenRef = useRef(0);
@@ -58,7 +58,7 @@ export function ProcessLogsViewerContent({
   const formatLogLine = (entry: LogEntry, index: number) => {
     return (
       <RawLogText
-        key={index}
+        key={`${entry.type}-${index}`}
         content={entry.content}
         channel={entry.type === 'STDERR' ? 'stderr' : 'stdout'}
         className="text-sm px-4 py-1"

@@ -40,10 +40,10 @@ const OAuthDialogImpl = NiceModal.create<NoProps>(() => {
       // Open popup window with authorize URL
       const width = 600;
       const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
+      const left = globalThis.screenX + (globalThis.outerWidth - width) / 2;
+      const top = globalThis.screenY + (globalThis.outerHeight - height) / 2;
 
-      popupRef.current = window.open(
+      popupRef.current = globalThis.open(
         data.authorize_url,
         'oauth-popup',
         `width=${width},height=${height},left=${left},top=${top},popup=yes,noopener=yes`

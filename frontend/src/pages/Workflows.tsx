@@ -42,8 +42,7 @@ import {
   type WorkflowStatus,
   type WorkflowTask,
 } from '@/components/workflow/PipelineView';
-import { WizardConfig } from '@/components/workflow/types';
-import { wizardConfigToCreateRequest } from '@/components/workflow/types';
+import { WizardConfig, wizardConfigToCreateRequest } from '@/components/workflow/types';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';

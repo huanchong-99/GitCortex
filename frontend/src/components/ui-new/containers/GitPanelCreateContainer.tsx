@@ -11,7 +11,7 @@ interface GitPanelCreateContainerProps {
 
 export function GitPanelCreateContainer({
   className,
-}: GitPanelCreateContainerProps) {
+}: Readonly<GitPanelCreateContainerProps>) {
   const {
     repos,
     addRepo,

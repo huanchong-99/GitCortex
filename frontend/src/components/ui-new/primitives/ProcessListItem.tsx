@@ -50,7 +50,7 @@ export function ProcessListItem({
   selected,
   onClick,
   className,
-}: ProcessListItemProps) {
+}: Readonly<ProcessListItemProps>) {
   const IconComponent = RUN_REASON_ICONS[runReason];
   const label = RUN_REASON_LABELS[runReason];
   const statusColor = STATUS_COLORS[status];

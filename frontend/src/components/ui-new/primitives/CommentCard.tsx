@@ -32,7 +32,7 @@ export function CommentCard({
   header,
   actions,
   className,
-}: CommentCardProps) {
+}: Readonly<CommentCardProps>) {
   return (
     <div className="p-base bg-panel font-sans text-base">
       <div

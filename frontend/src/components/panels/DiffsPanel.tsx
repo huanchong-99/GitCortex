@@ -14,8 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { Diff, DiffChangeKind } from 'shared/types';
-import type { Workspace } from 'shared/types';
+import type { Diff, DiffChangeKind, Workspace } from 'shared/types';
 import GitOperations, {
   type GitOperationsInputs,
 } from '@/components/tasks/Toolbar/GitOperations.tsx';

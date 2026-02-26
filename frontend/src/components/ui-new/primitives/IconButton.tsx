@@ -19,7 +19,7 @@ export function IconButton({
   'aria-label': ariaLabel,
   title,
   className,
-}: IconButtonProps) {
+}: Readonly<IconButtonProps>) {
   const getVariantStyles = () => {
     if (disabled) return 'opacity-40 cursor-not-allowed';
     if (variant === 'default') return 'text-low hover:text-normal hover:bg-secondary/50';

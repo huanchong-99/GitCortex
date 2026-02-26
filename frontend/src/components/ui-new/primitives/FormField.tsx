@@ -28,7 +28,7 @@ export function FormField({
   contentClassName,
   children,
   ...props
-}: FormFieldProps) {
+}: Readonly<FormFieldProps>) {
   const autoId = React.useId();
   const fieldId = id ?? autoId;
 

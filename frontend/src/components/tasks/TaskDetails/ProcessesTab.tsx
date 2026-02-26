@@ -20,7 +20,7 @@ import { useProcessSelection } from '@/contexts/ProcessSelectionContext';
 import { useRetryUi } from '@/contexts/RetryUiContext';
 
 interface ProcessesTabProps {
-  sessionId?: string;
+  readonly sessionId?: string;
 }
 
 function ProcessesTab({ sessionId }: ProcessesTabProps) {

@@ -4,13 +4,8 @@ import { Link, Loader2, XCircle } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import { ActionsDropdown } from '@/components/ui/actions-dropdown';
 import { Button } from '@/components/ui/button';
-import { useNavigateWithSearch } from '@/hooks';
+import { useNavigateWithSearch, useAuth } from '@/hooks';
 import { paths } from '@/lib/paths';
-import { attemptsApi } from '@/lib/api';
-import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
-import { TaskCardHeader } from './TaskCardHeader';
-import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/hooks';
 import { useUserSystem } from '@/components/ConfigProvider';
 
 type Task = TaskWithAttemptStatus;

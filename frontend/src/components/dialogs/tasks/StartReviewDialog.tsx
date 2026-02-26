@@ -124,7 +124,8 @@ const StartReviewDialogImpl = NiceModal.create<StartReviewDialogProps>(
         if (createdNewSession && targetSessionId) {
           selectSession(targetSessionId);
         }
-        onSuccess?.(createdNewSession ? targetSessionId : undefined);
+        const sessionIdForCallback = createdNewSession ? targetSessionId : undefined;
+        onSuccess?.(sessionIdForCallback);
         modal.hide();
       } catch (err) {
         console.error('Failed to start review:', err);

@@ -18,7 +18,7 @@ export function PreviewControlsContainer({
   attemptId,
   onViewProcessInPanel,
   className,
-}: PreviewControlsContainerProps) {
+}: Readonly<PreviewControlsContainerProps>) {
   const { repos } = useWorkspaceContext();
   const setRightMainPanelMode = useUiPreferencesStore(
     (s) => s.setRightMainPanelMode

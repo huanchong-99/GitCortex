@@ -11,7 +11,7 @@ interface CreateRepoButtonContainerProps {
 
 export function CreateRepoButtonContainer({
   onRepoCreated,
-}: CreateRepoButtonContainerProps) {
+}: Readonly<CreateRepoButtonContainerProps>) {
   const { t } = useTranslation('common');
   const handleClick = useCallback(async () => {
     const repo = await CreateRepoDialog.show();

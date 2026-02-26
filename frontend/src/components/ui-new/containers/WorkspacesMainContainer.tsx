@@ -25,7 +25,7 @@ export function WorkspacesMainContainer({
   isLoading,
   isNewSessionMode,
   onStartNewSession,
-}: WorkspacesMainContainerProps) {
+}: Readonly<WorkspacesMainContainerProps>) {
   const { diffStats } = useWorkspaceContext();
   const containerRef = useRef<HTMLElement>(null);
 

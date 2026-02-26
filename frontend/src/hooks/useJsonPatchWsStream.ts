@@ -131,7 +131,7 @@ export const useJsonPatchWsStream = <T extends object>(
         // Reset backoff on successful connection
         retryAttemptsRef.current = 0;
         if (retryTimerRef.current) {
-          window.clearTimeout(retryTimerRef.current);
+          globalThis.clearTimeout(retryTimerRef.current);
           retryTimerRef.current = null;
         }
       };

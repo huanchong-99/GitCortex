@@ -18,9 +18,9 @@ interface NewDesignScopeProps {
 // Wrapper component to get workspaceId from context for ExecutionProcessesProvider
 function ExecutionProcessesProviderWrapper({
   children,
-}: {
+}: Readonly<{
   children: ReactNode;
-}) {
+}>) {
   const { workspaceId, selectedSessionId } = useWorkspaceContext();
   return (
     <ExecutionProcessesProvider
@@ -32,7 +32,7 @@ function ExecutionProcessesProviderWrapper({
   );
 }
 
-export function NewDesignScope({ children }: NewDesignScopeProps) {
+export function NewDesignScope({ children }: Readonly<NewDesignScopeProps>) {
   const ref = useRef<HTMLDivElement>(null);
   const posthog = usePostHog();
   const hasTracked = useRef(false);

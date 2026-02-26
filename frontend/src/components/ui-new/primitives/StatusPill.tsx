@@ -44,7 +44,7 @@ export function StatusPill({
   className,
   onClick,
   ...props
-}: StatusPillProps) {
+}: Readonly<StatusPillProps>) {
   const content = label ?? children;
   const isInteractive = typeof onClick === 'function';
 

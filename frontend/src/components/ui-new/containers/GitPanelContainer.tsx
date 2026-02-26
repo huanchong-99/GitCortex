@@ -18,9 +18,9 @@ import type {
 } from 'shared/types';
 
 export interface GitPanelContainerProps {
-  selectedWorkspace: Workspace | undefined;
-  repos: RepoWithTargetBranch[];
-  diffs: Diff[];
+  readonly selectedWorkspace: Workspace | undefined;
+  readonly repos: RepoWithTargetBranch[];
+  readonly diffs: Diff[];
 }
 
 type PushState = 'idle' | 'pending' | 'success' | 'error';
@@ -29,7 +29,7 @@ export function GitPanelContainer({
   selectedWorkspace,
   repos,
   diffs,
-}: GitPanelContainerProps) {
+}: Readonly<GitPanelContainerProps>) {
   const { executeAction } = useActions();
   const navigate = useNavigate();
 

@@ -26,7 +26,7 @@ export function CollapsibleSectionHeader({
   children,
   className,
   contentClassName,
-}: CollapsibleSectionHeaderProps) {
+}: Readonly<CollapsibleSectionHeaderProps>) {
   const [expanded, toggle] = usePersistedExpanded(persistKey, defaultExpanded);
 
   const handleIconClick = (e: React.MouseEvent) => {

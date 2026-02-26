@@ -69,7 +69,7 @@ function EditDiffRenderer({
   defaultExpanded = false,
   statusAppearance = 'default',
   forceExpanded = false,
-}: Props) {
+}: Readonly<Props>) {
   const { config } = useUserSystem();
   const [expanded, setExpanded] = useExpandable(expansionKey, defaultExpanded);
   const effectiveExpanded = forceExpanded || expanded;

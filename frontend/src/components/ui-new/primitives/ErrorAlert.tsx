@@ -6,7 +6,7 @@ interface ErrorAlertProps {
   readonly className?: string;
 }
 
-export function ErrorAlert({ message, className }: ErrorAlertProps) {
+export function ErrorAlert({ message, className }: Readonly<ErrorAlertProps>) {
   return (
     <div
       role="alert"

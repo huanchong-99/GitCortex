@@ -27,7 +27,7 @@ export function InputField({
   actionIcon: ActionIcon,
   onAction,
   disabled,
-}: InputFieldProps) {
+}: Readonly<InputFieldProps>) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editValue, setEditValue] = React.useState(value);
   const [justSaved, setJustSaved] = React.useState(false);

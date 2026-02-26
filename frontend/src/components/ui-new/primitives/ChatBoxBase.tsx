@@ -97,7 +97,7 @@ export function ChatBoxBase({
   isRunning,
   focusKey,
   localImages,
-}: ChatBoxBaseProps) {
+}: Readonly<ChatBoxBaseProps>) {
   const { t } = useTranslation('common');
   const variantLabel = toPrettyCase(variant?.selected || 'DEFAULT');
   const variantOptions = variant?.options ?? [];

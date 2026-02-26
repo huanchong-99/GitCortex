@@ -29,9 +29,9 @@ const DEFAULT_DENIAL_REASON = 'User denied this tool use request.';
 
 // ---------- Types ----------
 interface PendingApprovalEntryProps {
-  pendingStatus: Extract<ToolStatus, { status: 'pending_approval' }>;
-  executionProcessId?: string;
-  children: ReactNode;
+  readonly pendingStatus: Extract<ToolStatus, { status: 'pending_approval' }>;
+  readonly executionProcessId?: string;
+  readonly children: ReactNode;
 }
 
 function useApprovalCountdown(
@@ -53,14 +53,14 @@ function useApprovalCountdown(
 
   useEffect(() => {
     if (paused) return;
-    const id = window.setInterval(() => {
+    const id = globalThis.setInterval(() => {
       const remaining = new Date(timeoutAt).getTime() - Date.now();
       const next = Math.max(0, Math.floor(remaining / 1000));
       setTimeLeft(next);
-      if (next <= 0) window.clearInterval(id);
+      if (next <= 0) globalThis.clearInterval(id);
     }, 1000);
 
-    return () => window.clearInterval(id);
+    return () => globalThis.clearInterval(id);
   }, [timeoutAt, paused]);
 
   const percent = useMemo(
@@ -77,12 +77,12 @@ function ActionButtons({
   isResponding,
   onApprove,
   onStartDeny,
-}: {
+}: Readonly<{
   disabled: boolean;
   isResponding: boolean;
   onApprove: () => void;
   onStartDeny: () => void;
-}) {
+}>) {
   return (
     <div className="flex items-center gap-1.5 pr-4">
       <Tooltip>
@@ -131,14 +131,14 @@ function DenyReasonForm({
   onCancel,
   onSubmit,
   projectId,
-}: {
+}: Readonly<{
   isResponding: boolean;
   value: string;
   onChange: (v: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
   projectId?: string;
-}) {
+}>) {
   return (
     <div className="flex flex-col gap-2 p-4">
       <WYSIWYGEditor

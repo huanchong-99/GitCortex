@@ -41,7 +41,7 @@ function ContextBarButton({
   iconClassName,
   tooltip,
   ...props
-}: ContextBarButtonProps) {
+}: Readonly<ContextBarButtonProps>) {
   const button = (
     <button
       className={cn(
@@ -72,10 +72,10 @@ function ContextBarButton({
 function DragHandle({
   onMouseDown,
   isDragging,
-}: {
+}: Readonly<{
   onMouseDown: (e: React.MouseEvent) => void;
   isDragging: boolean;
-}) {
+}>) {
   return (
     <div
       className={cn(
@@ -140,7 +140,7 @@ export function ContextBar({
   actionContext,
   onExecuteAction,
   editorType,
-}: ContextBarProps) {
+}: Readonly<ContextBarProps>) {
   const { style, isDragging, dragHandlers } =
     useContextBarPosition(containerRef);
 

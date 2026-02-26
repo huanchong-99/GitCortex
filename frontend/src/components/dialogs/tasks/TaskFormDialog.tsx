@@ -316,8 +316,8 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    globalThis.addEventListener('beforeunload', handleBeforeUnload);
+    return () => globalThis.removeEventListener('beforeunload', handleBeforeUnload);
   }, [modal.visible, isSubmitting, hasUnsavedChanges]);
 
   // Keyboard shortcuts

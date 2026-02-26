@@ -14,7 +14,7 @@ interface BrowseRepoButtonContainerProps {
 export function BrowseRepoButtonContainer({
   disabled,
   onRepoRegistered,
-}: BrowseRepoButtonContainerProps) {
+}: Readonly<BrowseRepoButtonContainerProps>) {
   const { t } = useTranslation('common');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);

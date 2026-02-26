@@ -59,7 +59,7 @@ export function CreateChatBox({
   agent,
   onPasteFiles,
   localImages,
-}: CreateChatBoxProps) {
+}: Readonly<CreateChatBoxProps>) {
   const { t } = useTranslation('tasks');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canSend = editor.value.trim().length > 0 && !isSending;

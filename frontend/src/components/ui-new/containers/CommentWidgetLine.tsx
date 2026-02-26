@@ -19,7 +19,7 @@ export function CommentWidgetLine({
   onSave,
   onCancel,
   projectId,
-}: CommentWidgetLineProps) {
+}: Readonly<CommentWidgetLineProps>) {
   const { t } = useTranslation('common');
   const { setDraft, addComment } = useReview();
   const [value, setValue] = useState(draft.text);
