@@ -60,6 +60,7 @@ SELECT
 FROM follow_up_drafts;
 
 -- Migrate existing retry_drafts
+-- NOTE: EXISTS subquery is acceptable here for a one-time migration to prevent duplicate inserts.
 INSERT INTO drafts (
     id, task_attempt_id, draft_type, retry_process_id, prompt,
     queued, sending, version, variant, image_ids, created_at, updated_at

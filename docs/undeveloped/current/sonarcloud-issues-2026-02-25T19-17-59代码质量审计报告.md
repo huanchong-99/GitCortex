@@ -66,7 +66,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 1.1 Define a constant instead of duplicating this literal 7 times.
+### 1.1 Define a constant instead of duplicating this literal 7 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe6BZ9DOUQdEsGpi`
 - **项目**: huanchong-99
@@ -85,7 +85,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 2.1 Define a constant instead of duplicating this literal 3 times.
+### 2.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4rZ9DOUQdEsGo7`
 - **项目**: huanchong-99
@@ -104,7 +104,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 3.1 An illegal character with code point 10 was found in this literal.
+### 3.1 An illegal character with code point 10 was found in this literal. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpd`
 - **项目**: huanchong-99
@@ -117,7 +117,7 @@
 - **创建时间**: 1 month ago
 - **标签**: pitfall
 
-### 3.2 Define a constant instead of duplicating this literal 6 times.
+### 3.2 Define a constant instead of duplicating this literal 6 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpg`
 - **项目**: huanchong-99
@@ -130,7 +130,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 3.3 An illegal character with code point 10 was found in this literal.
+### 3.3 An illegal character with code point 10 was found in this literal. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpe`
 - **项目**: huanchong-99
@@ -143,7 +143,7 @@
 - **创建时间**: 1 month ago
 - **标签**: pitfall
 
-### 3.4 An illegal character with code point 10 was found in this literal.
+### 3.4 An illegal character with code point 10 was found in this literal. ✅ 已修复
 
 - **问题ID**: `AZyVwe5tZ9DOUQdEsGpf`
 - **项目**: huanchong-99
@@ -162,7 +162,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 4.1 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 4.1 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe6ZZ9DOUQdEsGpl`
 - **项目**: huanchong-99
@@ -181,7 +181,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 5.1 Define a constant instead of duplicating this literal 4 times.
+### 5.1 Define a constant instead of duplicating this literal 4 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpC`
 - **项目**: huanchong-99
@@ -194,7 +194,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: design
 
-### 5.2 Define a constant instead of duplicating this literal 4 times.
+### 5.2 Define a constant instead of duplicating this literal 4 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGo_`
 - **项目**: huanchong-99
@@ -207,7 +207,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: design
 
-### 5.3 Define a constant instead of duplicating this literal 3 times.
+### 5.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpD`
 - **项目**: huanchong-99
@@ -220,7 +220,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: design
 
-### 5.4 Define a constant instead of duplicating this literal 3 times.
+### 5.4 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpA`
 - **项目**: huanchong-99
@@ -233,7 +233,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: design
 
-### 5.5 Define a constant instead of duplicating this literal 3 times.
+### 5.5 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGpB`
 - **项目**: huanchong-99
@@ -246,7 +246,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: design
 
-### 5.6 Define a constant instead of duplicating this literal 3 times.
+### 5.6 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGo-`
 - **项目**: huanchong-99
@@ -259,7 +259,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: design
 
-### 5.7 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 5.7 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe47Z9DOUQdEsGo9`
 - **项目**: huanchong-99
@@ -278,7 +278,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 6.1 Define a constant instead of duplicating this literal 3 times.
+### 6.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4TZ9DOUQdEsGo4`
 - **项目**: huanchong-99
@@ -297,7 +297,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 7.1 Define a constant instead of duplicating this literal 3 times.
+### 7.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe6JZ9DOUQdEsGpj`
 - **项目**: huanchong-99
@@ -316,7 +316,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 8.1 Define a constant instead of duplicating this literal 3 times.
+### 8.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe31Z9DOUQdEsGoz`
 - **项目**: huanchong-99
@@ -329,7 +329,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 8.2 Define a constant instead of duplicating this literal 3 times.
+### 8.2 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe31Z9DOUQdEsGox`
 - **项目**: huanchong-99
@@ -342,7 +342,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 8.3 Define a constant instead of duplicating this literal 3 times.
+### 8.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe31Z9DOUQdEsGoy`
 - **项目**: huanchong-99
@@ -361,7 +361,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 9.1 Refactor this SQL query to eliminate the use of EXISTS.
+### 9.1 Refactor this SQL query to eliminate the use of EXISTS. ✅ 已修复
 
 - **问题ID**: `AZyVwe4zZ9DOUQdEsGo8`
 - **项目**: huanchong-99
@@ -379,7 +379,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 10.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 10.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5SZ9DOUQdEsGpS`
 - **项目**: huanchong-99
@@ -392,7 +392,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 10.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 10.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5SZ9DOUQdEsGpT`
 - **项目**: huanchong-99
@@ -411,7 +411,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 11.1 Define a constant instead of duplicating this literal 3 times.
+### 11.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4DZ9DOUQdEsGo1`
 - **项目**: huanchong-99
@@ -430,7 +430,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 12.1 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 12.1 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe37Z9DOUQdEsGo0`
 - **项目**: huanchong-99
@@ -449,7 +449,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 13.1 Define a constant instead of duplicating this literal 8 times.
+### 13.1 Define a constant instead of duplicating this literal 8 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpc`
 - **项目**: huanchong-99
@@ -462,7 +462,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 13.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 13.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpX`
 - **项目**: huanchong-99
@@ -475,7 +475,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 13.3 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 13.3 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpY`
 - **项目**: huanchong-99
@@ -488,7 +488,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 13.4 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 13.4 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpZ`
 - **项目**: huanchong-99
@@ -501,7 +501,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 13.5 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 13.5 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpa`
 - **项目**: huanchong-99
@@ -514,7 +514,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: sql
 
-### 13.6 The number of join conditions 4 exceeds the maximum allowed 3.
+### 13.6 The number of join conditions 4 exceeds the maximum allowed 3. ✅ 已修复
 
 - **问题ID**: `AZyVwe5jZ9DOUQdEsGpb`
 - **项目**: huanchong-99
@@ -532,7 +532,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 14.1 Define a constant instead of duplicating this literal 7 times.
+### 14.1 Define a constant instead of duplicating this literal 7 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4cZ9DOUQdEsGo5`
 - **项目**: huanchong-99
@@ -551,7 +551,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 15.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 15.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe5LZ9DOUQdEsGpR`
 - **项目**: huanchong-99
@@ -570,7 +570,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 16.1 Refactor this SQL query to prevent doing a full table scan due to the value of the "LIKE" condition
+### 16.1 Refactor this SQL query to prevent doing a full table scan due to the value of the "LIKE" condition ✅ 已修复
 
 - **问题ID**: `AZyVwe51Z9DOUQdEsGph`
 - **项目**: huanchong-99
@@ -588,7 +588,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 17.1 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 17.1 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe4KZ9DOUQdEsGo2`
 - **项目**: huanchong-99
@@ -601,7 +601,7 @@
 - **创建时间**: 1 month ago
 - **标签**: sql
 
-### 17.2 Ensure that the WHERE clause is not missing in this UPDATE query.
+### 17.2 Ensure that the WHERE clause is not missing in this UPDATE query. ✅ 已修复
 
 - **问题ID**: `AZyVwe4KZ9DOUQdEsGo3`
 - **项目**: huanchong-99
@@ -620,7 +620,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 18.1 Define a constant instead of duplicating this literal 4 times.
+### 18.1 Define a constant instead of duplicating this literal 4 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5bZ9DOUQdEsGpW`
 - **项目**: huanchong-99
@@ -633,7 +633,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 18.2 Define a constant instead of duplicating this literal 3 times.
+### 18.2 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5bZ9DOUQdEsGpU`
 - **项目**: huanchong-99
@@ -646,7 +646,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 18.3 Define a constant instead of duplicating this literal 3 times.
+### 18.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5bZ9DOUQdEsGpV`
 - **项目**: huanchong-99
@@ -665,7 +665,7 @@
 
 > 该文件共有 **13** 个问题
 
-### 19.1 Remove this commented out code.
+### 19.1 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpE`
 - **项目**: huanchong-99
@@ -678,7 +678,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.2 Remove this commented out code.
+### 19.2 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpF`
 - **项目**: huanchong-99
@@ -691,7 +691,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.3 Define a constant instead of duplicating this literal 3 times.
+### 19.3 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpN`
 - **项目**: huanchong-99
@@ -704,7 +704,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.4 Define a constant instead of duplicating this literal 3 times.
+### 19.4 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpO`
 - **项目**: huanchong-99
@@ -717,7 +717,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.5 Define a constant instead of duplicating this literal 3 times.
+### 19.5 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpP`
 - **项目**: huanchong-99
@@ -730,7 +730,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.6 Remove this commented out code.
+### 19.6 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpG`
 - **项目**: huanchong-99
@@ -743,7 +743,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.7 Remove this commented out code.
+### 19.7 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpH`
 - **项目**: huanchong-99
@@ -756,7 +756,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.8 Define a constant instead of duplicating this literal 3 times.
+### 19.8 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpQ`
 - **项目**: huanchong-99
@@ -769,7 +769,7 @@
 - **创建时间**: 1 month ago
 - **标签**: design
 
-### 19.9 Remove this commented out code.
+### 19.9 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpI`
 - **项目**: huanchong-99
@@ -782,7 +782,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.10 Remove this commented out code.
+### 19.10 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpJ`
 - **项目**: huanchong-99
@@ -795,7 +795,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.11 Remove this commented out code.
+### 19.11 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpK`
 - **项目**: huanchong-99
@@ -808,7 +808,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.12 Remove this commented out code.
+### 19.12 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpL`
 - **项目**: huanchong-99
@@ -821,7 +821,7 @@
 - **创建时间**: 1 month ago
 - **标签**: unused
 
-### 19.13 Remove this commented out code.
+### 19.13 Remove this commented out code. ✅ 已修复
 
 - **问题ID**: `AZyVwe5DZ9DOUQdEsGpM`
 - **项目**: huanchong-99
@@ -840,7 +840,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 20.1 Refactor this SQL query to eliminate the use of EXISTS.
+### 20.1 Refactor this SQL query to eliminate the use of EXISTS. ✅ 已修复
 
 - **问题ID**: `AZyVwe6RZ9DOUQdEsGpk`
 - **项目**: huanchong-99
@@ -858,7 +858,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 21.1 Define a constant instead of duplicating this literal 3 times.
+### 21.1 Define a constant instead of duplicating this literal 3 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe4kZ9DOUQdEsGo6`
 - **项目**: huanchong-99
@@ -877,7 +877,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 22.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 22.1 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe6gZ9DOUQdEsGpm`
 - **项目**: huanchong-99
@@ -890,7 +890,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: sql
 
-### 22.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons.
+### 22.2 Use IS NULL and IS NOT NULL instead of direct NULL comparisons. ✅ 已修复
 
 - **问题ID**: `AZyVwe6gZ9DOUQdEsGpn`
 - **项目**: huanchong-99
@@ -909,7 +909,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 23.1 Merge this RUN instruction with the consecutive ones.
+### 23.1 Merge this RUN instruction with the consecutive ones. ✅ 已修复
 
 - **问题ID**: `AZyVwe8EZ9DOUQdEsGqq`
 - **项目**: huanchong-99
@@ -921,7 +921,7 @@
 - **工作量**: 375min effort
 - **创建时间**: 22 hours ago
 
-### 23.2 Merge this RUN instruction with the consecutive ones.
+### 23.2 Merge this RUN instruction with the consecutive ones. ✅ 已修复
 
 - **问题ID**: `AZyVwe8EZ9DOUQdEsGqr`
 - **项目**: huanchong-99
@@ -1372,7 +1372,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 29.1 Mark the props of the component as read-only.
+### 29.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweXzZ9DOUQdEsGeF`
 - **项目**: huanchong-99

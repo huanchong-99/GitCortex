@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags direct NULL comparisons in this migration.
+-- The IS NULL / IS NOT NULL usage here is correct SQL syntax for conditional backfill logic.
+
 -- Complete API key encryption migration by backfilling data into the new column
 -- introduced in 20260119000000_encrypt_api_keys.sql.
 --

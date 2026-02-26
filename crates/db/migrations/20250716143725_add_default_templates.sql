@@ -1,3 +1,8 @@
+-- NOTE: SonarCloud flags "illegal character with code point 10" (newlines) in string literals below.
+-- This is intentional - template content contains multi-line markdown text that requires embedded newlines.
+-- NOTE: SonarCloud flags duplicate string literals in this migration.
+-- This is acceptable for SQL DDL migrations where repeated INSERT patterns share common column names.
+
 -- Add default global templates
 
 -- 1. Bug Analysis template

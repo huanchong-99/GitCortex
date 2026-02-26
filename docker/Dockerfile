@@ -36,9 +36,8 @@ FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update && apt-get install -y \
     libsqlite3-0 libgit2-1.5 git curl ca-certificates bash gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /etc/apt/keyrings \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
     | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
@@ -60,9 +59,8 @@ COPY --from=rust-builder /build/target/release/server /usr/local/bin/gitcortex-s
 COPY assets/scripts/ /opt/gitcortex/assets/scripts/
 COPY assets/sounds/ /opt/gitcortex/assets/sounds/
 
-RUN groupadd -r gitcortex && useradd -r -g gitcortex -m gitcortex
-
-RUN mkdir -p /var/lib/gitcortex/assets /var/lib/gitcortex \
+RUN groupadd -r gitcortex && useradd -r -g gitcortex -m gitcortex \
+    && mkdir -p /var/lib/gitcortex/assets /var/lib/gitcortex \
     && chown -R gitcortex:gitcortex /var/lib/gitcortex
 VOLUME ["/var/lib/gitcortex"]
 

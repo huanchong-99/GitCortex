@@ -7,6 +7,7 @@ ALTER TABLE execution_processes
                                 'devserver'));
 
 -- 2. Copy existing values across
+-- NOTE: This UPDATE intentionally affects all rows as part of the migration to copy data to the new column.
 UPDATE execution_processes
   SET process_type_new = process_type;
 

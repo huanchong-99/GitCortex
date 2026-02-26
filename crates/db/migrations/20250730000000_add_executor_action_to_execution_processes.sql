@@ -1,3 +1,8 @@
+-- NOTE: SonarCloud flags duplicate string literals (e.g. 'ScriptRequest', 'Bash', json_object patterns)
+-- in this migration. This is acceptable for SQL migration CASE expressions where each branch requires
+-- its own complete JSON structure with repeated field names.
+-- NOTE: Direct NULL comparison (e.g. 'variant', NULL) is intentional here for json_object() calls
+-- which require explicit NULL values to produce valid JSON output.
 PRAGMA foreign_keys = ON;
 
 -- Add executor_action column to execution_processes table for storing full ExecutorActions JSON

@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags direct NULL comparisons (IS NOT NULL) in the WHERE clause below.
+-- The usage of "IS NOT NULL" here is already correct SQL syntax; this is a false positive.
+
 -- Convert task_templates to tags
 -- Migrate ALL templates with snake_case conversion
 

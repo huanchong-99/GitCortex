@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags UPDATE statements without WHERE clauses in this migration.
+-- These UPDATEs intentionally affect all rows to migrate script data from project_repos to repos.
+
 -- Add script columns to repos
 ALTER TABLE repos ADD COLUMN setup_script TEXT;
 ALTER TABLE repos ADD COLUMN cleanup_script TEXT;

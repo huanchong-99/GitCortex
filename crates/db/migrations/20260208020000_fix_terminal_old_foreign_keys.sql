@@ -1,3 +1,5 @@
+-- NOTE: SonarCloud flags duplicate string literals (e.g. datetime('now'), table/column names) in this migration.
+-- This is acceptable for SQL DDL migrations where table rebuild requires repeating column definitions.
 PRAGMA foreign_keys = OFF;
 
 CREATE TABLE terminal_log_new (

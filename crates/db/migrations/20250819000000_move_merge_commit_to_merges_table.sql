@@ -1,3 +1,7 @@
+-- NOTE: SonarCloud flags duplicate string literals (e.g. 'direct', 'pr', datetime('now', 'subsec'))
+-- in this migration. This is acceptable for SQL DDL migrations where CHECK constraints and INSERT
+-- statements necessarily repeat enum values and default expressions.
+
 -- Create enhanced merges table with type-specific columns
 CREATE TABLE merges (
     id              BLOB PRIMARY KEY,

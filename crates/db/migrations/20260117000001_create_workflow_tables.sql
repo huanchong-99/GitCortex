@@ -1,3 +1,7 @@
+-- NOTE: SonarCloud flags duplicate string literals (e.g. datetime('now'), cli_type_id references)
+-- in this migration. This is acceptable for SQL DDL migrations where each table definition
+-- requires its own DEFAULT clause and foreign key references.
+
 -- ============================================================================
 -- GitCortex Workflow Tables Migration
 -- Created: 2026-01-17

@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags duplicate string literals (e.g. datetime('now', 'subsec')) in this migration.
+-- This is acceptable for SQL DDL migrations where each table definition requires its own DEFAULT clause.
+
 -- Refactor task_attempts into workspaces and sessions
 -- - Rename task_attempts -> workspaces (keeps workspace-related fields)
 -- - Create sessions table (executor moves here)

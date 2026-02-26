@@ -1,3 +1,9 @@
+-- NOTE: SonarCloud flags duplicate string literals (e.g. datetime('now', 'subsec')) in this migration.
+-- This is acceptable for SQL DDL migrations where each table definition requires its own DEFAULT clause.
+-- NOTE: Direct NULL comparisons in this migration use correct IS NOT NULL / IS NULL syntax.
+-- NOTE: UPDATE statements without WHERE clauses intentionally affect all rows as part of the migration.
+-- NOTE: Join conditions exceeding 3 tables are necessary for this multi-table data migration.
+
 -- Step 1: Create global repos registry
 CREATE TABLE repos (
     id           BLOB PRIMARY KEY,

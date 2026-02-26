@@ -6,6 +6,7 @@ SET auto_confirm = 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE auto_confirm = 0;
 
+-- NOTE: EXISTS subquery is acceptable here for a one-time migration to clean up orphaned foreign key references.
 UPDATE terminal
 SET vk_session_id = NULL
 WHERE vk_session_id IS NOT NULL

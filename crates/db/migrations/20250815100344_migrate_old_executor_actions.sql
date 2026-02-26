@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags duplicate string literals in this migration.
+-- This is acceptable for SQL migration scripts where json_extract/json_set patterns repeat field paths.
+
 -- JSON format changed, means you can access logs from old execution_processes
 
 UPDATE execution_processes

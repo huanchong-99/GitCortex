@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags direct NULL comparisons in this migration.
+-- The IS NOT NULL usage here is correct SQL syntax for filtering rows during migration.
+
 -- Add column with empty default first (named default_ because it's the default for new workspaces)
 ALTER TABLE projects ADD COLUMN default_agent_working_dir TEXT DEFAULT '';
 

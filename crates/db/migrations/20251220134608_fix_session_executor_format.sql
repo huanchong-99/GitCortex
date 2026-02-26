@@ -1,3 +1,6 @@
+-- NOTE: SonarCloud flags the LIKE '%:%' pattern as causing a full table scan.
+-- This is acceptable for a one-time migration script where performance is not a concern.
+
 -- Fix session executor values that were incorrectly stored with variant suffix
 -- Values like "CLAUDE_CODE:ROUTER" should be "CLAUDE_CODE"
 -- This was introduced in the refactor from task_attempts to sessions (commit 6a129d0fa)
