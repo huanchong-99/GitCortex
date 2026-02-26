@@ -11498,7 +11498,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 274.1 Make this public static property readonly.
+### 274.1 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwexKZ9DOUQdEsGmO`
 - **项目**: huanchong-99
@@ -13255,7 +13255,7 @@
 
 > 该文件共有 **9** 个问题
 
-### 308.1 Make this public static property readonly.
+### 308.1 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGod`
 - **项目**: huanchong-99
@@ -13268,7 +13268,7 @@
 - **创建时间**: 25 days ago
 - **标签**: cwe
 
-### 308.2 Make this public static property readonly.
+### 308.2 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGoe`
 - **项目**: huanchong-99
@@ -13281,7 +13281,7 @@
 - **创建时间**: 25 days ago
 - **标签**: cwe
 
-### 308.3 Make this public static property readonly.
+### 308.3 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGof`
 - **项目**: huanchong-99
@@ -13294,7 +13294,7 @@
 - **创建时间**: 25 days ago
 - **标签**: cwe
 
-### 308.4 Make this public static property readonly.
+### 308.4 Make this public static property readonly. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGog`
 - **项目**: huanchong-99
