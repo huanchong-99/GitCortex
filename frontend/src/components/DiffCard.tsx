@@ -103,7 +103,7 @@ export default function DiffCard({
   const isContentEqual = oldContentSafe === newContentSafe;
 
   const diffOptions = useMemo(
-    () => (ignoreWhitespace ? { ignoreWhitespace: true as const } : undefined),
+    () => (ignoreWhitespace ? { ignoreWhitespace: true } : undefined),
     [ignoreWhitespace]
   );
 

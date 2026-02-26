@@ -64,7 +64,7 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
     // Compute default organization (prefer non-personal)
     const defaultOrgId = useMemo(() => {
       const orgs = orgsResponse?.organizations ?? [];
-      return orgs.find((o) => !o.is_personal)?.id ?? orgs[0]?.id ?? '';
+      return orgs.find((o) => o.is_personal === false)?.id ?? orgs[0]?.id ?? '';
     }, [orgsResponse]);
 
     // Use selected or default
