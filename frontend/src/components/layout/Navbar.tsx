@@ -70,7 +70,7 @@ export function Navbar() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { projectId, project } = useProject();
-  const { query, setQuery, active, clear, registerInputRef } = useSearch();
+  const { query, setQuery, active, registerInputRef } = useSearch();
   const handleOpenInEditor = useOpenProjectInEditor(project || null);
   const { loginStatus, reloadSystem, remoteFeaturesEnabled } = useUserSystem();
 
@@ -151,7 +151,6 @@ export function Navbar() {
               value={query}
               onChange={setQuery}
               disabled={!active}
-              onClear={clear}
               project={project || null}
             />
           </div>

@@ -70,7 +70,7 @@ function GitActionsDialogContent({
             >
               <GitPullRequest className="h-3.5 w-3.5" />
               {t('git.pr.number', {
-                number: Number.parseInt(mergedPR.prInfo.number, 10),
+                number: Number.parseInt(mergedPR.prInfo.number.toString(), 10),
               })}
               <ExternalLink className="h-3.5 w-3.5" />
             </a>

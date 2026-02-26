@@ -327,7 +327,7 @@ export function FileTagTypeaheadPlugin({
                         key={option.key}
                         option={option}
                         index={options.indexOf(option)}
-                        selectedIndex={selectedIndex}
+                        selectedIndex={selectedIndex ?? 0}
                         lastMousePositionRef={lastMousePositionRef}
                         setHighlightedIndex={setHighlightedIndex}
                         selectOptionAndCleanUp={selectOptionAndCleanUp}
@@ -348,7 +348,7 @@ export function FileTagTypeaheadPlugin({
                         key={option.key}
                         option={option}
                         index={options.indexOf(option)}
-                        selectedIndex={selectedIndex}
+                        selectedIndex={selectedIndex ?? 0}
                         lastMousePositionRef={lastMousePositionRef}
                         setHighlightedIndex={setHighlightedIndex}
                         selectOptionAndCleanUp={selectOptionAndCleanUp}

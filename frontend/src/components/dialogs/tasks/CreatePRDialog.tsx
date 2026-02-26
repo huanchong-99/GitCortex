@@ -264,7 +264,7 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
         // Handle CLI not installed/logged in errors
         if (handleCliError(
           result.error,
-          isMacEnvironment,
+          isMacEnvironment ?? false,
           showGhCliSetupDialog,
           setError,
           setGhCliHelp

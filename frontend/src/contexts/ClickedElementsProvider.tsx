@@ -179,8 +179,8 @@ function prunePrimitive(value: unknown, maxString: number): unknown {
   }
   if (t === 'number' || t === 'boolean') return value;
   if (t === 'function') return '[Function]';
-  if (t === 'bigint') return value.toString() + 'n';
-  if (t === 'symbol') return value.toString();
+  if (t === 'bigint') return (value as bigint).toString() + 'n';
+  if (t === 'symbol') return (value as symbol).toString();
   return null; // Not a primitive
 }
 

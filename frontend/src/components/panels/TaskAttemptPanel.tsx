@@ -27,7 +27,7 @@ const TaskAttemptPanel = ({
 
   return (
     <EntriesProvider key={attempt.id}>
-      <RetryUiProvider attemptId={attempt.id}>
+      <RetryUiProvider>
         {children({
           logs: (
             <VirtualizedList key={attempt.id} attempt={attempt} task={task} />

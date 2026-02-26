@@ -64,7 +64,7 @@ export function GitPanelContainer({
 
           const relevantPR = openPR || mergedPR;
           if (relevantPR?.type === 'pr') {
-            prNumber = Number.parseInt(relevantPR.prInfo.number, 10);
+            prNumber = Number.parseInt(relevantPR.prInfo.number.toString(), 10);
             prUrl = relevantPR.prInfo.url;
             prStatus = relevantPR.prInfo.status;
           }
@@ -283,7 +283,6 @@ export function GitPanelContainer({
       onOpenInEditor={handleOpenInEditor}
       onCopyPath={handleCopyPath}
       onOpenSettings={handleOpenSettings}
-      onAddRepo={() => console.log('Add repo clicked')}
     />
   );
 }

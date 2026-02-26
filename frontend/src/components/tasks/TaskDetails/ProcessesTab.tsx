@@ -14,7 +14,7 @@ import { ProfileVariantBadge } from '@/components/common/ProfileVariantBadge.tsx
 import { useExecutionProcesses } from '@/hooks/useExecutionProcesses';
 import { useLogStream } from '@/hooks/useLogStream';
 import { ProcessLogsViewerContent } from './ProcessLogsViewer';
-import type { ExecutionProcessStatus, ExecutionProcess } from 'shared/types';
+import type { ExecutionProcessStatus, ExecutionProcess, PatchType } from 'shared/types';
 
 import { useProcessSelection } from '@/contexts/ProcessSelectionContext';
 import { useRetryUi } from '@/contexts/RetryUiContext';
@@ -84,12 +84,14 @@ const getCopyButtonClassName = (copied: boolean, hasLogs: boolean): string => {
   return `${baseClasses} text-muted-foreground hover:text-foreground hover:bg-muted/50`;
 };
 
+type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
+
 const ProcessDetailsContent: React.FC<{
   selectedProcess: ExecutionProcess | null;
   loadingProcessId: string | null;
   selectedProcessId: string | null;
-  logs: Array<{ content: string }>;
-  logsError: Error | null;
+  logs: LogEntry[];
+  logsError: string | null;
   t: (key: string) => string;
 }> = ({
   selectedProcess,

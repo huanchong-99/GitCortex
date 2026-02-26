@@ -813,7 +813,6 @@ export function TaskFollowUpSection({
                 workspaceId={workspaceId}
                 attemptBranch={attemptBranch}
                 branchStatus={branchStatus}
-                isEditable={isEditable}
                 onResolve={onSendFollowUp}
                 enableResolve={
                   canSendFollowUp && !isAttemptRunning && isEditable
