@@ -1095,7 +1095,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 24.13 Extract this nested ternary operation into an independent statement.
+### 24.13 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweX9Z9DOUQdEsGeS`
 - **项目**: huanchong-99
@@ -1404,7 +1404,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 30.2 Extract this nested ternary operation into an independent statement.
+### 30.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweRDZ9DOUQdEsGbx`
 - **项目**: huanchong-99
@@ -1430,7 +1430,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 30.4 Extract this nested ternary operation into an independent statement.
+### 30.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweRDZ9DOUQdEsGbz`
 - **项目**: huanchong-99
@@ -1456,7 +1456,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 30.6 Extract this nested ternary operation into an independent statement.
+### 30.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweRDZ9DOUQdEsGb0`
 - **项目**: huanchong-99
@@ -1525,7 +1525,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 33.2 Extract this nested ternary operation into an independent statement.
+### 33.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZXZ9DOUQdEsGe2`
 - **项目**: huanchong-99
@@ -1596,7 +1596,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 34.4 Extract this nested ternary operation into an independent statement.
+### 34.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGev`
 - **项目**: huanchong-99
@@ -1635,7 +1635,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 34.7 Extract this nested ternary operation into an independent statement.
+### 34.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGey`
 - **项目**: huanchong-99
@@ -1648,7 +1648,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 34.8 Extract this nested ternary operation into an independent statement.
+### 34.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGez`
 - **项目**: huanchong-99
@@ -1661,7 +1661,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 34.9 Extract this nested ternary operation into an independent statement.
+### 34.9 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZPZ9DOUQdEsGe0`
 - **项目**: huanchong-99
@@ -1859,7 +1859,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 41.1 Extract this nested ternary operation into an independent statement.
+### 41.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwejmZ9DOUQdEsGhu`
 - **项目**: huanchong-99
@@ -1872,7 +1872,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 41.2 Extract this nested ternary operation into an independent statement.
+### 41.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwejmZ9DOUQdEsGhv`
 - **项目**: huanchong-99
@@ -2322,7 +2322,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.16 Extract this nested ternary operation into an independent statement.
+### 49.16 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiW`
 - **项目**: huanchong-99
@@ -3005,7 +3005,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 74.2 Extract this nested ternary operation into an independent statement.
+### 74.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwef5Z9DOUQdEsGgx`
 - **项目**: huanchong-99
@@ -3037,7 +3037,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 75.2 Extract this nested ternary operation into an independent statement.
+### 75.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwed4Z9DOUQdEsGgR`
 - **项目**: huanchong-99
@@ -3107,7 +3107,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 78.2 Extract this nested ternary operation into an independent statement.
+### 78.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwefhZ9DOUQdEsGgq`
 - **项目**: huanchong-99
@@ -3120,7 +3120,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 78.3 Extract this nested ternary operation into an independent statement.
+### 78.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwefhZ9DOUQdEsGgr`
 - **项目**: huanchong-99
@@ -3133,7 +3133,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 78.4 Extract this nested ternary operation into an independent statement.
+### 78.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwefhZ9DOUQdEsGgs`
 - **项目**: huanchong-99
@@ -3216,7 +3216,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 81.3 Extract this nested ternary operation into an independent statement.
+### 81.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgF`
 - **项目**: huanchong-99
@@ -3229,7 +3229,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: confusing
 
-### 81.4 Extract this nested ternary operation into an independent statement.
+### 81.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgG`
 - **项目**: huanchong-99
@@ -3242,7 +3242,7 @@
 - **创建时间**: 22 hours ago
 - **标签**: confusing
 
-### 81.5 Extract this nested ternary operation into an independent statement.
+### 81.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgH`
 - **项目**: huanchong-99
@@ -3255,7 +3255,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 81.6 Extract this nested ternary operation into an independent statement.
+### 81.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgI`
 - **项目**: huanchong-99
@@ -3268,7 +3268,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 81.7 Extract this nested ternary operation into an independent statement.
+### 81.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgJ`
 - **项目**: huanchong-99
@@ -3281,7 +3281,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 81.8 Extract this nested ternary operation into an independent statement.
+### 81.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgK`
 - **项目**: huanchong-99
@@ -3294,7 +3294,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 81.9 Extract this nested ternary operation into an independent statement.
+### 81.9 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgL`
 - **项目**: huanchong-99
@@ -3428,7 +3428,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 86.3 Extract this nested ternary operation into an independent statement.
+### 86.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg4`
 - **项目**: huanchong-99
@@ -3441,7 +3441,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 86.4 Extract this nested ternary operation into an independent statement.
+### 86.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg5`
 - **项目**: huanchong-99
@@ -3454,7 +3454,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 86.5 Extract this nested ternary operation into an independent statement.
+### 86.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg6`
 - **项目**: huanchong-99
@@ -3467,7 +3467,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 86.6 Extract this nested ternary operation into an independent statement.
+### 86.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg7`
 - **项目**: huanchong-99
@@ -3480,7 +3480,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 86.7 Extract this nested ternary operation into an independent statement.
+### 86.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg8`
 - **项目**: huanchong-99
@@ -3493,7 +3493,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 86.8 Extract this nested ternary operation into an independent statement.
+### 86.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg9`
 - **项目**: huanchong-99
@@ -3711,7 +3711,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 92.2 Extract this nested ternary operation into an independent statement.
+### 92.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwefyZ9DOUQdEsGgv`
 - **项目**: huanchong-99
@@ -4995,7 +4995,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 124.4 Extract this nested ternary operation into an independent statement.
+### 124.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweomZ9DOUQdEsGjP`
 - **项目**: huanchong-99
@@ -5008,7 +5008,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 124.5 Extract this nested ternary operation into an independent statement.
+### 124.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweomZ9DOUQdEsGjQ`
 - **项目**: huanchong-99
@@ -5021,7 +5021,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 124.6 Extract this nested ternary operation into an independent statement.
+### 124.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweomZ9DOUQdEsGjR`
 - **项目**: huanchong-99
@@ -5340,7 +5340,7 @@
 - **创建时间**: 25 days ago
 - **标签**: react, type-dependent
 
-### 134.5 Extract this nested ternary operation into an independent statement.
+### 134.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGiz`
 - **项目**: huanchong-99
@@ -5353,7 +5353,7 @@
 - **创建时间**: 25 days ago
 - **标签**: confusing
 
-### 134.6 Extract this nested ternary operation into an independent statement.
+### 134.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGi0`
 - **项目**: huanchong-99
@@ -5795,7 +5795,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 147.2 Extract this nested ternary operation into an independent statement.
+### 147.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc2`
 - **项目**: huanchong-99
@@ -5821,7 +5821,7 @@
 - **创建时间**: 26 days ago
 - **标签**: type-dependent
 
-### 147.4 Extract this nested ternary operation into an independent statement.
+### 147.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc4`
 - **项目**: huanchong-99
@@ -5834,7 +5834,7 @@
 - **创建时间**: 26 days ago
 - **标签**: confusing
 
-### 147.5 Extract this nested ternary operation into an independent statement.
+### 147.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc5`
 - **项目**: huanchong-99
@@ -5847,7 +5847,7 @@
 - **创建时间**: 26 days ago
 - **标签**: confusing
 
-### 147.6 Extract this nested ternary operation into an independent statement.
+### 147.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc6`
 - **项目**: huanchong-99
@@ -5860,7 +5860,7 @@
 - **创建时间**: 26 days ago
 - **标签**: confusing
 
-### 147.7 Extract this nested ternary operation into an independent statement.
+### 147.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc7`
 - **项目**: huanchong-99
@@ -5873,7 +5873,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 147.8 Extract this nested ternary operation into an independent statement.
+### 147.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc8`
 - **项目**: huanchong-99
@@ -5886,7 +5886,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 147.9 Extract this nested ternary operation into an independent statement.
+### 147.9 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc9`
 - **项目**: huanchong-99
@@ -5899,7 +5899,7 @@
 - **创建时间**: 26 days ago
 - **标签**: confusing
 
-### 147.10 Extract this nested ternary operation into an independent statement.
+### 147.10 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc-`
 - **项目**: huanchong-99
@@ -5912,7 +5912,7 @@
 - **创建时间**: 26 days ago
 - **标签**: confusing
 
-### 147.11 Extract this nested ternary operation into an independent statement.
+### 147.11 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweTEZ9DOUQdEsGc_`
 - **项目**: huanchong-99
@@ -5931,7 +5931,7 @@
 
 > 该文件共有 **7** 个问题
 
-### 148.1 Extract this nested ternary operation into an independent statement.
+### 148.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGct`
 - **项目**: huanchong-99
@@ -5944,7 +5944,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 148.2 Extract this nested ternary operation into an independent statement.
+### 148.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcu`
 - **项目**: huanchong-99
@@ -6009,7 +6009,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 148.7 Extract this nested ternary operation into an independent statement.
+### 148.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSzZ9DOUQdEsGcz`
 - **项目**: huanchong-99
@@ -6201,7 +6201,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 152.2 Extract this nested ternary operation into an independent statement.
+### 152.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSCZ9DOUQdEsGcF`
 - **项目**: huanchong-99
@@ -6310,7 +6310,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 155.2 Extract this nested ternary operation into an independent statement.
+### 155.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweR5Z9DOUQdEsGcC`
 - **项目**: huanchong-99
@@ -6323,7 +6323,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 155.3 Extract this nested ternary operation into an independent statement.
+### 155.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweR5Z9DOUQdEsGcD`
 - **项目**: huanchong-99
@@ -6407,7 +6407,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 156.6 Extract this nested ternary operation into an independent statement.
+### 156.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcX`
 - **项目**: huanchong-99
@@ -6433,7 +6433,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 156.8 Extract this nested ternary operation into an independent statement.
+### 156.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcZ`
 - **项目**: huanchong-99
@@ -6511,7 +6511,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 156.14 Extract this nested ternary operation into an independent statement.
+### 156.14 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSYZ9DOUQdEsGcf`
 - **项目**: huanchong-99
@@ -6595,7 +6595,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing, type-dependent
 
-### 157.3 Extract this nested ternary operation into an independent statement.
+### 157.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweROZ9DOUQdEsGb4`
 - **项目**: huanchong-99
@@ -6621,7 +6621,7 @@
 - **创建时间**: 1 month ago
 - **标签**: readability
 
-### 157.5 Extract this nested ternary operation into an independent statement.
+### 157.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweROZ9DOUQdEsGb6`
 - **项目**: huanchong-99
@@ -6718,7 +6718,7 @@
 - **创建时间**: 1 month ago
 - **标签**: performance, readability
 
-### 158.6 Extract this nested ternary operation into an independent statement.
+### 158.6 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcN`
 - **项目**: huanchong-99
@@ -6731,7 +6731,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 158.7 Extract this nested ternary operation into an independent statement.
+### 158.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcO`
 - **项目**: huanchong-99
@@ -6744,7 +6744,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 158.8 Extract this nested ternary operation into an independent statement.
+### 158.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweSNZ9DOUQdEsGcP`
 - **项目**: huanchong-99
@@ -6929,7 +6929,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 165.1 Extract this nested ternary operation into an independent statement.
+### 165.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwerqZ9DOUQdEsGkO`
 - **项目**: huanchong-99
@@ -7166,7 +7166,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 172.5 Extract this nested ternary operation into an independent statement.
+### 172.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweXjZ9DOUQdEsGeB`
 - **项目**: huanchong-99
@@ -7198,7 +7198,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 173.2 Extract this nested ternary operation into an independent statement.
+### 173.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweXTZ9DOUQdEsGd2`
 - **项目**: huanchong-99
@@ -7211,7 +7211,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 173.3 Extract this nested ternary operation into an independent statement.
+### 173.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweXTZ9DOUQdEsGd3`
 - **项目**: huanchong-99
@@ -7243,7 +7243,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 174.1 Extract this nested ternary operation into an independent statement.
+### 174.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweXbZ9DOUQdEsGd6`
 - **项目**: huanchong-99
@@ -7282,7 +7282,7 @@
 - **创建时间**: 26 days ago
 - **标签**: react
 
-### 174.4 Extract this nested ternary operation into an independent statement.
+### 174.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweXbZ9DOUQdEsGd8`
 - **项目**: huanchong-99
@@ -7403,7 +7403,7 @@
 - **创建时间**: 21 days ago
 - **标签**: react, type-dependent
 
-### 179.2 Extract this nested ternary operation into an independent statement.
+### 179.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweoGZ9DOUQdEsGjG`
 - **项目**: huanchong-99
@@ -7416,7 +7416,7 @@
 - **创建时间**: 21 days ago
 - **标签**: confusing
 
-### 179.3 Extract this nested ternary operation into an independent statement.
+### 179.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweoGZ9DOUQdEsGjH`
 - **项目**: huanchong-99
@@ -7595,7 +7595,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bad-practice, type-dependent
 
-### 185.3 Extract this nested ternary operation into an independent statement.
+### 185.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweZxZ9DOUQdEsGe_`
 - **项目**: huanchong-99
@@ -7896,7 +7896,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 192.3 Extract this nested ternary operation into an independent statement.
+### 192.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwealZ9DOUQdEsGfU`
 - **项目**: huanchong-99
@@ -7921,7 +7921,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, error-handling, ...
 
-### 192.5 Extract this nested ternary operation into an independent statement.
+### 192.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwealZ9DOUQdEsGfW`
 - **项目**: huanchong-99
@@ -8223,7 +8223,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 195.17 Extract this nested ternary operation into an independent statement.
+### 195.17 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj9`
 - **项目**: huanchong-99
@@ -8236,7 +8236,7 @@
 - **创建时间**: 14 days ago
 - **标签**: confusing
 
-### 195.18 Extract this nested ternary operation into an independent statement.
+### 195.18 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGj-`
 - **项目**: huanchong-99
@@ -8262,7 +8262,7 @@
 - **创建时间**: 14 days ago
 - **标签**: confusing, type-dependent
 
-### 195.20 Extract this nested ternary operation into an independent statement.
+### 195.20 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGkA`
 - **项目**: huanchong-99
@@ -8506,7 +8506,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 199.1 Extract this nested ternary operation into an independent statement.
+### 199.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwemTZ9DOUQdEsGik`
 - **项目**: huanchong-99
@@ -8519,7 +8519,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 199.2 Extract this nested ternary operation into an independent statement.
+### 199.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwemTZ9DOUQdEsGil`
 - **项目**: huanchong-99
@@ -8808,7 +8808,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 206.4 Extract this nested ternary operation into an independent statement.
+### 206.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweheZ9DOUQdEsGhO`
 - **项目**: huanchong-99
@@ -8961,7 +8961,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 212.3 Extract this nested ternary operation into an independent statement.
+### 212.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhU`
 - **项目**: huanchong-99
@@ -8974,7 +8974,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 212.4 Extract this nested ternary operation into an independent statement.
+### 212.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhV`
 - **项目**: huanchong-99
@@ -9026,7 +9026,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 212.8 Extract this nested ternary operation into an independent statement.
+### 212.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhZ`
 - **项目**: huanchong-99
@@ -9058,7 +9058,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 213.2 Extract this nested ternary operation into an independent statement.
+### 213.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwehWZ9DOUQdEsGhK`
 - **项目**: huanchong-99
@@ -9090,7 +9090,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 214.2 Extract this nested ternary operation into an independent statement.
+### 214.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwehPZ9DOUQdEsGhI`
 - **项目**: huanchong-99
@@ -9779,7 +9779,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 227.2 Extract this nested ternary operation into an independent statement.
+### 227.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweOwZ9DOUQdEsGa4`
 - **项目**: huanchong-99
@@ -10264,7 +10264,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 241.1 Extract this nested ternary operation into an independent statement.
+### 241.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweViZ9DOUQdEsGdW`
 - **项目**: huanchong-99
@@ -10393,7 +10393,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 243.7 Extract this nested ternary operation into an independent statement.
+### 243.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweV8Z9DOUQdEsGdj`
 - **项目**: huanchong-99
@@ -10929,7 +10929,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 259.2 Extract this nested ternary operation into an independent statement.
+### 259.2 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwez6Z9DOUQdEsGnI`
 - **项目**: huanchong-99
@@ -11236,7 +11236,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 269.1 Extract this nested ternary operation into an independent statement.
+### 269.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwewNZ9DOUQdEsGlv`
 - **项目**: huanchong-99
@@ -11281,7 +11281,7 @@
 - **创建时间**: 26 days ago
 - **标签**: brain-overload
 
-### 270.3 Extract this nested ternary operation into an independent statement.
+### 270.3 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwewpZ9DOUQdEsGl7`
 - **项目**: huanchong-99
@@ -11717,7 +11717,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 278.1 Extract this nested ternary operation into an independent statement.
+### 278.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwexdZ9DOUQdEsGmQ`
 - **项目**: huanchong-99
@@ -12763,7 +12763,7 @@
 - **创建时间**: 16 days ago
 - **标签**: brain-overload
 
-### 301.4 Extract this nested ternary operation into an independent statement.
+### 301.4 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGke`
 - **项目**: huanchong-99
@@ -13068,7 +13068,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 305.7 Extract this nested ternary operation into an independent statement.
+### 305.7 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk3`
 - **项目**: huanchong-99
@@ -13081,7 +13081,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 305.8 Extract this nested ternary operation into an independent statement.
+### 305.8 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk4`
 - **项目**: huanchong-99
@@ -13094,7 +13094,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 305.9 Extract this nested ternary operation into an independent statement.
+### 305.9 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk5`
 - **项目**: huanchong-99
@@ -13107,7 +13107,7 @@
 - **创建时间**: 17 days ago
 - **标签**: confusing
 
-### 305.10 Extract this nested ternary operation into an independent statement.
+### 305.10 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk6`
 - **项目**: huanchong-99
@@ -13120,7 +13120,7 @@
 - **创建时间**: 17 days ago
 - **标签**: confusing
 
-### 305.11 Extract this nested ternary operation into an independent statement.
+### 305.11 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwet5Z9DOUQdEsGk7`
 - **项目**: huanchong-99
@@ -13378,7 +13378,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 309.1 Extract this nested ternary operation into an independent statement.
+### 309.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwe2gZ9DOUQdEsGoc`
 - **项目**: huanchong-99
@@ -13468,7 +13468,7 @@
 - **创建时间**: 17 days ago
 - **标签**: brain-overload
 
-### 311.5 Extract this nested ternary operation into an independent statement.
+### 311.5 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoP`
 - **项目**: huanchong-99
