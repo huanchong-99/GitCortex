@@ -35,7 +35,7 @@ function truncateBody(body: string, maxLength: number): string {
 /**
  * Renders a diff hunk with syntax highlighting for added/removed lines
  */
-function DiffHunk({ diffHunk }: { diffHunk: string }) {
+function DiffHunk({ diffHunk }: Readonly<{ diffHunk: string }>) {
   const lines = diffHunk.split('\n');
 
   return (

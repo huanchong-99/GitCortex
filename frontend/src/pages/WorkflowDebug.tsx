@@ -56,7 +56,7 @@ export function buildWorkflowDebugWsUrl(
 /**
  * Status indicator with color coding
  */
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: Readonly<{ status: string }>) {
   const { t } = useTranslation('workflow');
 
   const statusColors: Record<string, string> = {

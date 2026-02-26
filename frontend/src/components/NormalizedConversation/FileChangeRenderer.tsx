@@ -54,12 +54,15 @@ const FileChangeRenderer = ({
   const theme = getActualTheme(config?.theme);
   const headerClass = cn('flex items-center gap-1.5 text-secondary-foreground');
 
-  const statusIcon =
-    statusAppearance === 'denied' ? (
-      <FileX className="h-3 w-3" />
-    ) : statusAppearance === 'timed_out' ? (
-      <FileClock className="h-3 w-3" />
-    ) : null;
+  const statusIcon = (() => {
+    if (statusAppearance === 'denied') {
+      return <FileX className="h-3 w-3" />;
+    }
+    if (statusAppearance === 'timed_out') {
+      return <FileClock className="h-3 w-3" />;
+    }
+    return null;
+  })();
 
   if (statusIcon) {
     return (

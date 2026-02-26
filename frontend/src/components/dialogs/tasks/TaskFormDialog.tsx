@@ -163,7 +163,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
   }, [mode, props, system.config?.executor_profile, defaultRepoBranches]);
 
   // Form submission handler
-  const handleSubmit = async ({ value }: { value: TaskFormValues }) => {
+  const handleSubmit = async ({ value }: Readonly<{ value: TaskFormValues }>) => {
     if (editMode) {
       await updateTask.mutateAsync(
         {

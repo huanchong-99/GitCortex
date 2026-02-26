@@ -30,7 +30,7 @@ const createUseWorkflowResult = (
     ...overrides,
   }) as UseWorkflowResult;
 
-const wrapper = ({ children }: { children: ReactNode }) => (
+const wrapper = ({ children }: Readonly<{ children: ReactNode }>) => (
   <I18nextProvider i18n={i18n}>
     <QueryClientProvider client={new QueryClient()}>
       <BrowserRouter

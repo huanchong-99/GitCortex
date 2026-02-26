@@ -481,7 +481,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
   );
 }
 
-function StatusDot({ status }: { status: string }) {
+function StatusDot({ status }: Readonly<{ status: string }>) {
   const colors: Record<string, string> = {
     not_started: 'bg-gray-400',
     starting: 'bg-yellow-400',

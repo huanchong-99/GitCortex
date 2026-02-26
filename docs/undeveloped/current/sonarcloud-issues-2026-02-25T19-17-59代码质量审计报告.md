@@ -1172,7 +1172,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 26.1 Extract this nested ternary operation into an independent statement.
+### 26.1 Extract this nested ternary operation into an independent statement. ✅ 已修复
 
 - **问题ID**: `AZyVweYXZ9DOUQdEsGec`
 - **项目**: huanchong-99
@@ -1256,7 +1256,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 27.4 Mark the props of the component as read-only.
+### 27.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweYgZ9DOUQdEsGei`
 - **项目**: huanchong-99
@@ -1738,7 +1738,7 @@
 - **创建时间**: 1 month ago
 - **标签**: api, dom, ...
 
-### 36.4 Mark the props of the component as read-only.
+### 36.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwejOZ9DOUQdEsGhr`
 - **项目**: huanchong-99
@@ -2000,7 +2000,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 43.8 Mark the props of the component as read-only.
+### 43.8 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekXZ9DOUQdEsGh8`
 - **项目**: huanchong-99
@@ -2192,7 +2192,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.6 Mark the props of the component as read-only.
+### 49.6 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiM`
 - **项目**: huanchong-99
@@ -2205,7 +2205,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.7 Mark the props of the component as read-only.
+### 49.7 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiN`
 - **项目**: huanchong-99
@@ -2218,7 +2218,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.8 Mark the props of the component as read-only.
+### 49.8 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiO`
 - **项目**: huanchong-99
@@ -2231,7 +2231,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.9 Mark the props of the component as read-only.
+### 49.9 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiP`
 - **项目**: huanchong-99
@@ -2244,7 +2244,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.10 Mark the props of the component as read-only.
+### 49.10 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiQ`
 - **项目**: huanchong-99
@@ -2257,7 +2257,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.11 Mark the props of the component as read-only.
+### 49.11 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiR`
 - **项目**: huanchong-99
@@ -2283,7 +2283,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe
 
-### 49.13 Mark the props of the component as read-only.
+### 49.13 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiT`
 - **项目**: huanchong-99
@@ -2296,7 +2296,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.14 Mark the props of the component as read-only.
+### 49.14 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiU`
 - **项目**: huanchong-99
@@ -2309,7 +2309,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 49.15 Mark the props of the component as read-only.
+### 49.15 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiV`
 - **项目**: huanchong-99
@@ -2335,7 +2335,7 @@
 - **创建时间**: 1 month ago
 - **标签**: confusing
 
-### 49.17 Mark the props of the component as read-only.
+### 49.17 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelWZ9DOUQdEsGiX`
 - **项目**: huanchong-99
@@ -2354,7 +2354,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 50.1 Mark the props of the component as read-only.
+### 50.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweibZ9DOUQdEsGhc`
 - **项目**: huanchong-99
@@ -2386,7 +2386,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 51.1 Mark the props of the component as read-only.
+### 51.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekOZ9DOUQdEsGh0`
 - **项目**: huanchong-99
@@ -2450,7 +2450,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 53.3 Mark the props of the component as read-only.
+### 53.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweirZ9DOUQdEsGhh`
 - **项目**: huanchong-99
@@ -2482,7 +2482,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 54.1 Mark the props of the component as read-only.
+### 54.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwekGZ9DOUQdEsGhz`
 - **项目**: huanchong-99
@@ -2501,7 +2501,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 55.1 Mark the props of the component as read-only.
+### 55.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweleZ9DOUQdEsGiY`
 - **项目**: huanchong-99
@@ -2520,7 +2520,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 56.1 Mark the props of the component as read-only.
+### 56.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweijZ9DOUQdEsGhe`
 - **项目**: huanchong-99
@@ -2539,7 +2539,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 57.1 Mark the props of the component as read-only.
+### 57.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwek5Z9DOUQdEsGiC`
 - **项目**: huanchong-99
@@ -2558,7 +2558,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 58.1 Mark the props of the component as read-only.
+### 58.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwei1Z9DOUQdEsGhj`
 - **项目**: huanchong-99
@@ -2603,7 +2603,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 59.1 Mark the props of the component as read-only.
+### 59.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwejvZ9DOUQdEsGhw`
 - **项目**: huanchong-99
@@ -2622,7 +2622,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 60.1 Mark the props of the component as read-only.
+### 60.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelLZ9DOUQdEsGiF`
 - **项目**: huanchong-99
@@ -2654,7 +2654,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 61.1 Mark the props of the component as read-only.
+### 61.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwelmZ9DOUQdEsGiZ`
 - **项目**: huanchong-99
@@ -2692,7 +2692,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 63.1 Mark the props of the component as read-only.
+### 63.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwednZ9DOUQdEsGgO`
 - **项目**: huanchong-99
@@ -2711,7 +2711,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 64.1 Mark the props of the component as read-only.
+### 64.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwedXZ9DOUQdEsGgM`
 - **项目**: huanchong-99
@@ -2730,7 +2730,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 65.1 Mark the props of the component as read-only.
+### 65.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweeYZ9DOUQdEsGgW`
 - **项目**: huanchong-99
@@ -2762,7 +2762,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 66.1 Mark the props of the component as read-only.
+### 66.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwee3Z9DOUQdEsGgd`
 - **项目**: huanchong-99
@@ -2794,7 +2794,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 67.1 Mark the props of the component as read-only.
+### 67.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwec-Z9DOUQdEsGgA`
 - **项目**: huanchong-99
@@ -2807,7 +2807,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 67.2 Mark the props of the component as read-only.
+### 67.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwec-Z9DOUQdEsGgB`
 - **项目**: huanchong-99
@@ -2826,7 +2826,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 68.1 Mark the props of the component as read-only.
+### 68.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwedGZ9DOUQdEsGgC`
 - **项目**: huanchong-99
@@ -2845,7 +2845,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 69.1 Mark the props of the component as read-only.
+### 69.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwefZZ9DOUQdEsGgm`
 - **项目**: huanchong-99
@@ -2871,7 +2871,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 69.3 Mark the props of the component as read-only.
+### 69.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwefZZ9DOUQdEsGgo`
 - **项目**: huanchong-99
@@ -2890,7 +2890,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 70.1 Mark the props of the component as read-only.
+### 70.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweeIZ9DOUQdEsGgU`
 - **项目**: huanchong-99
@@ -2909,7 +2909,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 71.1 Mark the props of the component as read-only.
+### 71.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweeAZ9DOUQdEsGgS`
 - **项目**: huanchong-99
@@ -2973,7 +2973,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 73.1 Mark the props of the component as read-only.
+### 73.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwec1Z9DOUQdEsGf_`
 - **项目**: huanchong-99
@@ -2992,7 +2992,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 74.1 Mark the props of the component as read-only.
+### 74.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwef5Z9DOUQdEsGgw`
 - **项目**: huanchong-99
@@ -3024,7 +3024,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 75.1 Mark the props of the component as read-only.
+### 75.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwed4Z9DOUQdEsGgQ`
 - **项目**: huanchong-99
@@ -3056,7 +3056,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 76.1 Mark the props of the component as read-only.
+### 76.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwedfZ9DOUQdEsGgN`
 - **项目**: huanchong-99
@@ -3075,7 +3075,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 77.1 Mark the props of the component as read-only.
+### 77.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwectZ9DOUQdEsGf-`
 - **项目**: huanchong-99
@@ -3094,7 +3094,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 78.1 Mark the props of the component as read-only.
+### 78.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwefhZ9DOUQdEsGgp`
 - **项目**: huanchong-99
@@ -3152,7 +3152,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 79.1 Mark the props of the component as read-only.
+### 79.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwee_Z9DOUQdEsGgf`
 - **项目**: huanchong-99
@@ -3171,7 +3171,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 80.1 Mark the props of the component as read-only.
+### 80.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwedwZ9DOUQdEsGgP`
 - **项目**: huanchong-99
@@ -3203,7 +3203,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 81.2 Mark the props of the component as read-only.
+### 81.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwedPZ9DOUQdEsGgE`
 - **项目**: huanchong-99
@@ -3313,7 +3313,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 82.1 Mark the props of the component as read-only.
+### 82.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwegiZ9DOUQdEsGhA`
 - **项目**: huanchong-99
@@ -3332,7 +3332,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 83.1 Mark the props of the component as read-only.
+### 83.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwegQZ9DOUQdEsGg0`
 - **项目**: huanchong-99
@@ -3364,7 +3364,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 84.1 Mark the props of the component as read-only.
+### 84.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweefZ9DOUQdEsGgY`
 - **项目**: huanchong-99
@@ -3383,7 +3383,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 85.1 Mark the props of the component as read-only.
+### 85.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwefpZ9DOUQdEsGgt`
 - **项目**: huanchong-99
@@ -3415,7 +3415,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 86.2 Mark the props of the component as read-only.
+### 86.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwegaZ9DOUQdEsGg3`
 - **项目**: huanchong-99
@@ -3538,7 +3538,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 87.1 Mark the props of the component as read-only.
+### 87.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwegIZ9DOUQdEsGgz`
 - **项目**: huanchong-99
@@ -3557,7 +3557,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 88.1 Mark the props of the component as read-only.
+### 88.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwefHZ9DOUQdEsGgg`
 - **项目**: huanchong-99
@@ -3615,7 +3615,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 89.1 Mark the props of the component as read-only.
+### 89.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweenZ9DOUQdEsGgZ`
 - **项目**: huanchong-99
@@ -3628,7 +3628,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 89.2 Mark the props of the component as read-only.
+### 89.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweenZ9DOUQdEsGga`
 - **项目**: huanchong-99
@@ -3641,7 +3641,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 89.3 Mark the props of the component as read-only.
+### 89.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweenZ9DOUQdEsGgb`
 - **项目**: huanchong-99
@@ -3660,7 +3660,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 90.1 Mark the props of the component as read-only.
+### 90.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwegBZ9DOUQdEsGgy`
 - **项目**: huanchong-99
@@ -3679,7 +3679,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 91.1 Mark the props of the component as read-only.
+### 91.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweevZ9DOUQdEsGgc`
 - **项目**: huanchong-99
@@ -3698,7 +3698,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 92.1 Mark the props of the component as read-only.
+### 92.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwefxZ9DOUQdEsGgu`
 - **项目**: huanchong-99
@@ -3743,7 +3743,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 93.2 Mark the props of the component as read-only.
+### 93.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweOZZ9DOUQdEsGax`
 - **项目**: huanchong-99
@@ -3814,7 +3814,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 94.1 Mark the props of the component as read-only.
+### 94.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweOOZ9DOUQdEsGat`
 - **项目**: huanchong-99
@@ -3891,7 +3891,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 96.1 Mark the props of the component as read-only.
+### 96.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweNzZ9DOUQdEsGan`
 - **项目**: huanchong-99
@@ -3994,7 +3994,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 98.1 Mark the props of the component as read-only.
+### 98.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweNpZ9DOUQdEsGal`
 - **项目**: huanchong-99
@@ -4142,7 +4142,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 101.1 Mark the props of the component as read-only.
+### 101.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweY_Z9DOUQdEsGep`
 - **项目**: huanchong-99
@@ -4174,7 +4174,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 102.1 Mark the props of the component as read-only.
+### 102.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZHZ9DOUQdEsGer`
 - **项目**: huanchong-99
@@ -4193,7 +4193,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 103.1 Mark the props of the component as read-only.
+### 103.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweY4Z9DOUQdEsGen`
 - **项目**: huanchong-99
@@ -4225,7 +4225,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 104.1 Mark the props of the component as read-only.
+### 104.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweYwZ9DOUQdEsGem`
 - **项目**: huanchong-99
@@ -4276,7 +4276,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 106.1 Mark the props of the component as read-only.
+### 106.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwebEZ9DOUQdEsGfe`
 - **项目**: huanchong-99
@@ -4295,7 +4295,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 107.1 Mark the props of the component as read-only.
+### 107.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwecNZ9DOUQdEsGf2`
 - **项目**: huanchong-99
@@ -4314,7 +4314,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 108.1 Mark the props of the component as read-only.
+### 108.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwebcZ9DOUQdEsGfo`
 - **项目**: huanchong-99
@@ -4359,7 +4359,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 109.1 Mark the props of the component as read-only.
+### 109.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwecUZ9DOUQdEsGf3`
 - **项目**: huanchong-99
@@ -4417,7 +4417,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 110.1 Mark the props of the component as read-only.
+### 110.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweb2Z9DOUQdEsGft`
 - **项目**: huanchong-99
@@ -4488,7 +4488,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 111.1 Mark the props of the component as read-only.
+### 111.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweblZ9DOUQdEsGfr`
 - **项目**: huanchong-99
@@ -4507,7 +4507,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 112.1 Mark the props of the component as read-only.
+### 112.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweckZ9DOUQdEsGf8`
 - **项目**: huanchong-99
@@ -4539,7 +4539,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 113.1 Mark the props of the component as read-only.
+### 113.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwebLZ9DOUQdEsGff`
 - **项目**: huanchong-99
@@ -4597,7 +4597,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 114.1 Mark the props of the component as read-only.
+### 114.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweccZ9DOUQdEsGf7`
 - **项目**: huanchong-99
@@ -4616,7 +4616,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 115.1 Mark the props of the component as read-only.
+### 115.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwea8Z9DOUQdEsGfa`
 - **项目**: huanchong-99
@@ -4719,7 +4719,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 117.1 Mark the props of the component as read-only.
+### 117.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwecFZ9DOUQdEsGf1`
 - **项目**: huanchong-99
@@ -4751,7 +4751,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 118.2 Mark the props of the component as read-only.
+### 118.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwebUZ9DOUQdEsGfk`
 - **项目**: huanchong-99
@@ -4790,7 +4790,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 118.5 Mark the props of the component as read-only.
+### 118.5 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwebUZ9DOUQdEsGfn`
 - **项目**: huanchong-99
@@ -4809,7 +4809,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 119.1 Mark the props of the component as read-only.
+### 119.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwebsZ9DOUQdEsGfs`
 - **项目**: huanchong-99
@@ -4892,7 +4892,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 122.1 Mark the props of the component as read-only.
+### 122.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwerOZ9DOUQdEsGkL`
 - **项目**: huanchong-99
@@ -4937,7 +4937,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 123.3 Mark the props of the component as read-only.
+### 123.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweqoZ9DOUQdEsGkG`
 - **项目**: huanchong-99
@@ -4969,7 +4969,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 124.2 Mark the props of the component as read-only.
+### 124.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweomZ9DOUQdEsGjN`
 - **项目**: huanchong-99
@@ -5040,7 +5040,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 125.1 Mark the props of the component as read-only.
+### 125.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwer9Z9DOUQdEsGkQ`
 - **项目**: huanchong-99
@@ -5059,7 +5059,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 126.1 Mark the props of the component as read-only.
+### 126.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwesiZ9DOUQdEsGkX`
 - **项目**: huanchong-99
@@ -5078,7 +5078,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 127.1 Mark the props of the component as read-only.
+### 127.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwesHZ9DOUQdEsGkR`
 - **项目**: huanchong-99
@@ -5147,7 +5147,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 130.1 Mark the props of the component as read-only.
+### 130.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwepIZ9DOUQdEsGjV`
 - **项目**: huanchong-99
@@ -5231,7 +5231,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 131.2 Mark the props of the component as read-only.
+### 131.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwem7Z9DOUQdEsGiu`
 - **项目**: huanchong-99
@@ -5250,7 +5250,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 132.1 Mark the props of the component as read-only.
+### 132.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenUZ9DOUQdEsGi3`
 - **项目**: huanchong-99
@@ -5269,7 +5269,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 133.1 Mark the props of the component as read-only.
+### 133.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenMZ9DOUQdEsGi2`
 - **项目**: huanchong-99
@@ -5301,7 +5301,7 @@
 - **创建时间**: 25 days ago
 - **标签**: optimization, performance
 
-### 134.2 Mark the props of the component as read-only.
+### 134.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGiw`
 - **项目**: huanchong-99
@@ -5327,7 +5327,7 @@
 - **创建时间**: 25 days ago
 - **标签**: jsx, performance, ...
 
-### 134.4 Mark the props of the component as read-only.
+### 134.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGiy`
 - **项目**: huanchong-99
@@ -5366,7 +5366,7 @@
 - **创建时间**: 25 days ago
 - **标签**: confusing
 
-### 134.7 Mark the props of the component as read-only.
+### 134.7 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenDZ9DOUQdEsGi1`
 - **项目**: huanchong-99
@@ -5463,7 +5463,7 @@
 - **创建时间**: 25 days ago
 - **标签**: redundant, type-dependent
 
-### 135.7 Mark the props of the component as read-only.
+### 135.7 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwentZ9DOUQdEsGjB`
 - **项目**: huanchong-99
@@ -5495,7 +5495,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 136.1 Mark the props of the component as read-only.
+### 136.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwen1Z9DOUQdEsGjD`
 - **项目**: huanchong-99
@@ -5514,7 +5514,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 137.1 Mark the props of the component as read-only.
+### 137.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenkZ9DOUQdEsGi5`
 - **项目**: huanchong-99
@@ -5527,7 +5527,7 @@
 - **创建时间**: 22 days ago
 - **标签**: react, type-dependent
 
-### 137.2 Mark the props of the component as read-only.
+### 137.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenkZ9DOUQdEsGi6`
 - **项目**: huanchong-99
@@ -5546,7 +5546,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 138.1 Mark the props of the component as read-only.
+### 138.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwenbZ9DOUQdEsGi4`
 - **项目**: huanchong-99
@@ -5565,7 +5565,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 139.1 Mark the props of the component as read-only.
+### 139.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwesQZ9DOUQdEsGkT`
 - **项目**: huanchong-99
@@ -5629,7 +5629,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 141.1 Mark the props of the component as read-only.
+### 141.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweo_Z9DOUQdEsGjU`
 - **项目**: huanchong-99
@@ -5648,7 +5648,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 142.1 Mark the props of the component as read-only.
+### 142.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweo4Z9DOUQdEsGjT`
 - **项目**: huanchong-99
@@ -6028,7 +6028,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 149.1 Mark the props of the component as read-only.
+### 149.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweSfZ9DOUQdEsGcj`
 - **项目**: huanchong-99
@@ -6265,7 +6265,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 154.1 Mark the props of the component as read-only.
+### 154.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweRfZ9DOUQdEsGb8`
 - **项目**: huanchong-99
@@ -6821,7 +6821,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 160.1 Mark the props of the component as read-only.
+### 160.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweqUZ9DOUQdEsGkC`
 - **项目**: huanchong-99
@@ -6840,7 +6840,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 161.1 Mark the props of the component as read-only.
+### 161.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweqeZ9DOUQdEsGkD`
 - **项目**: huanchong-99
@@ -6872,7 +6872,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 162.2 Mark the props of the component as read-only.
+### 162.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweq8Z9DOUQdEsGkJ`
 - **项目**: huanchong-99
@@ -6891,7 +6891,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 163.1 Mark the props of the component as read-only.
+### 163.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweqyZ9DOUQdEsGkH`
 - **项目**: huanchong-99
@@ -6967,7 +6967,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 167.1 Mark the props of the component as read-only.
+### 167.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwes6Z9DOUQdEsGka`
 - **项目**: huanchong-99
@@ -6986,7 +6986,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 168.1 Mark the props of the component as read-only.
+### 168.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwepoZ9DOUQdEsGje`
 - **项目**: huanchong-99
@@ -7005,7 +7005,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 169.1 Mark the props of the component as read-only.
+### 169.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwepdZ9DOUQdEsGjc`
 - **项目**: huanchong-99
@@ -7037,7 +7037,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 170.1 Mark the props of the component as read-only.
+### 170.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwepSZ9DOUQdEsGja`
 - **项目**: huanchong-99
@@ -7140,7 +7140,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 172.3 Mark the props of the component as read-only.
+### 172.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweXjZ9DOUQdEsGd_`
 - **项目**: huanchong-99
@@ -7153,7 +7153,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 172.4 Mark the props of the component as read-only.
+### 172.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweXjZ9DOUQdEsGeA`
 - **项目**: huanchong-99
@@ -7301,7 +7301,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 175.1 Mark the props of the component as read-only.
+### 175.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweoVZ9DOUQdEsGjK`
 - **项目**: huanchong-99
@@ -7320,7 +7320,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 176.1 Mark the props of the component as read-only.
+### 176.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwen-Z9DOUQdEsGjE`
 - **项目**: huanchong-99
@@ -7339,7 +7339,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 177.1 Mark the props of the component as read-only.
+### 177.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweoOZ9DOUQdEsGjI`
 - **项目**: huanchong-99
@@ -7352,7 +7352,7 @@
 - **创建时间**: 21 days ago
 - **标签**: react, type-dependent
 
-### 177.2 Mark the props of the component as read-only.
+### 177.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweoOZ9DOUQdEsGjJ`
 - **项目**: huanchong-99
@@ -7371,7 +7371,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 178.1 Mark the props of the component as read-only.
+### 178.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweodZ9DOUQdEsGjL`
 - **项目**: huanchong-99
@@ -7390,7 +7390,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 179.1 Mark the props of the component as read-only.
+### 179.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweoGZ9DOUQdEsGjF`
 - **项目**: huanchong-99
@@ -7454,7 +7454,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 181.1 Mark the props of the component as read-only.
+### 181.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwerzZ9DOUQdEsGkP`
 - **项目**: huanchong-99
@@ -7473,7 +7473,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 182.1 Mark the props of the component as read-only.
+### 182.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweszZ9DOUQdEsGkZ`
 - **项目**: huanchong-99
@@ -7492,7 +7492,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 183.1 Mark the props of the component as read-only.
+### 183.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweatZ9DOUQdEsGfX`
 - **项目**: huanchong-99
@@ -7524,7 +7524,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 184.1 Mark the props of the component as read-only.
+### 184.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZgZ9DOUQdEsGe4`
 - **项目**: huanchong-99
@@ -7569,7 +7569,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 185.1 Mark the props of the component as read-only.
+### 185.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZxZ9DOUQdEsGe9`
 - **项目**: huanchong-99
@@ -7614,7 +7614,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 186.1 Mark the props of the component as read-only.
+### 186.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweaBZ9DOUQdEsGfD`
 - **项目**: huanchong-99
@@ -7633,7 +7633,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 187.1 Mark the props of the component as read-only.
+### 187.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweYoZ9DOUQdEsGel`
 - **项目**: huanchong-99
@@ -7652,7 +7652,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 188.1 Mark the props of the component as read-only.
+### 188.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwea1Z9DOUQdEsGfZ`
 - **项目**: huanchong-99
@@ -7697,7 +7697,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 189.3 Mark the props of the component as read-only.
+### 189.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZ6Z9DOUQdEsGfC`
 - **项目**: huanchong-99
@@ -7716,7 +7716,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 190.1 Mark the props of the component as read-only.
+### 190.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweacZ9DOUQdEsGfR`
 - **项目**: huanchong-99
@@ -7826,7 +7826,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 191.8 Mark the props of the component as read-only.
+### 191.8 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweaUZ9DOUQdEsGfO`
 - **项目**: huanchong-99
@@ -7871,7 +7871,7 @@
 
 > 该文件共有 **5** 个问题
 
-### 192.1 Mark the props of the component as read-only.
+### 192.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwealZ9DOUQdEsGfS`
 - **项目**: huanchong-99
@@ -7997,7 +7997,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 194.2 Mark the props of the component as read-only.
+### 194.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweZpZ9DOUQdEsGe8`
 - **项目**: huanchong-99
@@ -8068,7 +8068,7 @@
 - **创建时间**: 14 days ago
 - **标签**: brain-overload
 
-### 195.5 Mark the props of the component as read-only.
+### 195.5 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGjx`
 - **项目**: huanchong-99
@@ -8275,7 +8275,7 @@
 - **创建时间**: 14 days ago
 - **标签**: confusing
 
-### 195.21 Mark the props of the component as read-only.
+### 195.21 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweqKZ9DOUQdEsGkB`
 - **项目**: huanchong-99
@@ -8538,7 +8538,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 200.1 Mark the props of the component as read-only.
+### 200.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwel3Z9DOUQdEsGic`
 - **项目**: huanchong-99
@@ -8557,7 +8557,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 201.1 Mark the props of the component as read-only.
+### 201.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwemBZ9DOUQdEsGid`
 - **项目**: huanchong-99
@@ -8718,7 +8718,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 204.1 Mark the props of the component as read-only.
+### 204.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwemyZ9DOUQdEsGir`
 - **项目**: huanchong-99
@@ -8731,7 +8731,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 204.2 Mark the props of the component as read-only.
+### 204.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwemyZ9DOUQdEsGis`
 - **项目**: huanchong-99
@@ -8750,7 +8750,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 205.1 Mark the props of the component as read-only.
+### 205.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwehFZ9DOUQdEsGhF`
 - **项目**: huanchong-99
@@ -8827,7 +8827,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 207.1 Mark the props of the component as read-only.
+### 207.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweh2Z9DOUQdEsGhR`
 - **项目**: huanchong-99
@@ -8846,7 +8846,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 208.1 Mark the props of the component as read-only.
+### 208.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweg9Z9DOUQdEsGhE`
 - **项目**: huanchong-99
@@ -8878,7 +8878,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 209.2 Mark the props of the component as read-only.
+### 209.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwegqZ9DOUQdEsGhC`
 - **项目**: huanchong-99
@@ -8897,7 +8897,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 210.1 Mark the props of the component as read-only.
+### 210.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwehuZ9DOUQdEsGhQ`
 - **项目**: huanchong-99
@@ -8916,7 +8916,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 211.1 Mark the props of the component as read-only.
+### 211.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwehnZ9DOUQdEsGhP`
 - **项目**: huanchong-99
@@ -8948,7 +8948,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload
 
-### 212.2 Mark the props of the component as read-only.
+### 212.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweiAZ9DOUQdEsGhT`
 - **项目**: huanchong-99
@@ -9045,7 +9045,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 213.1 Mark the props of the component as read-only.
+### 213.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwehWZ9DOUQdEsGhJ`
 - **项目**: huanchong-99
@@ -9077,7 +9077,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 214.1 Mark the props of the component as read-only.
+### 214.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwehPZ9DOUQdEsGhG`
 - **项目**: huanchong-99
@@ -9122,7 +9122,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 215.1 Mark the props of the component as read-only.
+### 215.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweg1Z9DOUQdEsGhD`
 - **项目**: huanchong-99
@@ -9141,7 +9141,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 216.1 Mark the props of the component as read-only.
+### 216.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweQbZ9DOUQdEsGbi`
 - **项目**: huanchong-99
@@ -9462,7 +9462,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 224.1 Mark the props of the component as read-only.
+### 224.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweQvZ9DOUQdEsGbo`
 - **项目**: huanchong-99
@@ -9624,7 +9624,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react
 
-### 225.7 Mark the props of the component as read-only.
+### 225.7 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGa_`
 - **项目**: huanchong-99
@@ -9650,7 +9650,7 @@
 - **创建时间**: 1 month ago
 - **标签**: jsx, performance, ...
 
-### 225.9 Mark the props of the component as read-only.
+### 225.9 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbB`
 - **项目**: huanchong-99
@@ -9689,7 +9689,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 225.12 Mark the props of the component as read-only.
+### 225.12 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbE`
 - **项目**: huanchong-99
@@ -9728,7 +9728,7 @@
 - **创建时间**: 1 month ago
 - **标签**: accessibility, react
 
-### 225.15 Mark the props of the component as read-only.
+### 225.15 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweO7Z9DOUQdEsGbH`
 - **项目**: huanchong-99
@@ -9747,7 +9747,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 226.1 Mark the props of the component as read-only.
+### 226.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwePOZ9DOUQdEsGbL`
 - **项目**: huanchong-99
@@ -9766,7 +9766,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 227.1 Mark the props of the component as read-only.
+### 227.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweOwZ9DOUQdEsGa3`
 - **项目**: huanchong-99
@@ -9798,7 +9798,7 @@
 
 > 该文件共有 **4** 个问题
 
-### 228.1 Mark the props of the component as read-only.
+### 228.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwePrZ9DOUQdEsGbU`
 - **项目**: huanchong-99
@@ -9824,7 +9824,7 @@
 - **创建时间**: 23 days ago
 - **标签**: jsx, performance, ...
 
-### 228.3 Mark the props of the component as read-only.
+### 228.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwePrZ9DOUQdEsGbX`
 - **项目**: huanchong-99
@@ -9837,7 +9837,7 @@
 - **创建时间**: 23 days ago
 - **标签**: react, type-dependent
 
-### 228.4 Mark the props of the component as read-only.
+### 228.4 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwePrZ9DOUQdEsGbY`
 - **项目**: huanchong-99
@@ -9868,7 +9868,7 @@
 - **工作量**: 485min effort
 - **创建时间**: 1 month ago
 
-### 229.2 Mark the props of the component as read-only.
+### 229.2 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweQRZ9DOUQdEsGbe`
 - **项目**: huanchong-99
@@ -9926,7 +9926,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 230.1 Mark the props of the component as read-only.
+### 230.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweOnZ9DOUQdEsGa2`
 - **项目**: huanchong-99
@@ -9945,7 +9945,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 231.1 Mark the props of the component as read-only.
+### 231.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweK7Z9DOUQdEsGaa`
 - **项目**: huanchong-99
@@ -9964,7 +9964,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 232.1 Mark the props of the component as read-only.
+### 232.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweNHZ9DOUQdEsGac`
 - **项目**: huanchong-99
@@ -10009,7 +10009,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 233.1 Mark the props of the component as read-only.
+### 233.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweM_Z9DOUQdEsGab`
 - **项目**: huanchong-99
@@ -10073,7 +10073,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 235.1 Mark the props of the component as read-only.
+### 235.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweW6Z9DOUQdEsGdt`
 - **项目**: huanchong-99
@@ -10111,7 +10111,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 237.1 Mark the props of the component as read-only.
+### 237.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweWzZ9DOUQdEsGds`
 - **项目**: huanchong-99
@@ -10130,7 +10130,7 @@
 
 > 该文件共有 **6** 个问题
 
-### 238.1 Mark the props of the component as read-only.
+### 238.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweXLZ9DOUQdEsGdv`
 - **项目**: huanchong-99
@@ -10213,7 +10213,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 239.1 Mark the props of the component as read-only.
+### 239.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweWRZ9DOUQdEsGdl`
 - **项目**: huanchong-99
@@ -10232,7 +10232,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 240.1 Mark the props of the component as read-only.
+### 240.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweWiZ9DOUQdEsGdn`
 - **项目**: huanchong-99
@@ -10589,7 +10589,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 250.1 Mark the props of the component as read-only.
+### 250.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0RZ9DOUQdEsGnM`
 - **项目**: huanchong-99
@@ -10608,7 +10608,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 251.1 Mark the props of the component as read-only.
+### 251.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwezzZ9DOUQdEsGnF`
 - **项目**: huanchong-99
@@ -10640,7 +10640,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 252.1 Mark the props of the component as read-only.
+### 252.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwey8Z9DOUQdEsGms`
 - **项目**: huanchong-99
@@ -10672,7 +10672,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 253.1 Mark the props of the component as read-only.
+### 253.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0hZ9DOUQdEsGnO`
 - **项目**: huanchong-99
@@ -10795,7 +10795,7 @@
 - **创建时间**: 1 month ago
 - **标签**: brain-overload, confusing
 
-### 254.9 Mark the props of the component as read-only.
+### 254.9 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwezbZ9DOUQdEsGnA`
 - **项目**: huanchong-99
@@ -10840,7 +10840,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 255.1 Mark the props of the component as read-only.
+### 255.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0CZ9DOUQdEsGnJ`
 - **项目**: huanchong-99
@@ -10916,7 +10916,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 259.1 Mark the props of the component as read-only.
+### 259.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwez6Z9DOUQdEsGnH`
 - **项目**: huanchong-99
@@ -10948,7 +10948,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 260.1 Mark the props of the component as read-only.
+### 260.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0vZ9DOUQdEsGnS`
 - **项目**: huanchong-99
@@ -10967,7 +10967,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 261.1 Mark the props of the component as read-only.
+### 261.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0ZZ9DOUQdEsGnN`
 - **项目**: huanchong-99
@@ -10986,7 +10986,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 262.1 Mark the props of the component as read-only.
+### 262.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwezrZ9DOUQdEsGnE`
 - **项目**: huanchong-99
@@ -11005,7 +11005,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 263.1 Mark the props of the component as read-only.
+### 263.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0oZ9DOUQdEsGnP`
 - **项目**: huanchong-99
@@ -11050,7 +11050,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 264.1 Mark the props of the component as read-only.
+### 264.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwezSZ9DOUQdEsGmw`
 - **项目**: huanchong-99
@@ -11095,7 +11095,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 265.1 Mark the props of the component as read-only.
+### 265.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe0JZ9DOUQdEsGnK`
 - **项目**: huanchong-99
@@ -11127,7 +11127,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 266.1 Mark the props of the component as read-only.
+### 266.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwey0Z9DOUQdEsGmq`
 - **项目**: huanchong-99
@@ -12447,7 +12447,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 296.1 Mark the props of the component as read-only.
+### 296.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweuNZ9DOUQdEsGlB`
 - **项目**: huanchong-99
@@ -12524,7 +12524,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015
 
-### 298.3 Mark the props of the component as read-only.
+### 298.3 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVweu8Z9DOUQdEsGlT`
 - **项目**: huanchong-99
@@ -13719,7 +13719,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 316.1 Mark the props of the component as read-only.
+### 316.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe04Z9DOUQdEsGnT`
 - **项目**: huanchong-99
@@ -13751,7 +13751,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 317.1 Mark the props of the component as read-only.
+### 317.1 Mark the props of the component as read-only. ✅ 已修复
 
 - **问题ID**: `AZyVwe1HZ9DOUQdEsGnY`
 - **项目**: huanchong-99

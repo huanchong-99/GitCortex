@@ -34,7 +34,7 @@ vi.mock('@/lib/api', async () => {
 });
 
 const createWrapper = (queryClient: QueryClient) => {
-  return function Wrapper({ children }: { children: ReactNode }) {
+  return function Wrapper({ children }: Readonly<{ children: ReactNode }>) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );

@@ -17,7 +17,7 @@ import { IdeIcon } from '@/components/ide/IdeIcon';
 /**
  * Render an action icon, handling special icon types
  */
-function ActionItemIcon({ icon }: { icon: ActionIcon }) {
+function ActionItemIcon({ icon }: Readonly<{ icon: ActionIcon }>) {
   if (isSpecialIcon(icon)) {
     if (icon === 'ide-icon') {
       return <IdeIcon className="h-4 w-4" />;

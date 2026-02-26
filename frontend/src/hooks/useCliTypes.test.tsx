@@ -28,7 +28,7 @@ const createMockQueryClient = () =>
     },
   });
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
+const wrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
   <QueryClientProvider client={createMockQueryClient()}>
     {children}
   </QueryClientProvider>

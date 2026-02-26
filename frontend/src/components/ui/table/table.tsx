@@ -77,7 +77,7 @@ const TableEmpty = ({
   </TableRow>
 );
 
-const TableLoading = ({ colSpan }: { colSpan: number }) => (
+const TableLoading = ({ colSpan }: Readonly<{ colSpan: number }>) => (
   <TableRow>
     <TableCell colSpan={colSpan}>
       <div className="h-5 w-full bg-muted/30 rounded animate-pulse" />

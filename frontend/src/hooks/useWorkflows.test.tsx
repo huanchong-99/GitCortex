@@ -47,7 +47,7 @@ const createMockQueryClient = () =>
     },
   });
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
+const wrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
   <QueryClientProvider client={createMockQueryClient()}>
     {children}
   </QueryClientProvider>
@@ -346,7 +346,7 @@ describe('status mutations cache invalidation', () => {
     const queryClient = createMockQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+    const scopedWrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 
@@ -371,7 +371,7 @@ describe('status mutations cache invalidation', () => {
     const queryClient = createMockQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+    const scopedWrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 
@@ -396,7 +396,7 @@ describe('status mutations cache invalidation', () => {
     const queryClient = createMockQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+    const scopedWrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 
@@ -421,7 +421,7 @@ describe('status mutations cache invalidation', () => {
     const queryClient = createMockQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+    const scopedWrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 
@@ -481,7 +481,7 @@ describe('useMergeWorkflow', () => {
     const queryClient = createMockQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+    const scopedWrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 
@@ -522,7 +522,7 @@ describe('useSubmitWorkflowPromptResponse', () => {
     const queryClient = createMockQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const scopedWrapper = ({ children }: { children: React.ReactNode }) => (
+    const scopedWrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
 

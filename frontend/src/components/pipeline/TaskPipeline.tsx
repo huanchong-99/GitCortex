@@ -12,7 +12,7 @@ interface TaskPipelineProps {
 /**
  * Task column with branch info and terminals
  */
-function TaskColumn({ task, isLast }: { task: WorkflowTaskDto; isLast: boolean }) {
+function TaskColumn({ task, isLast }: Readonly<{ task: WorkflowTaskDto; isLast: boolean }>) {
   const { t } = useTranslation('workflow');
 
   return (

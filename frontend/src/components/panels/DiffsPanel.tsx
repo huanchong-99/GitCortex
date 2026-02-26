@@ -44,7 +44,7 @@ const exceedsMaxLineCount = (d: Diff, maxLines: number): boolean => {
   return true;
 };
 
-const getDiffId = ({ diff, index }: { diff: Diff; index: number }) =>
+const getDiffId = ({ diff, index }: Readonly<{ diff: Diff; index: number }>) =>
   `${diff.newPath || diff.oldPath || index}`;
 
 export function DiffsPanel({ selectedAttempt, gitOps }: Readonly<DiffsPanelProps>) {

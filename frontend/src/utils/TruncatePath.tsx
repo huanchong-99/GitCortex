@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-export function DisplayTruncatedPath({ path }: { path: string }) {
+export function DisplayTruncatedPath({ path }: Readonly<{ path: string }>) {
   const isWindows = path.includes('\\');
   const parts = isWindows ? path.split('\\') : path.split('/');
 
@@ -29,7 +29,7 @@ export function DisplayTruncatedPath({ path }: { path: string }) {
   );
 }
 
-const ElipsisComponent = ({ className }: { className: string }) => {
+const ElipsisComponent = ({ className }: Readonly<{ className: string }>) => {
   return (
     <div
       className={cn('absolute -translate-x-full tracking-tighter', className)}

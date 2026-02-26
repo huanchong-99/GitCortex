@@ -61,7 +61,7 @@ export function useApprovalForm(approvalId: string) {
   };
 }
 
-export function ApprovalFormProvider({ children }: { children: ReactNode }) {
+export function ApprovalFormProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [stateMap, setStateMap] = useState<ApprovalFormStateMap>({});
 
   const getState = useCallback(
