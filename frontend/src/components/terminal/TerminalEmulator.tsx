@@ -305,12 +305,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         if (isActive) {
           const reason = event?.reason?.trim();
           const showCode = typeof code === 'number' && code !== 1000 && code !== 1005;
-          let detail = '';
-          if (reason) {
-            detail = reason;
-          } else if (showCode) {
-            detail = `code ${code}`;
-          }
+          const detail = reason || (showCode ? `code ${code}` : '');
           markDisconnected(detail ? `${DISCONNECTED_HINT} (${detail})` : DISCONNECTED_HINT);
           if (!isExpectedClose && !skipNextAutoReconnectRef.current) {
             scheduleAutoReconnect();
