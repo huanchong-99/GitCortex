@@ -190,7 +190,7 @@ describe('PipelineView', () => {
       />
     );
 
-    const connectors = container.querySelectorAll('.w-8.h-0\\.5.bg-muted\\/30');
+    const connectors = container.querySelectorAll(String.raw`.w-8.h-0\.5.bg-muted\/30`);
     expect(connectors.length).toBe(1);
   });
 
@@ -309,7 +309,7 @@ describe('PipelineView', () => {
       />
     );
 
-    const connectors = container.querySelectorAll('.w-8.h-0\\.5.bg-muted\\/30');
+    const connectors = container.querySelectorAll(String.raw`.w-8.h-0\.5.bg-muted\/30`);
     expect(connectors.length).toBe(0);
   });
 

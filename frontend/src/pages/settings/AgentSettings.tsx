@@ -617,8 +617,7 @@ export function AgentSettings() {
           </div>
 
           {useFormEditor &&
-          localParsedProfiles &&
-          localParsedProfiles.executors ? (
+          localParsedProfiles?.executors ? (
             // Form-based editor
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">

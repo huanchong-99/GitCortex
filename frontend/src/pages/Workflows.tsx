@@ -242,7 +242,7 @@ export function Workflows() {
             id: promptItemId,
             detected: payload,
             decision:
-              pendingDecision && pendingDecision.decision === 'ask_user'
+              pendingDecision?.decision === 'ask_user'
                 ? pendingDecision
                 : null,
           },
