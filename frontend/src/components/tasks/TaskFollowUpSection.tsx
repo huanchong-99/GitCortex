@@ -25,7 +25,14 @@ import {
 } from '@/components/ui/tooltip';
 //
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { ScratchType, type TaskWithAttemptStatus, type DraftFollowUpData, ExecutorProfileId } from 'shared/types';
+import {
+  ScratchType,
+  type TaskWithAttemptStatus,
+  type DraftFollowUpData,
+  ExecutorProfileId,
+  type QueueStatus,
+  type Session
+} from 'shared/types';
 import { useBranchStatus } from '@/hooks';
 import { useAttemptRepo } from '@/hooks/useAttemptRepo';
 import { useAttemptExecution } from '@/hooks/useAttemptExecution';
@@ -53,12 +60,9 @@ import { useTranslation } from 'react-i18next';
 import { useScratch } from '@/hooks/useScratch';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queueApi } from '@/lib/api';
-import type { QueueStatus } from 'shared/types';
-import { imagesApi, attemptsApi } from '@/lib/api';
+import { queueApi, imagesApi, attemptsApi } from '@/lib/api';
 import { PrCommentsDialog } from '@/components/dialogs/tasks/PrCommentsDialog';
 import type { NormalizedComment } from '@/components/ui/wysiwyg/nodes/pr-comment-node';
-import type { Session } from 'shared/types';
 
 interface TaskFollowUpSectionProps {
   task: TaskWithAttemptStatus;
