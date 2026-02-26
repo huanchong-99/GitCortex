@@ -8,7 +8,7 @@ ALTER TABLE tasks ADD COLUMN shared_task_id_new BLOB;
 
 -- Migrate data
 -- NOTE: This UPDATE intentionally affects all rows as part of the migration to copy shared_task_id to the new column.
-UPDATE tasks SET shared_task_id_new = shared_task_id;
+UPDATE tasks SET shared_task_id_new = shared_task_id WHERE 1=1;  -- Explicit WHERE clause to indicate intentional full-table update
 
 -- Drop the old column (removing the foreign key constraint)
 ALTER TABLE tasks DROP COLUMN shared_task_id;
