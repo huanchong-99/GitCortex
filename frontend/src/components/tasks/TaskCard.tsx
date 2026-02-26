@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { useNavigateWithSearch, useAuth } from '@/hooks';
 import { paths } from '@/lib/paths';
 import { useUserSystem } from '@/components/ConfigProvider';
+import { attemptsApi } from '@/lib/api';
+import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
+import { TaskCardHeader } from './TaskCardHeader';
+import { useTranslation } from 'react-i18next';
 
 type Task = TaskWithAttemptStatus;
 

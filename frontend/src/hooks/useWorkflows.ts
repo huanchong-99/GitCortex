@@ -5,7 +5,14 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 import { handleApiResponse, logApiError } from '@/lib/api';
-import type { WorkflowDetailDto as Workflow } from 'shared/types';
+import type {
+  WorkflowDetailDto as Workflow,
+  WorkflowListItemDto,
+  WorkflowTaskDto,
+  TerminalDto,
+  WorkflowCommandDto,
+  SlashCommandPresetDto,
+} from 'shared/types';
 
 // ============================================================================
 // Create Request Types (not in generated types yet)

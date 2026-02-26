@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { NodeKey, SerializedLexicalNode, Spread } from 'lexical';
+import { SerializedLexicalNode, Spread } from 'lexical';
 import { HelpCircle, Loader2 } from 'lucide-react';
 import {
   useTaskAttemptId,
