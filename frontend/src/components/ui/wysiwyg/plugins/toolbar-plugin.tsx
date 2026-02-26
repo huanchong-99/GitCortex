@@ -114,18 +114,18 @@ export function ToolbarPlugin() {
     const toolbarWidth = 180;
 
     // Position above selection, centered
-    let top = rect.top - TOOLBAR_HEIGHT - GAP + window.scrollY;
-    let left = rect.left + rect.width / 2 - toolbarWidth / 2 + window.scrollX;
+    let top = rect.top - TOOLBAR_HEIGHT - GAP + globalThis.window.scrollY;
+    let left = rect.left + rect.width / 2 - toolbarWidth / 2 + globalThis.window.scrollX;
 
     // Flip below if not enough space above
     if (rect.top < TOOLBAR_HEIGHT + GAP + VIEWPORT_PADDING) {
-      top = rect.bottom + GAP + window.scrollY;
+      top = rect.bottom + GAP + globalThis.window.scrollY;
     }
 
     // Keep within viewport horizontally
     left = Math.max(
       VIEWPORT_PADDING,
-      Math.min(left, window.innerWidth - toolbarWidth - VIEWPORT_PADDING)
+      Math.min(left, globalThis.window.innerWidth - toolbarWidth - VIEWPORT_PADDING)
     );
 
     setPosition({ top, left });

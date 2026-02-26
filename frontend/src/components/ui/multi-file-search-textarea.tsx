@@ -275,8 +275,8 @@ export function MultiFileSearchTextarea({
     let finalLeft = textareaRect.left;
 
     // Ensure dropdown doesn't go off the right edge
-    if (finalLeft + dropdownWidth > window.innerWidth - 16) {
-      finalLeft = window.innerWidth - dropdownWidth - 16;
+    if (finalLeft + dropdownWidth > globalThis.window.innerWidth - 16) {
+      finalLeft = globalThis.window.innerWidth - dropdownWidth - 16;
     }
 
     // Ensure dropdown doesn't go off the left edge
@@ -285,7 +285,7 @@ export function MultiFileSearchTextarea({
     }
 
     // Calculate available space below and above textarea
-    const availableSpaceBelow = window.innerHeight - textareaRect.bottom - 32;
+    const availableSpaceBelow = globalThis.window.innerHeight - textareaRect.bottom - 32;
     const availableSpaceAbove = textareaRect.top - 32;
 
     // If not enough space below, position above

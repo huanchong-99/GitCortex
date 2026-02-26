@@ -55,7 +55,7 @@ export const PERSIST_KEYS = {
 } as const;
 
 // Check if screen is wide enough to keep sidebar visible
-const isWideScreen = () => window.innerWidth > 2048;
+const isWideScreen = () => globalThis.window.innerWidth > 2048;
 
 export type PersistKey =
   | typeof PERSIST_KEYS.workspacesSidebarArchived

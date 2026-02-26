@@ -61,8 +61,8 @@ function getItemClassName(isSelected: boolean): string {
 
 function getMenuPosition(anchorEl: HTMLElement) {
   const rect = anchorEl.getBoundingClientRect();
-  const viewportHeight = window.innerHeight;
-  const viewportWidth = window.innerWidth;
+  const viewportHeight = globalThis.window.innerHeight;
+  const viewportWidth = globalThis.window.innerWidth;
 
   const spaceAbove = rect.top;
   const spaceBelow = viewportHeight - rect.bottom;
