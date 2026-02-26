@@ -82,7 +82,7 @@ function TerminalActivityItem({
 /**
  * Status indicator dot with animation for active states
  */
-function StatusIndicator({ status }: { status: string }) {
+function StatusIndicator({ status }: Readonly<{ status: string }>) {
   const { t } = useTranslation('workflow');
   const statusKey = `terminalDebug.status.${status}` as const;
 
