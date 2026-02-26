@@ -139,9 +139,7 @@ export function Workflows() {
   const validProjectId =
     projectIdFromUrl && projects.some((p) => p.id === projectIdFromUrl)
       ? projectIdFromUrl
-      : projects.length > 0
-        ? projects[0].id
-        : null;
+      : projects[0]?.id ?? null;
 
   // Update URL when projectId is invalid or missing
   useEffect(() => {

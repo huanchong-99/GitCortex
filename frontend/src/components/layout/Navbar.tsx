@@ -59,9 +59,8 @@ const EXTERNAL_LINKS = [
 
 function NavDivider() {
   return (
-    <div
-      className="mx-2 h-6 w-px bg-border/60"
-      role="separator"
+    <hr
+      className="mx-2 h-6 w-px bg-border/60 border-0"
       aria-orientation="vertical"
     />
   );

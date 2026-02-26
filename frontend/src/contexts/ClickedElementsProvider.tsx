@@ -141,7 +141,7 @@ function formatDomBits(ce?: OpenInEditorPayload['clickedElement']) {
 
 function normalizeClassName(className?: string): string {
   if (!className) return '';
-  return className.split(/\s+/).filter(Boolean).sort().join('.');
+  return className.split(/\s+/).filter(Boolean).sort((a, b) => a.localeCompare(b)).join('.');
 }
 
 function makeDedupeKey(
@@ -209,7 +209,7 @@ function pruneObject(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   let count = 0;
-  for (const k of Object.keys(obj)) {
+  for (const k of Object.keys(obj).sort((a, b) => a.localeCompare(b))) {
     if (count++ > 50) {
       out['[TruncatedKeys]'] = true;
       break;

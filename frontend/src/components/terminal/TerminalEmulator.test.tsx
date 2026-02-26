@@ -33,10 +33,10 @@ vi.mock('@xterm/addon-fit', () => {
 class MockWebSocket {
   static instances: MockWebSocket[] = [];
   static autoOpen = true;
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSING = 2;
-  static CLOSED = 3;
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
 
   url = '';
   readyState = MockWebSocket.CONNECTING;

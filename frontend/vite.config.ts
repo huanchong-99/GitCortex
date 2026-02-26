@@ -82,7 +82,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: parseInt(process.env.FRONTEND_PORT || "23457"),
+    port: Number.parseInt(process.env.FRONTEND_PORT || "23457", 10),
     strictPort: true, // Don't try other ports if 23457 is in use
     proxy: {
       "/api": {
