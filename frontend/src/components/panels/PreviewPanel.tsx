@@ -258,8 +258,7 @@ export function PreviewPanel() {
                       className="underline font-bold"
                     >
                       {t('preview.troubleAlert.item3Link')}
-                    </a>
-                    .
+                    </a>.
                   </li>
                 </ol>
                 <div className="flex gap-2">
