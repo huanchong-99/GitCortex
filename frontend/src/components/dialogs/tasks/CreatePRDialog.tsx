@@ -30,7 +30,7 @@ import type {
   GhCliSupportContent,
   GhCliSupportVariant,
 } from '@/components/dialogs/auth/GhCliSetupDialog';
-import type { GhCliSetupError } from 'shared/types';
+import type { GhCliSetupError, PrError } from 'shared/types';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { defineModal } from '@/lib/modals';
 
@@ -60,7 +60,7 @@ function getActionText(errorType: string): string {
 
 // Helper to handle CLI not installed/logged in errors
 function handleCliError(
-  error: GhCliSetupError,
+  error: PrError,
   isMacEnvironment: boolean,
   showGhCliSetupDialog: () => Promise<void>,
   setError: (error: string) => void,
@@ -88,7 +88,7 @@ function handleCliError(
 
 // Helper to handle git CLI errors
 function handleGitCliError(
-  error: GhCliSetupError,
+  error: PrError,
   result: any,
   t: any,
   setError: (error: string) => void,
@@ -113,7 +113,7 @@ function handleGitCliError(
 
 // Helper to handle target branch not found error
 function handleTargetBranchError(
-  error: GhCliSetupError,
+  error: PrError,
   t: any,
   setError: (error: string) => void,
   setGhCliHelp: (help: GhCliSupportContent | null) => void
