@@ -146,28 +146,9 @@ function useDiffData(input: DiffInput): DiffData {
   }, [input]);
 }
 
-// Helper to handle keyboard events for toggle
-function handleToggleKeyDown(e: React.KeyboardEvent, onToggle: () => void) {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    onToggle();
-  }
-}
-
-// Helper to get header interactive props
-function getHeaderProps(onToggle?: () => void) {
-  if (!onToggle) {
-    return { role: undefined, tabIndex: undefined, onKeyDown: undefined };
-  }
-  return {
-    role: 'button' as const,
-    tabIndex: 0,
-    onKeyDown: (e: React.KeyboardEvent) => handleToggleKeyDown(e, onToggle),
-  };
-}
 
 // Helper component for diff stats
-function DiffStats({ additions, deletions }: { additions: number; deletions: number }) {
+function DiffStats({ additions, deletions }: Readonly<{ additions: number; deletions: number }>) {
   const hasStats = additions > 0 || deletions > 0;
   if (!hasStats) return null;
 
@@ -200,43 +181,53 @@ export function DiffViewCard({
   } = useDiffData(input);
 
   const FileIcon = getFileIcon(filePath, actualTheme);
-  const headerProps = getHeaderProps(onToggle);
+
+  const headerContent = (
+    <>
+      <div className="flex-1 flex items-center gap-base min-w-0">
+        <span className="relative shrink-0">
+          <FileIcon className="size-icon-base" />
+          {status && (
+            <ToolStatusDot
+              status={status}
+              className="absolute -bottom-0.5 -right-0.5"
+            />
+          )}
+        </span>
+        <span className="text-sm text-normal truncate font-ibm-plex-mono">
+          {filePath}
+        </span>
+        <DiffStats additions={additions} deletions={deletions} />
+      </div>
+      {onToggle && (
+        <CaretDownIcon
+          className={cn(
+            'size-icon-xs shrink-0 text-low transition-transform',
+            !expanded && '-rotate-90'
+          )}
+        />
+      )}
+    </>
+  );
 
   return (
     <div className={cn('rounded-sm border overflow-hidden', className)}>
       {/* Header */}
-      <div
-        className={cn(
-          'flex items-center bg-panel p-base w-full',
-          onToggle && 'cursor-pointer'
-        )}
-        onClick={onToggle}
-        {...headerProps}
-      >
-        <div className="flex-1 flex items-center gap-base min-w-0">
-          <span className="relative shrink-0">
-            <FileIcon className="size-icon-base" />
-            {status && (
-              <ToolStatusDot
-                status={status}
-                className="absolute -bottom-0.5 -right-0.5"
-              />
-            )}
-          </span>
-          <span className="text-sm text-normal truncate font-ibm-plex-mono">
-            {filePath}
-          </span>
-          <DiffStats additions={additions} deletions={deletions} />
+      {onToggle ? (
+        <button
+          type="button"
+          className={cn(
+            'flex items-center bg-panel p-base w-full cursor-pointer'
+          )}
+          onClick={onToggle}
+        >
+          {headerContent}
+        </button>
+      ) : (
+        <div className="flex items-center bg-panel p-base w-full">
+          {headerContent}
         </div>
-        {onToggle && (
-          <CaretDownIcon
-            className={cn(
-              'size-icon-xs shrink-0 text-low transition-transform',
-              !expanded && '-rotate-90'
-            )}
-          />
-        )}
-      </div>
+      )}
 
       {/* Diff body - shown when expanded */}
       {expanded && (

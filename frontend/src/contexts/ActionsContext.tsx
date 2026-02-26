@@ -44,7 +44,7 @@ interface ActionsProviderProps {
   children: ReactNode;
 }
 
-export function ActionsProvider({ children }: ActionsProviderProps) {
+export function ActionsProvider({ children }: Readonly<ActionsProviderProps>) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   // Get workspace context (ActionsProvider is nested inside WorkspaceProvider)

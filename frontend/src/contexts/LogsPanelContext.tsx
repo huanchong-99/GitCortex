@@ -50,7 +50,7 @@ interface LogsPanelProviderProps {
   children: ReactNode;
 }
 
-export function LogsPanelProvider({ children }: LogsPanelProviderProps) {
+export function LogsPanelProvider({ children }: Readonly<LogsPanelProviderProps>) {
   const { workspaceId, isCreateMode } = useWorkspaceContext();
   const { rightMainPanelMode, setRightMainPanelMode } = useWorkspacePanelState(
     isCreateMode ? undefined : workspaceId

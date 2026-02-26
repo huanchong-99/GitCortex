@@ -75,10 +75,10 @@ function getToggleLabelText(forceReset: boolean, worktreeResetOn: boolean, t: an
 function ToggleSwitch({
   enabled,
   enabledColor = 'bg-emerald-500',
-}: {
+}: Readonly<{
   enabled: boolean;
   enabledColor?: string;
-}) {
+}>) {
   return (
     <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">
       <span
@@ -101,14 +101,14 @@ function ToggleSwitch({
 function RepositoryList({
   repoInfo,
   repoCount,
-}: {
+}: Readonly<{
   repoInfo: Array<{
     repoId: string;
     repoName: string;
     targetSha: string | null;
   }>;
   repoCount: number;
-}) {
+}>) {
   return (
     <div className="mt-1 space-y-1">
       {repoInfo.map((repo) => (
@@ -141,14 +141,14 @@ function HistoryChangeWarning({
   laterSetup,
   laterCleanup,
   t,
-}: {
+}: Readonly<{
   hasLater: boolean;
   laterCount: number;
   laterCoding: number;
   laterSetup: number;
   laterCleanup: number;
   t: any;
-}) {
+}>) {
   if (!hasLater) return null;
 
   return (
@@ -211,14 +211,14 @@ function UncommittedChangesWarning({
   acknowledgeUncommitted,
   setAcknowledgeUncommitted,
   t,
-}: {
+}: Readonly<{
   anyDirty: boolean;
   totalUncommitted: number;
   totalUntracked: number;
   acknowledgeUncommitted: boolean;
   setAcknowledgeUncommitted: (v: boolean) => void;
   t: any;
-}) {
+}>) {
   if (!anyDirty) return null;
 
   return (
@@ -268,7 +268,7 @@ function ResetWorktreeCanReset({
   totalUncommitted,
   totalUntracked,
   t,
-}: {
+}: Readonly<{
   needGitReset: boolean;
   canGitReset: boolean;
   worktreeResetOn: boolean;
@@ -282,7 +282,7 @@ function ResetWorktreeCanReset({
   totalUncommitted: number;
   totalUntracked: number;
   t: any;
-}) {
+}>) {
   if (!(needGitReset && canGitReset)) return null;
 
   return (
@@ -348,7 +348,7 @@ function ResetWorktreeCannotReset({
   repoCount,
   repoInfo,
   t,
-}: {
+}: Readonly<{
   needGitReset: boolean;
   canGitReset: boolean;
   worktreeResetOn: boolean;
@@ -362,7 +362,7 @@ function ResetWorktreeCannotReset({
     targetSha: string | null;
   }>;
   t: any;
-}) {
+}>) {
   if (!(needGitReset && !canGitReset)) return null;
 
   const containerClassName =

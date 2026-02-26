@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { useCallback } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { cn } from '@/lib/utils';
 import {
@@ -76,6 +77,27 @@ export function SearchableDropdown<T>({
   emptyMessage = 'No items found',
   getItemBadge,
 }: SearchableDropdownProps<T>) {
+  const renderItem = useCallback((idx: number) => {
+    const item = filteredItems[idx];
+    const key = getItemKey(item);
+    const isHighlighted = idx === highlightedIndex;
+    const isSelected = selectedValue === key;
+    return (
+      <DropdownMenuItem
+        onSelect={() => onSelect(item)}
+        onMouseEnter={() => onHighlightedIndexChange(idx)}
+        preventFocusOnHover
+        badge={getItemBadge?.(item)}
+        className={cn(
+          isSelected && 'bg-secondary',
+          isHighlighted && 'bg-secondary'
+        )}
+      >
+        {getItemLabel(item)}
+      </DropdownMenuItem>
+    );
+  }, [filteredItems, getItemKey, highlightedIndex, selectedValue, onSelect, onHighlightedIndexChange, getItemBadge, getItemLabel]);
+
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -99,26 +121,7 @@ export function SearchableDropdown<T>({
             computeItemKey={(idx) =>
               getItemKey(filteredItems[idx]) ?? String(idx)
             }
-            itemContent={(idx) => {
-              const item = filteredItems[idx];
-              const key = getItemKey(item);
-              const isHighlighted = idx === highlightedIndex;
-              const isSelected = selectedValue === key;
-              return (
-                <DropdownMenuItem
-                  onSelect={() => onSelect(item)}
-                  onMouseEnter={() => onHighlightedIndexChange(idx)}
-                  preventFocusOnHover
-                  badge={getItemBadge?.(item)}
-                  className={cn(
-                    isSelected && 'bg-secondary',
-                    isHighlighted && 'bg-secondary'
-                  )}
-                >
-                  {getItemLabel(item)}
-                </DropdownMenuItem>
-              );
-            }}
+            itemContent={renderItem}
           />
         )}
       </DropdownMenuContent>

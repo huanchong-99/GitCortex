@@ -45,9 +45,9 @@ export function useApprovalFeedbackOptional() {
 
 export function ApprovalFeedbackProvider({
   children,
-}: {
+}: Readonly<{
   children: ReactNode;
-}) {
+}>) {
   const [activeApproval, setActiveApproval] = useState<ActiveApproval | null>(
     null
   );

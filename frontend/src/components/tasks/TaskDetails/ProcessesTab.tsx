@@ -262,7 +262,41 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {!selectedProcessId ? (
+      {selectedProcessId ? (
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between px-4 py-2 border-b flex-shrink-0">
+            <h2 className="text-lg font-semibold">
+              {t('processes.detailsTitle')}
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyLogs}
+                disabled={logs.length === 0}
+                className={getCopyButtonClassName(copied, logs.length > 0)}
+              >
+                {copied ? t('processes.logsCopied') : t('processes.copyLogs')}
+              </button>
+              <button
+                onClick={() => setSelectedProcessId(null)}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md border border-border transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {t('processes.backToList')}
+              </button>
+            </div>
+          </div>
+          <div className="flex-1">
+            <ProcessDetailsContent
+              selectedProcess={selectedProcess}
+              loadingProcessId={loadingProcessId}
+              selectedProcessId={selectedProcessId}
+              logs={logs}
+              logsError={logsError}
+              t={t}
+            />
+          </div>
+        </div>
+      ) : (
         <div className="flex-1 overflow-auto px-4 pb-20 pt-4">
           {processesError && (
             <div className="mb-3 text-sm text-destructive">
@@ -278,7 +312,8 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
           {executionProcesses.length > 0 && (
             <div className="space-y-3">
               {executionProcesses.map((process) => (
-                <div
+                <button
+                  type="button"
                   key={process.id}
                   className={getProcessClassName(
                     process.id,
@@ -361,44 +396,10 @@ function ProcessesTab({ sessionId }: Readonly<ProcessesTabProps>) {
                       )}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between px-4 py-2 border-b flex-shrink-0">
-            <h2 className="text-lg font-semibold">
-              {t('processes.detailsTitle')}
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopyLogs}
-                disabled={logs.length === 0}
-                className={getCopyButtonClassName(copied, logs.length > 0)}
-              >
-                {copied ? t('processes.logsCopied') : t('processes.copyLogs')}
-              </button>
-              <button
-                onClick={() => setSelectedProcessId(null)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md border border-border transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {t('processes.backToList')}
-              </button>
-            </div>
-          </div>
-          <div className="flex-1">
-            <ProcessDetailsContent
-              selectedProcess={selectedProcess}
-              loadingProcessId={loadingProcessId}
-              selectedProcessId={selectedProcessId}
-              logs={logs}
-              logsError={logsError}
-              t={t}
-            />
-          </div>
         </div>
       )}
     </div>

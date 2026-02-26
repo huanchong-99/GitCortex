@@ -82,7 +82,7 @@ export function GeneralSettings() {
         return t('settings.general.git.branchPrefix.errors.invalidChars');
       // Control chars check
       for (let i = 0; i < prefix.length; i++) {
-        const code = prefix.charCodeAt(i);
+        const code = prefix.codePointAt(i)!;
         if (code < 0x20 || code === 0x7f)
           return t('settings.general.git.branchPrefix.errors.controlChars');
       }

@@ -724,7 +724,8 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
       </Dialog>
       {showDiscardWarning && (
         <div className="fixed inset-0 z-[10000] flex items-start justify-center p-4 overflow-y-auto">
-          <div
+          <button
+            type="button"
             className="fixed inset-0 bg-black/50"
             onClick={() => setShowDiscardWarning(false)}
           />

@@ -29,9 +29,9 @@ const MessageEditContext = createContext<MessageEditContextType | null>(null);
 
 export function MessageEditProvider({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   const [activeEdit, setActiveEdit] = useState<EditState | null>(null);
   const { entries } = useEntries();
 

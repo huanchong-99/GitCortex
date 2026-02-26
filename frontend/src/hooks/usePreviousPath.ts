@@ -61,7 +61,7 @@ export function usePreviousPath() {
   // Track pathnames as user navigates
   useEffect(() => {
     const scopedVisited = getVisitedPaths(scopeKey);
-    if (scopedVisited[scopedVisited.length - 1] !== location.pathname) {
+    if (scopedVisited.at(-1) !== location.pathname) {
       scopedVisited.push(location.pathname);
       // Keep only last N entries to prevent memory bloat
       if (scopedVisited.length > MAX_VISITED_PATHS) {

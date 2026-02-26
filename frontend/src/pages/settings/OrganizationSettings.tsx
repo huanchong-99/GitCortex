@@ -52,13 +52,13 @@ function InvitationListContent({
   onRevoke,
   isRevoking,
   t,
-}: {
+}: Readonly<{
   loadingInvitations: boolean;
   invitations: any[];
   onRevoke: (id: string) => void;
   isRevoking: boolean;
   t: any;
-}) {
+}>) {
   if (loadingInvitations) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -101,7 +101,7 @@ function MemberListContent({
   isRemoving,
   isRoleChanging,
   t,
-}: {
+}: Readonly<{
   loadingMembers: boolean;
   members: any[];
   currentUserId: string | null;
@@ -111,7 +111,7 @@ function MemberListContent({
   isRemoving: boolean;
   isRoleChanging: boolean;
   t: any;
-}) {
+}>) {
   if (loadingMembers) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -163,7 +163,7 @@ function RemoteProjectsContent({
   remoteProjectUnsupportedMessage,
   loadRemoteProjectsErrorMessage,
   t,
-}: {
+}: Readonly<{
   loadingProjects: boolean;
   loadingRemoteProjects: boolean;
   isRemoteProjectUnsupported: boolean;
@@ -178,7 +178,7 @@ function RemoteProjectsContent({
   remoteProjectUnsupportedMessage: string;
   loadRemoteProjectsErrorMessage: string;
   t: any;
-}) {
+}>) {
   if (loadingProjects || loadingRemoteProjects) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -322,19 +322,20 @@ export function OrganizationSettings() {
         err instanceof Error ? err.message : 'Failed to update member role'
       );
     },
-    onDeleteSuccess: async () => {
+    onDeleteSuccess: () => {
       setSuccess(t('settings.deleteSuccess'));
       setTimeout(() => setSuccess(null), 3000);
       // Refetch organizations and switch to personal org
-      await refetchOrgs();
-      if (orgsResponse?.organizations) {
-        const personalOrg = orgsResponse.organizations.find(
-          (org) => org.is_personal
-        );
-        if (personalOrg) {
-          handleOrgSelect(personalOrg.id);
+      refetchOrgs().then(() => {
+        if (orgsResponse?.organizations) {
+          const personalOrg = orgsResponse.organizations.find(
+            (org) => org.is_personal
+          );
+          if (personalOrg) {
+            handleOrgSelect(personalOrg.id);
+          }
         }
-      }
+      }).catch(console.error);
     },
     onDeleteError: (err) => {
       setError(err instanceof Error ? err.message : t('settings.deleteError'));

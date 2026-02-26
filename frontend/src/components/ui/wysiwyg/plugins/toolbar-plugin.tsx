@@ -21,12 +21,12 @@ function ToolbarButton({
   onClick,
   children,
   title,
-}: {
+}: Readonly<{
   active?: boolean;
   onClick: (e: React.MouseEvent) => void;
   children: React.ReactNode;
   title: string;
-}) {
+}>) {
   return (
     <button
       type="button"

@@ -165,14 +165,14 @@ function DiffListContent({
   toggle,
   selectedAttempt,
   t,
-}: {
+}: Readonly<{
   loading: boolean;
   diffs: Diff[];
   collapsedIds: Set<string>;
   toggle: (id: string) => void;
   selectedAttempt: Workspace | null;
   t: (key: string, params?: Record<string, unknown>) => string;
-}) {
+}>) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -243,12 +243,9 @@ function DiffsPanelContent({
                           : t('diff.collapseAll')
                       }
                     >
-                      {(() => {
-                        if (allCollapsed) {
-                          return <ChevronsDown className="h-4 w-4" />;
-                        }
-                        return <ChevronsUp className="h-4 w-4" />;
-                      })()}
+                      {allCollapsed
+                        ? <ChevronsDown className="h-4 w-4" />
+                        : <ChevronsUp className="h-4 w-4" />}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">

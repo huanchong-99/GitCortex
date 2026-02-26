@@ -502,9 +502,10 @@ export function ProjectSettings() {
               ) : (
                 <div className="space-y-2">
                   {repositories.map((repo) => (
-                    <div
+                    <button
+                      type="button"
                       key={repo.id}
-                      className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 cursor-pointer transition-colors w-full text-left"
                       onClick={() =>
                         navigate(`/settings/repos?repoId=${repo.id}`)
                       }
@@ -531,7 +532,7 @@ export function ProjectSettings() {
                           <Trash2 className="h-4 w-4" />
                         )}
                       </Button>
-                    </div>
+                    </button>
                   ))}
 
                   {repositories.length === 0 && !loadingRepos && (

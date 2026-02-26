@@ -11,7 +11,7 @@ interface Props {
 /**
  * Displays wizard step progress with completion indicators.
  */
-export function StepIndicator({ currentStep, completedSteps }: Props) {
+export function StepIndicator({ currentStep, completedSteps }: Readonly<Props>) {
   const { t } = useTranslation('workflow');
 
   return (

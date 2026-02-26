@@ -161,7 +161,7 @@ function createScriptToolPatch(
         ? { status: 'success' }
         : { status: 'failed' };
 
-  const output = entries.map((line) => line.content).join('\n');
+  const output = entries.map((line) => typeof line.content === 'string' ? line.content : JSON.stringify(line.content)).join('\n');
 
   const toolNormalizedEntry: NormalizedEntry = {
     entry_type: {
@@ -250,7 +250,7 @@ export const useConversationHistory = ({
           resolve(allEntries);
         },
         onError: (err) => {
-          console.warn!(
+          console.warn(
             `Error loading entries for historic execution process ${executionProcess.id}`,
             err
           );
@@ -524,23 +524,18 @@ export const useConversationHistory = ({
   // This emits its own events as they are streamed
   const loadRunningAndEmit = useCallback(
     (executionProcess: ExecutionProcess): Promise<void> => {
+      const url = executionProcess.executorAction.typ.type === 'ScriptRequest'
+        ? `/api/execution-processes/${executionProcess.id}/raw-logs/ws`
+        : `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
+
       return new Promise((resolve, reject) => {
-        let url = '';
-        if (executionProcess.executorAction.typ.type === 'ScriptRequest') {
-          url = `/api/execution-processes/${executionProcess.id}/raw-logs/ws`;
-        } else {
-          url = `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
-        }
         const controller = streamJsonPatchEntries<PatchType>(url, {
           onEntries(entries) {
             const patchesWithKey = entries.map((entry, index) =>
               patchWithKey(entry, executionProcess.id, index)
             );
             mergeIntoDisplayed((state) => {
-              state[executionProcess.id] = {
-                executionProcess,
-                entries: patchesWithKey,
-              };
+              state[executionProcess.id] = { executionProcess, entries: patchesWithKey };
             });
             emitEntries(displayedExecutionProcesses.current, 'running', false);
           },

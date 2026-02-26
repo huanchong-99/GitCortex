@@ -284,9 +284,9 @@ export const Actions = {
       const wasArchived = workspace.archived;
 
       // Calculate next workspace before archiving
-      const nextWorkspaceId = !wasArchived
-        ? getNextWorkspaceId(ctx.activeWorkspaces, workspaceId)
-        : null;
+      const nextWorkspaceId = wasArchived
+        ? null
+        : getNextWorkspaceId(ctx.activeWorkspaces, workspaceId);
 
       // Perform the archive/unarchive
       await attemptsApi.update(workspaceId, { archived: !wasArchived });

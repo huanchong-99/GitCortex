@@ -81,7 +81,7 @@ interface WorkspaceProviderProps {
   children: ReactNode;
 }
 
-export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
+export function WorkspaceProvider({ children }: Readonly<WorkspaceProviderProps>) {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   const location = useLocation();

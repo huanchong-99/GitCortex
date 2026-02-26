@@ -11,6 +11,7 @@ ALTER TABLE repos ADD COLUMN dev_server_script TEXT;
 -- Migrate scripts only when repo-level value is unambiguous.
 -- Avoid LIMIT 1 so shared repos with diverging per-project scripts are not
 -- silently overwritten by an arbitrary row.
+-- intentional: update all rows
 UPDATE repos
 SET
     setup_script = (
@@ -51,6 +52,7 @@ SET
     );
 
 -- Migrate dev_script only when repo-level value is unambiguous across projects.
+-- intentional: update all rows
 UPDATE repos
 SET dev_server_script = (
     SELECT CASE

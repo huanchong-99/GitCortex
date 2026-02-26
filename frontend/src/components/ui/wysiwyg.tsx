@@ -44,14 +44,11 @@ import { Button } from '@/components/ui/button';
 import { Check, Clipboard, Pencil, Trash2 } from 'lucide-react';
 import { writeClipboardViaBridge } from '@/vscode/bridge';
 
-/** Markdown string representing the editor content */
-export type SerializedEditorState = string;
-
 type WysiwygProps = {
   placeholder?: string;
   /** Markdown string representing the editor content */
-  value: SerializedEditorState;
-  onChange?: (state: SerializedEditorState) => void;
+  value: string;
+  onChange?: (state: string) => void;
   onEditorStateChange?: (s: EditorState) => void;
   disabled?: boolean;
   onPasteFiles?: (files: File[]) => void;
@@ -107,7 +104,7 @@ function WYSIWYGEditor({
     if (!value) return;
     try {
       // Unescape markdown-escaped underscores for cleaner clipboard output
-      const unescaped = value.replaceAll('\\_', '_');
+      const unescaped = value.replaceAll(String.raw`\_`, '_');
       await writeClipboardViaBridge(unescaped);
       setCopied(true);
       globalThis.setTimeout(() => setCopied(false), 400);
@@ -206,6 +203,8 @@ function WYSIWYGEditor({
     [onPasteFiles, disabled]
   );
 
+  const memoizedLocalImages = useMemo(() => localImages ?? [], [localImages]);
+
   // Memoized placeholder element
   const placeholderElement = useMemo(
     () => (
@@ -220,7 +219,7 @@ function WYSIWYGEditor({
     <div className="wysiwyg text-base">
       <TaskAttemptContext.Provider value={taskAttemptId}>
         <TaskContext.Provider value={taskId}>
-          <LocalImagesContext.Provider value={localImages ?? []}>
+          <LocalImagesContext.Provider value={memoizedLocalImages}>
             <LexicalComposer initialConfig={initialConfig}>
               <MarkdownSyncPlugin
                 value={value}

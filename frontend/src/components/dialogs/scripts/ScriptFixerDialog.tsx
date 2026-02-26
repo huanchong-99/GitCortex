@@ -120,14 +120,14 @@ function ProcessStatusIndicator({
   isProcessKilled,
   exitCode,
   t,
-}: {
+}: Readonly<{
   isProcessRunning: boolean;
   isProcessSuccessful: boolean;
   hasProcessError: boolean;
   isProcessKilled: boolean;
   exitCode: number | bigint | null | undefined;
   t: any;
-}) {
+}>) {
   if (isProcessRunning) {
     return (
       <>

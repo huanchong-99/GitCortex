@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { PatchType } from 'shared/types';
 
 type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
@@ -7,6 +7,19 @@ const MAX_LOG_ENTRIES = 5000;
 interface UseLogStreamResult {
   logs: LogEntry[];
   error: string | null;
+}
+
+function parseLogPatches(data: unknown): LogEntry[] {
+  if (!data || typeof data !== 'object' || !('JsonPatch' in data)) return [];
+  const patches = (data as { JsonPatch: Array<{ value?: PatchType }> }).JsonPatch;
+  const entries: LogEntry[] = [];
+  for (const patch of patches) {
+    const value = patch?.value;
+    if (value?.type === 'STDOUT' || value?.type === 'STDERR') {
+      entries.push({ type: value.type, content: value.content });
+    }
+  }
+  return entries;
 }
 
 export const useLogStream = (processId: string): UseLogStreamResult => {
@@ -18,6 +31,30 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
   const isIntentionallyClosed = useRef<boolean>(false);
   // Track current processId to prevent stale WebSocket messages from contaminating logs
   const currentProcessIdRef = useRef<string>(processId);
+
+  const addLogEntry = useCallback((entry: LogEntry, capturedProcessId: string) => {
+    if (currentProcessIdRef.current !== capturedProcessId) return;
+    setLogs((prev) => {
+      const next = [...prev, entry];
+      return next.length <= MAX_LOG_ENTRIES ? next : next.slice(next.length - MAX_LOG_ENTRIES);
+    });
+  }, []);
+
+  const handleMessage = useCallback((event: MessageEvent, capturedProcessId: string) => {
+    try {
+      const data = JSON.parse(event.data);
+      const entries = parseLogPatches(data);
+      for (const entry of entries) {
+        addLogEntry(entry, capturedProcessId);
+      }
+      if (data.finished === true) {
+        isIntentionallyClosed.current = true;
+        wsRef.current?.close();
+      }
+    } catch (e) {
+      console.error('Failed to parse message:', e);
+    }
+  }, [addLogEntry]);
 
   useEffect(() => {
     if (!processId) {
@@ -31,50 +68,6 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
     setLogs([]);
     setError(null);
 
-    const addLogEntry = (entry: LogEntry, capturedProcessId: string) => {
-      // Only add log entry if this WebSocket is still for the current process
-      if (currentProcessIdRef.current !== capturedProcessId) {
-        return;
-      }
-      setLogs((prev) => {
-        const next = [...prev, entry];
-        if (next.length <= MAX_LOG_ENTRIES) {
-          return next;
-        }
-        return next.slice(next.length - MAX_LOG_ENTRIES);
-      });
-    };
-
-    const handleMessage = (event: MessageEvent, capturedProcessId: string) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        // Handle different message types based on LogMsg enum
-        if ('JsonPatch' in data) {
-          const patches = data.JsonPatch as Array<{ value?: PatchType }>;
-          patches.forEach((patch) => {
-            const value = patch?.value;
-            if (!value || !value.type) return;
-
-            switch (value.type) {
-              case 'STDOUT':
-              case 'STDERR':
-                addLogEntry({ type: value.type, content: value.content }, capturedProcessId);
-                break;
-              // Ignore other patch types (NORMALIZED_ENTRY, DIFF, etc.)
-              default:
-                break;
-            }
-          });
-        } else if (data.finished === true) {
-          isIntentionallyClosed.current = true;
-          wsRef.current?.close();
-        }
-      } catch (e) {
-        console.error('Failed to parse message:', e);
-      }
-    };
-
     const open = () => {
       // Capture processId at the time of opening the WebSocket
       const capturedProcessId = processId;
@@ -87,13 +80,11 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
       isIntentionallyClosed.current = false;
 
       ws.onopen = () => {
-        // Ignore if processId has changed since WebSocket was opened
         if (currentProcessIdRef.current !== capturedProcessId) {
           ws.close();
           return;
         }
         setError(null);
-        // Reset logs on new connection since server replays history
         setLogs([]);
         retryCountRef.current = 0;
       };
@@ -101,25 +92,18 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
       ws.onmessage = (event) => handleMessage(event, capturedProcessId);
 
       ws.onerror = () => {
-        // Ignore errors from stale WebSocket connections
-        if (currentProcessIdRef.current !== capturedProcessId) {
-          return;
-        }
+        if (currentProcessIdRef.current !== capturedProcessId) return;
         setError('Connection failed');
       };
 
       ws.onclose = (event) => {
-        // Don't retry for stale WebSocket connections
-        if (currentProcessIdRef.current !== capturedProcessId) {
-          return;
-        }
-        // Only retry if the close was not intentional and not a normal closure
+        if (currentProcessIdRef.current !== capturedProcessId) return;
         if (!isIntentionallyClosed.current && event.code !== 1000) {
           const next = retryCountRef.current + 1;
           retryCountRef.current = next;
           if (next <= 6) {
             const delay = Math.min(1500, 250 * 2 ** (next - 1));
-            retryTimerRef.current = setTimeout(() => open(), delay);
+            retryTimerRef.current = setTimeout(open, delay);
           }
         }
       };
@@ -138,7 +122,7 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
         retryTimerRef.current = null;
       }
     };
-  }, [processId]);
+  }, [processId, handleMessage]);
 
   return { logs, error };
 };

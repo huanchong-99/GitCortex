@@ -32,10 +32,10 @@ export type SerializedPrCommentNode = Spread<
 function PrCommentComponent({
   data,
   onDoubleClickEdit,
-}: {
+}: Readonly<{
   data: NormalizedComment;
   onDoubleClickEdit: (event: React.MouseEvent) => void;
-}): JSX.Element {
+}>): JSX.Element {
   const handleClick = useCallback(
     (event: React.MouseEvent) => {
       event.preventDefault();

@@ -21,7 +21,7 @@ const ExecutionProcessesContext =
 
 export const ExecutionProcessesProvider: React.FC<{
   attemptId: string | undefined;
-  sessionId?: string | undefined;
+  sessionId?: string;
   children: React.ReactNode;
 }> = ({ attemptId, sessionId, children }) => {
   const {

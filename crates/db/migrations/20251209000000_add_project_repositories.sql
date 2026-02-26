@@ -106,6 +106,7 @@ JOIN project_repos pr ON pr.project_id = t.project_id
 JOIN repos r ON r.id = pr.repo_id;
 
 -- Step 8: Backfill merges.repo_id from attempt_repos
+-- intentional: update all rows
 UPDATE merges
 SET repo_id = COALESCE(
     (
@@ -130,6 +131,7 @@ SET repo_id = COALESCE(
 -- Step 9: Make merges.repo_id NOT NULL
 DROP INDEX idx_merges_repo_id;
 ALTER TABLE merges ADD COLUMN repo_id_new BLOB NOT NULL DEFAULT X'00';
+-- intentional: update all rows
 UPDATE merges
 SET repo_id_new = COALESCE(
     repo_id,

@@ -12,7 +12,7 @@ interface WorkflowWizardProps {
 
 const STEPS = ['Configure', 'Review', 'Execute'];
 
-export function WorkflowWizard({ projectId, onClose }: WorkflowWizardProps) {
+export function WorkflowWizard({ projectId, onClose }: Readonly<WorkflowWizardProps>) {
   const [currentStep, setCurrentStep] = useState(0);
 
   const handleNext = () => {

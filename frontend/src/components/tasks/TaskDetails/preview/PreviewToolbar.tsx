@@ -75,7 +75,7 @@ export function PreviewToolbar({
   };
 
   const actions =
-    mode !== 'noServer' ? (
+    mode === 'noServer' ? undefined : (
       <>
         <TooltipProvider>
           <Tooltip>
@@ -161,7 +161,7 @@ export function PreviewToolbar({
           </Tooltip>
         </TooltipProvider>
       </>
-    ) : undefined;
+    );
 
   return (
     <NewCardHeader className="shrink-0" actions={actions}>

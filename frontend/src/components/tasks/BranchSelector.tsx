@@ -194,6 +194,29 @@ function BranchSelector({
     handleBranchSelect,
   ]);
 
+  const renderBranchItem = useCallback((idx: number) => {
+    const branch = filteredBranches[idx];
+    const isDisabled = isBranchDisabled(branch);
+    const isHighlighted = idx === highlightedIndex;
+    const isSelected = selectedBranch === branch.name;
+
+    return (
+      <BranchRow
+        branch={branch}
+        isSelected={isSelected}
+        isDisabled={isDisabled}
+        isHighlighted={isHighlighted}
+        onHover={() => setHighlightedIndex(idx)}
+        onSelect={() => handleBranchSelect(branch.name)}
+        disabledTooltip={
+          isDisabled
+            ? (disabledTooltip ?? defaultDisabledTooltip)
+            : undefined
+        }
+      />
+    );
+  }, [filteredBranches, isBranchDisabled, highlightedIndex, selectedBranch, handleBranchSelect, disabledTooltip, defaultDisabledTooltip]);
+
   return (
     <DropdownMenu
       open={open}
@@ -274,28 +297,7 @@ function BranchSelector({
               style={{ height: '16rem' }}
               totalCount={filteredBranches.length}
               computeItemKey={(idx) => filteredBranches[idx]?.name ?? idx}
-              itemContent={(idx) => {
-                const branch = filteredBranches[idx];
-                const isDisabled = isBranchDisabled(branch);
-                const isHighlighted = idx === highlightedIndex;
-                const isSelected = selectedBranch === branch.name;
-
-                return (
-                  <BranchRow
-                    branch={branch}
-                    isSelected={isSelected}
-                    isDisabled={isDisabled}
-                    isHighlighted={isHighlighted}
-                    onHover={() => setHighlightedIndex(idx)}
-                    onSelect={() => handleBranchSelect(branch.name)}
-                    disabledTooltip={
-                      isDisabled
-                        ? (disabledTooltip ?? defaultDisabledTooltip)
-                        : undefined
-                    }
-                  />
-                );
-              }}
+              itemContent={renderBranchItem}
             />
           )}
         </DropdownMenuContent>

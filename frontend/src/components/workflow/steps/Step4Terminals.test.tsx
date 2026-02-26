@@ -467,7 +467,7 @@ describe('Step4Terminals', () => {
 
     await waitFor(() => {
       const labelPattern = new RegExp(
-        i18n.t('workflow:step4.terminalLabel', { index: 1 }).replace('1', '\\d')
+        i18n.t('workflow:step4.terminalLabel', { index: 1 }).replace('1', String.raw`\d`)
       );
       const terminalHeaders = screen.getAllByText(labelPattern);
       expect(terminalHeaders[0]).toHaveTextContent(

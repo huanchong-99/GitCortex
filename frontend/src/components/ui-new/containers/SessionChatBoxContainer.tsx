@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   type Session,
-  type ToolStatus,
   type BaseCodingAgent,
 } from 'shared/types';
 import { useAttemptExecution } from '@/hooks/useAttemptExecution';
@@ -125,10 +124,7 @@ export function SessionChatBoxContainer({
         entryType.type === 'tool_use' &&
         entryType.status.status === 'pending_approval'
       ) {
-        const status = entryType.status as Extract<
-          ToolStatus,
-          { status: 'pending_approval' }
-        >;
+        const status = entryType.status;
         return {
           approvalId: status.approval_id,
           timeoutAt: status.timeout_at,
@@ -607,12 +603,14 @@ export function SessionChatBoxContainer({
       }}
       actions={{
         onSend: () => {
-          void handleSend();
+          handleSend().catch(console.error);
         },
         onQueue: () => {
-          void handleQueueMessage();
+          handleQueueMessage().catch(console.error);
         },
-        onCancelQueue: cancelQueue,
+        onCancelQueue: () => {
+          cancelQueue().catch(console.error);
+        },
         onStop: stopExecution,
         onPasteFiles: uploadFiles,
       }}

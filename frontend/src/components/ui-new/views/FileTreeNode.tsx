@@ -24,7 +24,7 @@ interface FileTreeNodeProps {
   showCommentBadge?: boolean;
 }
 
-export const FileTreeNode = forwardRef<HTMLDivElement, FileTreeNodeProps>(
+export const FileTreeNode = forwardRef<HTMLButtonElement, FileTreeNodeProps>(
   function FileTreeNode(
     {
       node,
@@ -60,22 +60,15 @@ export const FileTreeNode = forwardRef<HTMLDivElement, FileTreeNodeProps>(
     };
 
     return (
-      <div
+      <button
         ref={ref}
-        role="button"
-        tabIndex={0}
+        type="button"
         className={cn(
           'flex items-center h-[26px] cursor-pointer text-low hover:bg-panel rounded',
           'relative select-none',
           isSelected && 'bg-panel text-normal'
         )}
         onClick={handleClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
       >
         {/* Indentation guides */}
         {depth > 0 && (
@@ -109,11 +102,12 @@ export const FileTreeNode = forwardRef<HTMLDivElement, FileTreeNodeProps>(
 
           {/* Icon */}
           <span className="shrink-0">
-            {isFolder ? (
-              <FolderSimpleIcon className="size-icon-sm" weight="fill" />
-            ) : FileIcon ? (
-              <FileIcon size={14} />
-            ) : null}
+            {(() => {
+              const fileIconElement = FileIcon ? <FileIcon size={14} /> : null;
+              return isFolder ? (
+                <FolderSimpleIcon className="size-icon-sm" weight="fill" />
+              ) : fileIconElement;
+            })()}
           </span>
 
           {/* File/folder name - color based on change kind */}
@@ -162,7 +156,7 @@ export const FileTreeNode = forwardRef<HTMLDivElement, FileTreeNodeProps>(
               </span>
             )}
         </div>
-      </div>
+      </button>
     );
   }
 );

@@ -425,7 +425,7 @@ describe('E2E: Real-World User Scenarios', () => {
 
   describe('Scenario 7: Error Handling', () => {
     it('should handle API errors gracefully', async () => {
-      const user = userEvent.setup();
+      userEvent.setup();
 
       // Mock API error
       vi.stubGlobal('fetch', vi.fn(() =>

@@ -14,7 +14,7 @@ interface FileTreeProps {
   onToggleExpand: (path: string) => void;
   selectedPath?: string | null;
   onSelectFile?: (path: string) => void;
-  onNodeRef?: (path: string, el: HTMLDivElement | null) => void;
+  onNodeRef?: (path: string, el: HTMLButtonElement | null) => void;
   searchQuery: string;
   onSearchChange: (value: string) => void;
   isAllExpanded: boolean;

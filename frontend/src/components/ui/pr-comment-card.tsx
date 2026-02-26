@@ -180,7 +180,7 @@ function FullCard({
  *
  * @param variant - 'compact' for inline chip, 'full' for inline card, 'list' for block card
  */
-export function PrCommentCard(props: PrCommentCardProps) {
+export function PrCommentCard(props: Readonly<PrCommentCardProps>) {
   if (props.variant === 'compact') {
     return <CompactCard {...props} />;
   }

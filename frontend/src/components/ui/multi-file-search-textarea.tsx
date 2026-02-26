@@ -52,7 +52,7 @@ export function MultiFileSearchTextarea({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const searchCacheRef = useRef<Map<string, FileSearchResult[]>>(new Map());
-  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const portalContainer = usePortalContainer();
 
   useEffect(() => {
@@ -373,13 +373,14 @@ export function MultiFileSearchTextarea({
             ) : (
               <div className="py-1">
                 {searchResults.map((file, index) => (
-                  <div
+                  <button
+                    type="button"
                     key={file.path}
                     ref={(el) => {
                       if (el) itemRefs.current.set(index, el);
                       else itemRefs.current.delete(index);
                     }}
-                    className={`px-3 py-2 cursor-pointer text-sm ${
+                    className={`px-3 py-2 cursor-pointer text-sm w-full text-left ${
                       index === selectedIndex
                         ? 'bg-blue-50 text-blue-900'
                         : 'hover:bg-muted'
@@ -390,7 +391,7 @@ export function MultiFileSearchTextarea({
                     <div className="text-xs text-muted-foreground truncate">
                       {file.path}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

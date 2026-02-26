@@ -58,7 +58,7 @@ function DialogContentRenderer({
   deselectAll,
   toggleSelection,
   t,
-}: {
+}: Readonly<{
   errorMessage: string | null;
   isLoading: boolean;
   comments: UnifiedPrComment[];
@@ -68,7 +68,7 @@ function DialogContentRenderer({
   deselectAll: () => void;
   toggleSelection: (id: string) => void;
   t: any;
-}) {
+}>) {
   if (errorMessage) {
     return (
       <Alert variant="destructive">

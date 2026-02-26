@@ -96,11 +96,8 @@ export function useNavigateWithSearch(): NavigateFunction {
 
       // Only preserve current search params if none provided in the path
       const currentSearch = searchParams.toString();
-      const finalSearch = parsed.search
-        ? parsed.search
-        : currentSearch
-          ? `?${currentSearch}`
-          : '';
+      const preservedSearch = currentSearch ? `?${currentSearch}` : '';
+      const finalSearch = parsed.search ? parsed.search : preservedSearch;
 
       navigate(
         {

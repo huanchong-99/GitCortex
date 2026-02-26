@@ -154,6 +154,19 @@ function getToolCommand(
   return undefined;
 }
 
+const SCRIPT_TOOL_NAMES = ['Setup Script', 'Cleanup Script', 'Tool Install Script'];
+
+function isScriptCommandEntry(action_type: ActionType, toolName: string): boolean {
+  return action_type.action === 'command_run' && SCRIPT_TOOL_NAMES.includes(toolName);
+}
+
+function extractExitCode(action_type: ActionType): number | null {
+  if (action_type.action !== 'command_run') return null;
+  return action_type.result?.exit_status?.type === 'exit_code'
+    ? action_type.result.exit_status.code
+    : null;
+}
+
 /**
  * Render tool_use entry types with appropriate components
  */
@@ -206,25 +219,12 @@ function renderToolUseEntry(
   }
 
   // Script entries (Setup Script, Cleanup Script, Tool Install Script)
-  const scriptToolNames = [
-    'Setup Script',
-    'Cleanup Script',
-    'Tool Install Script',
-  ];
-  if (
-    action_type.action === 'command_run' &&
-    scriptToolNames.includes(entryType.tool_name)
-  ) {
-    const exitCode =
-      action_type.result?.exit_status?.type === 'exit_code'
-        ? action_type.result.exit_status.code
-        : null;
-
+  if (isScriptCommandEntry(action_type, entryType.tool_name)) {
     return (
       <ScriptEntryWithFix
         title={entryType.tool_name}
         processId={executionProcessId ?? ''}
-        exitCode={exitCode}
+        exitCode={extractExitCode(action_type)}
         status={status}
         workspaceId={taskAttempt?.id}
         sessionId={taskAttempt?.session?.id}
@@ -672,10 +672,8 @@ function ScriptEntryWithFix({
 
     // Determine script type based on title
     const scriptType: ScriptType =
-      title === 'Setup Script'
-        ? 'setup'
-        : title === 'Cleanup Script'
-          ? 'cleanup'
+      title === 'Setup Script' ? 'setup'
+        : title === 'Cleanup Script' ? 'cleanup'
           : 'dev_server';
 
     ScriptFixerDialog.show({

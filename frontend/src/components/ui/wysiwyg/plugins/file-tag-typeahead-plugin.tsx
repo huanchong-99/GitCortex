@@ -137,23 +137,27 @@ function TagMenuItem({
   lastMousePositionRef,
   setHighlightedIndex,
   selectOptionAndCleanUp,
-}: {
+}: Readonly<{
   option: FileTagOption;
   index: number;
   selectedIndex: number;
   lastMousePositionRef: React.MutableRefObject<{ x: number; y: number } | null>;
   setHighlightedIndex: (index: number) => void;
   selectOptionAndCleanUp: (option: FileTagOption) => void;
-}) {
+}>) {
   const tag = option.item.tag!;
   const isSelected = index === selectedIndex;
 
   return (
     <div
       key={option.key}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={-1}
       className={getItemClassName(isSelected)}
       onMouseMove={createMouseMoveHandler(lastMousePositionRef, setHighlightedIndex, index)}
       onClick={() => selectOptionAndCleanUp(option)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOptionAndCleanUp(option); } }}
     >
       <div className="flex items-center gap-2 font-medium">
         <TagIcon className="h-3.5 w-3.5 text-blue-600" />
@@ -177,23 +181,27 @@ function FileMenuItem({
   lastMousePositionRef,
   setHighlightedIndex,
   selectOptionAndCleanUp,
-}: {
+}: Readonly<{
   option: FileTagOption;
   index: number;
   selectedIndex: number;
   lastMousePositionRef: React.MutableRefObject<{ x: number; y: number } | null>;
   setHighlightedIndex: (index: number) => void;
   selectOptionAndCleanUp: (option: FileTagOption) => void;
-}) {
+}>) {
   const file = option.item.file!;
   const isSelected = index === selectedIndex;
 
   return (
     <div
       key={option.key}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={-1}
       className={getItemClassName(isSelected)}
       onMouseMove={createMouseMoveHandler(lastMousePositionRef, setHighlightedIndex, index)}
       onClick={() => selectOptionAndCleanUp(option)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOptionAndCleanUp(option); } }}
     >
       <div className="flex items-center gap-2 font-medium truncate">
         <FileText className="h-3.5 w-3.5 flex-shrink-0" />
@@ -231,10 +239,10 @@ function handleFileSelection(
 export function FileTagTypeaheadPlugin({
   workspaceId,
   projectId,
-}: {
+}: Readonly<{
   workspaceId?: string;
   projectId?: string;
-}) {
+}>) {
   const [editor] = useLexicalComposerContext();
   const [options, setOptions] = useState<FileTagOption[]>([]);
   const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null);

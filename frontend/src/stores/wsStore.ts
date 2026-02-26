@@ -455,11 +455,8 @@ function handleStringDecisionSource(
   promptContext: ReturnType<typeof extractPromptEventContext>
 ): TerminalPromptDecisionPayload {
   const normalizedDecision = normalizePromptDecisionAction(decisionSource);
-  const decisionDetailSource = isJsonRecord(payload.decisionDetail)
-    ? payload.decisionDetail
-    : isJsonRecord(payload.decision_detail)
-      ? payload.decision_detail
-      : undefined;
+  const decisionDetailFallback = isJsonRecord(payload.decision_detail) ? payload.decision_detail : undefined;
+  const decisionDetailSource = isJsonRecord(payload.decisionDetail) ? payload.decisionDetail : decisionDetailFallback;
   const decisionRawSource = payload.decisionRaw ?? payload.decision_raw;
 
   const normalizedPayload: TerminalPromptDecisionPayload = {
@@ -616,17 +613,19 @@ function buildWorkflowEventsUrl(workflowId: string): string {
 function aggregateConnectionStatus(
   workflowConnections: Map<string, WorkflowScopedConnection>
 ): ConnectionStatus {
-  const statuses = Array.from(workflowConnections.values()).map(
-    (connection) => connection.status
+  const statuses = new Set(
+    Array.from(workflowConnections.values()).map(
+      (connection) => connection.status
+    )
   );
 
-  if (statuses.includes('connected')) {
+  if (statuses.has('connected')) {
     return 'connected';
   }
-  if (statuses.includes('reconnecting')) {
+  if (statuses.has('reconnecting')) {
     return 'reconnecting';
   }
-  if (statuses.includes('connecting')) {
+  if (statuses.has('connecting')) {
     return 'connecting';
   }
 
@@ -786,7 +785,7 @@ export const useWsStore = create<WsState>((set, get) => ({
     } else {
       clearConnectionTimers(connection);
 
-      if (connection.ws && connection.ws.readyState !== undefined && connection.ws.readyState < WebSocket.CLOSING) {
+      if (connection.ws?.readyState !== undefined && connection.ws.readyState < WebSocket.CLOSING) {
         connection.ws.close();
       }
 
@@ -874,7 +873,7 @@ export const useWsStore = create<WsState>((set, get) => ({
 
         const connectedConnections = new Map(get()._workflowConnections);
         const active = connectedConnections.get(targetWorkflowId);
-        if (!active || active.ws !== ws) {
+        if (active?.ws !== ws) {
           clearInterval(heartbeatInterval);
           return;
         }
@@ -966,7 +965,7 @@ export const useWsStore = create<WsState>((set, get) => ({
       const closedConnections = new Map(currentStateForClose._workflowConnections);
       const active = closedConnections.get(targetWorkflowId);
 
-      if (!active || active.ws !== ws) return;
+      if (active?.ws !== ws) return;
 
       closedConnections.set(targetWorkflowId, {
         ...active,
@@ -1009,7 +1008,7 @@ export const useWsStore = create<WsState>((set, get) => ({
       const reconnectingConnections = new Map(currentStateForClose._workflowConnections);
       const active = reconnectingConnections.get(targetWorkflowId);
 
-      if (!active || active.ws !== ws) {
+      if (active?.ws !== ws) {
         clearTimeout(reconnectTimeout);
         return;
       }
@@ -1046,7 +1045,7 @@ export const useWsStore = create<WsState>((set, get) => ({
     ) => {
       const disconnectedConnections = new Map(currentStateForClose._workflowConnections);
       const active = disconnectedConnections.get(targetWorkflowId);
-      if (!active || active.ws !== ws) return;
+      if (active?.ws !== ws) return;
 
       disconnectedConnections.set(targetWorkflowId, {
         ...active,
@@ -1237,7 +1236,7 @@ export const useWsStore = create<WsState>((set, get) => ({
     for (const connection of state._workflowConnections.values()) {
       clearConnectionTimers(connection);
 
-      if (connection.ws && connection.ws.readyState !== undefined && connection.ws.readyState < WebSocket.CLOSING) {
+      if (connection.ws?.readyState !== undefined && connection.ws.readyState < WebSocket.CLOSING) {
         connection.ws.close();
       }
     }

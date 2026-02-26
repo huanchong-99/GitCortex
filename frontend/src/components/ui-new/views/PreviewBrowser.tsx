@@ -106,7 +106,7 @@ function EmptyStateContent({
   handleEditDevScript,
   handleFixDevScript,
   t,
-}: {
+}: Readonly<{
   isLoading: boolean;
   isStarting: boolean;
   hasDevScript: boolean;
@@ -115,7 +115,7 @@ function EmptyStateContent({
   handleEditDevScript: () => void;
   handleFixDevScript?: () => void;
   t: any;
-}) {
+}>) {
   if (isLoading) {
     return (
       <>
@@ -175,6 +175,91 @@ function EmptyStateContent({
           {t('preview.noServer.learnMore')}
         </a>
       </div>
+    </div>
+  );
+}
+
+// Helper component for mobile iframe view
+function MobileIframeView({
+  url,
+  title,
+  mobileScale,
+}: Readonly<{
+  url: string;
+  title: string;
+  mobileScale: number;
+}>) {
+  return (
+    <div
+      className="bg-primary rounded-[2rem] p-3 shadow-xl origin-center"
+      style={{ transform: mobileScale < 1 ? `scale(${mobileScale})` : undefined }}
+    >
+      <div
+        className="rounded-[1.5rem] overflow-hidden"
+        style={{ width: MOBILE_WIDTH, height: MOBILE_HEIGHT }}
+      >
+        <iframe
+          src={url}
+          title={title}
+          className="w-full h-full border-0"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Helper component for desktop/responsive iframe view
+function DesktopIframeView({
+  url,
+  title,
+  screenSize,
+  isResizing,
+  containerStyle,
+  onResizeStart,
+}: Readonly<{
+  url: string;
+  title: string;
+  screenSize: ScreenSize;
+  isResizing: boolean;
+  containerStyle: React.CSSProperties;
+  onResizeStart: (direction: 'right' | 'bottom' | 'corner') => (e: React.MouseEvent | React.TouchEvent) => void;
+}>) {
+  return (
+    <div
+      className={cn(
+        'rounded-sm border overflow-hidden relative',
+        screenSize === 'responsive' && 'shadow-lg'
+      )}
+      style={containerStyle}
+    >
+      <iframe
+        src={url}
+        title={title}
+        className={cn('w-full h-full border-0', isResizing && 'pointer-events-none')}
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        referrerPolicy="no-referrer"
+      />
+      {screenSize === 'responsive' && (
+        <>
+          <div
+            className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-brand/30 transition-colors"
+            onMouseDown={onResizeStart('right')}
+            onTouchStart={onResizeStart('right')}
+          />
+          <div
+            className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-brand/30 transition-colors"
+            onMouseDown={onResizeStart('bottom')}
+            onTouchStart={onResizeStart('bottom')}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize hover:bg-brand/30 transition-colors"
+            onMouseDown={onResizeStart('corner')}
+            onTouchStart={onResizeStart('corner')}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -388,71 +473,20 @@ export function PreviewBrowser({
             )}
           >
             {screenSize === 'mobile' ? (
-              // Phone frame for mobile mode - scales down to fit container
-              <div
-                className="bg-primary rounded-[2rem] p-3 shadow-xl origin-center"
-                style={{
-                  transform:
-                    mobileScale < 1 ? `scale(${mobileScale})` : undefined,
-                }}
-              >
-                <div
-                  className="rounded-[1.5rem] overflow-hidden"
-                  style={{ width: MOBILE_WIDTH, height: MOBILE_HEIGHT }}
-                >
-                  <iframe
-                    src={url}
-                    title={t('preview.browser.title')}
-                    className="w-full h-full border-0"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              </div>
+              <MobileIframeView
+                url={url}
+                title={t('preview.browser.title')}
+                mobileScale={mobileScale}
+              />
             ) : (
-              // Desktop and responsive modes
-              <div
-                className={cn(
-                  'rounded-sm border overflow-hidden relative',
-                  screenSize === 'responsive' && 'shadow-lg'
-                )}
-                style={getIframeContainerStyle()}
-              >
-                <iframe
-                  src={url}
-                  title={t('preview.browser.title')}
-                  className={cn(
-                    'w-full h-full border-0',
-                    isResizing && 'pointer-events-none'
-                  )}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                  referrerPolicy="no-referrer"
-                />
-
-                {/* Resize handles for responsive mode */}
-                {screenSize === 'responsive' && (
-                  <>
-                    {/* Right edge handle */}
-                    <div
-                      className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-brand/30 transition-colors"
-                      onMouseDown={onResizeStart('right')}
-                      onTouchStart={onResizeStart('right')}
-                    />
-                    {/* Bottom edge handle */}
-                    <div
-                      className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-brand/30 transition-colors"
-                      onMouseDown={onResizeStart('bottom')}
-                      onTouchStart={onResizeStart('bottom')}
-                    />
-                    {/* Corner handle */}
-                    <div
-                      className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize hover:bg-brand/30 transition-colors"
-                      onMouseDown={onResizeStart('corner')}
-                      onTouchStart={onResizeStart('corner')}
-                    />
-                  </>
-                )}
-              </div>
+              <DesktopIframeView
+                url={url}
+                title={t('preview.browser.title')}
+                screenSize={screenSize}
+                isResizing={isResizing}
+                containerStyle={getIframeContainerStyle()}
+                onResizeStart={onResizeStart}
+              />
             )}
           </div>
         ) : (

@@ -45,6 +45,7 @@ get_json_keys() {
     | select(getpath($p) | type == "string")
     | $p | join(".")
   ' "$file" 2>/dev/null | LC_ALL=C sort -u
+  return 0
 }
 
 check_duplicate_keys() {

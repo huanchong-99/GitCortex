@@ -77,9 +77,10 @@ function DragHandle({
   isDragging: boolean;
 }>) {
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'flex justify-center py-half border-b',
+        'flex justify-center py-half border-b w-full',
         isDragging ? 'cursor-grabbing' : 'cursor-grab'
       )}
       onMouseDown={onMouseDown}
@@ -89,7 +90,7 @@ function DragHandle({
         <span className="size-dot rounded-full bg-panel group-hover:bg-low transition" />
         <span className="size-dot rounded-full bg-panel group-hover:bg-low transition" />
       </div>
-    </div>
+    </button>
   );
 }
 

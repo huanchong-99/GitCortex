@@ -45,12 +45,16 @@ function serializeKeyEvent(e: KeyboardEvent): KeyPayload {
   };
 }
 
+/** Type alias for nullable form input elements */
+type NullableFormInput = HTMLTextAreaElement | HTMLInputElement | null;
+
 /** Type alias for editable elements to reduce union type repetition */
 type EditableElement = HTMLInputElement | HTMLTextAreaElement | (HTMLElement & { isContentEditable: boolean });
 
 /** Platform check used for shortcut detection. */
 const isMac = () => {
-  const platform = (navigator as any).userAgentData?.platform ?? navigator.platform;
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- fallback for browsers without userAgentData
+  const platform: string = (navigator as any).userAgentData?.platform ?? navigator.platform;
   return platform.toUpperCase().includes('MAC');
 };
 
@@ -130,7 +134,7 @@ async function readClipboardText(): Promise<string> {
 
 /** Best-effort selection extractor for inputs, textareas, and contentEditable. */
 function getSelectedText(): string {
-  const el = activeEditable() as EditableElement | null;
+  const el = activeEditable();
   if (el && (el as HTMLInputElement).selectionStart !== undefined) {
     const input = el as HTMLInputElement | HTMLTextAreaElement;
     const start = input.selectionStart ?? 0;
@@ -206,14 +210,12 @@ function pasteIntoInput(
  */
 function insertTextAtCaretGeneric(text: string) {
   const el =
-    (activeEditable() as EditableElement | null) ||
+    activeEditable() ||
     (document.querySelector(
       'textarea, input:not([type=checkbox]):not([type=radio])'
-    ) as HTMLTextAreaElement | HTMLInputElement | null);
+    ) as NullableFormInput);
   if (!el) return;
-  if ((el as HTMLInputElement).selectionStart !== undefined) {
-    pasteIntoInput(el as HTMLInputElement | HTMLTextAreaElement, text);
-  } else {
+  if ((el as HTMLInputElement).selectionStart === undefined) {
     try {
       // Legacy fallback for contentEditable insert (no modern API alternative)
       // eslint-disable-next-line deprecation/deprecation
@@ -223,6 +225,8 @@ function insertTextAtCaretGeneric(text: string) {
       console.debug('insertText command failed, using innerText fallback', error);
       (el as HTMLElement).innerText += text;
     }
+  } else {
+    pasteIntoInput(el as HTMLInputElement | HTMLTextAreaElement, text);
   }
 }
 
@@ -244,14 +248,11 @@ function enqueueInsert(text: string) {
     attempts++;
     const el =
       activeEditable() ||
-      (document.querySelector(EDITABLE_SELECTOR) as
-        | HTMLTextAreaElement
-        | HTMLInputElement
-        | null);
+      (document.querySelector(EDITABLE_SELECTOR) as NullableFormInput);
     if (el) {
       // drain queue
       while (insertQueue.length > 0) {
-        insertTextAtCaretGeneric(insertQueue.shift() as string);
+        insertTextAtCaretGeneric(insertQueue.shift()!);
       }
       if (insertRetryTimer != null) {
         globalThis.clearInterval(insertRetryTimer);
@@ -312,6 +313,8 @@ type IframeMessage = {
 
 // Handle messages from the parent webview (clipboard, add-to input)
 globalThis.addEventListener('message', (e: MessageEvent) => {
+  // Verify the message originates from this window (VSCode webview security)
+  if (e.source && e.source !== window) return;
   const data: unknown = e?.data;
   if (!data || typeof data !== 'object') return;
   const msg = data as IframeMessage;
@@ -325,10 +328,7 @@ globalThis.addEventListener('message', (e: MessageEvent) => {
   if (msg.type === 'VIBE_ADD_TO_INPUT' && typeof msg.text === 'string') {
     const el =
       activeEditable() ||
-      (document.querySelector(EDITABLE_SELECTOR) as
-        | HTMLTextAreaElement
-        | HTMLInputElement
-        | null);
+      (document.querySelector(EDITABLE_SELECTOR) as NullableFormInput);
     if (el) insertTextAtCaretGeneric(msg.text);
     else enqueueInsert(msg.text);
   }
@@ -428,7 +428,7 @@ function handleRedoShortcut(e: KeyboardEvent): boolean {
 
 // Helper to handle paste shortcut
 async function handlePasteShortcut(e: KeyboardEvent): Promise<boolean> {
-  const el = activeEditable() as EditableElement | null;
+  const el = activeEditable();
   if (!el) return false;
 
   e.preventDefault();

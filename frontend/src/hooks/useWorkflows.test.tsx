@@ -278,7 +278,7 @@ describe('useCreateWorkflow', () => {
 
     // Verify autoConfirm is included in request body
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
     const requestBody = JSON.parse(requestInit.body as string);
     expect(requestBody.tasks[0].terminals[0].autoConfirm).toBe(true);
   });

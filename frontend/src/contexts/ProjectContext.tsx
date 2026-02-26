@@ -23,7 +23,7 @@ interface ProjectProviderProps {
   children: ReactNode;
 }
 
-export function ProjectProvider({ children }: ProjectProviderProps) {
+export function ProjectProvider({ children }: Readonly<ProjectProviderProps>) {
   const location = useLocation();
 
   // Extract projectId from current route path

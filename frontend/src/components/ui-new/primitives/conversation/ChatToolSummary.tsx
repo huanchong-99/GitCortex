@@ -49,17 +49,16 @@ export const ChatToolSummary = forwardRef<
   const Icon =
     toolName === 'Bash' ? TerminalWindowIcon : ListMagnifyingGlassIcon;
 
+  const Wrapper = isClickable ? 'button' : 'div';
+
   return (
-    <div
+    <Wrapper
+      {...(isClickable ? { type: 'button' as const, onClick: handleClick } : {})}
       className={cn(
-        'flex items-start gap-base text-sm text-low',
+        'flex items-start gap-base text-sm text-low text-left',
         isClickable && 'cursor-pointer',
         className
       )}
-      onClick={isClickable ? handleClick : undefined}
-      role={isClickable ? 'button' : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } } : undefined}
     >
       <span className="relative shrink-0 mt-0.5">
         <Icon className="size-icon-base" />
@@ -79,6 +78,6 @@ export const ChatToolSummary = forwardRef<
       >
         {summary}
       </span>
-    </div>
+    </Wrapper>
   );
 });

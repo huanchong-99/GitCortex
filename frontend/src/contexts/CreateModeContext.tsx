@@ -29,7 +29,7 @@ interface CreateModeProviderProps {
   children: ReactNode;
 }
 
-export function CreateModeProvider({ children }: CreateModeProviderProps) {
+export function CreateModeProvider({ children }: Readonly<CreateModeProviderProps>) {
   // Fetch most recent workspace to use as initial values
   const { workspaces: activeWorkspaces, archivedWorkspaces } = useWorkspaces();
   const mostRecentWorkspace = activeWorkspaces[0] ?? archivedWorkspaces[0];

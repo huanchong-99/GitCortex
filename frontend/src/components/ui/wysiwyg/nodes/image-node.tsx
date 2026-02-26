@@ -37,10 +37,10 @@ function truncatePath(path: string, maxLength = 24): string {
 function ImageComponent({
   data,
   onDoubleClickEdit,
-}: {
+}: Readonly<{
   data: ImageData;
   onDoubleClickEdit: (event: React.MouseEvent) => void;
-}): JSX.Element {
+}>): JSX.Element {
   const { src, altText } = data;
   const taskAttemptId = useTaskAttemptId();
   const taskId = useTaskId();

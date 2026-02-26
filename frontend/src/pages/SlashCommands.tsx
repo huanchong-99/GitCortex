@@ -190,7 +190,7 @@ function SlashCommandFormDialog({
   command,
   onClose,
   onSubmit,
-}: SlashCommandFormDialogProps) {
+}: Readonly<SlashCommandFormDialogProps>) {
   const { t } = useTranslation('slashCommands');
   const [cmd, setCmd] = useState(command?.command || '');
   const [description, setDescription] = useState(command?.description || '');

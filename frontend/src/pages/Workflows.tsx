@@ -112,6 +112,109 @@ function isSamePromptContext(
   return true;
 }
 
+// Helper to resolve project ID from working directory path
+async function resolveProjectIdFromPath(
+  workingDir: string,
+  fallbackProjectId: string | null
+): Promise<string | null> {
+  try {
+    const resolveResponse = await fetch('/api/projects/resolve-by-path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: workingDir }),
+    });
+
+    if (!resolveResponse.ok) {
+      throw new Error('Failed to resolve project from path');
+    }
+
+    const resolveData = await resolveResponse.json();
+    if (!resolveData.success || !resolveData.data?.projectId) {
+      throw new Error(resolveData.message || 'Failed to resolve project');
+    }
+
+    return resolveData.data.projectId;
+  } catch (resolveError) {
+    if (!fallbackProjectId) {
+      throw resolveError;
+    }
+    console.warn(
+      'Failed to resolve project from path, using selected project fallback:',
+      resolveError
+    );
+    return fallbackProjectId;
+  }
+}
+
+// Helper component for workflow detail action buttons
+function WorkflowDetailActions({
+  workflowId,
+  actions,
+  hasCompletedAllTasks,
+  mutations,
+  handlers,
+}: Readonly<{
+  workflowId: string;
+  actions: ReturnType<typeof getWorkflowActions>;
+  hasCompletedAllTasks: boolean;
+  mutations: {
+    preparePending: boolean;
+    startPending: boolean;
+    pausePending: boolean;
+    stopPending: boolean;
+    mergePending: boolean;
+  };
+  handlers: {
+    onPrepare: (id: string) => void;
+    onStart: (id: string) => void;
+    onPause: (id: string) => void;
+    onStop: (id: string) => void;
+    onMerge: (id: string) => void;
+    onDelete: (id: string) => void;
+  };
+}>) {
+  return (
+    <div className="flex gap-2">
+      {actions.canPrepare && (
+        <Button onClick={() => handlers.onPrepare(workflowId)} disabled={mutations.preparePending}>
+          <Rocket className="w-4 h-4 mr-2" />
+          {mutations.preparePending ? 'Preparing...' : 'Prepare Workflow'}
+        </Button>
+      )}
+      {actions.canStart && (
+        <Button onClick={() => handlers.onStart(workflowId)} disabled={mutations.startPending}>
+          <Play className="w-4 h-4 mr-2" />
+          Start Workflow
+        </Button>
+      )}
+      {actions.canPause && (
+        <Button variant="outline" onClick={() => handlers.onPause(workflowId)} disabled={mutations.pausePending}>
+          <Pause className="w-4 h-4 mr-2" />
+          Pause
+        </Button>
+      )}
+      {actions.canStop && (
+        <Button variant="destructive" onClick={() => handlers.onStop(workflowId)} disabled={mutations.stopPending}>
+          <Square className="w-4 h-4 mr-2" />
+          Stop
+        </Button>
+      )}
+      {actions.canMerge && (
+        <Button onClick={() => handlers.onMerge(workflowId)} disabled={!hasCompletedAllTasks || mutations.mergePending}>
+          <GitMerge className="w-4 h-4 mr-2" />
+          {mutations.mergePending ? 'Merging...' : 'Merge Workflow'}
+        </Button>
+      )}
+      {actions.canDelete && (
+        <Button variant="outline" onClick={() => handlers.onDelete(workflowId)}>
+          <Trash2 className="w-4 h-4 mr-2" />
+          Delete
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function Workflows() {
   const { t } = useTranslation('workflow');
   const { showToast } = useToast();
@@ -585,10 +688,9 @@ export function Workflows() {
       setIsDeletingProject(true);
       await projectsApi.delete(validProjectId);
 
-      const remainingProjects = projects.filter(
+      const fallbackProjectId = projects.find(
         (project) => project.id !== validProjectId
-      );
-      const fallbackProjectId = remainingProjects[0]?.id;
+      )?.id;
       const newParams = new URLSearchParams(searchParams);
 
       if (fallbackProjectId) {
@@ -675,55 +777,21 @@ export function Workflows() {
     const fallbackProjectId = validProjectId;
 
     try {
-      let projectId = fallbackProjectId;
-
-      if (workingDir) {
-        try {
-          const resolveResponse = await fetch('/api/projects/resolve-by-path', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: workingDir }),
-          });
-
-          if (!resolveResponse.ok) {
-            throw new Error('Failed to resolve project from path');
-          }
-
-          const resolveData = await resolveResponse.json();
-          if (!resolveData.success || !resolveData.data?.projectId) {
-            throw new Error(resolveData.message || 'Failed to resolve project');
-          }
-
-          projectId = resolveData.data.projectId;
-        } catch (resolveError) {
-          if (!projectId) {
-            throw resolveError;
-          }
-
-          console.warn(
-            'Failed to resolve project from path, using selected project fallback:',
-            resolveError
-          );
-        }
-      }
+      const projectId = workingDir
+        ? await resolveProjectIdFromPath(workingDir, fallbackProjectId)
+        : fallbackProjectId;
 
       if (!projectId) {
         throw new Error('No project selected to create workflow');
       }
 
-      // Transform WizardConfig to CreateWorkflowRequest using the resolved project ID
       const request = wizardConfigToCreateRequest(projectId, wizardConfig);
-
       const newWorkflow = await createMutation.mutateAsync(request);
 
-      // Update URL with the project ID so the workflow list can be refreshed (preserve other params)
       const newParams = new URLSearchParams(searchParams);
       newParams.set('projectId', projectId);
       setSearchParams(newParams, { replace: true });
-
-      // Select the newly created workflow to show its details
       setSelectedWorkflowId(newWorkflow.id);
-
       setShowWizard(false);
     } catch (error) {
       console.error('Failed to create workflow:', error);
@@ -796,66 +864,26 @@ export function Workflows() {
           <Button variant="outline" onClick={() => setSelectedWorkflowId(null)}>
             ← Back to Workflows
           </Button>
-          <div className="flex gap-2">
-            {actions.canPrepare && (
-              <Button
-                onClick={() => handlePrepareWorkflow(selectedWorkflowDetail.id)}
-                disabled={prepareMutation.isPending}
-              >
-                <Rocket className="w-4 h-4 mr-2" />
-                {prepareMutation.isPending
-                  ? 'Preparing...'
-                  : 'Prepare Workflow'}
-              </Button>
-            )}
-            {actions.canStart && (
-              <Button
-                onClick={() => handleStartWorkflow(selectedWorkflowDetail.id)}
-                disabled={startMutation.isPending}
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Start Workflow
-              </Button>
-            )}
-            {actions.canPause && (
-              <Button
-                variant="outline"
-                onClick={() => handlePauseWorkflow(selectedWorkflowDetail.id)}
-                disabled={pauseMutation.isPending}
-              >
-                <Pause className="w-4 h-4 mr-2" />
-                Pause
-              </Button>
-            )}
-            {actions.canStop && (
-              <Button
-                variant="destructive"
-                onClick={() => handleStopWorkflow(selectedWorkflowDetail.id)}
-                disabled={stopMutation.isPending}
-              >
-                <Square className="w-4 h-4 mr-2" />
-                Stop
-              </Button>
-            )}
-            {actions.canMerge && (
-              <Button
-                onClick={() => handleMergeWorkflow(selectedWorkflowDetail.id)}
-                disabled={!hasCompletedAllTasks || mergeMutation.isPending}
-              >
-                <GitMerge className="w-4 h-4 mr-2" />
-                {mergeMutation.isPending ? 'Merging...' : 'Merge Workflow'}
-              </Button>
-            )}
-            {actions.canDelete && (
-              <Button
-                variant="outline"
-                onClick={() => handleDeleteWorkflow(selectedWorkflowDetail.id)}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-            )}
-          </div>
+          <WorkflowDetailActions
+            workflowId={selectedWorkflowDetail.id}
+            actions={actions}
+            hasCompletedAllTasks={hasCompletedAllTasks}
+            mutations={{
+              preparePending: prepareMutation.isPending,
+              startPending: startMutation.isPending,
+              pausePending: pauseMutation.isPending,
+              stopPending: stopMutation.isPending,
+              mergePending: mergeMutation.isPending,
+            }}
+            handlers={{
+              onPrepare: handlePrepareWorkflow,
+              onStart: handleStartWorkflow,
+              onPause: handlePauseWorkflow,
+              onStop: handleStopWorkflow,
+              onMerge: handleMergeWorkflow,
+              onDelete: handleDeleteWorkflow,
+            }}
+          />
         </div>
 
         <PipelineView

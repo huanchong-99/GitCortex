@@ -92,16 +92,16 @@ function parsePathWithLineCol(raw?: string): {
   const parts = normalized.split(':');
   if (parts.length <= 2) return { path: normalized };
 
-  const last = parts[parts.length - 1];
+  const last = parts.at(-1);
   const maybeCol = Number(last);
   if (!Number.isFinite(maybeCol)) return { path: normalized };
 
-  const prev = parts[parts.length - 2];
+  const prev = parts.at(-2);
   const maybeLine = Number(prev);
   if (!Number.isFinite(maybeLine)) return { path: normalized };
 
   // Windows drive (e.g., "C") is at index 0; this still works because we only strip the end
-  const basePath = parts.slice(0, parts.length - 2).join(':');
+  const basePath = parts.slice(0, -2).join(':');
   return { path: basePath, line: maybeLine, col: maybeCol };
 }
 
@@ -127,7 +127,7 @@ function relativizePath(p: string, workspaceRoot?: string): string {
 function formatLoc(path: string, line?: number, col?: number) {
   if (!path) return '';
   if (line == null) return path;
-  const colPart = col != null ? `:${col}` : '';
+  const colPart = col == null ? '' : `:${col}`;
   const lineCol = `${line}${colPart}`;
   return `${path}:${lineCol}`;
 }
@@ -344,10 +344,12 @@ function formatClickedMarkdown(
     return `${indent}${arrow}${c.name} (\`${sourceText}\`)${tag}`;
   });
 
+  const locDisplay = loc ? `\`${loc}\`` : 'no source';
+
   return [
     `From preview click:`,
     `- DOM: ${dom}`,
-    `- Selected start: ${first.name} (${loc ? `\`${loc}\`` : 'no source'})`,
+    `- Selected start: ${first.name} (${locDisplay})`,
     effectiveChain.length > 1
       ? ['- Component hierarchy:', ...items].join('\n')
       : '',
@@ -359,7 +361,7 @@ function formatClickedMarkdown(
 export function ClickedElementsProvider({
   children,
   attempt,
-}: ClickedElementsProviderProps) {
+}: Readonly<ClickedElementsProviderProps>) {
   const [elements, setElements] = useState<ClickedEntry[]>([]);
   const workspaceRoot = attempt?.containerRef;
 

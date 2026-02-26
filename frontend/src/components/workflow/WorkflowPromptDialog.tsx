@@ -102,7 +102,7 @@ export function WorkflowPromptDialog({
   isSubmitting,
   submitError,
   onSubmit,
-}: WorkflowPromptDialogProps) {
+}: Readonly<WorkflowPromptDialogProps>) {
   const mode = getPromptDialogMode(prompt);
 
   const choiceOptions = useMemo(() => normalizeChoiceOptions(prompt), [prompt]);

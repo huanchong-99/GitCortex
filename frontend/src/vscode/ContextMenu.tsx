@@ -96,9 +96,6 @@ export const WebviewContextMenu: React.FC = () => {
         const sel = globalThis.getSelection();
         cut = !!sel && sel.toString().length > 0;
         paste = true;
-      } else {
-        cut = false;
-        paste = false;
       }
       setCanCut(cut);
       setCanPaste(paste);
@@ -203,7 +200,7 @@ export const WebviewContextMenu: React.FC = () => {
     const text = await readClipboardText();
     const tgt = targetRef.current as HTMLElement | null;
     if (tgt && (tgt as HTMLInputElement).selectionStart !== undefined) {
-      (tgt as HTMLElement).focus();
+      tgt.focus();
       pasteIntoInput(tgt as HTMLInputElement | HTMLTextAreaElement, text);
     } else if (isEditable(tgt)) {
       (tgt as HTMLElement).focus();
@@ -250,6 +247,7 @@ export const WebviewContextMenu: React.FC = () => {
   return (
     <div
       ref={menuRef}
+      role="menu"
       style={{
         position: 'fixed',
         left: (adjustedPos ?? pos).x,

@@ -196,7 +196,7 @@ export function createDecoratorNode<T>(
     isNode: isNodeFn,
     serialization: serConfig,
     UserComponent: Component,
-  }: {
+  }: Readonly<{
     data: T;
     nodeKey: NodeKey;
     isNode: (node: LexicalNode | null | undefined) => node is GeneratedNode;
@@ -206,7 +206,7 @@ export function createDecoratorNode<T>(
       nodeKey: NodeKey;
       onDoubleClickEdit: (event: React.MouseEvent) => void;
     }>;
-  }) {
+  }>) {
     const [editor] = useLexicalComposerContext();
     const handleDoubleClick = useCallback(
       (event: React.MouseEvent) => {

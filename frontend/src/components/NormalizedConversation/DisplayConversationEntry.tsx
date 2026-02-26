@@ -461,6 +461,71 @@ const PlanPresentationCard: React.FC<{
   );
 };
 
+// Helper to render command expanded details
+const CommandDetails: React.FC<{
+  argsText: string | null;
+  output: string | null;
+  linkifyUrls: boolean;
+  argsLabel: string;
+  outputLabel: string;
+}> = ({ argsText, output, linkifyUrls, argsLabel, outputLabel }) => (
+  <>
+    {argsText && (
+      <>
+        <div className="font-normal uppercase bg-background border-b border-dashed px-2 py-1">
+          {argsLabel}
+        </div>
+        <div className="px-2 py-1">{argsText}</div>
+      </>
+    )}
+    {output && (
+      <>
+        <div className="font-normal uppercase bg-background border-y border-dashed px-2 py-1">
+          {outputLabel}
+        </div>
+        <div className="px-2 py-1">
+          <RawLogText content={output} linkifyUrls={linkifyUrls} />
+        </div>
+      </>
+    )}
+  </>
+);
+
+// Helper to render generic tool expanded details
+const GenericToolDetails: React.FC<{
+  actionType: any;
+  argsLabel: string;
+  resultLabel: string;
+  taskAttemptId?: string;
+}> = ({ actionType, argsLabel, resultLabel, taskAttemptId }) => {
+  if (!actionType) return null;
+  return (
+    <>
+      <div className="font-normal uppercase bg-background border-b border-dashed px-2 py-1">
+        {argsLabel}
+      </div>
+      <div className="px-2 py-1">
+        {renderJson(actionType.arguments)}
+      </div>
+      <div className="font-normal uppercase bg-background border-y border-dashed px-2 py-1">
+        {resultLabel}
+      </div>
+      <div className="px-2 py-1">
+        {actionType.result?.type.type === 'markdown' &&
+          actionType.result.value && (
+            <WYSIWYGEditor
+              value={actionType.result.value?.toString()}
+              disabled
+              taskAttemptId={taskAttemptId}
+            />
+          )}
+        {actionType.result?.type.type === 'json' &&
+          renderJson(actionType.result.value)}
+      </div>
+    </>
+  );
+};
+
 const ToolCallCard: React.FC<{
   entry: NormalizedEntry | ProcessStartPayload;
   expansionKey: string;
@@ -469,141 +534,81 @@ const ToolCallCard: React.FC<{
 }> = ({ entry, expansionKey, forceExpanded = false, taskAttemptId }) => {
   const { t } = useTranslation('common');
 
-  // Determine if this is a NormalizedEntry with tool_use
   const isNormalizedEntry = 'entry_type' in entry;
   const entryType =
     isNormalizedEntry && entry.entry_type.type === 'tool_use'
       ? entry.entry_type
       : undefined;
 
-  // Compute defaults from entry
   const linkifyUrls = entryType?.tool_name === 'Tool Install Script';
-  const defaultExpanded = linkifyUrls;
-
   const [expanded, toggle] = useExpandable(
     `tool-entry:${expansionKey}`,
-    defaultExpanded
+    linkifyUrls
   );
   const effectiveExpanded = forceExpanded || expanded;
 
-  // Extract action details
   const actionType = entryType?.action_type;
   const isCommand = actionType?.action === 'command_run';
   const isTool = actionType?.action === 'tool';
-
-  // Label and content
   const label = isCommand ? 'Ran' : entryType?.tool_name || 'Tool';
 
   const inlineText = isNormalizedEntry ? entry.content.trim() : '';
-  const isSingleLine = inlineText !== '' && !/\r?\n/.test(inlineText);
-  const showInlineSummary = isSingleLine;
+  const showInlineSummary = inlineText !== '' && !/\r?\n/.test(inlineText);
 
-  // Command details
   const commandResult = isCommand ? actionType.result : null;
   const output = commandResult?.output ?? null;
   let argsText: string | null = null;
   if (isCommand) {
     const fromArgs =
       typeof actionType.command === 'string' ? actionType.command : '';
-    const fallback = inlineText;
-    argsText = (fromArgs || fallback).trim();
+    argsText = (fromArgs || inlineText).trim();
   }
-
-  // Tool details
-  const hasArgs = isTool && !!actionType.arguments;
-  const hasResult = isTool && !!actionType.result;
 
   const hasExpandableDetails = isCommand
     ? Boolean(argsText) || Boolean(output)
-    : hasArgs || hasResult;
+    : (isTool && !!actionType.arguments) || (isTool && !!actionType.result);
 
-  const HeaderWrapper: React.ElementType = hasExpandableDetails
-    ? 'button'
-    : 'div';
+  const HeaderWrapper: React.ElementType = hasExpandableDetails ? 'button' : 'div';
   const headerProps = hasExpandableDetails
     ? {
-        onClick: (e: React.MouseEvent) => {
-          e.preventDefault();
-          toggle();
-        },
+        onClick: (e: React.MouseEvent) => { e.preventDefault(); toggle(); },
         title: effectiveExpanded
           ? t('conversation.toolDetailsToggle.hide')
           : t('conversation.toolDetailsToggle.show'),
       }
     : {};
 
-  const headerClassName = cn(
-    'w-full flex items-center gap-1.5 text-left text-secondary-foreground'
-  );
-
   return (
     <div className="inline-block w-full flex flex-col gap-4">
-      <HeaderWrapper {...headerProps} className={headerClassName}>
+      <HeaderWrapper {...headerProps} className="w-full flex items-center gap-1.5 text-left text-secondary-foreground">
         <span className=" min-w-0 flex items-center gap-1.5">
           <span>
             {entryType && getStatusIndicator(entryType)}
             {entryType && getEntryIcon(entryType)}
           </span>
-          {showInlineSummary ? (
-            <span className="text-sm font-mono">{inlineText}</span>
-          ) : (
-            <span className="text-sm font-mono">{label}</span>
-          )}
+          <span className="text-sm font-mono">{showInlineSummary ? inlineText : label}</span>
         </span>
       </HeaderWrapper>
 
       {effectiveExpanded && (
         <div className="max-h-[200px] overflow-y-auto border">
           {isCommand ? (
-            <>
-              {argsText && (
-                <>
-                  <div className="font-normal uppercase bg-background border-b border-dashed px-2 py-1">
-                    {t('conversation.args')}
-                  </div>
-                  <div className="px-2 py-1">{argsText}</div>
-                </>
-              )}
-
-              {output && (
-                <>
-                  <div className="font-normal uppercase bg-background border-y border-dashed px-2 py-1">
-                    {t('conversation.output')}
-                  </div>
-                  <div className="px-2 py-1">
-                    <RawLogText content={output} linkifyUrls={linkifyUrls} />
-                  </div>
-                </>
-              )}
-            </>
+            <CommandDetails
+              argsText={argsText}
+              output={output}
+              linkifyUrls={linkifyUrls}
+              argsLabel={t('conversation.args')}
+              outputLabel={t('conversation.output')}
+            />
           ) : (
-            <>
-              {isTool && actionType && (
-                <>
-                  <div className="font-normal uppercase bg-background border-b border-dashed px-2 py-1">
-                    {t('conversation.args')}
-                  </div>
-                  <div className="px-2 py-1">
-                    {renderJson(actionType.arguments)}
-                  </div>
-                  <div className="font-normal uppercase bg-background border-y border-dashed px-2 py-1">
-                    {t('conversation.result')}
-                  </div>
-                  <div className="px-2 py-1">
-                    {actionType.result?.type.type === 'markdown' &&
-                      actionType.result.value && (
-                        <WYSIWYGEditor
-                          value={actionType.result.value?.toString()}
-                          disabled
-                          taskAttemptId={taskAttemptId}
-                        />
-                      )}
-                    {actionType.result?.type.type === 'json' &&
-                      renderJson(actionType.result.value)}
-                  </div>
-                </>
-              )}
-            </>
+            isTool && (
+              <GenericToolDetails
+                actionType={actionType}
+                argsLabel={t('conversation.args')}
+                resultLabel={t('conversation.result')}
+                taskAttemptId={taskAttemptId}
+              />
+            )
           )}
         </div>
       )}
@@ -707,6 +712,86 @@ const getToolStatusAppearance = (status: ToolStatus): ToolStatusAppearance => {
   return 'default';
 };
 
+// Helper to extract exit code from a command_run action
+function getCommandExitCode(actionType: ActionType): number | null {
+  if (actionType.action !== 'command_run') return null;
+  return actionType.result?.exit_status?.type === 'exit_code'
+    ? actionType.result.exit_status.code
+    : null;
+}
+
+const isFileEdit = (a: ActionType): a is FileEditAction =>
+  a.action === 'file_edit';
+
+// Extracted from DisplayConversationEntry to reduce cognitive complexity
+function renderToolUseBody(
+  toolEntry: Extract<NormalizedEntryType, { type: 'tool_use' }>,
+  isPendingApproval: boolean,
+  defaultExpanded: boolean,
+  statusAppearance: ToolStatusAppearance,
+  entry: NormalizedEntry | ProcessStartPayload,
+  expansionKey: string,
+  taskAttempt?: WorkspaceWithSession,
+) {
+  if (isFileEdit(toolEntry.action_type)) {
+    const fileEditAction = toolEntry.action_type;
+    return (
+      <div className="space-y-3">
+        {fileEditAction.changes.map((change, idx) => (
+          <FileChangeRenderer
+            key={`${fileEditAction.path}-${idx}`}
+            path={fileEditAction.path}
+            change={change}
+            expansionKey={`edit:${expansionKey}:${idx}`}
+            defaultExpanded={defaultExpanded}
+            statusAppearance={statusAppearance}
+            forceExpanded={isPendingApproval}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (toolEntry.action_type.action === 'plan_presentation') {
+    return (
+      <PlanPresentationCard
+        plan={toolEntry.action_type.plan}
+        expansionKey={expansionKey}
+        defaultExpanded={defaultExpanded}
+        statusAppearance={statusAppearance}
+        taskAttemptId={taskAttempt?.id}
+      />
+    );
+  }
+
+  if (
+    toolEntry.action_type.action === 'command_run' &&
+    SCRIPT_TOOL_NAMES.has(toolEntry.tool_name)
+  ) {
+    const exitCode = getCommandExitCode(toolEntry.action_type);
+    return (
+      <ScriptToolCallCard
+        entry={entry}
+        expansionKey={expansionKey}
+        taskAttemptId={taskAttempt?.id}
+        sessionId={taskAttempt?.session?.id}
+        isFailed={exitCode !== null && exitCode !== 0}
+        toolName={toolEntry.tool_name}
+        forceExpanded={isPendingApproval}
+      />
+    );
+  }
+
+  return (
+    <ToolCallCard
+      entry={entry}
+      expansionKey={expansionKey}
+      forceExpanded={isPendingApproval}
+      taskAttemptId={taskAttempt?.id}
+    />
+  );
+}
+
 /*******************
  * Main component  *
  *******************/
@@ -754,8 +839,6 @@ function DisplayConversationEntry({
   const isUserMessage = entryType.type === 'user_message';
   const isUserFeedback = entryType.type === 'user_feedback';
   const isLoading = entryType.type === 'loading';
-  const isFileEdit = (a: ActionType): a is FileEditAction =>
-    a.action === 'file_edit';
 
   if (isUserMessage) {
     return (
@@ -790,120 +873,32 @@ function DisplayConversationEntry({
       </div>
     );
   }
-  const renderToolUseBody = (
-    toolEntry: Extract<NormalizedEntryType, { type: 'tool_use' }>,
-    isPendingApproval: boolean,
-    defaultExpanded: boolean,
-    statusAppearance: ToolStatusAppearance
-  ) => {
-    if (isFileEdit(toolEntry.action_type)) {
-      const fileEditAction = toolEntry.action_type;
-      return (
-        <div className="space-y-3">
-          {fileEditAction.changes.map((change, idx) => (
-            <FileChangeRenderer
-              key={`${fileEditAction.path}-${idx}`}
-              path={fileEditAction.path}
-              change={change}
-              expansionKey={`edit:${expansionKey}:${idx}`}
-              defaultExpanded={defaultExpanded}
-              statusAppearance={statusAppearance}
-              forceExpanded={isPendingApproval}
-            />
-          ))}
-        </div>
-      );
-    }
-
-    if (toolEntry.action_type.action === 'plan_presentation') {
-      return (
-        <PlanPresentationCard
-          plan={toolEntry.action_type.plan}
-          expansionKey={expansionKey}
-          defaultExpanded={defaultExpanded}
-          statusAppearance={statusAppearance}
-          taskAttemptId={taskAttempt?.id}
-        />
-      );
-    }
-
-    if (
-      toolEntry.action_type.action === 'command_run' &&
-      SCRIPT_TOOL_NAMES.has(toolEntry.tool_name)
-    ) {
-      const actionType = toolEntry.action_type;
-      const exitCode =
-        actionType.result?.exit_status?.type === 'exit_code'
-          ? actionType.result.exit_status.code
-          : null;
-      const isFailed = exitCode !== null && exitCode !== 0;
-
-      return (
-        <ScriptToolCallCard
-          entry={entry}
-          expansionKey={expansionKey}
-          taskAttemptId={taskAttempt?.id}
-          sessionId={taskAttempt?.session?.id}
-          isFailed={isFailed}
-          toolName={toolEntry.tool_name}
-          forceExpanded={isPendingApproval}
-        />
-      );
-    }
-
-    return (
-      <ToolCallCard
-        entry={entry}
-        expansionKey={expansionKey}
-        forceExpanded={isPendingApproval}
-        taskAttemptId={taskAttempt?.id}
-      />
-    );
-  };
-
-  const renderToolUse = () => {
-    if (!isNormalizedEntry(entry)) return null;
-    if (entryType.type !== 'tool_use') return null;
+  if (isToolUse && entryType.type === 'tool_use') {
     const toolEntry = entryType;
-
     const status = toolEntry.status;
-    const statusAppearance = getToolStatusAppearance(status);
-    const isPlanPresentation =
-      toolEntry.action_type.action === 'plan_presentation';
     const isPendingApproval = status.status === 'pending_approval';
-    const defaultExpanded = isPendingApproval || isPlanPresentation;
+    const defaultExpanded = isPendingApproval || toolEntry.action_type.action === 'plan_presentation';
 
     const body = renderToolUseBody(
-      toolEntry,
-      isPendingApproval,
-      defaultExpanded,
-      statusAppearance
+      toolEntry, isPendingApproval, defaultExpanded,
+      getToolStatusAppearance(status), entry, expansionKey, taskAttempt
     );
 
     const content = (
-      <div
-        className={`px-4 py-2 text-sm space-y-3 ${greyed ? 'opacity-50 pointer-events-none' : ''}`}
-      >
+      <div className={`px-4 py-2 text-sm space-y-3 ${greyed ? 'opacity-50 pointer-events-none' : ''}`}>
         {body}
       </div>
     );
 
     if (isPendingApprovalStatus(status)) {
       return (
-        <PendingApprovalEntry
-          pendingStatus={status}
-          executionProcessId={executionProcessId}
-        >
+        <PendingApprovalEntry pendingStatus={status} executionProcessId={executionProcessId}>
           {content}
         </PendingApprovalEntry>
       );
     }
 
     return content;
-  };
-
-  if (isToolUse) {
-    return renderToolUse();
   }
 
   if (isSystem || isError) {

@@ -287,7 +287,7 @@ export function DiffViewCardWithComments({
         side,
         lineNumber,
         text: '',
-        ...(codeLine !== undefined ? { codeLine } : {}),
+        ...(codeLine === undefined ? {} : { codeLine }),
       };
       setDraft(widgetKey, draft);
     },
@@ -337,99 +337,96 @@ export function DiffViewCardWithComments({
   return (
     <div className={cn('my-base rounded-sm border', className)}>
       {/* Header */}
-      <div
-        role={onToggle ? "button" : undefined}
-        tabIndex={onToggle ? 0 : undefined}
-        className={cn(
-          'w-full flex items-center bg-primary px-base gap-base sticky top-0 z-10 border-b border-transparent ',
-          onToggle && 'cursor-pointer',
-          expanded && 'border-inherit rounded-t-sm'
-        )}
-        onClick={onToggle}
-        onKeyDown={onToggle ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        } : undefined}
-      >
-        <span className="relative shrink-0">
-          <FileIcon className="size-icon-base" />
-          {status && (
-            <ToolStatusDot
-              status={status}
-              className="absolute -bottom-0.5 -right-0.5"
-            />
-          )}
-        </span>
-        {changeLabel && (
-          <span
+      {(() => {
+        const HeaderTag = onToggle ? 'button' : 'div';
+        return (
+          <HeaderTag
+            {...(onToggle ? { type: 'button' as const, onClick: onToggle } : {})}
             className={cn(
-              'text-sm shrink-0 bg-primary rounded-sm px-1',
-              changeKind === 'deleted' && 'text-error border border-error/20',
-              changeKind === 'added' && 'text-success border border-success/20'
+              'w-full flex items-center bg-primary px-base gap-base sticky top-0 z-10 border-b border-transparent ',
+              onToggle && 'cursor-pointer text-left',
+              expanded && 'border-inherit rounded-t-sm'
             )}
           >
-            {changeLabel}
-          </span>
-        )}
-        <div
-          className={cn(
-            'text-sm flex-1 min-w-0',
-            changeKind === 'deleted' && 'text-error line-through'
-          )}
-        >
-          <DisplayTruncatedPath path={filePath} />
-        </div>
-        {(changeKind === 'renamed' || changeKind === 'copied') && oldPath && (
-          <span className="text-low text-sm shrink-0">
-            ← {oldPath.split('/').pop()}
-          </span>
-        )}
-        {hasStats && (
-          <span className="text-sm shrink-0">
-            {additions > 0 && (
-              <span className="text-success">+{additions}</span>
-            )}
-            {additions > 0 && deletions > 0 && ' '}
-            {deletions > 0 && <span className="text-error">-{deletions}</span>}
-          </span>
-        )}
-        {totalCommentCount > 0 && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded shrink-0">
-            {commentsForFile.length > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-accent">
-                <ChatCircleIcon className="size-icon-xs" weight="fill" />
-                {commentsForFile.length}
-              </span>
-            )}
-            {githubCommentsForFile.length > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-low">
-                <GithubLogoIcon className="size-icon-xs" weight="fill" />
-                {githubCommentsForFile.length}
-              </span>
-            )}
-          </span>
-        )}
-        <div className="flex items-center gap-1 shrink-0">
-          {attemptId && (
-            <span onClick={(e) => e.stopPropagation()}>
-              <OpenInIdeButton
-                onClick={handleOpenInIde}
-                className="size-icon-xs p-0"
-              />
-            </span>
-          )}
-          {onToggle && (
-            <CaretDownIcon
-              className={cn(
-                'size-icon-xs text-low transition-transform',
-                !expanded && '-rotate-90'
+            <span className="relative shrink-0">
+              <FileIcon className="size-icon-base" />
+              {status && (
+                <ToolStatusDot
+                  status={status}
+                  className="absolute -bottom-0.5 -right-0.5"
+                />
               )}
-            />
-          )}
-        </div>
-      </div>
+            </span>
+            {changeLabel && (
+              <span
+                className={cn(
+                  'text-sm shrink-0 bg-primary rounded-sm px-1',
+                  changeKind === 'deleted' && 'text-error border border-error/20',
+                  changeKind === 'added' && 'text-success border border-success/20'
+                )}
+              >
+                {changeLabel}
+              </span>
+            )}
+            <div
+              className={cn(
+                'text-sm flex-1 min-w-0',
+                changeKind === 'deleted' && 'text-error line-through'
+              )}
+            >
+              <DisplayTruncatedPath path={filePath} />
+            </div>
+            {(changeKind === 'renamed' || changeKind === 'copied') && oldPath && (
+              <span className="text-low text-sm shrink-0">
+                ← {oldPath.split('/').pop()}
+              </span>
+            )}
+            {hasStats && (
+              <span className="text-sm shrink-0">
+                {additions > 0 && (
+                  <span className="text-success">+{additions}</span>
+                )}
+                {additions > 0 && deletions > 0 && ' '}
+                {deletions > 0 && <span className="text-error">-{deletions}</span>}
+              </span>
+            )}
+            {totalCommentCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded shrink-0">
+                {commentsForFile.length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-accent">
+                    <ChatCircleIcon className="size-icon-xs" weight="fill" />
+                    {commentsForFile.length}
+                  </span>
+                )}
+                {githubCommentsForFile.length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-low">
+                    <GithubLogoIcon className="size-icon-xs" weight="fill" />
+                    {githubCommentsForFile.length}
+                  </span>
+                )}
+              </span>
+            )}
+            <div className="flex items-center gap-1 shrink-0">
+              {attemptId && (
+                <span role="presentation" onClick={(e) => e.stopPropagation()}>
+                  <OpenInIdeButton
+                    onClick={handleOpenInIde}
+                    className="size-icon-xs p-0"
+                  />
+                </span>
+              )}
+              {onToggle && (
+                <CaretDownIcon
+                  className={cn(
+                    'size-icon-xs text-low transition-transform',
+                    !expanded && '-rotate-90'
+                  )}
+                />
+              )}
+            </div>
+          </HeaderTag>
+        );
+      })()}
 
       {/* Diff body - shown when expanded */}
       {expanded && (

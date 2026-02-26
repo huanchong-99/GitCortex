@@ -12,7 +12,8 @@ export function useCommandBarShortcut(
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       // CMD+K (Mac) or Ctrl+K (Windows/Linux)
-      const platform = (navigator as any).userAgentData?.platform ?? navigator.platform;
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- fallback for browsers without userAgentData
+      const platform: string = (navigator as any).userAgentData?.platform ?? navigator.platform;
       const isMac = platform.toUpperCase().includes('MAC');
       const modifier = isMac ? event.metaKey : event.ctrlKey;
 

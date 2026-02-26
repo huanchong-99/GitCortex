@@ -59,9 +59,7 @@ describe('wsStore', () => {
     globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     websocketInstances.length = 0;
 
-    const OriginalCtor = MockWebSocket as unknown as {
-      new (url: string): MockWebSocket;
-    };
+    const OriginalCtor = MockWebSocket as unknown as new (url: string) => MockWebSocket;
 
     globalThis.WebSocket = class extends OriginalCtor {
       constructor(url: string) {

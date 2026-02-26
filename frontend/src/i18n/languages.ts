@@ -70,6 +70,6 @@ export function getLanguageOptions(browserDefaultLabel: string) {
     label:
       ui === 'BROWSER'
         ? browserDefaultLabel
-        : getEndonym(UI_TO_I18N[ui as keyof typeof UI_TO_I18N]),
+        : getEndonym(UI_TO_I18N[ui]),
   }));
 }

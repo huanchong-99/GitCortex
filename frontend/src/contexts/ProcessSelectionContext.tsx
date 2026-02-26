@@ -16,7 +16,7 @@ interface ProcessSelectionProviderProps {
 export function ProcessSelectionProvider({
   children,
   initialProcessId = null,
-}: ProcessSelectionProviderProps) {
+}: Readonly<ProcessSelectionProviderProps>) {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(
     initialProcessId
   );

@@ -4,7 +4,6 @@ import { useDebouncedCallback } from './useDebouncedCallback';
 import {
   ScratchType,
   type PreviewSettingsData,
-  type ScratchPayload,
 } from 'shared/types';
 
 export type ScreenSize = 'desktop' | 'mobile' | 'responsive';
@@ -54,7 +53,7 @@ export function usePreviewSettings(
   });
 
   // Extract settings from scratch data
-  const payload = scratch?.payload as ScratchPayload | undefined;
+  const payload = scratch?.payload;
   const scratchData: PreviewSettingsData | undefined =
     payload?.type === 'PREVIEW_SETTINGS' ? payload.data : undefined;
 

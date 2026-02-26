@@ -32,7 +32,7 @@ export function createSemanticHook<A extends Action>(action: A) {
     } = options;
 
     // Use 'when' as alias for 'enabled' if provided
-    const isEnabled = when !== undefined ? when : enabled;
+    const isEnabled = when ?? enabled;
     const resolvedEnabled =
       typeof isEnabled === 'function' ? isEnabled() : isEnabled;
 

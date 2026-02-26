@@ -35,8 +35,40 @@ export function DataTable<T>({
   isLoading,
   emptyState,
   headerContent,
-}: DataTableProps<T>) {
+}: Readonly<DataTableProps<T>>) {
   const colSpan = columns.length;
+
+  const bodyContent = data.length === 0
+    ? <TableEmpty colSpan={colSpan}>{emptyState || 'No data'}</TableEmpty>
+    : data.map((row) => {
+        const key = keyExtractor(row);
+        const handleClick = onRowClick ? () => onRowClick(row) : undefined;
+        const handleKeyDown = onRowClick
+          ? (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onRowClick(row);
+              }
+            }
+          : undefined;
+
+        return (
+          <TableRow
+            key={key}
+            clickable={!!onRowClick}
+            role={onRowClick ? 'button' : undefined}
+            tabIndex={onRowClick ? 0 : undefined}
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+          >
+            {columns.map((column) => (
+              <TableCell key={column.id} className={column.className}>
+                {column.accessor(row)}
+              </TableCell>
+            ))}
+          </TableRow>
+        );
+      });
 
   return (
     <Table>
@@ -59,38 +91,8 @@ export function DataTable<T>({
       <TableBody>
         {isLoading ? (
           <TableLoading colSpan={colSpan} />
-        ) : data.length === 0 ? (
-          <TableEmpty colSpan={colSpan}>{emptyState || 'No data'}</TableEmpty>
         ) : (
-          data.map((row) => {
-            const key = keyExtractor(row);
-            const handleClick = onRowClick ? () => onRowClick(row) : undefined;
-            const handleKeyDown = onRowClick
-              ? (e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onRowClick(row);
-                  }
-                }
-              : undefined;
-
-            return (
-              <TableRow
-                key={key}
-                clickable={!!onRowClick}
-                role={onRowClick ? 'button' : undefined}
-                tabIndex={onRowClick ? 0 : undefined}
-                onClick={handleClick}
-                onKeyDown={handleKeyDown}
-              >
-                {columns.map((column) => (
-                  <TableCell key={column.id} className={column.className}>
-                    {column.accessor(row)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
-          })
+          bodyContent
         )}
       </TableBody>
     </Table>

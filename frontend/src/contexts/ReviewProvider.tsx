@@ -59,10 +59,10 @@ export function useReviewOptional() {
 export function ReviewProvider({
   children,
   attemptId,
-}: {
+}: Readonly<{
   children: ReactNode;
   attemptId?: string;
-}) {
+}>) {
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
 

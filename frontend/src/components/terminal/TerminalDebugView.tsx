@@ -31,12 +31,12 @@ const sanitizeTerminalHistoryContent = (content: string) =>
   stripAnsi(content)
     .replaceAll('\r\n', '\n')
     .replaceAll('\r', '\n')
-    .replace(CONTROL_CHARACTERS_REGEX, '');
+    .replaceAll(CONTROL_CHARACTERS_REGEX, '');
 
 /**
  * Renders the terminal debugging UI with a terminal list and active emulator.
  */
-export function TerminalDebugView({ tasks, wsUrl }: Props) {
+export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
   const { t } = useTranslation('workflow');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
   const [historyByTerminalId, setHistoryByTerminalId] = useState<Record<string, TerminalHistoryState>>({});
@@ -192,7 +192,14 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         method: 'POST',
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        console.log('Terminal started successfully');
+        // Mark this terminal as ready and clear restart flag
+        needsRestartRef.current.delete(terminalId);
+        readyTerminalIdsRef.current.add(terminalId);
+        // Note: Don't reset restart attempts here - only reset on manual restart
+        // This prevents infinite loops when API succeeds but process doesn't actually start
+      } else {
         const error = await response.json().catch(() => null);
 
         // Handle 409 Conflict by stopping first, then retrying
@@ -212,13 +219,6 @@ export function TerminalDebugView({ tasks, wsUrl }: Props) {
         resetAutoStart(terminalId);
         // Clear ready state on failure
         readyTerminalIdsRef.current.delete(terminalId);
-      } else {
-        console.log('Terminal started successfully');
-        // Mark this terminal as ready and clear restart flag
-        needsRestartRef.current.delete(terminalId);
-        readyTerminalIdsRef.current.add(terminalId);
-        // Note: Don't reset restart attempts here - only reset on manual restart
-        // This prevents infinite loops when API succeeds but process doesn't actually start
       }
     } catch (error) {
       console.error('Failed to start terminal:', error);

@@ -80,9 +80,9 @@ function isSafeCssValue(value: string): boolean {
 // Component that adds postMessage listener for style overrides
 export function AppWithStyleOverride({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   const { setTheme } = useTheme();
 
   useEffect(() => {

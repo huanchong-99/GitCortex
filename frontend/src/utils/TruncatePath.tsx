@@ -18,7 +18,7 @@ export function DisplayTruncatedPath({ path }: Readonly<{ path: string }>) {
         <ElipsisComponent className="bottom-[9lh]" />
         <ElipsisComponent className="bottom-[10lh]" />
 
-        {parts.reverse().map((part, index) => (
+        {parts.toReversed().map((part, index) => (
           <span className="flex-none font-ibm-plex-mono " key={`path-part-${index}-${part}`}>
             {isWindows ? '\\' : '/'}
             {part}

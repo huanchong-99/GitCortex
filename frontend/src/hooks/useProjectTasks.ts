@@ -145,15 +145,15 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
 
     const sorted = Object.values(merged).sort(
       (a, b) =>
-        new Date(b.createdAt as string).getTime() -
-        new Date(a.createdAt as string).getTime()
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
     );
 
     (Object.values(byStatus) as TaskWithAttemptStatus[][]).forEach((list) => {
       list.sort(
         (a, b) =>
-          new Date(b.createdAt as string).getTime() -
-          new Date(a.createdAt as string).getTime()
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
       );
     });
 
@@ -183,8 +183,8 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     (Object.values(grouped) as SharedTaskRecord[][]).forEach((list) => {
       list.sort(
         (a, b) =>
-          new Date(b.created_at as string).getTime() -
-          new Date(a.created_at as string).getTime()
+          new Date(b.created_at).getTime() -
+          new Date(a.created_at).getTime()
       );
     });
 

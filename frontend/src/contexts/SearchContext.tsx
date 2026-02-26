@@ -25,7 +25,7 @@ interface SearchProviderProps {
   children: ReactNode;
 }
 
-export function SearchProvider({ children }: SearchProviderProps) {
+export function SearchProvider({ children }: Readonly<SearchProviderProps>) {
   const [query, setQuery] = useState('');
   const location = useLocation();
   const { projectId } = useParams<{ projectId: string }>();

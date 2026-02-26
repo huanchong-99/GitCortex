@@ -32,6 +32,8 @@ interface MessageListContext {
 
 const INITIAL_TOP_ITEM = { index: 'LAST' as const, align: 'end' as const };
 
+const ListSpacer = () => <div className="h-2" />;
+
 const InitialDataScrollModifier: ScrollModifier = {
   type: 'item-location',
   location: INITIAL_TOP_ITEM,
@@ -176,8 +178,8 @@ export function ConversationList({ attempt, task }: Readonly<ConversationListPro
             context={messageListContext}
             computeItemKey={computeItemKey}
             ItemContent={ItemContent}
-            Header={() => <div className="h-2" />}
-            Footer={() => <div className="h-2" />}
+            Header={ListSpacer}
+            Footer={ListSpacer}
           />
         </VirtuosoMessageListLicense>
       </div>

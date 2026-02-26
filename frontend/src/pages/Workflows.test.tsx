@@ -1221,7 +1221,7 @@ describe('Workflows Page', () => {
         }
 
         if (url === '/api/workflows') {
-          const body = init?.body ? JSON.parse(String(init.body)) : null;
+          const body = init?.body ? JSON.parse(init.body as string) : null;
           expect(body?.projectId).toBe('proj-1');
 
           return Promise.resolve({

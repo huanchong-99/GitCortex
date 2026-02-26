@@ -81,7 +81,7 @@ interface TerminalCardProps {
 /**
  * Renders a terminal summary card with status and role details.
  */
-export function TerminalCard({ terminal, onClick }: TerminalCardProps) {
+export function TerminalCard({ terminal, onClick }: Readonly<TerminalCardProps>) {
   const { t } = useTranslation('workflow');
   const statusStyle = STATUS_STYLES[terminal.status];
   const cliType = Object.hasOwn(CLI_TYPES, terminal.cliTypeId)

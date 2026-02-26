@@ -18,12 +18,14 @@ interface UseDevserverPreviewOptions {
   };
 }
 
+const DEFAULT_OPTIONS: UseDevserverPreviewOptions = {
+  projectId: '',
+  projectHasDevScript: false,
+} as const;
+
 export function useDevserverPreview(
   attemptId?: string | null | undefined,
-  options: UseDevserverPreviewOptions = {
-    projectId: '',
-    projectHasDevScript: false,
-  }
+  options: UseDevserverPreviewOptions = DEFAULT_OPTIONS
 ): DevserverPreviewState {
   const { projectHasDevScript = false, lastKnownUrl } = options;
   const {

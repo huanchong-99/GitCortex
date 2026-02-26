@@ -69,7 +69,7 @@ export function PipelineView({
   mergeTerminal,
   onTerminalClick,
   onMergeTerminalClick,
-}: PipelineViewProps) {
+}: Readonly<PipelineViewProps>) {
   const { t } = useTranslation('workflow');
   const statusStyle = STATUS_STYLES[status];
   const statusLabel = t(STATUS_LABEL_KEYS[status]);

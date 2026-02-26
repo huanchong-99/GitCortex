@@ -15,14 +15,14 @@ export class McpConfigStrategyGeneral {
     for (let i = 0; i < cfg.servers_path.length - 1; i++) {
       const key = cfg.servers_path[i];
       const next = isJsonObject(current[key])
-        ? (current[key] as JsonObject)
+        ? current[key]
         : undefined;
       if (!next) current[key] = {};
       current = current[key] as JsonObject;
     }
 
     if (cfg.servers_path.length > 0) {
-      const lastKey = cfg.servers_path[cfg.servers_path.length - 1];
+      const lastKey = cfg.servers_path.at(-1)!;
       current[lastKey] = cfg.servers;
     }
     return fullConfig;
@@ -90,7 +90,7 @@ export class McpConfigStrategyGeneral {
     for (let i = 0; i < mcp_config.servers_path.length - 1; i++) {
       const key = mcp_config.servers_path[i];
       const next = isJsonObject(current[key])
-        ? (current[key] as JsonObject)
+        ? current[key]
         : undefined;
       if (!next) current[key] = {};
       current = current[key] as JsonObject;
@@ -101,7 +101,7 @@ export class McpConfigStrategyGeneral {
       return updated;
     }
 
-    const lastKey = mcp_config.servers_path[mcp_config.servers_path.length - 1];
+    const lastKey = mcp_config.servers_path.at(-1)!;
     if (!isJsonObject(current[lastKey])) current[lastKey] = {};
     (current[lastKey] as JsonObject)[serverKey] = preconfVal[serverKey];
 

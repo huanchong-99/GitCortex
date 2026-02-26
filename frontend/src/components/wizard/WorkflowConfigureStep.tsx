@@ -2,7 +2,7 @@ interface WorkflowConfigureStepProps {
   projectId: string;
 }
 
-export function WorkflowConfigureStep({ projectId }: WorkflowConfigureStepProps) {
+export function WorkflowConfigureStep({ projectId }: Readonly<WorkflowConfigureStepProps>) {
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4">Configure Workflow</h2>

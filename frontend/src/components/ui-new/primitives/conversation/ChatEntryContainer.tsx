@@ -89,36 +89,33 @@ export function ChatEntryContainer({
       )}
     >
       {/* Header */}
-      <div
-        role={onToggle ? "button" : undefined}
-        tabIndex={onToggle ? 0 : undefined}
-        className={cn(
-          'flex items-center px-double py-base gap-base rounded-sm overflow-hidden',
-          config.headerBg,
-          onToggle && 'cursor-pointer'
-        )}
-        onClick={onToggle}
-        onKeyDown={onToggle ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        } : undefined}
-      >
-        <Icon className="size-icon-xs shrink-0 text-low" />
-        {title && (
-          <span className="flex-1 text-sm text-normal truncate">{title}</span>
-        )}
-        {headerRight}
-        {onToggle && (
-          <CaretDownIcon
+      {(() => {
+        const HeaderTag = onToggle ? 'button' : 'div';
+        return (
+          <HeaderTag
+            {...(onToggle ? { type: 'button' as const, onClick: onToggle } : {})}
             className={cn(
-              'size-icon-xs shrink-0 text-low transition-transform',
-              !expanded && '-rotate-90'
+              'flex items-center px-double py-base gap-base rounded-sm overflow-hidden',
+              config.headerBg,
+              onToggle && 'cursor-pointer w-full text-left'
             )}
-          />
-        )}
-      </div>
+          >
+            <Icon className="size-icon-xs shrink-0 text-low" />
+            {title && (
+              <span className="flex-1 text-sm text-normal truncate">{title}</span>
+            )}
+            {headerRight}
+            {onToggle && (
+              <CaretDownIcon
+                className={cn(
+                  'size-icon-xs shrink-0 text-low transition-transform',
+                  !expanded && '-rotate-90'
+                )}
+              />
+            )}
+          </HeaderTag>
+        );
+      })()}
 
       {/* Content - shown when expanded */}
       {expanded && children && <div className="p-double">{children}</div>}

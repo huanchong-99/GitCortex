@@ -76,7 +76,7 @@ export class ClickToComponentListener {
       const data = event.data as ClickToComponentMessage;
 
       // Only handle messages from our click-to-component tool
-      if (!data || data.source !== 'click-to-component') {
+      if (data?.source !== 'click-to-component') {
         return;
       }
 

@@ -53,7 +53,7 @@ function extractErrorMessage(err: unknown): string {
     if (msg instanceof Error) {
       return msg.message;
     }
-    return String(msg);
+    return typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
   }
 
   return 'Failed to rebase';

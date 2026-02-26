@@ -17,7 +17,7 @@ export function useVariant({ processVariant, scratchVariant }: Args) {
 
   // Compute initial value: scratch takes priority over process
   const getInitialVariant = () =>
-    scratchVariant !== undefined ? scratchVariant : processVariant;
+    scratchVariant === undefined ? processVariant : scratchVariant;
 
   const [selectedVariant, setSelectedVariantState] = useState<string | null>(
     getInitialVariant
@@ -28,7 +28,7 @@ export function useVariant({ processVariant, scratchVariant }: Args) {
     if (hasUserSelectionRef.current) return;
 
     const newVariant =
-      scratchVariant !== undefined ? scratchVariant : processVariant;
+      scratchVariant === undefined ? processVariant : scratchVariant;
     setSelectedVariantState(newVariant);
   }, [scratchVariant, processVariant]);
 

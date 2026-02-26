@@ -29,7 +29,7 @@ export function WorkflowWizard({
   onComplete,
   onCancel,
   onError,
-}: WorkflowWizardProps) {
+}: Readonly<WorkflowWizardProps>) {
   const [state, setState] = useState<{
     config: WizardConfig;
     isSubmitting: boolean;

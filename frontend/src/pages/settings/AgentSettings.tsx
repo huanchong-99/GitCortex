@@ -183,7 +183,7 @@ export function AgentSettings() {
     configName: string,
     baseConfig?: string | null
   ) => {
-    if (!localParsedProfiles || !localParsedProfiles.executors) return;
+    if (!localParsedProfiles?.executors) return;
 
     const executorsMap =
       localParsedProfiles.executors as unknown as ExecutorsMap;
@@ -351,7 +351,7 @@ export function AgentSettings() {
     configuration: string,
     formData: unknown
   ) => {
-    if (!localParsedProfiles || !localParsedProfiles.executors) return;
+    if (!localParsedProfiles?.executors) return;
 
     const executorsMap =
       localParsedProfiles.executors as unknown as ExecutorsMap;
@@ -373,7 +373,7 @@ export function AgentSettings() {
   };
 
   const handleExecutorConfigSave = async (formData: unknown) => {
-    if (!localParsedProfiles || !localParsedProfiles.executors) return;
+    if (!localParsedProfiles?.executors) return;
 
     // Clear any previous errors
     setSaveError(null);
@@ -431,7 +431,9 @@ export function AgentSettings() {
           <AlertDescription>
             {profilesError instanceof Error
               ? profilesError.message
-              : String(profilesError)}
+              : typeof profilesError === 'object'
+                ? JSON.stringify(profilesError)
+                : String(profilesError)}
           </AlertDescription>
         </Alert>
       )}

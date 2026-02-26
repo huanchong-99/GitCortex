@@ -137,6 +137,25 @@ export function ProjectSelectorContainer({
     setDropdownOpen(false);
   }, [onCreateProject]);
 
+  const renderProjectItem = useCallback((idx: number) => {
+    const item = filteredItems[idx];
+    const isHighlighted = idx + 1 === safeHighlightedIndex;
+    const isSelected = selectedProjectId === item.id;
+    return (
+      <DropdownMenuItem
+        onSelect={() => handleSelect(item)}
+        onMouseEnter={() => setHighlightedIndex(idx + 1)}
+        preventFocusOnHover
+        className={cn(
+          isSelected && 'bg-secondary',
+          isHighlighted && 'bg-secondary'
+        )}
+      >
+        {item.name}
+      </DropdownMenuItem>
+    );
+  }, [filteredItems, safeHighlightedIndex, selectedProjectId, handleSelect]);
+
   return (
     <DropdownMenu open={dropdownOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -199,25 +218,7 @@ export function ProjectSelectorContainer({
             style={{ height: '14rem' }}
             totalCount={filteredItems.length}
             computeItemKey={(idx) => filteredItems[idx]?.id ?? String(idx)}
-            itemContent={(idx) => {
-              const item = filteredItems[idx];
-              // Highlight index is offset by 1 (create button is at 0)
-              const isHighlighted = idx + 1 === safeHighlightedIndex;
-              const isSelected = selectedProjectId === item.id;
-              return (
-                <DropdownMenuItem
-                  onSelect={() => handleSelect(item)}
-                  onMouseEnter={() => setHighlightedIndex(idx + 1)}
-                  preventFocusOnHover
-                  className={cn(
-                    isSelected && 'bg-secondary',
-                    isHighlighted && 'bg-secondary'
-                  )}
-                >
-                  {item.name}
-                </DropdownMenuItem>
-              );
-            }}
+            itemContent={renderProjectItem}
           />
         )}
       </DropdownMenuContent>

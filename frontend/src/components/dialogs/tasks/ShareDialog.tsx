@@ -36,7 +36,7 @@ function StatusContent({
   remoteDisabledMessage,
   handleLinkProject,
   t,
-}: {
+}: Readonly<{
   isRemoteDisabled: boolean;
   isSignedIn: boolean;
   isProjectLinked: boolean;
@@ -45,7 +45,7 @@ function StatusContent({
   remoteDisabledMessage: string;
   handleLinkProject: () => void;
   t: any;
-}) {
+}>) {
   if (isRemoteDisabled) {
     return (
       <Alert className="mt-1">

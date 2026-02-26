@@ -48,7 +48,7 @@ const TaskPanel = ({ task }: Readonly<TaskPanelProps>) => {
       if (rtf) {
         return rtf.format(-value, unit);
       }
-      const plural = value !== 1 ? 's' : '';
+      const plural = value === 1 ? '' : 's';
       return `${value} ${unit}${plural} ago`;
     };
 

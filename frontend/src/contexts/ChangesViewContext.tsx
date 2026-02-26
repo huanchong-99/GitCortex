@@ -46,7 +46,7 @@ interface ChangesViewProviderProps {
   children: React.ReactNode;
 }
 
-export function ChangesViewProvider({ children }: ChangesViewProviderProps) {
+export function ChangesViewProvider({ children }: Readonly<ChangesViewProviderProps>) {
   const { diffPaths } = useWorkspaceContext();
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [fileInView, setFileInView] = useState<string | null>(null);

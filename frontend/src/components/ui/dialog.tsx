@@ -84,7 +84,7 @@ const Dialog = React.forwardRef<
         // If no submit button, look for primary action button
         const buttons = Array.from(
           ref.current.querySelectorAll('button')
-        ) as HTMLButtonElement[];
+        );
         const primaryButton = buttons.find(
           (btn) =>
             !btn.disabled &&
@@ -109,7 +109,8 @@ const Dialog = React.forwardRef<
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-start justify-center p-4 overflow-y-auto">
-      <div
+      <button
+        type="button"
         className="fixed inset-0 bg-black/50"
         onClick={() => (uncloseable ? {} : onOpenChange?.(false))}
       />

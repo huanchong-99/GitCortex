@@ -29,7 +29,7 @@ export function FileTreeContainer({
   const [collapsedPaths, setCollapsedPaths] =
     usePersistedCollapsedPaths(workspaceId);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const nodeRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Get GitHub comments state from workspace context
   const {
@@ -54,7 +54,7 @@ export function FileTreeContainer({
   }, [fileInView]);
 
   const handleNodeRef = useCallback(
-    (path: string, el: HTMLDivElement | null) => {
+    (path: string, el: HTMLButtonElement | null) => {
       if (el) {
         nodeRefs.current.set(path, el);
       } else {

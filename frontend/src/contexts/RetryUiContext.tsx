@@ -18,9 +18,9 @@ const RetryUiContext = createContext<RetryUiContextType | null>(null);
 
 export function RetryUiProvider({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   const { executionProcessesAll: executionProcesses } =
     useExecutionProcessesContext();
 

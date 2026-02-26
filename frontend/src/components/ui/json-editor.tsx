@@ -40,7 +40,7 @@ export const JSONEditor: React.FC<JSONEditorProps> = ({
   };
 
   // Avoid SSR errors
-  if (typeof globalThis.window === 'undefined') return null;
+  if (globalThis.window === undefined) return null;
 
   return (
     <div

@@ -45,6 +45,27 @@ function mapWorkflowStatus(
   }
 }
 
+function mapTerminalStatus(status: string): Terminal['status'] {
+  switch (status) {
+    case 'idle':
+    case 'not_started':
+      return 'not_started';
+    case 'starting':
+      return 'starting';
+    case 'waiting':
+      return 'waiting';
+    case 'running':
+    case 'working':
+      return 'working';
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    default:
+      return 'not_started';
+  }
+}
+
 export function buildWorkflowDebugWsUrl(
   locationLike: Pick<Location, 'protocol' | 'host'>
 ): string {
@@ -145,28 +166,6 @@ export function WorkflowDebugPage() {
       })
     ),
   }));
-
-  // Map terminal status from DTO to internal format
-  function mapTerminalStatus(status: string): Terminal['status'] {
-    switch (status) {
-      case 'idle':
-      case 'not_started':
-        return 'not_started';
-      case 'starting':
-        return 'starting';
-      case 'waiting':
-        return 'waiting';
-      case 'running':
-      case 'working':
-        return 'working';
-      case 'completed':
-        return 'completed';
-      case 'failed':
-        return 'failed';
-      default:
-        return 'not_started';
-    }
-  }
 
   const pipelineStatus = mapWorkflowStatus(data.status);
 

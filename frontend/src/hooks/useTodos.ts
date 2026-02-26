@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { TodoItem, NormalizedEntry } from 'shared/types';
+import type { TodoItem } from 'shared/types';
 import type { PatchTypeWithKey } from '@/hooks/useConversationHistory';
 
 interface UseTodosResult {
@@ -20,7 +20,7 @@ export const useTodos = (entries: PatchTypeWithKey[]): UseTodosResult => {
 
     for (const entry of entries) {
       if (entry.type === 'NORMALIZED_ENTRY' && entry.content) {
-        const normalizedEntry = entry.content as NormalizedEntry;
+        const normalizedEntry = entry.content;
 
         if (
           normalizedEntry.entry_type?.type === 'tool_use' &&

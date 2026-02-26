@@ -64,6 +64,30 @@ function processNextLevel(
   return childMap;
 }
 
+// Helper to ensure a node exists in the map and return the updated map for traversal
+function ensureNodeAndDescend(
+  currentMap: Map<string, TreeNode>,
+  parts: string[],
+  index: number,
+  diff: Diff
+): Map<string, TreeNode> {
+  const part = parts[index];
+  const isFile = index === parts.length - 1;
+  const currentPath = parts.slice(0, index + 1).join('/');
+
+  if (!currentMap.has(part)) {
+    const node = createTreeNode(currentPath, part, isFile, isFile ? diff : undefined);
+    currentMap.set(part, node);
+  }
+
+  const node = currentMap.get(part)!;
+
+  if (!isFile && node.children) {
+    return processNextLevel(node, parts, index, diff);
+  }
+  return currentMap;
+}
+
 /**
  * Transforms flat Diff[] into hierarchical TreeNode[]
  */
@@ -71,7 +95,6 @@ export function buildFileTree(diffs: Diff[]): TreeNode[] {
   const rootMap = new Map<string, TreeNode>();
 
   for (const diff of diffs) {
-    // Use newPath for most changes, oldPath for deletions
     const filePath = diff.newPath ?? diff.oldPath;
     if (!filePath) continue;
 
@@ -79,20 +102,7 @@ export function buildFileTree(diffs: Diff[]): TreeNode[] {
     let currentMap = rootMap;
 
     for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isFile = i === parts.length - 1;
-      const currentPath = parts.slice(0, i + 1).join('/');
-
-      if (!currentMap.has(part)) {
-        const node = createTreeNode(currentPath, part, isFile, isFile ? diff : undefined);
-        currentMap.set(part, node);
-      }
-
-      const node = currentMap.get(part)!;
-
-      if (!isFile && node.children) {
-        currentMap = processNextLevel(node, parts, i, diff);
-      }
+      currentMap = ensureNodeAndDescend(currentMap, parts, i, diff);
     }
   }
 

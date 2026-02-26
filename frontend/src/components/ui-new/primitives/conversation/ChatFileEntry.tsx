@@ -22,6 +22,77 @@ interface ChatFileEntryProps {
   readonly onOpenInChanges?: () => void;
 }
 
+function DiffStats({ additions, deletions }: Readonly<{ additions?: number; deletions?: number }>) {
+  const hasStats = additions !== undefined || deletions !== undefined;
+  if (!hasStats) return null;
+  return (
+    <span className="text-sm shrink-0">
+      {additions !== undefined && additions > 0 && (
+        <span className="text-success">+{additions}</span>
+      )}
+      {additions !== undefined && deletions !== undefined && ' '}
+      {deletions !== undefined && deletions > 0 && (
+        <span className="text-error">-{deletions}</span>
+      )}
+    </span>
+  );
+}
+
+function FileHeaderContent({
+  filename,
+  FileIcon,
+  status,
+  onOpenInChanges,
+  additions,
+  deletions,
+  onToggle,
+  expanded,
+  viewInChangesLabel,
+}: Readonly<{
+  filename: string;
+  FileIcon: React.ComponentType<{ className?: string }>;
+  status?: ToolStatus;
+  onOpenInChanges?: () => void;
+  additions?: number;
+  deletions?: number;
+  onToggle?: () => void;
+  expanded: boolean;
+  viewInChangesLabel: string;
+}>) {
+  return (
+    <>
+      <div className="flex-1 flex items-center gap-base min-w-0">
+        <span className="relative shrink-0">
+          <FileIcon className="size-icon-base" />
+          {status && (
+            <ToolStatusDot status={status} className="absolute -bottom-0.5 -right-0.5" />
+          )}
+        </span>
+        <span className="text-sm text-normal truncate">{filename}</span>
+        {onOpenInChanges && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onOpenInChanges(); }}
+            className="shrink-0 p-0.5 rounded hover:bg-muted text-low hover:text-normal transition-colors"
+            title={viewInChangesLabel}
+          >
+            <ArrowSquareUpRightIcon className="size-icon-xs" />
+          </button>
+        )}
+        <DiffStats additions={additions} deletions={deletions} />
+      </div>
+      {onToggle && (
+        <CaretDownIcon
+          className={cn(
+            'size-icon-xs shrink-0 text-low transition-transform',
+            !expanded && '-rotate-90'
+          )}
+        />
+      )}
+    </>
+  );
+}
+
 export function ChatFileEntry({
   filename,
   additions,
@@ -36,18 +107,21 @@ export function ChatFileEntry({
   const { t } = useTranslation('tasks');
   const { theme } = useTheme();
   const actualTheme = getActualTheme(theme);
-  const hasStats = additions !== undefined || deletions !== undefined;
   const FileIcon = getFileIcon(filename, actualTheme);
   const isDenied = status?.status === 'denied';
 
-  // Process diff content if provided
   const diffData = useDiffData(
     diffContent ?? { type: 'unified', path: filename, unifiedDiff: '' }
   );
   const hasDiffContent = diffContent && diffData.isValid;
 
-  // If we have diff content, wrap in a container with the diff body
+  const headerProps = {
+    filename, FileIcon, status, onOpenInChanges, additions, deletions, onToggle, expanded,
+    viewInChangesLabel: t('conversation.viewInChangesPanel'),
+  };
+
   if (hasDiffContent) {
+    const HeaderTag = onToggle ? 'button' : 'div';
     return (
       <div
         className={cn(
@@ -56,70 +130,16 @@ export function ChatFileEntry({
           className
         )}
       >
-        {/* Header */}
-        <div
-          role={onToggle ? "button" : undefined}
-          tabIndex={onToggle ? 0 : undefined}
+        <HeaderTag
+          {...(onToggle ? { type: 'button' as const, onClick: onToggle } : {})}
           className={cn(
             'flex items-center p-base w-full',
             isDenied ? 'bg-error/20' : 'bg-panel',
-            onToggle && 'cursor-pointer'
+            onToggle && 'cursor-pointer text-left'
           )}
-          onClick={onToggle}
-          onKeyDown={onToggle ? (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onToggle();
-            }
-          } : undefined}
         >
-          <div className="flex-1 flex items-center gap-base min-w-0">
-            <span className="relative shrink-0">
-              <FileIcon className="size-icon-base" />
-              {status && (
-                <ToolStatusDot
-                  status={status}
-                  className="absolute -bottom-0.5 -right-0.5"
-                />
-              )}
-            </span>
-            <span className="text-sm text-normal truncate">{filename}</span>
-            {onOpenInChanges && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenInChanges();
-                }}
-                className="shrink-0 p-0.5 rounded hover:bg-muted text-low hover:text-normal transition-colors"
-                title={t('conversation.viewInChangesPanel')}
-              >
-                <ArrowSquareUpRightIcon className="size-icon-xs" />
-              </button>
-            )}
-            {hasStats && (
-              <span className="text-sm shrink-0">
-                {additions !== undefined && additions > 0 && (
-                  <span className="text-success">+{additions}</span>
-                )}
-                {additions !== undefined && deletions !== undefined && ' '}
-                {deletions !== undefined && deletions > 0 && (
-                  <span className="text-error">-{deletions}</span>
-                )}
-              </span>
-            )}
-          </div>
-          {onToggle && (
-            <CaretDownIcon
-              className={cn(
-                'size-icon-xs shrink-0 text-low transition-transform',
-                !expanded && '-rotate-90'
-              )}
-            />
-          )}
-        </div>
-
-        {/* Diff body - shown when expanded */}
+          <FileHeaderContent {...headerProps} />
+        </HeaderTag>
         {expanded && (
           <DiffViewBody
             diffFile={diffData.diffFile}
@@ -133,7 +153,6 @@ export function ChatFileEntry({
     );
   }
 
-  // Original header-only rendering (no diff content)
   return (
     <div
       role={onToggle ? "button" : undefined}
@@ -152,50 +171,7 @@ export function ChatFileEntry({
         }
       } : undefined}
     >
-      <div className="flex-1 flex items-center gap-base min-w-0">
-        <span className="relative shrink-0">
-          <FileIcon className="size-icon-base" />
-          {status && (
-            <ToolStatusDot
-              status={status}
-              className="absolute -bottom-0.5 -right-0.5"
-            />
-          )}
-        </span>
-        <span className="text-sm text-normal truncate">{filename}</span>
-        {onOpenInChanges && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenInChanges();
-            }}
-            className="shrink-0 p-0.5 rounded hover:bg-muted text-low hover:text-normal transition-colors"
-            title={t('conversation.viewInChangesPanel')}
-          >
-            <ArrowSquareUpRightIcon className="size-icon-xs" />
-          </button>
-        )}
-        {hasStats && (
-          <span className="text-sm shrink-0">
-            {additions !== undefined && additions > 0 && (
-              <span className="text-success">+{additions}</span>
-            )}
-            {additions !== undefined && deletions !== undefined && ' '}
-            {deletions !== undefined && deletions > 0 && (
-              <span className="text-error">-{deletions}</span>
-            )}
-          </span>
-        )}
-      </div>
-      {onToggle && (
-        <CaretDownIcon
-          className={cn(
-            'size-icon-xs shrink-0 text-low transition-transform',
-            !expanded && '-rotate-90'
-          )}
-        />
-      )}
+      <FileHeaderContent {...headerProps} />
     </div>
   );
 }

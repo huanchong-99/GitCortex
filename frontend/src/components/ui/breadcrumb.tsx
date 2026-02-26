@@ -82,7 +82,7 @@ const BreadcrumbSeparator = ({
     className={cn('[&>svg]:w-3.5 [&>svg]:h-3.5', className)}
     {...props}
   >
-    {children ?? <span className="tracking-[-1em] mx-2">//</span>}
+    {children ?? <span className="tracking-[-1em] mx-2">{'//'}</span>}
   </li>
 );
 BreadcrumbSeparator.displayName = 'BreadcrumbSeparator';
