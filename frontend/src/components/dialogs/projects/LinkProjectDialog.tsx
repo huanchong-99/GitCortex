@@ -167,8 +167,7 @@ const LinkProjectDialogImpl = NiceModal.create<LinkProjectDialogProps>(
 
     const [selectedOrgId, setSelectedOrgId] = useState<string>('');
     const [linkMode, setLinkMode] = useState<LinkMode>('existing');
-    const [selectedRemoteProjectId, setSelectedRemoteProjectId] =
-      useState<string>('');
+    const [selectedRemoteProjectId, setSelectedRemoteProjectId] = useState<string>('');
     const [newProjectName, setNewProjectName] = useState('');
     const [error, setError] = useState<string | null>(null);
     const remoteDisabledMessage = t('linkDialog.remoteDisabled', {

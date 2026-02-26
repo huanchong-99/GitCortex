@@ -63,8 +63,7 @@ const StartReviewDialogImpl = NiceModal.create<StartReviewDialogProps>(
       return config?.executor_profile ?? null;
     }, [defaultProfile, sessionExecutor, config?.executor_profile]);
 
-    const [userSelectedProfile, setUserSelectedProfile] =
-      useState<ExecutorProfileId | null>(null);
+    const [userSelectedProfile, setUserSelectedProfile] = useState<ExecutorProfileId | null>(null);
     const [additionalPrompt, setAdditionalPrompt] = useState('');
     const [createNewSession, setCreateNewSession] = useState(
       () => !resolvedSessionId

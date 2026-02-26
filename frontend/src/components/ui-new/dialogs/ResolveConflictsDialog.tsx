@@ -79,10 +79,8 @@ const ResolveConflictsDialogImpl =
       }, [sessionExecutor, config?.executor_profile]);
 
       // Default to creating a new session if no existing session
-      const [createNewSession, setCreateNewSession] =
-        useState(!selectedSessionId);
-      const [userSelectedProfile, setUserSelectedProfile] =
-        useState<ExecutorProfileId | null>(null);
+      const [createNewSession, setCreateNewSession] = useState(!selectedSessionId);
+      const [userSelectedProfile, setUserSelectedProfile] = useState<ExecutorProfileId | null>(null);
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [error, setError] = useState<string | null>(null);
 

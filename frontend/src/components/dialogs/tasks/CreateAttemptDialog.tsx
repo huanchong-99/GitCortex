@@ -48,8 +48,7 @@ const CreateAttemptDialogImpl = NiceModal.create<CreateAttemptDialogProps>(
       },
     });
 
-    const [userSelectedProfile, setUserSelectedProfile] =
-      useState<ExecutorProfileId | null>(null);
+    const [userSelectedProfile, setUserSelectedProfile] = useState<ExecutorProfileId | null>(null);
 
     const { data: attempts = [], isLoading: isLoadingAttempts } =
       useTaskAttemptsWithSessions(taskId, {

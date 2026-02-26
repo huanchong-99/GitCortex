@@ -85,8 +85,7 @@ export function useCreateModeState({
   const [targetBranches, setTargetBranches] = useState<Record<string, string>>(
     {}
   );
-  const [selectedProfile, setSelectedProfile] =
-    useState<ExecutorProfileId | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<ExecutorProfileId | null>(null);
   const [message, setMessage] = useState('');
   const [hasInitialValue, setHasInitialValue] = useState(false);
 
