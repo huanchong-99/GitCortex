@@ -11363,7 +11363,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 271.1 Do not use an object literal as default for parameter `options`.
+### 271.1 Do not use an object literal as default for parameter `options`. ✅ 已修复
 
 - **问题ID**: `AZyVwewfZ9DOUQdEsGl4`
 - **项目**: huanchong-99
@@ -11666,7 +11666,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 276.6 The signature '(callback: ((this: MediaQueryList, ev: MediaQueryListEvent) => any) | null): void' of 'mql.addListener' is deprecated.
+### 276.6 The signature '(callback: ((this: MediaQueryList, ev: MediaQueryListEvent) => any) | null): void' of 'mql.addListener' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmL`
 - **项目**: huanchong-99
@@ -11679,7 +11679,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, obsolete, ...
 
-### 276.7 The signature '(callback: ((this: MediaQueryList, ev: MediaQueryListEvent) => any) | null): void' of 'mql.removeListener' is deprecated.
+### 276.7 The signature '(callback: ((this: MediaQueryList, ev: MediaQueryListEvent) => any) | null): void' of 'mql.removeListener' is deprecated. ✅ 已修复
 
 - **问题ID**: `AZyVwew4Z9DOUQdEsGmM`
 - **项目**: huanchong-99
@@ -11979,7 +11979,7 @@
 - **工作量**: 425min effort
 - **创建时间**: 1 month ago
 
-### 283.5 Prefer `throw error` over `return Promise.reject(error)`.
+### 283.5 Prefer `throw error` over `return Promise.reject(error)`. ✅ 已修复
 
 - **问题ID**: `AZyVwewxZ9DOUQdEsGmF`
 - **项目**: huanchong-99
@@ -12223,7 +12223,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 289.1 Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.
+### 289.1 Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read. ✅ 已修复
 
 - **问题ID**: `AZyVweyMZ9DOUQdEsGmf`
 - **项目**: huanchong-99
@@ -12396,7 +12396,7 @@
 
 > 该文件共有 **1** 个问题
 
-### 294.1 Don't use a zero fraction in the number.
+### 294.1 Don't use a zero fraction in the number. ✅ 已修复
 
 - **问题ID**: `AZyVwe3bZ9DOUQdEsGor`
 - **项目**: huanchong-99
@@ -12428,7 +12428,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2015, type-dependent, ...
 
-### 295.2 Remove this useless assignment to variable "user".
+### 295.2 Remove this useless assignment to variable "user". ✅ 已修复
 
 - **问题ID**: `AZyVweuWZ9DOUQdEsGlE`
 - **项目**: huanchong-99
@@ -12550,7 +12550,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2020, portability
 
-### 298.5 Move function 'mapTerminalStatus' to the outer scope.
+### 298.5 Move function 'mapTerminalStatus' to the outer scope. ✅ 已修复
 
 - **问题ID**: `AZyVweu8Z9DOUQdEsGlV`
 - **项目**: huanchong-99
@@ -12705,7 +12705,7 @@
 - **创建时间**: 14 days ago
 - **标签**: redundant, type-dependent
 
-### 300.9 'init.body' may use Object's default stringification format ('[object Object]') when stringified.
+### 300.9 'init.body' may use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVweuzZ9DOUQdEsGlQ`
 - **项目**: huanchong-99
@@ -12815,7 +12815,7 @@
 - **创建时间**: 17 days ago
 - **标签**: confusing, type-dependent
 
-### 301.8 Prefer `.find(…)` over `.filter(…)`.
+### 301.8 Prefer `.find(…)` over `.filter(…)`. ✅ 已修复
 
 - **问题ID**: `AZyVwetGZ9DOUQdEsGki`
 - **项目**: huanchong-99
@@ -12909,7 +12909,7 @@
 - **创建时间**: 1 month ago
 - **标签**: type-dependent
 
-### 302.7 'profilesError' will use Object's default stringification format ('[object Object]') when stringified.
+### 302.7 'profilesError' will use Object's default stringification format ('[object Object]') when stringified. ✅ 已修复
 
 - **问题ID**: `AZyVwetlZ9DOUQdEsGku`
 - **项目**: huanchong-99
@@ -12941,7 +12941,7 @@
 
 > 该文件共有 **2** 个问题
 
-### 303.1 Prefer `String#codePointAt()` over `String#charCodeAt()`.
+### 303.1 Prefer `String#codePointAt()` over `String#charCodeAt()`. ✅ 已修复
 
 - **问题ID**: `AZyVwetbZ9DOUQdEsGkm`
 - **项目**: huanchong-99
@@ -13333,7 +13333,7 @@
 - **创建时间**: 25 days ago
 - **标签**: es2020, portability
 
-### 308.7 Type literal has only a call signature, you should use a function type instead.
+### 308.7 Type literal has only a call signature, you should use a function type instead. ✅ 已修复
 
 - **问题ID**: `AZyVwe2uZ9DOUQdEsGoj`
 - **项目**: huanchong-99
@@ -13507,7 +13507,7 @@
 - **创建时间**: 17 days ago
 - **标签**: es2020, portability
 
-### 311.8 `statuses` should be a `Set`, and use `statuses.has()` to check existence or non-existence.
+### 311.8 `statuses` should be a `Set`, and use `statuses.has()` to check existence or non-existence. ✅ 已修复
 
 - **问题ID**: `AZyVwe2OZ9DOUQdEsGoS`
 - **项目**: huanchong-99
@@ -13764,7 +13764,7 @@
 - **创建时间**: 1 month ago
 - **标签**: react, type-dependent
 
-### 317.2 Move this array "reverse" operation to a separate statement or replace it with "toReversed".
+### 317.2 Move this array "reverse" operation to a separate statement or replace it with "toReversed". ✅ 已修复
 
 - **问题ID**: `AZyVwe1HZ9DOUQdEsGnZ`
 - **项目**: huanchong-99
@@ -13860,7 +13860,7 @@
 
 > 该文件共有 **3** 个问题
 
-### 320.1 Prefer `.findLast(…)` over `.filter(…).pop()`.
+### 320.1 Prefer `.findLast(…)` over `.filter(…).pop()`. ✅ 已修复
 
 - **问题ID**: `AZyVwe1AZ9DOUQdEsGnV`
 - **项目**: huanchong-99
@@ -13963,7 +13963,7 @@
 - **创建时间**: 1 month ago
 - **标签**: es2020, portability
 
-### 322.4 Review this redundant assignment: "cut" already holds the assigned value along all execution paths.
+### 322.4 Review this redundant assignment: "cut" already holds the assigned value along all execution paths. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoA`
 - **项目**: huanchong-99
@@ -13976,7 +13976,7 @@
 - **创建时间**: 1 month ago
 - **标签**: redundant
 
-### 322.5 Review this redundant assignment: "paste" already holds the assigned value along all execution paths.
+### 322.5 Review this redundant assignment: "paste" already holds the assigned value along all execution paths. ✅ 已修复
 
 - **问题ID**: `AZyVwe2AZ9DOUQdEsGoB`
 - **项目**: huanchong-99
@@ -14306,7 +14306,7 @@
 - **创建时间**: 1 month ago
 - **标签**: cwe, html5, ...
 
-### 323.17 Verify the origin of the received message.
+### 323.17 Verify the origin of the received message. ✅ 已修复
 
 - **问题ID**: `AZyVwe14Z9DOUQdEsGnz`
 - **项目**: huanchong-99
@@ -14467,7 +14467,7 @@
 - **创建时间**: 1 month ago
 - **标签**: convention, import, ...
 
-### 324.3 Prefer `Number.parseInt` over `parseInt`.
+### 324.3 Prefer `Number.parseInt` over `parseInt`. ✅ 已修复
 
 - **问题ID**: `AZyVwe3jZ9DOUQdEsGou`
 - **项目**: huanchong-99
@@ -14810,7 +14810,7 @@
 - **创建时间**: 1 month ago
 - **标签**: bash, best-practices, ...
 
-### 327.14 Define a constant instead of using the literal '   - %s\n' 7 times.
+### 327.14 Define a constant instead of using the literal '   - %s\n' 7 times. ✅ 已修复
 
 - **问题ID**: `AZyVwe7iZ9DOUQdEsGqH`
 - **项目**: huanchong-99
@@ -15171,7 +15171,7 @@
 - **创建时间**: 2 days ago
 - **标签**: convention, import, ...
 
-### 333.2 Prefer `node:os` over `os`.
+### 333.2 Prefer `node:os` over `os`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqX`
 - **项目**: huanchong-99
@@ -15223,7 +15223,7 @@
 - **创建时间**: 2 days ago
 - **标签**: convention, import, ...
 
-### 333.6 Prefer `node:readline` over `readline`.
+### 333.6 Prefer `node:readline` over `readline`. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqd`
 - **项目**: huanchong-99
@@ -15236,7 +15236,7 @@
 - **创建时间**: 27 days ago
 - **标签**: convention, import, ...
 
-### 333.7 Prefer top-level await over an async function `main` call.
+### 333.7 Prefer top-level await over an async function `main` call. ✅ 已修复
 
 - **问题ID**: `AZyVwe7rZ9DOUQdEsGqe`
 - **项目**: huanchong-99
