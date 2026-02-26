@@ -6,6 +6,7 @@ import {
   ReactNode,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 import { genId } from '@/utils/id';
 
@@ -136,19 +137,22 @@ export function ReviewProvider({
     return header + commentsMd;
   }, [comments]);
 
+  const contextValue = useMemo(
+    () => ({
+      comments,
+      drafts,
+      addComment,
+      updateComment,
+      deleteComment,
+      clearComments,
+      setDraft,
+      generateReviewMarkdown,
+    }),
+    [comments, drafts, generateReviewMarkdown]
+  );
+
   return (
-    <ReviewContext.Provider
-      value={{
-        comments,
-        drafts,
-        addComment,
-        updateComment,
-        deleteComment,
-        clearComments,
-        setDraft,
-        generateReviewMarkdown,
-      }}
-    >
+    <ReviewContext.Provider value={contextValue}>
       {children}
     </ReviewContext.Provider>
   );

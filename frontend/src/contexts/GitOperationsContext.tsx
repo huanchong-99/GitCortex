@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 type GitOperationsContextType = {
   error: string | null;
@@ -19,8 +19,10 @@ export const GitOperationsProvider: React.FC<{
     setError(null);
   }, [attemptId]);
 
+  const contextValue = useMemo(() => ({ error, setError }), [error]);
+
   return (
-    <GitOperationsContext.Provider value={{ error, setError }}>
+    <GitOperationsContext.Provider value={contextValue}>
       {children}
     </GitOperationsContext.Provider>
   );

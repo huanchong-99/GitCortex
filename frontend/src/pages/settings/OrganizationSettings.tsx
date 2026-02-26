@@ -724,7 +724,7 @@ export function OrganizationSettings() {
               </div>
               <Button
                 variant="destructive"
-                onClick={handleDeleteOrganization}
+                onClick={() => void handleDeleteOrganization()}
                 disabled={deleteOrganization.isPending}
               >
                 {deleteOrganization.isPending ? (

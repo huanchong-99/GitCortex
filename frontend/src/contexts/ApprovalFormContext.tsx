@@ -4,6 +4,7 @@ import {
   useState,
   ReactNode,
   useCallback,
+  useMemo,
 } from 'react';
 
 interface ApprovalFormState {
@@ -90,14 +91,17 @@ export function ApprovalFormProvider({ children }: Readonly<{ children: ReactNod
     });
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      getState,
+      setState,
+      clear,
+    }),
+    [getState, setState, clear]
+  );
+
   return (
-    <ApprovalFormContext.Provider
-      value={{
-        getState,
-        setState,
-        clear,
-      }}
-    >
+    <ApprovalFormContext.Provider value={contextValue}>
       {children}
     </ApprovalFormContext.Provider>
   );

@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import { useApprovalMutation } from '@/hooks/useApprovalMutation';
@@ -88,18 +89,21 @@ export function ApprovalFeedbackProvider({
     [activeApproval, denyAsync]
   );
 
+  const contextValue = useMemo(
+    () => ({
+      activeApproval,
+      enterFeedbackMode,
+      exitFeedbackMode,
+      submitFeedback,
+      isSubmitting: isDenying,
+      error: denyError?.message ?? null,
+      isTimedOut,
+    }),
+    [activeApproval, enterFeedbackMode, exitFeedbackMode, submitFeedback, isDenying, denyError, isTimedOut]
+  );
+
   return (
-    <ApprovalFeedbackContext.Provider
-      value={{
-        activeApproval,
-        enterFeedbackMode,
-        exitFeedbackMode,
-        submitFeedback,
-        isSubmitting: isDenying,
-        error: denyError?.message ?? null,
-        isTimedOut,
-      }}
-    >
+    <ApprovalFeedbackContext.Provider value={contextValue}>
       {children}
     </ApprovalFeedbackContext.Provider>
   );

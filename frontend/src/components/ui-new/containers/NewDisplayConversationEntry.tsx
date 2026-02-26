@@ -573,7 +573,7 @@ function ToolSummaryEntry({
   }, [summary, expanded]);
 
   // Any tool with output can open the logs panel
-  const hasOutput = content && content.trim().length > 0;
+  const hasOutput = content?.trim().length > 0;
 
   const handleViewContent = useCallback(() => {
     viewToolContentInPanel(toolName, content, command);

@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
@@ -57,14 +58,17 @@ export function SearchProvider({ children }: SearchProviderProps) {
     inputRef.current = ref;
   }, []);
 
-  const value: SearchState = {
-    query,
-    setQuery,
-    active: isTasksRoute,
-    clear,
-    focusInput,
-    registerInputRef,
-  };
+  const value = useMemo<SearchState>(
+    () => ({
+      query,
+      setQuery,
+      active: isTasksRoute,
+      clear,
+      focusInput,
+      registerInputRef,
+    }),
+    [query, isTasksRoute, registerInputRef]
+  );
 
   return (
     <SearchContext.Provider value={value}>{children}</SearchContext.Provider>

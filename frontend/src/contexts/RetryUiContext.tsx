@@ -48,12 +48,15 @@ export function RetryUiProvider({
     [activeRetryProcessId, processOrder]
   );
 
-  const value: RetryUiContextType = {
-    activeRetryProcessId,
-    setActiveRetryProcessId,
-    processOrder,
-    isProcessGreyed,
-  };
+  const value = useMemo<RetryUiContextType>(
+    () => ({
+      activeRetryProcessId,
+      setActiveRetryProcessId,
+      processOrder,
+      isProcessGreyed,
+    }),
+    [activeRetryProcessId, processOrder, isProcessGreyed]
+  );
 
   return (
     <RetryUiContext.Provider value={value}>{children}</RetryUiContext.Provider>
