@@ -255,40 +255,45 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                   } else {
                     return (
                       <div className="p-2">
-                        {filteredEntries.map((entry) => (
-                          <div
-                            key={`${entry.path}-${entry.name}`}
-                            className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-accent ${
-                              !entry.is_directory
-                                ? 'opacity-50 cursor-not-allowed'
-                                : ''
-                            }`}
-                            onClick={() =>
-                              entry.is_directory && handleFolderClick(entry)
-                            }
-                            title={entry.name} // Show full name on hover
-                          >
-                            {(() => {
-                              if (entry.is_directory) {
-                                if (entry.is_git_repo) {
-                                  return <FolderOpen className="h-4 w-4 text-success flex-shrink-0" />;
-                                } else {
-                                  return <Folder className="h-4 w-4 text-blue-600 flex-shrink-0" />;
-                                }
-                              } else {
-                                return <File className="h-4 w-4 text-gray-400 flex-shrink-0" />;
+                        {filteredEntries.map((entry) => {
+                          const isDisabled = !entry.is_directory;
+                          const disabledClass = isDisabled
+                            ? 'opacity-50 cursor-not-allowed'
+                            : '';
+
+                          return (
+                            <button
+                              key={`${entry.path}-${entry.name}`}
+                              type="button"
+                              className={`w-full flex items-center space-x-2 p-2 rounded hover:bg-accent ${disabledClass}`}
+                              onClick={() =>
+                                entry.is_directory && handleFolderClick(entry)
                               }
-                            })()}
-                            <span className="text-sm flex-1 truncate min-w-0">
-                              {entry.name}
-                            </span>
-                            {entry.is_git_repo && (
-                              <span className="text-xs text-success bg-green-100 px-2 py-1 rounded flex-shrink-0">
-                                {t('folderPicker.gitRepo')}
+                              disabled={isDisabled}
+                              title={entry.name}
+                            >
+                              {(() => {
+                                if (entry.is_directory) {
+                                  if (entry.is_git_repo) {
+                                    return <FolderOpen className="h-4 w-4 text-success flex-shrink-0" />;
+                                  } else {
+                                    return <Folder className="h-4 w-4 text-blue-600 flex-shrink-0" />;
+                                  }
+                                } else {
+                                  return <File className="h-4 w-4 text-gray-400 flex-shrink-0" />;
+                                }
+                              })()}
+                              <span className="text-sm flex-1 truncate min-w-0 text-left">
+                                {entry.name}
                               </span>
-                            )}
-                          </div>
-                        ))}
+                              {entry.is_git_repo && (
+                                <span className="text-xs text-success bg-green-100 px-2 py-1 rounded flex-shrink-0">
+                                  {t('folderPicker.gitRepo')}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     );
                   }

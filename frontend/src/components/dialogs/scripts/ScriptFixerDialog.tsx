@@ -101,6 +101,82 @@ function getScriptContent(repo: any, scriptType: ScriptType): string {
   return repo.devServerScript ?? '';
 }
 
+// Helper to get run reason from script type
+function getRunReason(scriptType: ScriptType): string {
+  if (scriptType === 'setup') {
+    return 'setupscript';
+  }
+  if (scriptType === 'cleanup') {
+    return 'cleanupscript';
+  }
+  return 'devserver';
+}
+
+// Status indicator component
+function ProcessStatusIndicator({
+  isProcessRunning,
+  isProcessSuccessful,
+  hasProcessError,
+  isProcessKilled,
+  exitCode,
+  t,
+}: {
+  isProcessRunning: boolean;
+  isProcessSuccessful: boolean;
+  hasProcessError: boolean;
+  isProcessKilled: boolean;
+  exitCode: number | bigint | null | undefined;
+  t: any;
+}) {
+  if (isProcessRunning) {
+    return (
+      <>
+        <RunningDots />
+        <span className="text-muted-foreground">
+          {t('scriptFixer.statusRunning')}
+        </span>
+      </>
+    );
+  }
+
+  if (isProcessSuccessful) {
+    return (
+      <>
+        <span className="size-2 rounded-full bg-success" />
+        <span className="text-success">
+          {t('scriptFixer.statusSuccess')}
+        </span>
+      </>
+    );
+  }
+
+  if (hasProcessError) {
+    return (
+      <>
+        <span className="size-2 rounded-full bg-destructive bg-error" />
+        <span className="text-destructive text-error">
+          {t('scriptFixer.statusFailed', {
+            exitCode: Number(exitCode ?? 0),
+          })}
+        </span>
+      </>
+    );
+  }
+
+  if (isProcessKilled) {
+    return (
+      <>
+        <span className="size-2 rounded-full bg-low" />
+        <span className="text-muted-foreground">
+          {t('scriptFixer.statusKilled')}
+        </span>
+      </>
+    );
+  }
+
+  return null;
+}
+
 const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
   ({ scriptType, repos, workspaceId, sessionId, initialRepoId }) => {
     const modal = useModal();
@@ -123,12 +199,7 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
 
     // Find the latest process for this script type
     const latestProcess = useMemo(() => {
-      const runReason =
-        scriptType === 'setup'
-          ? 'setupscript'
-          : scriptType === 'cleanup'
-            ? 'cleanupscript'
-            : 'devserver';
+      const runReason = getRunReason(scriptType);
       const filtered = executionProcesses.filter(
         (p) => p.runReason === runReason && !p.dropped
       );
@@ -334,37 +405,14 @@ const ScriptFixerDialogImpl = NiceModal.create<ScriptFixerDialogProps>(
                 {/* Status indicator */}
                 {latestProcess && (
                   <div className="flex items-center gap-2 text-sm">
-                    {isProcessRunning ? (
-                      <>
-                        <RunningDots />
-                        <span className="text-muted-foreground">
-                          {t('scriptFixer.statusRunning')}
-                        </span>
-                      </>
-                    ) : isProcessSuccessful ? (
-                      <>
-                        <span className="size-2 rounded-full bg-success" />
-                        <span className="text-success">
-                          {t('scriptFixer.statusSuccess')}
-                        </span>
-                      </>
-                    ) : hasProcessError ? (
-                      <>
-                        <span className="size-2 rounded-full bg-destructive bg-error" />
-                        <span className="text-destructive text-error">
-                          {t('scriptFixer.statusFailed', {
-                            exitCode: Number(latestProcess.exitCode ?? 0),
-                          })}
-                        </span>
-                      </>
-                    ) : isProcessKilled ? (
-                      <>
-                        <span className="size-2 rounded-full bg-low" />
-                        <span className="text-muted-foreground">
-                          {t('scriptFixer.statusKilled')}
-                        </span>
-                      </>
-                    ) : null}
+                    <ProcessStatusIndicator
+                      isProcessRunning={isProcessRunning}
+                      isProcessSuccessful={isProcessSuccessful}
+                      hasProcessError={hasProcessError}
+                      isProcessKilled={isProcessKilled}
+                      exitCode={latestProcess.exitCode}
+                      t={t}
+                    />
                   </div>
                 )}
               </div>

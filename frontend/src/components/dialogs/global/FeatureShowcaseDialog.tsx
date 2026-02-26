@@ -99,9 +99,9 @@ const FeatureShowcaseDialogImpl = NiceModal.create<FeatureShowcaseDialogProps>(
                 </p>
 
                 <div className="flex items-center gap-2">
-                  {config.stages.map((_, index) => (
+                  {config.stages.map((stageItem, index) => (
                     <div
-                      key={`stage-indicator-${index}`}
+                      key={`${stageItem.titleKey}-${index}`}
                       className={`h-1 flex-1 rounded-full transition-colors ${
                         index === currentStage ? 'bg-primary' : 'bg-muted'
                       }`}

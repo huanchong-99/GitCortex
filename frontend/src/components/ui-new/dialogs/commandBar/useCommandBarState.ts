@@ -100,7 +100,7 @@ function handleSelectAction(
           status: 'selectingRepo',
           stack: [...state.stack, state.page],
           search: '',
-          pendingAction: action as GitActionDefinition,
+          pendingAction: action,
         },
         noEffect,
       ];
