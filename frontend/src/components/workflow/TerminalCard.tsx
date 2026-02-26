@@ -84,12 +84,12 @@ interface TerminalCardProps {
 export function TerminalCard({ terminal, onClick }: TerminalCardProps) {
   const { t } = useTranslation('workflow');
   const statusStyle = STATUS_STYLES[terminal.status];
-  const cliType = Object.prototype.hasOwnProperty.call(CLI_TYPES, terminal.cliTypeId)
+  const cliType = Object.hasOwn(CLI_TYPES, terminal.cliTypeId)
     ? CLI_TYPES[terminal.cliTypeId as CliTypeId]
     : undefined;
   const orderLabel = t('terminalCard.orderLabel', { index: terminal.orderIndex + 1 });
   const roleValue = terminal.role?.trim();
-  const roleLabel = roleValue ? roleValue : t('terminalCard.defaultRole');
+  const roleLabel = roleValue || t('terminalCard.defaultRole');
 
   return (
     <button

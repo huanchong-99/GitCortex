@@ -43,8 +43,13 @@ export function ToastProvider({ children }: Readonly<ToastProviderProps>) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  const value = React.useMemo(
+    () => ({ toasts, showToast, dismissToast }),
+    [toasts, showToast, dismissToast]
+  );
+
   return (
-    <ToastContext.Provider value={{ toasts, showToast, dismissToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </ToastContext.Provider>
