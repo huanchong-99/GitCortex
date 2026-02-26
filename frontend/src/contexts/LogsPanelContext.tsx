@@ -62,12 +62,14 @@ export function LogsPanelProvider({ children }: LogsPanelProviderProps) {
   const [logMatchIndices, setLogMatchIndices] = useState<number[]>([]);
   const [logCurrentMatchIdx, setLogCurrentMatchIdx] = useState(0);
 
-  const logContentId =
-    logsPanelContent?.type === 'process'
-      ? logsPanelContent.processId
-      : logsPanelContent?.type === 'tool'
-        ? logsPanelContent.toolName
-        : null;
+  let logContentId: string | null;
+  if (logsPanelContent?.type === 'process') {
+    logContentId = logsPanelContent.processId;
+  } else if (logsPanelContent?.type === 'tool') {
+    logContentId = logsPanelContent.toolName;
+  } else {
+    logContentId = null;
+  }
 
   useEffect(() => {
     setLogSearchQuery('');

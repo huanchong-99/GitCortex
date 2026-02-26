@@ -79,34 +79,47 @@ function ImageComponent({
   );
 
   // Determine what to show as thumbnail
-  let thumbnailContent: React.ReactNode;
-  let displayName: string;
-  let metadataLine: string | null = null;
+  const getThumbnailContent = () => {
+    const hasContext = !!taskAttemptId || !!taskId;
+    const hasLocalImage = localImages.some((img) => img.path === src);
 
-  // Check if we have context for fetching metadata (either taskAttemptId or taskId)
-  const hasContext = !!taskAttemptId || !!taskId;
-  // Check if image exists in local images (for create mode where no task context exists yet)
-  const hasLocalImage = localImages.some((img) => img.path === src);
+    if (!isVibeImage) {
+      return {
+        thumbnail: (
+          <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
+            <HelpCircle className="w-5 h-5 text-muted-foreground" />
+          </div>
+        ),
+        displayName: truncatePath(altText || src),
+        metadataLine: null,
+      };
+    }
 
-  if (isVibeImage && (hasLocalImage || hasContext)) {
+    if (!hasLocalImage && !hasContext) {
+      return {
+        thumbnail: (
+          <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
+            <HelpCircle className="w-5 h-5 text-muted-foreground" />
+          </div>
+        ),
+        displayName: truncatePath(src),
+        metadataLine: null,
+      };
+    }
+
     if (loading) {
-      thumbnailContent = (
-        <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
-          <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
-        </div>
-      );
-      displayName = truncatePath(src);
-    } else if (metadata?.exists && metadata.proxy_url) {
-      thumbnailContent = (
-        <img
-          src={metadata.proxy_url}
-          alt={altText}
-          className="w-10 h-10 object-cover rounded flex-shrink-0"
-          draggable={false}
-        />
-      );
-      displayName = truncatePath(metadata.file_name || altText || src);
-      // Build metadata line
+      return {
+        thumbnail: (
+          <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
+            <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+          </div>
+        ),
+        displayName: truncatePath(src),
+        metadataLine: null,
+      };
+    }
+
+    if (metadata?.exists && metadata.proxy_url) {
       const parts: string[] = [];
       if (metadata.format) {
         parts.push(metadata.format.toUpperCase());
@@ -115,35 +128,34 @@ function ImageComponent({
       if (sizeStr) {
         parts.push(sizeStr);
       }
-      if (parts.length > 0) {
-        metadataLine = parts.join(' · ');
-      }
-    } else {
-      // Vibe image but not found or error
-      thumbnailContent = (
+
+      return {
+        thumbnail: (
+          <img
+            src={metadata.proxy_url}
+            alt={altText}
+            className="w-10 h-10 object-cover rounded flex-shrink-0"
+            draggable={false}
+          />
+        ),
+        displayName: truncatePath(metadata.file_name || altText || src),
+        metadataLine: parts.length > 0 ? parts.join(' · ') : null,
+      };
+    }
+
+    return {
+      thumbnail: (
         <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
           <HelpCircle className="w-5 h-5 text-muted-foreground" />
         </div>
-      );
-      displayName = truncatePath(src);
-    }
-  } else if (!isVibeImage) {
-    // Non-vibe-image: show question mark and path
-    thumbnailContent = (
-      <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
-        <HelpCircle className="w-5 h-5 text-muted-foreground" />
-      </div>
-    );
-    displayName = truncatePath(altText || src);
-  } else {
-    // isVibeImage but no context available - fallback to question mark
-    thumbnailContent = (
-      <div className="w-10 h-10 flex items-center justify-center bg-muted rounded flex-shrink-0">
-        <HelpCircle className="w-5 h-5 text-muted-foreground" />
-      </div>
-    );
-    displayName = truncatePath(src);
-  }
+      ),
+      displayName: truncatePath(src),
+      metadataLine: null,
+    };
+  };
+
+  const { thumbnail: thumbnailContent, displayName, metadataLine } =
+    getThumbnailContent();
 
   return (
     <span

@@ -145,13 +145,16 @@ export function PreviewPanel() {
     (previewState.status === 'ready' && Boolean(previewState.url)) ||
     (customUrl !== null && hasRunningDevServer);
   const isPreviewReadyWithoutError = isPreviewReady && !iframeError;
-  const mode = iframeError
-    ? 'error'
-    : isPreviewReadyWithoutError
-      ? 'ready'
-      : hasRunningDevServer
-        ? 'searching'
-        : 'noServer';
+
+  const getPreviewMode = (): 'error' | 'ready' | 'searching' | 'noServer' => {
+    if (iframeError) return 'error';
+    if (isPreviewReadyWithoutError) return 'ready';
+    if (hasRunningDevServer) return 'searching';
+    return 'noServer';
+  };
+
+  const mode = getPreviewMode();
+
   const toggleLogs = () => {
     setShowLogs((v) => !v);
   };

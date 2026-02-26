@@ -34,8 +34,8 @@ export function FormField({
 
   const descriptionId = description ? `${fieldId}-description` : undefined;
   const errorId = error ? `${fieldId}-error` : undefined;
-  const describedBy =
-    [descriptionId, errorId].filter(Boolean).join(' ') || undefined;
+  const describedByParts = [descriptionId, errorId].filter(Boolean);
+  const describedBy = describedByParts.length > 0 ? describedByParts.join(' ') : undefined;
 
   const control = React.isValidElement(children)
     ? React.cloneElement(children, {

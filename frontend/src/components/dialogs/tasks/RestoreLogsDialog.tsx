@@ -316,22 +316,22 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                       className={(() => {
                         if (!worktreeResetOn) {
                           return 'flex items-start gap-3 rounded-md border p-3';
-                        } else if (hasRisk) {
-                          return 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3';
-                        } else {
-                          return 'flex items-start gap-3 rounded-md border p-3 border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20';
                         }
+                        if (hasRisk) {
+                          return 'flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3';
+                        }
+                        return 'flex items-start gap-3 rounded-md border p-3 border-amber-300/60 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-900/20';
                       })()}
                     >
                       <AlertTriangle
                         className={(() => {
                           if (!worktreeResetOn) {
                             return 'h-4 w-4 text-muted-foreground mt-0.5';
-                          } else if (hasRisk) {
-                            return 'h-4 w-4 text-destructive mt-0.5';
-                          } else {
-                            return 'h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5';
                           }
+                          if (hasRisk) {
+                            return 'h-4 w-4 text-destructive mt-0.5';
+                          }
+                          return 'h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5';
                         })()}
                       />
                       <div className="text-sm min-w-0 w-full break-words">
@@ -452,12 +452,10 @@ const RestoreLogsDialogImpl = NiceModal.create<RestoreLogsDialogProps>(
                               if (forceReset) {
                                 if (worktreeResetOn) {
                                   return t('restoreLogsDialog.resetWorktree.enabled');
-                                } else {
-                                  return t('restoreLogsDialog.resetWorktree.disabled');
                                 }
-                              } else {
-                                return t('restoreLogsDialog.resetWorktree.disabledUncommitted');
+                                return t('restoreLogsDialog.resetWorktree.disabled');
                               }
+                              return t('restoreLogsDialog.resetWorktree.disabledUncommitted');
                             })()}
                           </div>
                           <div className="ml-auto relative inline-flex h-5 w-9 items-center rounded-full">

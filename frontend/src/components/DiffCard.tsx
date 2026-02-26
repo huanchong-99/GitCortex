@@ -323,13 +323,15 @@ export default function DiffCard({
           className="px-4 pb-4 text-xs font-mono"
           style={{ color: 'hsl(var(--muted-foreground) / 0.9)' }}
         >
-          {(() => {
-            if (isOmitted) return 'Content omitted due to file size. Open in editor to view.';
-            if (!isContentEqual) return 'Failed to render diff for this file.';
-            if (diff.change === 'renamed') return 'File renamed with no content changes.';
-            if (diff.change === 'permissionChange') return 'File permission changed.';
-            return 'No content changes to display.';
-          })()}
+          {isOmitted
+            ? 'Content omitted due to file size. Open in editor to view.'
+            : !isContentEqual
+              ? 'Failed to render diff for this file.'
+              : diff.change === 'renamed'
+                ? 'File renamed with no content changes.'
+                : diff.change === 'permissionChange'
+                  ? 'File permission changed.'
+                  : 'No content changes to display.'}
         </div>
       )}
     </div>

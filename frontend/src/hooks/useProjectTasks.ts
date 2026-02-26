@@ -113,10 +113,10 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
     const map: Record<string, SharedTaskRecord> = {};
     const list = Array.isArray(sharedTasksList) ? sharedTasksList : [];
     for (const task of list) {
-      const assignee =
-        task.assignee_user_id && assignees
-          ? assignees.find((a) => a.user_id === task.assignee_user_id)
-          : null;
+      let assignee = null;
+      if (task.assignee_user_id && assignees) {
+        assignee = assignees.find((a) => a.user_id === task.assignee_user_id) ?? null;
+      }
       map[task.id] = {
         ...task,
         status: task.status,
