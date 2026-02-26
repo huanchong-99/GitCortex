@@ -789,7 +789,7 @@
 
 ---
 
-## 23. huanchong-99GitCortexdocker/Dockerfile
+## 23. huanchong-99GitCortexdocker/Dockerfile ✅ 已修复
 
 > 该文件共有 **1** 个问题
 
@@ -5565,7 +5565,7 @@
 
 ---
 
-## 165. huanchong-99GitCortexscripts/docker/e2e-smoke.sh
+## 165. huanchong-99GitCortexscripts/docker/e2e-smoke.sh ✅ 已修复
 
 > 该文件共有 **2** 个问题
 
