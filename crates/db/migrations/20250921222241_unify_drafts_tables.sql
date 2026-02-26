@@ -59,21 +59,17 @@ SELECT
     queued, sending, version, variant, image_ids, created_at, updated_at
 FROM follow_up_drafts;
 
--- Migrate existing retry_drafts
--- NOTE: EXISTS subquery is acceptable here for a one-time migration to prevent duplicate inserts.
+-- Migrate existing retry_drafts using LEFT JOIN to prevent duplicate inserts.
 INSERT INTO drafts (
     id, task_attempt_id, draft_type, retry_process_id, prompt,
     queued, sending, version, variant, image_ids, created_at, updated_at
 )
 SELECT
-    id, task_attempt_id, 'retry', retry_process_id, prompt,
-    queued, sending, version, variant, image_ids, created_at, updated_at
+    rd.id, rd.task_attempt_id, 'retry', rd.retry_process_id, rd.prompt,
+    rd.queued, rd.sending, rd.version, rd.variant, rd.image_ids, rd.created_at, rd.updated_at
 FROM retry_drafts rd
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM drafts d
-    WHERE d.id = rd.id
-);
+LEFT JOIN drafts d ON d.id = rd.id
+WHERE d.id IS NULL;
 
 -- Drop old tables
 DROP TABLE IF EXISTS follow_up_drafts;
