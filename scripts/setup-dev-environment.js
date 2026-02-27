@@ -89,9 +89,9 @@ function clearPorts() {
 
 // CLI interface
 if (require.main === module) {
-  const command = process.argv[2];
+  async function main() {
+    const command = process.argv[2];
 
-  try {
     switch (command) {
       case "get": {
         const ports = await getPorts();
@@ -131,10 +131,12 @@ if (require.main === module) {
         );
         break;
     }
-  } catch (error) {
+  }
+
+  main().catch((error) => {
     console.error(error);
     process.exit(1);
-  }
+  });
 }
 
 module.exports = { getPorts, clearPorts };

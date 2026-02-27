@@ -393,10 +393,7 @@ if (process.platform === "win32") {
     .on("SIGINT", () => stop(0));
 }
 
-/**
- * Main entry point - using top-level await
- */
-try {
+async function main() {
   acquireDevLock();
   console.log("[dev] Setting up development environment...");
 
@@ -449,15 +446,16 @@ try {
     ["run", "dev", "--", "--port", String(ports.frontend), "--host"],
     {
       env,
-      cwd: path.join(__dirname, "..", "frontend")
+      cwd: path.join(__dirname, "..", "frontend"),
     }
   );
 
   console.log("[dev] Development servers started successfully");
   console.log("[dev] Press Ctrl+C to stop");
-} catch (err) {
+}
+
+main().catch((err) => {
   releaseDevLock();
   console.error("[dev] Failed to start development environment:", err);
   process.exit(1);
-}
-
+});
