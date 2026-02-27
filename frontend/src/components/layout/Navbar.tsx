@@ -38,20 +38,25 @@ import {
 import { OAuthDialog } from '@/components/dialogs/global/OAuthDialog';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { oauthApi } from '@/lib/api';
+import { LanguageToggleButton } from './LanguageToggleButton';
 
 const INTERNAL_NAV = [
-  { label: 'Projects', icon: FolderOpen, to: '/board' },
-  { label: 'Slash Commands', icon: Terminal, to: '/commands' },
+  { labelKey: 'navbar.internal.projects', icon: FolderOpen, to: '/board' },
+  {
+    labelKey: 'navbar.internal.slashCommands',
+    icon: Terminal,
+    to: '/commands',
+  },
 ];
 
 const EXTERNAL_LINKS = [
   {
-    label: 'Docs',
+    labelKey: 'navbar.external.docs',
     icon: BookOpen,
     href: 'https://gitcortex.com/docs',
   },
   {
-    label: 'Support',
+    labelKey: 'navbar.external.support',
     icon: MessageCircleQuestion,
     href: 'https://github.com/BloopAI/gitcortex/issues',
   },
@@ -194,7 +199,7 @@ export function Navbar() {
                     size="icon"
                     className="h-9 w-9"
                     onClick={handleCreateTask}
-                    aria-label="Create new task"
+                    aria-label={t('common:navbar.createTaskAria')}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -206,7 +211,7 @@ export function Navbar() {
             <Button variant="ghost" size="sm" className="h-9 gap-1.5" asChild>
               <Link to="/workspaces/create">
                 <FolderOpen className="h-4 w-4" />
-                Workspaces
+                {t('common:navbar.workspaces')}
               </Link>
             </Button>
             <NavDivider />
@@ -217,7 +222,7 @@ export function Navbar() {
                 size="icon"
                 className="h-9 w-9"
                 asChild
-                aria-label="Settings"
+                aria-label={t('common:navbar.settingsAria')}
               >
                 <Link
                   to={
@@ -229,6 +234,7 @@ export function Navbar() {
                   <Settings className="h-4 w-4" />
                 </Link>
               </Button>
+              <LanguageToggleButton />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -236,7 +242,7 @@ export function Navbar() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
-                    aria-label="Main navigation"
+                    aria-label={t('common:navbar.mainNavigationAria')}
                   >
                     <Menu className="h-4 w-4" />
                   </Button>
@@ -254,7 +260,7 @@ export function Navbar() {
                       >
                         <Link to={item.to}>
                           <Icon className="mr-2 h-4 w-4" />
-                          {item.label}
+                          {t(`common:${item.labelKey}`)}
                         </Link>
                       </DropdownMenuItem>
                     );
@@ -272,7 +278,7 @@ export function Navbar() {
                           rel="noopener noreferrer"
                         >
                           <Icon className="mr-2 h-4 w-4" />
-                          {item.label}
+                          {t(`common:${item.labelKey}`)}
                         </a>
                       </DropdownMenuItem>
                     );
@@ -288,7 +294,7 @@ export function Navbar() {
                   ) : (
                     <DropdownMenuItem onSelect={handleOpenOAuth}>
                       <LogIn className="mr-2 h-4 w-4" />
-                      Sign in
+                      {t('common:signIn')}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>

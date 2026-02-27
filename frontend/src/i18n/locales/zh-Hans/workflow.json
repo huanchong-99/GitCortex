@@ -421,7 +421,9 @@
     "pipeline": "流水线",
     "debug": "调试",
     "selectWorkflowFirst": "请先选择工作流",
-    "settings": "设置"
+    "settings": "设置",
+    "workflowManagement": "工作流管理",
+    "createWorkspace": "创建工作区"
   },
   "kanban": {
     "columns": {

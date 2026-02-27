@@ -88,8 +88,27 @@
     "currentBadge": " (current)"
   },
   "navbar": {
-    "tryNewUI": "try the new UI"
+    "tryNewUI": "try the new UI",
+    "workspaces": "Workspaces",
+    "createTaskAria": "Create new task",
+    "settingsAria": "Settings",
+    "mainNavigationAria": "Main navigation",
+    "internal": {
+      "projects": "Projects",
+      "slashCommands": "Slash Commands"
+    },
+    "external": {
+      "docs": "Docs",
+      "support": "Support"
+    },
+    "languageToggle": {
+      "en": "EN",
+      "zh": "中",
+      "switchToEnglish": "Switch interface to English",
+      "switchToChinese": "Switch interface to Chinese"
+    }
   },
+  "signIn": "Sign in",
   "signOut": "Sign out",
   "devMode": {
     "banner": "Development Mode - This is a development build"

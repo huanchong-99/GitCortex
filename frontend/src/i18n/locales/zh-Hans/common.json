@@ -88,8 +88,27 @@
     "currentBadge": "（当前）"
   },
   "navbar": {
-    "tryNewUI": "试用新界面"
+    "tryNewUI": "试用新界面",
+    "workspaces": "工作区",
+    "createTaskAria": "创建新任务",
+    "settingsAria": "设置",
+    "mainNavigationAria": "主导航",
+    "internal": {
+      "projects": "项目",
+      "slashCommands": "斜杠命令"
+    },
+    "external": {
+      "docs": "文档",
+      "support": "支持"
+    },
+    "languageToggle": {
+      "en": "EN",
+      "zh": "中",
+      "switchToEnglish": "切换为英文界面",
+      "switchToChinese": "切换为中文界面"
+    }
   },
+  "signIn": "登录",
   "signOut": "退出登录",
   "devMode": {
     "banner": "开发模式 - 这是开发版本"

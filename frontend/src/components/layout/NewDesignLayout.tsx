@@ -8,6 +8,7 @@ import {
 import { LayoutGrid, GitBranch, Bug, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { LanguageToggleButton } from './LanguageToggleButton';
 
 type ViewType = 'kanban' | 'pipeline' | 'debug';
 
@@ -130,18 +131,19 @@ export function NewDesignLayout() {
               type="button"
               onClick={() => navigate('/wizard')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
-              title={t('viewSwitcher.workflowManagement', { defaultValue: 'Workflow Management' })}
+              title={t('viewSwitcher.workflowManagement')}
             >
-              {t('viewSwitcher.workflowManagement', { defaultValue: 'Workflow Management' })}
+              {t('viewSwitcher.workflowManagement')}
             </button>
             <button
               type="button"
               onClick={() => navigate('/workspaces/create')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-low hover:text-high hover:bg-secondary"
-              title={t('viewSwitcher.createWorkspace', { defaultValue: 'Create Workspace' })}
+              title={t('viewSwitcher.createWorkspace')}
             >
-              {t('viewSwitcher.createWorkspace', { defaultValue: 'Create Workspace' })}
+              {t('viewSwitcher.createWorkspace')}
             </button>
+            <LanguageToggleButton className="h-auto min-w-0 px-3 py-1.5 rounded text-sm" />
             <button
               type="button"
               onClick={() => navigate('/settings')}

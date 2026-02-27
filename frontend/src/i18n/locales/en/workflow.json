@@ -422,7 +422,9 @@
     "pipeline": "Pipeline",
     "debug": "Debug",
     "selectWorkflowFirst": "Select a workflow first",
-    "settings": "Settings"
+    "settings": "Settings",
+    "workflowManagement": "Workflow Management",
+    "createWorkspace": "Create Workspace"
   },
   "kanban": {
     "columns": {
