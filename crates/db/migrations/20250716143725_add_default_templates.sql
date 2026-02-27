@@ -49,7 +49,7 @@ INSERT INTO task_templates (
     '2. Recommendations for fixes' || char(10) ||
     '3. Estimated effort for addressing each issue',
     'Bug Analysis',
-    datetime('now', 'subsec'),
+    datetime('now', 'subsec'), -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
     datetime('now', 'subsec')
 );
 

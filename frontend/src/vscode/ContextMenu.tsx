@@ -136,7 +136,26 @@ export const WebviewContextMenu: React.FC = () => {
     return () => cancelAnimationFrame(id);
   }, [visible, pos]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const id = requestAnimationFrame(() => {
+      focusMenuItem(0);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [visible, canCut, canPaste]);
+
   const close = () => setVisible(false);
+
+  const focusMenuItem = (nextIndex: number) => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const items = Array.from(
+      menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
+    );
+    if (items.length === 0) return;
+    const normalizedIndex = ((nextIndex % items.length) + items.length) % items.length;
+    items[normalizedIndex]?.focus();
+  };
 
   const onCopy = async () => {
     const tgt = targetRef.current as HTMLElement | null;
@@ -157,7 +176,6 @@ export const WebviewContextMenu: React.FC = () => {
     if (!copied) {
       try {
         // Legacy fallback for environments where Clipboard API is unavailable
-        // eslint-disable-next-line deprecation/deprecation
         document.execCommand('copy');
       } catch {
         /* empty */
@@ -182,7 +200,6 @@ export const WebviewContextMenu: React.FC = () => {
         await writeClipboardText(sel);
         try {
           // Legacy fallback for contentEditable cut operation
-          // eslint-disable-next-line deprecation/deprecation
           document.execCommand('delete');
         } catch {
           /* empty */
@@ -205,7 +222,6 @@ export const WebviewContextMenu: React.FC = () => {
     } else if (isEditable(tgt)) {
       (tgt as HTMLElement).focus();
       // Legacy fallback for contentEditable paste operation
-      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('insertText', false, text);
     }
     close();
@@ -214,7 +230,6 @@ export const WebviewContextMenu: React.FC = () => {
   const onUndo = () => {
     try {
       // Legacy fallback for undo operation (no modern API alternative)
-      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('undo');
     } catch {
       /* empty */
@@ -224,7 +239,6 @@ export const WebviewContextMenu: React.FC = () => {
   const onRedo = () => {
     try {
       // Legacy fallback for redo operation (no modern API alternative)
-      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('redo');
     } catch {
       /* empty */
@@ -234,12 +248,52 @@ export const WebviewContextMenu: React.FC = () => {
   const onSelectAll = () => {
     try {
       // Legacy fallback for select all operation (no modern API alternative)
-      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('selectAll');
     } catch {
       /* empty */
     }
     close();
+  };
+
+  const onMenuKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const items = Array.from(
+      menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
+    );
+    if (items.length === 0) return;
+
+    const currentIndex = items.findIndex((item) => item === document.activeElement);
+    const activeIndex = currentIndex >= 0 ? currentIndex : 0;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusMenuItem(activeIndex + 1);
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusMenuItem(activeIndex - 1);
+      return;
+    }
+
+    if (e.key === 'Home') {
+      e.preventDefault();
+      focusMenuItem(0);
+      return;
+    }
+
+    if (e.key === 'End') {
+      e.preventDefault();
+      focusMenuItem(items.length - 1);
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
   };
 
   if (!visible) return null;
@@ -248,6 +302,8 @@ export const WebviewContextMenu: React.FC = () => {
     <div
       ref={menuRef}
       role="menu"
+      tabIndex={-1}
+      aria-orientation="vertical"
       style={{
         position: 'fixed',
         left: (adjustedPos ?? pos).x,
@@ -256,6 +312,7 @@ export const WebviewContextMenu: React.FC = () => {
       }}
       className="min-w-[160px] rounded-md border border-gray-300 bg-white text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
       onContextMenu={(e) => e.preventDefault()}
+      onKeyDown={onMenuKeyDown}
     >
       <MenuItem label="Copy" onClick={onCopy} />
       {canCut && <MenuItem label="Cut" onClick={onCut} />}

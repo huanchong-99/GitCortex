@@ -136,6 +136,47 @@ function createUserMessagePatch(
   return patchWithKey(userPatch, executionProcessId, 'user');
 }
 
+function buildCommandExitStatus(
+  executionProcess: ExecutionProcess | undefined,
+  exitCode: number
+): CommandExitStatus | null {
+  if (executionProcess?.status === ExecutionProcessStatus.running) {
+    return null;
+  }
+
+  return {
+    type: 'exit_code',
+    code: exitCode,
+  };
+}
+
+function buildToolStatus(
+  executionProcess: ExecutionProcess | undefined,
+  exitCode: number
+): ToolStatus {
+  if (executionProcess?.status === ExecutionProcessStatus.running) {
+    return { status: 'created' };
+  }
+
+  if (exitCode === 0) {
+    return { status: 'success' };
+  }
+
+  return { status: 'failed' };
+}
+
+function stringifyEntryContent(line: PatchTypeWithKey): string {
+  if (typeof line.content === 'string') {
+    return line.content;
+  }
+
+  return JSON.stringify(line.content);
+}
+
+function stringifyEntries(entries: PatchTypeWithKey[]): string {
+  return entries.map(stringifyEntryContent).join('\n');
+}
+
 // Helper to create script tool patch
 function createScriptToolPatch(
   executionProcess: ExecutionProcess | undefined,
@@ -146,22 +187,9 @@ function createScriptToolPatch(
   patchWithKey: (patch: PatchType, executionProcessId: string, index: number | 'user') => PatchTypeWithKey
 ): PatchTypeWithKey {
   const exitCode = Number(executionProcess?.exitCode) || 0;
-  const exit_status: CommandExitStatus | null =
-    executionProcess?.status === 'running'
-      ? null
-      : {
-          type: 'exit_code',
-          code: exitCode,
-        };
-
-  const toolStatus: ToolStatus =
-    executionProcess?.status === ExecutionProcessStatus.running
-      ? { status: 'created' }
-      : exitCode === 0
-        ? { status: 'success' }
-        : { status: 'failed' };
-
-  const output = entries.map((line) => typeof line.content === 'string' ? line.content : JSON.stringify(line.content)).join('\n');
+  const exit_status = buildCommandExitStatus(executionProcess, exitCode);
+  const toolStatus = buildToolStatus(executionProcess, exitCode);
+  const output = stringifyEntries(entries);
 
   const toolNormalizedEntry: NormalizedEntry = {
     entry_type: {
@@ -201,6 +229,158 @@ function getScriptToolName(context: string): string | null {
   }
 }
 
+type CodingAgentProcessResult = {
+  entries: PatchTypeWithKey[];
+  hasPendingApproval: boolean;
+  isProcessRunning: boolean;
+  processFailedOrKilled: boolean;
+  needsSetup: boolean;
+  setupHelpText: string | undefined;
+};
+
+type ScriptProcessResult = {
+  entries: PatchTypeWithKey[];
+  isProcessRunning: boolean;
+  processFailedOrKilled: boolean;
+};
+
+function getPromptFromExecutorAction(typ: ExecutorAction['typ']): string {
+  if (
+    typ.type === 'CodingAgentInitialRequest' ||
+    typ.type === 'CodingAgentFollowUpRequest'
+  ) {
+    return typ.prompt;
+  }
+
+  return '';
+}
+
+function buildExecutionProcessStreamUrl(executionProcess: ExecutionProcess): string {
+  if (executionProcess.executorAction.typ.type === 'ScriptRequest') {
+    return `/api/execution-processes/${executionProcess.id}/raw-logs/ws`;
+  }
+
+  return `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
+}
+
+function getRunningOrInitialAddType(
+  displayedCount: number
+): Extract<AddEntryType, 'running' | 'initial'> {
+  if (displayedCount > 1) {
+    return 'running';
+  }
+
+  return 'initial';
+}
+
+function processCodingAgentEntries(
+  processState: ExecutionProcessState,
+  index: number,
+  totalProcesses: number,
+  getLiveExecutionProcess: (executionProcessId: string) => ExecutionProcess | undefined,
+  patchWithKey: (
+    patch: PatchType,
+    executionProcessId: string,
+    index: number | 'user'
+  ) => PatchTypeWithKey
+): CodingAgentProcessResult {
+  const entries: PatchTypeWithKey[] = [];
+
+  const prompt = getPromptFromExecutorAction(processState.executionProcess.executorAction.typ);
+  const userPatch = createUserMessagePatch(
+    processState.executionProcess.id,
+    prompt,
+    patchWithKey
+  );
+  entries.push(userPatch);
+
+  const entriesExcludingUser = processState.entries.filter(
+    (entry) =>
+      entry.type !== 'NORMALIZED_ENTRY' ||
+      entry.content.entry_type.type !== 'user_message'
+  );
+
+  const hasPendingApproval = hasPendingApprovalInEntries(entriesExcludingUser);
+  entries.push(...entriesExcludingUser);
+
+  const liveProcessStatus = getLiveExecutionProcess(processState.executionProcess.id)?.status;
+  const isProcessRunning = liveProcessStatus === ExecutionProcessStatus.running;
+  const processFailedOrKilled =
+    liveProcessStatus === ExecutionProcessStatus.failed ||
+    liveProcessStatus === ExecutionProcessStatus.killed;
+
+  let needsSetup = false;
+  let setupHelpText: string | undefined;
+
+  if (processFailedOrKilled && index === totalProcesses - 1) {
+    const setupText = findSetupRequiredText(entriesExcludingUser);
+    if (setupText) {
+      needsSetup = true;
+      setupHelpText = setupText;
+    }
+  }
+
+  if (isProcessRunning && !hasPendingApprovalInEntries(entriesExcludingUser)) {
+    entries.push(makeLoadingPatch(processState.executionProcess.id));
+  }
+
+  return {
+    entries,
+    hasPendingApproval,
+    isProcessRunning,
+    processFailedOrKilled,
+    needsSetup,
+    setupHelpText,
+  };
+}
+
+function processScriptRequestEntries(
+  processState: ExecutionProcessState,
+  index: number,
+  totalProcesses: number,
+  getLiveExecutionProcess: (executionProcessId: string) => ExecutionProcess | undefined,
+  patchWithKey: (
+    patch: PatchType,
+    executionProcessId: string,
+    index: number | 'user'
+  ) => PatchTypeWithKey
+): ScriptProcessResult {
+  const typ = processState.executionProcess.executorAction.typ;
+  const context = typ.type === 'ScriptRequest' ? typ.context : null;
+  const toolName = context ? getScriptToolName(context) : null;
+
+  if (!toolName) {
+    return {
+      entries: [],
+      isProcessRunning: false,
+      processFailedOrKilled: false,
+    };
+  }
+
+  const executionProcess = getLiveExecutionProcess(processState.executionProcess.id);
+  const isProcessRunning = executionProcess?.status === ExecutionProcessStatus.running;
+  const processFailedOrKilled =
+    (executionProcess?.status === ExecutionProcessStatus.failed ||
+      executionProcess?.status === ExecutionProcessStatus.killed) &&
+    index === totalProcesses - 1;
+
+  const script = typ.type === 'ScriptRequest' ? typ.script : '';
+  const toolPatch = createScriptToolPatch(
+    executionProcess,
+    processState.executionProcess.id,
+    toolName,
+    script,
+    processState.entries,
+    patchWithKey
+  );
+
+  return {
+    entries: [toolPatch],
+    isProcessRunning,
+    processFailedOrKilled,
+  };
+}
+
 export const useConversationHistory = ({
   attempt,
   onEntriesUpdated,
@@ -236,12 +416,7 @@ export const useConversationHistory = ({
   const loadEntriesForHistoricExecutionProcess = (
     executionProcess: ExecutionProcess
   ) => {
-    let url = '';
-    if (executionProcess.executorAction.typ.type === 'ScriptRequest') {
-      url = `/api/execution-processes/${executionProcess.id}/raw-logs/ws`;
-    } else {
-      url = `/api/execution-processes/${executionProcess.id}/normalized-logs/ws`;
-    }
+    const url = buildExecutionProcessStreamUrl(executionProcess);
 
     return new Promise<PatchType[]>((resolve) => {
       const controller = streamJsonPatchEntries<PatchType>(url, {
@@ -315,175 +490,79 @@ export const useConversationHistory = ({
 
   const flattenEntriesForEmit = useCallback(
     (executionProcessState: ExecutionProcessStateStore): PatchTypeWithKey[] => {
-      // Helper: Process coding agent entries
-      const processCodingAgentEntries = (
-        p: ExecutionProcessState,
-        index: number,
-        totalProcesses: number
-      ): {
-        entries: PatchTypeWithKey[];
-        hasPendingApproval: boolean;
-        isProcessRunning: boolean;
-        processFailedOrKilled: boolean;
-        needsSetup: boolean;
-        setupHelpText: string | undefined;
-      } => {
-        const entries: PatchTypeWithKey[] = [];
-
-        // Add user message
-        const typ = p.executionProcess.executorAction.typ;
-        const prompt = (typ.type === 'CodingAgentInitialRequest' || typ.type === 'CodingAgentFollowUpRequest')
-          ? typ.prompt
-          : '';
-        const userPatch = createUserMessagePatch(
-          p.executionProcess.id,
-          prompt,
-          patchWithKey
-        );
-        entries.push(userPatch);
-
-        // Remove all coding agent added user messages
-        const entriesExcludingUser = p.entries.filter(
-          (e) =>
-            e.type !== 'NORMALIZED_ENTRY' ||
-            e.content.entry_type.type !== 'user_message'
-        );
-
-        const hasPendingApproval = hasPendingApprovalInEntries(entriesExcludingUser);
-        entries.push(...entriesExcludingUser);
-
-        const liveProcessStatus = getLiveExecutionProcess(p.executionProcess.id)?.status;
-        const isProcessRunning = liveProcessStatus === ExecutionProcessStatus.running;
-        const processFailedOrKilled =
-          liveProcessStatus === ExecutionProcessStatus.failed ||
-          liveProcessStatus === ExecutionProcessStatus.killed;
-
-        let needsSetup = false;
-        let setupHelpText: string | undefined;
-
-        if (processFailedOrKilled && index === totalProcesses - 1) {
-          const setupText = findSetupRequiredText(entriesExcludingUser);
-          if (setupText) {
-            needsSetup = true;
-            setupHelpText = setupText;
-          }
-        }
-
-        if (isProcessRunning && !hasPendingApprovalInEntries(entriesExcludingUser)) {
-          entries.push(makeLoadingPatch(p.executionProcess.id));
-        }
-
-        return {
-          entries,
-          hasPendingApproval,
-          isProcessRunning,
-          processFailedOrKilled,
-          needsSetup,
-          setupHelpText,
-        };
-      };
-
-      // Helper: Process script request entries
-      const processScriptRequestEntries = (
-        p: ExecutionProcessState,
-        index: number,
-        totalProcesses: number
-      ): {
-        entries: PatchTypeWithKey[];
-        isProcessRunning: boolean;
-        processFailedOrKilled: boolean;
-      } => {
-        const typ = p.executionProcess.executorAction.typ;
-        const context = typ.type === 'ScriptRequest' ? typ.context : null;
-        const toolName = context ? getScriptToolName(context) : null;
-        if (!toolName) return { entries: [], isProcessRunning: false, processFailedOrKilled: false };
-
-        const executionProcess = getLiveExecutionProcess(p.executionProcess.id);
-        const isProcessRunning = executionProcess?.status === ExecutionProcessStatus.running;
-        const processFailedOrKilled =
-          (executionProcess?.status === ExecutionProcessStatus.failed ||
-            executionProcess?.status === ExecutionProcessStatus.killed) &&
-          index === totalProcesses - 1;
-
-        const script = typ.type === 'ScriptRequest' ? typ.script : '';
-        const toolPatch = createScriptToolPatch(
-          executionProcess,
-          p.executionProcess.id,
-          toolName,
-          script,
-          p.entries,
-          patchWithKey
-        );
-
-        return {
-          entries: [toolPatch],
-          isProcessRunning,
-          processFailedOrKilled,
-        };
-      };
-
-      // Flags to control Next Action bar emit
       let hasPendingApproval = false;
       let hasRunningProcess = false;
       let lastProcessFailedOrKilled = false;
       let needsSetup = false;
       let setupHelpText: string | undefined;
 
-      // Create user messages + tool calls for setup/cleanup scripts
-      const allEntries = Object.values(executionProcessState)
-        .sort(
-          (a, b) =>
-            new Date(a.executionProcess.createdAt).getTime() -
-            new Date(b.executionProcess.createdAt).getTime()
-        )
-        .flatMap((p, index) => {
-          const actionType = p.executionProcess.executorAction.typ.type;
-          const totalProcesses = Object.keys(executionProcessState).length;
+      const totalProcesses = Object.keys(executionProcessState).length;
+      const sortedProcesses = Object.values(executionProcessState).sort(
+        (a, b) =>
+          new Date(a.executionProcess.createdAt).getTime() -
+          new Date(b.executionProcess.createdAt).getTime()
+      );
 
-          if (
-            actionType === 'CodingAgentInitialRequest' ||
-            actionType === 'CodingAgentFollowUpRequest' ||
-            actionType === 'ReviewRequest'
-          ) {
-            const result = processCodingAgentEntries(p, index, totalProcesses);
+      const allEntries: PatchTypeWithKey[] = [];
+      for (const [index, processState] of sortedProcesses.entries()) {
+        const actionType = processState.executionProcess.executorAction.typ.type;
 
-            if (result.hasPendingApproval) {
-              hasPendingApproval = true;
-            }
-            if (result.isProcessRunning) {
-              hasRunningProcess = true;
-            }
-            if (result.processFailedOrKilled) {
-              lastProcessFailedOrKilled = true;
-              if (result.needsSetup) {
-                needsSetup = true;
-                setupHelpText = result.setupHelpText;
-              }
-            }
+        if (
+          actionType === 'CodingAgentInitialRequest' ||
+          actionType === 'CodingAgentFollowUpRequest' ||
+          actionType === 'ReviewRequest'
+        ) {
+          const result = processCodingAgentEntries(
+            processState,
+            index,
+            totalProcesses,
+            getLiveExecutionProcess,
+            patchWithKey
+          );
 
-            return result.entries;
-          } else if (actionType === 'ScriptRequest') {
-            const result = processScriptRequestEntries(p, index, totalProcesses);
-
-            if (result.isProcessRunning) {
-              hasRunningProcess = true;
+          if (result.hasPendingApproval) {
+            hasPendingApproval = true;
+          }
+          if (result.isProcessRunning) {
+            hasRunningProcess = true;
+          }
+          if (result.processFailedOrKilled) {
+            lastProcessFailedOrKilled = true;
+            if (result.needsSetup) {
+              needsSetup = true;
+              setupHelpText = result.setupHelpText;
             }
-            if (result.processFailedOrKilled) {
-              lastProcessFailedOrKilled = true;
-            }
-
-            return result.entries;
           }
 
-          return [];
-        });
+          allEntries.push(...result.entries);
+          continue;
+        }
 
-      // Emit the next action bar if no process running
+        if (actionType === 'ScriptRequest') {
+          const result = processScriptRequestEntries(
+            processState,
+            index,
+            totalProcesses,
+            getLiveExecutionProcess,
+            patchWithKey
+          );
+
+          if (result.isProcessRunning) {
+            hasRunningProcess = true;
+          }
+          if (result.processFailedOrKilled) {
+            lastProcessFailedOrKilled = true;
+          }
+
+          allEntries.push(...result.entries);
+        }
+      }
+
       if (!hasRunningProcess && !hasPendingApproval) {
         allEntries.push(
           nextActionPatch(
             lastProcessFailedOrKilled,
-            Object.keys(executionProcessState).length,
+            totalProcesses,
             needsSetup,
             setupHelpText
           )
@@ -718,10 +797,9 @@ export const useConversationHistory = ({
 
     for (const activeProcess of activeProcesses) {
       if (!displayedExecutionProcesses.current[activeProcess.id]) {
-        const runningOrInitial =
-          Object.keys(displayedExecutionProcesses.current).length > 1
-            ? 'running'
-            : 'initial';
+        const runningOrInitial = getRunningOrInitialAddType(
+          Object.keys(displayedExecutionProcesses.current).length
+        );
         ensureProcessVisible(activeProcess);
         emitEntries(
           displayedExecutionProcesses.current,

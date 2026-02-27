@@ -52,6 +52,15 @@ type Props = Readonly<{
 }>;
 
 type FileEditAction = Extract<ActionType, { action: 'file_edit' }>;
+type GenericToolAction = Extract<ActionType, { action: 'tool' }>;
+
+const isNormalizedConversationEntry = (
+  entry: NormalizedEntry | ProcessStartPayload
+): entry is NormalizedEntry => 'entry_type' in entry;
+
+const isProcessStartEntry = (
+  entry: NormalizedEntry | ProcessStartPayload
+): entry is ProcessStartPayload => 'processId' in entry;
 
 const renderJson = (v: JsonValue) => (
   <pre className="whitespace-pre-wrap">{JSON.stringify(v, null, 2)}</pre>
@@ -493,7 +502,7 @@ const CommandDetails: React.FC<{
 
 // Helper to render generic tool expanded details
 const GenericToolDetails: React.FC<{
-  actionType: any;
+  actionType?: GenericToolAction;
   argsLabel: string;
   resultLabel: string;
   taskAttemptId?: string;
@@ -526,6 +535,68 @@ const GenericToolDetails: React.FC<{
   );
 };
 
+const ToolCallHeaderContent: React.FC<{
+  entryType?: Extract<NormalizedEntryType, { type: 'tool_use' }>;
+  summaryText: string;
+}> = ({ entryType, summaryText }) => (
+  <span className=" min-w-0 flex items-center gap-1.5">
+    <span>
+      {entryType && getStatusIndicator(entryType)}
+      {entryType && getEntryIcon(entryType)}
+    </span>
+    <span className="text-sm font-mono">{summaryText}</span>
+  </span>
+);
+
+const ToolCallDetailsContent: React.FC<{
+  isCommand: boolean;
+  isTool: boolean;
+  actionType?: ActionType;
+  argsText: string | null;
+  output: string | null;
+  linkifyUrls: boolean;
+  taskAttemptId?: string;
+  argsLabel: string;
+  outputLabel: string;
+  resultLabel: string;
+}> = ({
+  isCommand,
+  isTool,
+  actionType,
+  argsText,
+  output,
+  linkifyUrls,
+  taskAttemptId,
+  argsLabel,
+  outputLabel,
+  resultLabel,
+}) => {
+  if (isCommand) {
+    return (
+      <CommandDetails
+        argsText={argsText}
+        output={output}
+        linkifyUrls={linkifyUrls}
+        argsLabel={argsLabel}
+        outputLabel={outputLabel}
+      />
+    );
+  }
+
+  if (isTool) {
+    return (
+      <GenericToolDetails
+        actionType={actionType as GenericToolAction}
+        argsLabel={argsLabel}
+        resultLabel={resultLabel}
+        taskAttemptId={taskAttemptId}
+      />
+    );
+  }
+
+  return null;
+};
+
 const ToolCallCard: React.FC<{
   entry: NormalizedEntry | ProcessStartPayload;
   expansionKey: string;
@@ -534,7 +605,7 @@ const ToolCallCard: React.FC<{
 }> = ({ entry, expansionKey, forceExpanded = false, taskAttemptId }) => {
   const { t } = useTranslation('common');
 
-  const isNormalizedEntry = 'entry_type' in entry;
+  const isNormalizedEntry = isNormalizedConversationEntry(entry);
   const entryType =
     isNormalizedEntry && entry.entry_type.type === 'tool_use'
       ? entry.entry_type
@@ -567,49 +638,45 @@ const ToolCallCard: React.FC<{
   const hasExpandableDetails = isCommand
     ? Boolean(argsText) || Boolean(output)
     : (isTool && !!actionType.arguments) || (isTool && !!actionType.result);
-
-  const HeaderWrapper: React.ElementType = hasExpandableDetails ? 'button' : 'div';
-  const headerProps = hasExpandableDetails
-    ? {
-        onClick: (e: React.MouseEvent) => { e.preventDefault(); toggle(); },
-        title: effectiveExpanded
-          ? t('conversation.toolDetailsToggle.hide')
-          : t('conversation.toolDetailsToggle.show'),
-      }
-    : {};
+  const summaryText = showInlineSummary ? inlineText : label;
+  const detailTitle = effectiveExpanded
+    ? t('conversation.toolDetailsToggle.hide')
+    : t('conversation.toolDetailsToggle.show');
 
   return (
     <div className="inline-block w-full flex flex-col gap-4">
-      <HeaderWrapper {...headerProps} className="w-full flex items-center gap-1.5 text-left text-secondary-foreground">
-        <span className=" min-w-0 flex items-center gap-1.5">
-          <span>
-            {entryType && getStatusIndicator(entryType)}
-            {entryType && getEntryIcon(entryType)}
-          </span>
-          <span className="text-sm font-mono">{showInlineSummary ? inlineText : label}</span>
-        </span>
-      </HeaderWrapper>
+      {hasExpandableDetails ? (
+        <button
+          type="button"
+          onClick={(e: React.MouseEvent) => {
+            e.preventDefault();
+            toggle();
+          }}
+          title={detailTitle}
+          className="w-full flex items-center gap-1.5 text-left text-secondary-foreground"
+        >
+          <ToolCallHeaderContent entryType={entryType} summaryText={summaryText} />
+        </button>
+      ) : (
+        <div className="w-full flex items-center gap-1.5 text-left text-secondary-foreground">
+          <ToolCallHeaderContent entryType={entryType} summaryText={summaryText} />
+        </div>
+      )}
 
       {effectiveExpanded && (
         <div className="max-h-[200px] overflow-y-auto border">
-          {isCommand ? (
-            <CommandDetails
-              argsText={argsText}
-              output={output}
-              linkifyUrls={linkifyUrls}
-              argsLabel={t('conversation.args')}
-              outputLabel={t('conversation.output')}
-            />
-          ) : (
-            isTool && (
-              <GenericToolDetails
-                actionType={actionType}
-                argsLabel={t('conversation.args')}
-                resultLabel={t('conversation.result')}
-                taskAttemptId={taskAttemptId}
-              />
-            )
-          )}
+          <ToolCallDetailsContent
+            isCommand={isCommand}
+            isTool={isTool}
+            actionType={actionType}
+            argsText={argsText}
+            output={output}
+            linkifyUrls={linkifyUrls}
+            taskAttemptId={taskAttemptId}
+            argsLabel={t('conversation.args')}
+            outputLabel={t('conversation.output')}
+            resultLabel={t('conversation.result')}
+          />
         </div>
       )}
     </div>
@@ -800,6 +867,30 @@ export const DisplayConversationEntryMaxWidth = (props: Props) => {
   return <DisplayConversationEntry {...props} />;
 };
 
+function renderEntryBody(
+  entry: NormalizedEntry,
+  taskAttempt?: WorkspaceWithSession
+) {
+  const shouldUseMarkdown = shouldRenderMarkdown(entry.entry_type);
+  const plainContent = entry.content;
+  const contentBody = shouldUseMarkdown ? (
+    <WYSIWYGEditor
+      value={plainContent}
+      disabled
+      className="whitespace-pre-wrap break-words flex flex-col gap-1 font-light"
+      taskAttemptId={taskAttempt?.id}
+    />
+  ) : (
+    plainContent
+  );
+
+  return (
+    <div className="px-4 py-2 text-sm">
+      <div className={getContentClassName(entry.entry_type)}>{contentBody}</div>
+    </div>
+  );
+}
+
 function DisplayConversationEntry({
   entry,
   expansionKey,
@@ -808,18 +899,10 @@ function DisplayConversationEntry({
   task,
 }: Props) {
   const { t } = useTranslation('common');
-  const isNormalizedEntry = (
-    entry: NormalizedEntry | ProcessStartPayload
-  ): entry is NormalizedEntry => 'entry_type' in entry;
-
-  const isProcessStart = (
-    entry: NormalizedEntry | ProcessStartPayload
-  ): entry is ProcessStartPayload => 'processId' in entry;
-
   const { isProcessGreyed } = useRetryUi();
   const greyed = isProcessGreyed(executionProcessId);
 
-  if (isProcessStart(entry)) {
+  if (isProcessStartEntry(entry)) {
     return (
       <div className={greyed ? 'opacity-50 pointer-events-none' : undefined}>
         <ToolCallCard
@@ -833,133 +916,114 @@ function DisplayConversationEntry({
 
   // Handle NormalizedEntry
   const entryType = entry.entry_type;
-  const isSystem = entryType.type === 'system_message';
-  const isError = entryType.type === 'error_message';
-  const isToolUse = entryType.type === 'tool_use';
-  const isUserMessage = entryType.type === 'user_message';
-  const isUserFeedback = entryType.type === 'user_feedback';
-  const isLoading = entryType.type === 'loading';
-
-  if (isUserMessage) {
-    return (
-      <UserMessage
-        content={entry.content}
-        executionProcessId={executionProcessId}
-        taskAttempt={taskAttempt}
-      />
-    );
-  }
-
-  if (isUserFeedback) {
-    const feedbackEntry = entryType;
-    return (
-      <div className="py-2">
-        <div className="bg-background px-4 py-2 text-sm border-y border-dashed">
-          <div
-            className="text-xs mb-1 opacity-70"
-            style={{ color: 'hsl(var(--destructive))' }}
-          >
-            {t('conversation.deniedByUser', {
-              toolName: feedbackEntry.denied_tool,
-            })}
+  switch (entryType.type) {
+    case 'user_message':
+      return (
+        <UserMessage
+          content={entry.content}
+          executionProcessId={executionProcessId}
+          taskAttempt={taskAttempt}
+        />
+      );
+    case 'user_feedback':
+      return (
+        <div className="py-2">
+          <div className="bg-background px-4 py-2 text-sm border-y border-dashed">
+            <div
+              className="text-xs mb-1 opacity-70"
+              style={{ color: 'hsl(var(--destructive))' }}
+            >
+              {t('conversation.deniedByUser', {
+                toolName: entryType.denied_tool,
+              })}
+            </div>
+            <WYSIWYGEditor
+              value={entry.content}
+              disabled
+              className="whitespace-pre-wrap break-words flex flex-col gap-1 font-light py-3"
+              taskAttemptId={taskAttempt?.id}
+            />
           </div>
-          <WYSIWYGEditor
-            value={entry.content}
-            disabled
-            className="whitespace-pre-wrap break-words flex flex-col gap-1 font-light py-3"
+        </div>
+      );
+    case 'tool_use': {
+      const toolEntry = entryType;
+      const status = toolEntry.status;
+      const isPendingApproval = status.status === 'pending_approval';
+      const defaultExpanded =
+        isPendingApproval || toolEntry.action_type.action === 'plan_presentation';
+      const body = renderToolUseBody(
+        toolEntry,
+        isPendingApproval,
+        defaultExpanded,
+        getToolStatusAppearance(status),
+        entry,
+        expansionKey,
+        taskAttempt
+      );
+      const content = (
+        <div
+          className={`px-4 py-2 text-sm space-y-3 ${greyed ? 'opacity-50 pointer-events-none' : ''}`}
+        >
+          {body}
+        </div>
+      );
+
+      if (isPendingApprovalStatus(status)) {
+        return (
+          <PendingApprovalEntry
+            pendingStatus={status}
+            executionProcessId={executionProcessId}
+          >
+            {content}
+          </PendingApprovalEntry>
+        );
+      }
+
+      return content;
+    }
+    case 'system_message':
+    case 'error_message':
+      return (
+        <div
+          className={`px-4 py-2 text-sm ${greyed ? 'opacity-50 pointer-events-none' : ''}`}
+        >
+          <CollapsibleEntry
+            content={entry.content}
+            markdown={shouldRenderMarkdown(entryType)}
+            expansionKey={expansionKey}
+            variant={entryType.type === 'system_message' ? 'system' : 'error'}
+            contentClassName={getContentClassName(entryType)}
             taskAttemptId={taskAttempt?.id}
           />
         </div>
-      </div>
-    );
-  }
-  if (isToolUse && entryType.type === 'tool_use') {
-    const toolEntry = entryType;
-    const status = toolEntry.status;
-    const isPendingApproval = status.status === 'pending_approval';
-    const defaultExpanded = isPendingApproval || toolEntry.action_type.action === 'plan_presentation';
-
-    const body = renderToolUseBody(
-      toolEntry, isPendingApproval, defaultExpanded,
-      getToolStatusAppearance(status), entry, expansionKey, taskAttempt
-    );
-
-    const content = (
-      <div className={`px-4 py-2 text-sm space-y-3 ${greyed ? 'opacity-50 pointer-events-none' : ''}`}>
-        {body}
-      </div>
-    );
-
-    if (isPendingApprovalStatus(status)) {
-      return (
-        <PendingApprovalEntry pendingStatus={status} executionProcessId={executionProcessId}>
-          {content}
-        </PendingApprovalEntry>
       );
-    }
-
-    return content;
-  }
-
-  if (isSystem || isError) {
-    return (
-      <div
-        className={`px-4 py-2 text-sm ${greyed ? 'opacity-50 pointer-events-none' : ''}`}
-      >
-        <CollapsibleEntry
-          content={isNormalizedEntry(entry) ? entry.content : ''}
-          markdown={shouldRenderMarkdown(entryType)}
-          expansionKey={expansionKey}
-          variant={isSystem ? 'system' : 'error'}
-          contentClassName={getContentClassName(entryType)}
-          taskAttemptId={taskAttempt?.id}
-        />
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="px-4 py-2 text-sm">
-        <LoadingCard />
-      </div>
-    );
-  }
-
-  if (entry.entry_type.type === 'next_action') {
-    return (
-      <div className="px-4 py-2 text-sm">
-        <NextActionCard
-          attemptId={taskAttempt?.id}
-          sessionId={taskAttempt?.session?.id}
-          containerRef={taskAttempt?.containerRef}
-          failed={entry.entry_type.failed}
-          execution_processes={entry.entry_type.execution_processes}
-          task={task}
-          needsSetup={entry.entry_type.needs_setup}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="px-4 py-2 text-sm">
-      <div className={getContentClassName(entryType)}>
-        {shouldRenderMarkdown(entryType) ? (
-          <WYSIWYGEditor
-            value={isNormalizedEntry(entry) ? entry.content : ''}
-            disabled
-            className="whitespace-pre-wrap break-words flex flex-col gap-1 font-light"
-            taskAttemptId={taskAttempt?.id}
+    case 'loading':
+      return (
+        <div className="px-4 py-2 text-sm">
+          <LoadingCard />
+        </div>
+      );
+    case 'next_action':
+      return (
+        <div className="px-4 py-2 text-sm">
+          <NextActionCard
+            attemptId={taskAttempt?.id}
+            sessionId={taskAttempt?.session?.id}
+            containerRef={taskAttempt?.containerRef}
+            failed={entryType.failed}
+            execution_processes={entryType.execution_processes}
+            task={task}
+            needsSetup={entryType.needs_setup}
           />
-        ) : isNormalizedEntry(entry) ? (
-          entry.content
-        ) : (
-          ''
-        )}
-      </div>
-    </div>
-  );
+        </div>
+      );
+    default:
+      if (!isNormalizedConversationEntry(entry)) {
+        return null;
+      }
+      return renderEntryBody(entry, taskAttempt);
+  }
 }
 
 export default DisplayConversationEntryMaxWidth;

@@ -7,7 +7,7 @@ CREATE TABLE projects (
     name          TEXT NOT NULL,
     git_repo_path TEXT NOT NULL DEFAULT '' UNIQUE,
     setup_script  TEXT DEFAULT '',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')), -- NOSONAR: SQLite migration DDL repeats this DEFAULT by design.
     updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
 );
 

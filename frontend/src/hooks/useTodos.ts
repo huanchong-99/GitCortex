@@ -9,9 +9,9 @@ interface UseTodosResult {
 }
 
 /**
- * Hook that extracts and maintains the latest TODO state from normalized conversation entries.
- * Filters for TodoManagement ActionType entries and returns the most recent todo list,
- * along with the currently in-progress todo item.
+ * Hook that extracts and maintains the latest task-list state from normalized conversation entries.
+ * Filters for TodoManagement ActionType entries and returns the most recent item list,
+ * along with the currently in-progress item.
  */
 export const useTodos = (entries: PatchTypeWithKey[]): UseTodosResult => {
   return useMemo(() => {
@@ -52,7 +52,7 @@ export const useTodos = (entries: PatchTypeWithKey[]): UseTodosResult => {
       }
     }
 
-    // Find the currently in-progress todo
+    // Find the currently in-progress item
     const inProgressTodo =
       latestTodos.find((todo) => {
         const status = todo.status?.toLowerCase();

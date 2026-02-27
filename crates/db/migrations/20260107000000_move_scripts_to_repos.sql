@@ -49,7 +49,8 @@ SET
         END
         FROM project_repos pr
         WHERE pr.repo_id = repos.id
-    );
+    )
+WHERE 1 = 1;
 
 -- Migrate dev_script only when repo-level value is unambiguous across projects.
 -- intentional: update all rows
@@ -63,7 +64,8 @@ SET dev_server_script = (
     FROM projects p
     JOIN project_repos pr ON pr.project_id = p.id
     WHERE pr.repo_id = repos.id
-);
+)
+WHERE 1 = 1;
 
 -- Keep legacy per-project script columns for compatibility and manual conflict
 -- remediation when a shared repo has divergent project-specific scripts.

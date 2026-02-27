@@ -1,5 +1,16 @@
 import { useEffect, useCallback } from 'react';
 
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    platform?: string;
+  };
+};
+
+function getPlatformIdentifier(): string {
+  const nav = navigator as NavigatorWithUserAgentData;
+  return nav.userAgentData?.platform ?? navigator.userAgent;
+}
+
 /**
  * Hook that listens for CMD+K (Mac) or Ctrl+K (Windows/Linux) to open the command bar.
  * Uses native DOM event listener with capture phase to intercept before other handlers
@@ -12,8 +23,7 @@ export function useCommandBarShortcut(
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       // CMD+K (Mac) or Ctrl+K (Windows/Linux)
-      // eslint-disable-next-line @typescript-eslint/no-deprecated -- fallback for browsers without userAgentData
-      const platform: string = (navigator as any).userAgentData?.platform ?? navigator.platform;
+      const platform = getPlatformIdentifier();
       const isMac = platform.toUpperCase().includes('MAC');
       const modifier = isMac ? event.metaKey : event.ctrlKey;
 

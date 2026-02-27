@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS shared_tasks (
     assignee_username   TEXT,
     version             INTEGER NOT NULL DEFAULT 1,
     last_event_seq      INTEGER,
-    created_at          TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    created_at          TEXT NOT NULL DEFAULT (datetime('now', 'subsec')), -- NOSONAR: SQLite migration DDL repeats this DEFAULT by design.
     updated_at          TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
 );
 

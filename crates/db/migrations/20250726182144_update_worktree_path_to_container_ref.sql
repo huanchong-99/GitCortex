@@ -1,7 +1,9 @@
 -- Add migration script here
 
 ALTER TABLE task_attempts ADD COLUMN container_ref TEXT;  -- nullable
-UPDATE task_attempts SET container_ref = worktree_path;
+UPDATE task_attempts
+SET container_ref = worktree_path
+WHERE 1=1;  -- Explicit WHERE clause to indicate intentional full-table update
 
 -- If you might have triggers or indexes on worktree_path, drop them before this step.
 

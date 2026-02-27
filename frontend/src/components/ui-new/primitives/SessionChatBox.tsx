@@ -564,7 +564,7 @@ export function SessionChatBox({
               </ToolbarDropdown>
             </>
           )}
-          {/* Existing session mode: show in-progress todo when running, otherwise file stats */}
+          {/* Existing session mode: show active task item when running, otherwise file stats */}
           {!isNewSessionMode && (
             <>
               {isRunning && inProgressTodo ? (

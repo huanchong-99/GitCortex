@@ -21,23 +21,23 @@ interface EntriesProviderProps {
 }
 
 export const EntriesProvider = ({ children }: EntriesProviderProps) => {
-  const [entries, setEntriesState] = useState<PatchTypeWithKey[]>([]);
+  const [entries, setEntries] = useState<PatchTypeWithKey[]>([]);
 
-  const setEntries = useCallback((newEntries: PatchTypeWithKey[]) => {
-    setEntriesState(newEntries);
+  const updateEntries = useCallback((newEntries: PatchTypeWithKey[]) => {
+    setEntries(newEntries);
   }, []);
 
   const reset = useCallback(() => {
-    setEntriesState([]);
+    setEntries([]);
   }, []);
 
   const value = useMemo(
     () => ({
       entries,
-      setEntries,
+      setEntries: updateEntries,
       reset,
     }),
-    [entries, setEntries, reset]
+    [entries, updateEntries, reset]
   );
 
   return (

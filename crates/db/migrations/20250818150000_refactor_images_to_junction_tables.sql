@@ -13,7 +13,7 @@ CREATE TABLE images (
     mime_type             TEXT,
     size_bytes            INTEGER,
     hash                  TEXT NOT NULL UNIQUE,  -- SHA256 for deduplication
-    created_at            TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    created_at            TEXT NOT NULL DEFAULT (datetime('now', 'subsec')), -- NOSONAR: SQLite migration DDL repeats this DEFAULT by design.
     updated_at            TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
 );
 

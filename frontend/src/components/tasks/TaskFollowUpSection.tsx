@@ -994,9 +994,8 @@ export function TaskFollowUpSection({
               </div>
             )}
 
-            <div
-              role="group"
-              className="flex flex-col gap-2"
+            <fieldset
+              className="flex flex-col gap-2 border-0 p-0 m-0 min-w-0"
               onFocus={() => setIsTextareaFocused(true)}
               onBlur={(e) => {
                 // Only blur if focus is leaving the container entirely
@@ -1016,7 +1015,7 @@ export function TaskFollowUpSection({
                 onCmdEnter={handleSubmitShortcut}
                 className="min-h-[40px]"
               />
-            </div>
+            </fieldset>
           </div>
         </div>
       </div>

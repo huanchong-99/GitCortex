@@ -7,13 +7,10 @@ export interface PreviewUrlInfo {
   scheme: 'http' | 'https';
 }
 
-// Simplified regex patterns to reduce complexity
-const urlPatterns = [
-  // Full URL pattern (e.g., http://localhost:3000, https://127.0.0.1:8080)
-  /(https?:\/\/(?:\[[0-9a-f:]+\]|localhost|127\.0\.0\.1|0\.0\.0\.0|\d+(?:\.\d+){3})(?::\d{2,5})?(?:\/\S*)?)/i,
-  // Host:port pattern (e.g., localhost:3000, 0.0.0.0:8080)
-  /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[[0-9a-f:]+\]|\d+(?:\.\d+){3}):(\d{2,5})/i,
-];
+const FULL_URL_PATTERN = /(https?:\/\/[^\s"'`<>]+)/i;
+const HOST_PORT_PATTERN = /([a-z0-9.:-]+):(\d{2,5})/i;
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::', '[::]']);
+const IPV4_PATTERN = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 
 // Get the hostname from the current browser location, falling back to 'localhost'
 const getBrowserHostname = (): string => {
@@ -23,23 +20,41 @@ const getBrowserHostname = (): string => {
   return 'localhost';
 };
 
+const isIpv4Host = (host: string): boolean => IPV4_PATTERN.test(host);
+
+const isBracketedIpv6Host = (host: string): boolean =>
+  host.startsWith('[') && host.endsWith(']');
+
+const isLocalHost = (host: string): boolean => {
+  const lowered = host.toLowerCase();
+  return (
+    LOCAL_HOSTS.has(lowered) ||
+    isIpv4Host(lowered) ||
+    isBracketedIpv6Host(lowered)
+  );
+};
+
+const normalizeHost = (host: string, browserHostname: string): string => {
+  const lowered = host.toLowerCase();
+  if (lowered === '0.0.0.0' || lowered === '::' || lowered === '[::]') {
+    return browserHostname;
+  }
+  return host;
+};
+
 export const detectPreviewUrl = (line: string): PreviewUrlInfo | null => {
   const cleaned = stripAnsi(line);
   const browserHostname = getBrowserHostname();
 
   // Try to match a full URL first
-  const fullUrlMatch = urlPatterns[0].exec(cleaned);
+  const fullUrlMatch = FULL_URL_PATTERN.exec(cleaned);
   if (fullUrlMatch) {
     try {
       const parsed = new URL(fullUrlMatch[1]);
-      // Replace 0.0.0.0 or :: with browser hostname
-      if (
-        parsed.hostname === '0.0.0.0' ||
-        parsed.hostname === '::' ||
-        parsed.hostname === '[::]'
-      ) {
-        parsed.hostname = browserHostname;
+      if (!isLocalHost(parsed.hostname)) {
+        return null;
       }
+      parsed.hostname = normalizeHost(parsed.hostname, browserHostname);
       return {
         url: parsed.toString(),
         port: parsed.port ? Number(parsed.port) : undefined,
@@ -51,12 +66,17 @@ export const detectPreviewUrl = (line: string): PreviewUrlInfo | null => {
   }
 
   // Try to match host:port pattern
-  const hostPortMatch = urlPatterns[1].exec(cleaned);
+  const hostPortMatch = HOST_PORT_PATTERN.exec(cleaned);
   if (hostPortMatch) {
-    const port = Number(hostPortMatch[1]);
+    const host = hostPortMatch[1];
+    if (!isLocalHost(host)) {
+      return null;
+    }
+    const port = Number(hostPortMatch[2]);
     const scheme = /https/i.test(cleaned) ? 'https' : 'http';
+    const normalizedHost = normalizeHost(host, browserHostname);
     return {
-      url: `${scheme}://${browserHostname}:${port}`,
+      url: `${scheme}://${normalizedHost}:${port}`,
       port,
       scheme,
     };

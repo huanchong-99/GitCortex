@@ -19,7 +19,7 @@ export function useVariant({ processVariant, scratchVariant }: Args) {
   const getInitialVariant = () =>
     scratchVariant === undefined ? processVariant : scratchVariant;
 
-  const [selectedVariant, setSelectedVariantState] = useState<string | null>(
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(
     getInitialVariant
   );
 
@@ -29,14 +29,14 @@ export function useVariant({ processVariant, scratchVariant }: Args) {
 
     const newVariant =
       scratchVariant === undefined ? processVariant : scratchVariant;
-    setSelectedVariantState(newVariant);
+    setSelectedVariant(newVariant);
   }, [scratchVariant, processVariant]);
 
   // When user explicitly selects a variant, mark it and update state
-  const setSelectedVariant = useCallback((variant: string | null) => {
+  const updateSelectedVariant = useCallback((variant: string | null) => {
     hasUserSelectionRef.current = true;
-    setSelectedVariantState(variant);
+    setSelectedVariant(variant);
   }, []);
 
-  return { selectedVariant, setSelectedVariant } as const;
+  return { selectedVariant, setSelectedVariant: updateSelectedVariant } as const;
 }

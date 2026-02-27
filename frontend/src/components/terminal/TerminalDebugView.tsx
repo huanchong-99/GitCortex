@@ -25,13 +25,21 @@ interface TerminalHistoryState {
 }
 
 const TERMINAL_HISTORY_LIMIT = 1000;
-const CONTROL_CHARACTERS_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+const stripControlCharacters = (value: string): string =>
+  Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code === 0x09 || code === 0x0a || code === 0x0d || (code >= 0x20 && code !== 0x7f);
+    })
+    .join('');
 
 const sanitizeTerminalHistoryContent = (content: string) =>
-  stripAnsi(content)
+  stripControlCharacters(
+    stripAnsi(content)
     .replaceAll('\r\n', '\n')
     .replaceAll('\r', '\n')
-    .replaceAll(CONTROL_CHARACTERS_REGEX, '');
+  );
 
 /**
  * Renders the terminal debugging UI with a terminal list and active emulator.
@@ -125,24 +133,26 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-          const messageValue = payload && typeof payload === 'object' && 'message' in payload
-            ? (payload as { message?: unknown }).message
-            : undefined;
-          const message = typeof messageValue === 'string'
-            ? messageValue
-            : messageValue instanceof Error
-              ? messageValue.message
-              : '';
+          let message = '';
+          if (payload && typeof payload === 'object' && 'message' in payload) {
+            const messageValue = (payload as { message?: unknown }).message;
+            if (typeof messageValue === 'string') {
+              message = messageValue;
+            } else if (messageValue instanceof Error) {
+              message = messageValue.message;
+            }
+          }
+
           throw new Error(message || `Failed to load terminal history (${response.status})`);
         }
 
-        const entries =
-          payload &&
-          typeof payload === 'object' &&
-          'data' in payload &&
-          Array.isArray((payload as { data?: unknown }).data)
-            ? ((payload as { data: unknown[] }).data as TerminalLogEntry[])
-            : [];
+        let entries: TerminalLogEntry[] = [];
+        if (payload && typeof payload === 'object' && 'data' in payload) {
+          const dataValue = (payload as { data?: unknown }).data;
+          if (Array.isArray(dataValue)) {
+            entries = dataValue as TerminalLogEntry[];
+          }
+        }
 
         const lines = entries
           .map((entry) => (typeof entry.content === 'string' ? entry.content : ''))

@@ -415,6 +415,27 @@ export function AgentSettings() {
     }
   };
 
+  const getProfilesErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    if (typeof error === 'object' && error !== null) {
+      const message = Reflect.get(error, 'message');
+      if (typeof message === 'string' && message.trim()) {
+        return message;
+      }
+
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return '[Unserializable error object]';
+      }
+    }
+
+    return String(error);
+  };
+
   if (profilesLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -429,11 +450,7 @@ export function AgentSettings() {
       {!!profilesError && (
         <Alert variant="destructive">
           <AlertDescription>
-            {profilesError instanceof Error
-              ? profilesError.message
-              : typeof profilesError === 'object'
-                ? JSON.stringify(profilesError)
-                : String(profilesError)}
+            {getProfilesErrorMessage(profilesError)}
           </AlertDescription>
         </Alert>
       )}

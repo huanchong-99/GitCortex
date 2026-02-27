@@ -149,7 +149,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
         new Date(a.createdAt).getTime()
     );
 
-    (Object.values(byStatus) as TaskWithAttemptStatus[][]).forEach((list) => {
+    Object.values(byStatus).forEach((list) => {
       list.sort(
         (a, b) =>
           new Date(b.createdAt).getTime() -
@@ -180,7 +180,7 @@ export const useProjectTasks = (projectId: string): UseProjectTasksResult => {
       grouped[sharedTask.status]?.push(sharedTask);
     });
 
-    (Object.values(grouped) as SharedTaskRecord[][]).forEach((list) => {
+    Object.values(grouped).forEach((list) => {
       list.sort(
         (a, b) =>
           new Date(b.created_at).getTime() -

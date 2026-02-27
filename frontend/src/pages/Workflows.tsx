@@ -215,6 +215,82 @@ function WorkflowDetailActions({
   );
 }
 
+function renderBlockingView({
+  projectsLoading,
+  projectsErrorMessage,
+  projectCount,
+  workflowsLoading,
+  workflowsErrorMessage,
+  loadFailedText,
+}: Readonly<{
+  projectsLoading: boolean;
+  projectsErrorMessage: string | null;
+  projectCount: number;
+  workflowsLoading: boolean;
+  workflowsErrorMessage: string | null;
+  loadFailedText: string;
+}>): JSX.Element | null {
+  if (projectsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader message="Loading projects..." />
+      </div>
+    );
+  }
+
+  if (projectsErrorMessage) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-error mb-4">{loadFailedText}</p>
+            <p className="text-sm text-low">{projectsErrorMessage}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (projectCount === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
+            <p className="text-sm text-low">
+              Please create a project first in Settings → Projects before
+              creating workflows.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (workflowsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader message="Loading workflows..." />
+      </div>
+    );
+  }
+
+  if (workflowsErrorMessage) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-error mb-4">{loadFailedText}</p>
+            <p className="text-sm text-low">{workflowsErrorMessage}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function Workflows() {
   const { t } = useTranslation('workflow');
   const { showToast } = useToast();
@@ -561,7 +637,9 @@ export function Workflows() {
       decision={activePromptDecision}
       submitError={promptSubmitError}
       isSubmitting={isSubmittingActivePrompt}
-      onSubmit={(response) => handleSubmitPromptResponse(response)}
+      onSubmit={(response) => {
+        void handleSubmitPromptResponse(response);
+      }}
     />
   ) : null;
 
@@ -714,63 +792,18 @@ export function Workflows() {
   // Get current project name for display
   const currentProject = projects.find((p) => p.id === validProjectId);
 
-  if (projectsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader message="Loading projects..." />
-      </div>
-    );
+  const blockingView = renderBlockingView({
+    projectsLoading,
+    projectsErrorMessage: projectsError?.message ?? null,
+    projectCount: projects.length,
+    workflowsLoading: isLoading,
+    workflowsErrorMessage: error?.message ?? null,
+    loadFailedText: t('errors.loadFailed'),
+  });
+  if (blockingView) {
+    return blockingView;
   }
 
-  if (projectsError) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md">
-          <CardContent className="pt-6">
-            <p className="text-error mb-4">{t('errors.loadFailed')}</p>
-            <p className="text-sm text-low">{projectsError.message}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (projects.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md">
-          <CardContent className="pt-6">
-            <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
-            <p className="text-sm text-low">
-              Please create a project first in Settings → Projects before
-              creating workflows.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader message="Loading workflows..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md">
-          <CardContent className="pt-6">
-            <p className="text-error mb-4">{t('errors.loadFailed')}</p>
-            <p className="text-sm text-low">{error.message}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   const handleCreateWorkflow = async (wizardConfig: WizardConfig) => {
     const workingDir = wizardConfig.project.workingDirectory?.trim();
@@ -876,12 +909,24 @@ export function Workflows() {
               mergePending: mergeMutation.isPending,
             }}
             handlers={{
-              onPrepare: handlePrepareWorkflow,
-              onStart: handleStartWorkflow,
-              onPause: handlePauseWorkflow,
-              onStop: handleStopWorkflow,
-              onMerge: handleMergeWorkflow,
-              onDelete: handleDeleteWorkflow,
+              onPrepare: (workflowId) => {
+                void handlePrepareWorkflow(workflowId);
+              },
+              onStart: (workflowId) => {
+                void handleStartWorkflow(workflowId);
+              },
+              onPause: (workflowId) => {
+                void handlePauseWorkflow(workflowId);
+              },
+              onStop: (workflowId) => {
+                void handleStopWorkflow(workflowId);
+              },
+              onMerge: (workflowId) => {
+                void handleMergeWorkflow(workflowId);
+              },
+              onDelete: (workflowId) => {
+                void handleDeleteWorkflow(workflowId);
+              },
             }}
           />
         </div>
@@ -898,7 +943,9 @@ export function Workflows() {
           onTerminalClick={undefined}
           onMergeTerminalClick={
             canTriggerMerge
-              ? () => handleMergeWorkflow(selectedWorkflowDetail.id)
+              ? () => {
+                void handleMergeWorkflow(selectedWorkflowDetail.id);
+              }
               : undefined
           }
         />

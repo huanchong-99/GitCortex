@@ -7,7 +7,7 @@ CREATE TABLE terminal_log_new (
     terminal_id TEXT NOT NULL REFERENCES terminal(id) ON DELETE CASCADE,
     log_type TEXT NOT NULL,
     content TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')) -- NOSONAR: SQLite migration DDL repeats this DEFAULT by design.
 );
 
 INSERT INTO terminal_log_new (id, terminal_id, log_type, content, created_at)

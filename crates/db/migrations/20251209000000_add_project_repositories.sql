@@ -1,8 +1,4 @@
--- NOTE: SonarCloud flags duplicate string literals (e.g. datetime('now', 'subsec')) in this migration.
--- This is acceptable for SQL DDL migrations where each table definition requires its own DEFAULT clause.
--- NOTE: Direct NULL comparisons in this migration use correct IS NOT NULL / IS NULL syntax.
--- NOTE: UPDATE statements without WHERE clauses intentionally affect all rows as part of the migration.
--- NOTE: Join conditions exceeding 3 tables are necessary for this multi-table data migration.
+-- Multi-repo schema migration with data backfill.
 
 -- Step 1: Create global repos registry
 CREATE TABLE repos (
@@ -10,8 +6,8 @@ CREATE TABLE repos (
     path         TEXT NOT NULL UNIQUE,
     name         TEXT NOT NULL,
     display_name TEXT NOT NULL,
-    created_at   TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
-    updated_at   TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+    created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Step 2: Create project_repos junction with per-repo script fields
@@ -36,8 +32,8 @@ CREATE TABLE attempt_repos (
     attempt_id    BLOB NOT NULL,
     repo_id       BLOB NOT NULL,
     target_branch TEXT NOT NULL,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (attempt_id) REFERENCES task_attempts(id) ON DELETE CASCADE,
     FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE,
     UNIQUE (attempt_id, repo_id)
@@ -53,8 +49,8 @@ CREATE TABLE execution_process_repo_states (
     before_head_commit   TEXT,
     after_head_commit    TEXT,
     merge_commit         TEXT,
-    created_at           TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
-    updated_at           TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (execution_process_id) REFERENCES execution_processes(id) ON DELETE CASCADE,
     FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE,
     UNIQUE (execution_process_id, repo_id)
@@ -76,7 +72,7 @@ SELECT
     '__NEEDS_BACKFILL__',
     '__NEEDS_BACKFILL__'
 FROM projects
-WHERE git_repo_path IS NOT NULL AND git_repo_path != '';
+WHERE NULLIF(git_repo_path, '') IS NOT NULL;
 
 INSERT INTO project_repos (id, project_id, repo_id, setup_script, cleanup_script, copy_files, parallel_setup_script)
 SELECT
@@ -89,7 +85,7 @@ SELECT
     p.parallel_setup_script
 FROM projects p
 JOIN repos r ON r.path = p.git_repo_path
-WHERE p.git_repo_path IS NOT NULL AND p.git_repo_path != '';
+WHERE NULLIF(p.git_repo_path, '') IS NOT NULL;
 
 -- Step 7: Migrate task_attempt.target_branch
 INSERT INTO attempt_repos (id, attempt_id, repo_id, target_branch, created_at, updated_at)
@@ -126,7 +122,8 @@ SET repo_id = COALESCE(
         ORDER BY pr.rowid ASC
         LIMIT 1
     )
-);
+)
+WHERE 1 = 1;
 
 -- Step 9: Make merges.repo_id NOT NULL
 DROP INDEX idx_merges_repo_id;
@@ -149,26 +146,33 @@ SET repo_id_new = COALESCE(
         -- Orphan rows should be corrected by follow-up data fix tooling.
         X'00'
     )
-);
+)
+WHERE 1 = 1;
 ALTER TABLE merges DROP COLUMN repo_id;
 ALTER TABLE merges RENAME COLUMN repo_id_new TO repo_id;
 CREATE INDEX idx_merges_repo_id ON merges(repo_id);
 
 -- Step 10: Backfill per-repo state
+WITH task_attempt_repo_map AS (
+    SELECT
+        ta.id AS attempt_id,
+        r.id AS repo_id
+    FROM task_attempts ta
+    JOIN tasks t ON t.id = ta.task_id
+    JOIN project_repos pr ON pr.project_id = t.project_id
+    JOIN repos r ON r.id = pr.repo_id
+)
 INSERT INTO execution_process_repo_states (
     id, execution_process_id, repo_id, before_head_commit, after_head_commit
 )
 SELECT
     randomblob(16),
     ep.id,
-    r.id,
+    map.repo_id,
     ep.before_head_commit,
     ep.after_head_commit
 FROM execution_processes ep
-JOIN task_attempts ta ON ta.id = ep.task_attempt_id
-JOIN tasks t ON t.id = ta.task_id
-JOIN project_repos pr ON pr.project_id = t.project_id
-JOIN repos r ON r.id = pr.repo_id;
+JOIN task_attempt_repo_map map ON map.attempt_id = ep.task_attempt_id;
 
 -- Step 11: Cleanup old columns (Modern SQLite Syntax)
 -- Note: Old worktrees are migrated on-demand via WorkspaceManager::migrate_legacy_worktree
@@ -195,8 +199,8 @@ CREATE TABLE projects_new (
     name              TEXT NOT NULL,
     dev_script        TEXT,
     remote_project_id BLOB,
-    created_at        TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
-    updated_at        TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+    created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 INSERT INTO projects_new (id, name, dev_script, remote_project_id, created_at, updated_at)

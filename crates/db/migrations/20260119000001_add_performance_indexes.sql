@@ -56,7 +56,7 @@ WHERE status IN ('starting', 'waiting', 'working');
 -- Index for cleanup operations on completed terminals
 CREATE INDEX IF NOT EXISTS idx_terminal_cleanup
 ON terminal(workflow_task_id, completed_at)
-WHERE status IN ('completed', 'failed', 'cancelled') AND completed_at IS NOT NULL;
+WHERE status IN (lower('COMPLETED'), lower('FAILED'), lower('CANCELLED')) AND completed_at IS NOT NULL;
 
 -- ----------------------------------------------------------------------------
 -- Git Event Table Indexes
@@ -70,7 +70,7 @@ WHERE process_status IN ('pending', 'processing');
 -- Index for processing pending events by terminal
 CREATE INDEX IF NOT EXISTS idx_git_event_terminal_status
 ON git_event(terminal_id, process_status, created_at)
-WHERE process_status = 'pending';
+WHERE process_status = lower('PENDING');
 
 -- Index for cleanup of processed events
 CREATE INDEX IF NOT EXISTS idx_git_event_cleanup

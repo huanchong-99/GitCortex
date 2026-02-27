@@ -52,11 +52,11 @@ type NullableFormInput = HTMLTextAreaElement | HTMLInputElement | null;
 type EditableElement = HTMLInputElement | HTMLTextAreaElement | (HTMLElement & { isContentEditable: boolean });
 
 /** Platform check used for shortcut detection. */
-const isMac = () => {
-  // eslint-disable-next-line @typescript-eslint/no-deprecated -- fallback for browsers without userAgentData
-  const platform: string = (navigator as any).userAgentData?.platform ?? navigator.platform;
-  return platform.toUpperCase().includes('MAC');
-};
+function detectPlatformString(): string {
+  return navigator.userAgent;
+}
+
+const isMac = () => detectPlatformString().toUpperCase().includes('MAC');
 
 /** True for Cmd/Ctrl+C (no Shift/Alt). */
 const isCopy = (e: KeyboardEvent) =>
@@ -113,7 +113,6 @@ async function writeClipboardText(text: string): Promise<boolean> {
     console.debug('Clipboard write failed, trying execCommand fallback', error);
     try {
       // Legacy fallback for environments where Clipboard API is unavailable
-      // eslint-disable-next-line deprecation/deprecation
       return document.execCommand('copy');
     } catch (fallbackError) {
       console.debug('execCommand copy also failed', fallbackError);
@@ -218,7 +217,6 @@ function insertTextAtCaretGeneric(text: string) {
   if ((el as HTMLInputElement).selectionStart === undefined) {
     try {
       // Legacy fallback for contentEditable insert (no modern API alternative)
-      // eslint-disable-next-line deprecation/deprecation
       document.execCommand('insertText', false, text);
       el.dispatchEvent(new Event('input', { bubbles: true }));
     } catch (error) {
@@ -311,13 +309,23 @@ type IframeMessage = {
   requestId?: string;
 };
 
+const ALLOWED_PARENT_MESSAGE_TYPES = new Set([
+  'vscode-iframe-clipboard-paste-result',
+  'VIBE_ADD_TO_INPUT',
+]);
+
 // Handle messages from the parent webview (clipboard, add-to input)
 globalThis.addEventListener('message', (e: MessageEvent) => {
-  // Verify the message originates from this window (VSCode webview security)
-  if (e.source && e.source !== window) return;
-  const data: unknown = e?.data;
+  if (!inIframe()) return;
+  if (e.source !== globalThis.parent) return;
+  if (e.origin !== VSCODE_PARENT_ORIGIN) return;
+
+  const data: unknown = e.data;
   if (!data || typeof data !== 'object') return;
+
   const msg = data as IframeMessage;
+  if (!ALLOWED_PARENT_MESSAGE_TYPES.has(msg.type)) return;
+
   if (msg.type === 'vscode-iframe-clipboard-paste-result' && msg.requestId) {
     const fn = pasteResolvers[msg.requestId];
     if (fn) {
@@ -325,6 +333,7 @@ globalThis.addEventListener('message', (e: MessageEvent) => {
       delete pasteResolvers[msg.requestId];
     }
   }
+
   if (msg.type === 'VIBE_ADD_TO_INPUT' && typeof msg.text === 'string') {
     const el =
       activeEditable() ||
@@ -404,7 +413,6 @@ function handleUndoShortcut(e: KeyboardEvent): boolean {
   e.stopPropagation();
   try {
     // Legacy fallback for undo operation (no modern API alternative)
-    // eslint-disable-next-line deprecation/deprecation
     document.execCommand('undo');
   } catch (error) {
     console.debug('Undo command failed', error);
@@ -418,7 +426,6 @@ function handleRedoShortcut(e: KeyboardEvent): boolean {
   e.stopPropagation();
   try {
     // Legacy fallback for redo operation (no modern API alternative)
-    // eslint-disable-next-line deprecation/deprecation
     document.execCommand('redo');
   } catch (error) {
     console.debug('Redo command failed', error);

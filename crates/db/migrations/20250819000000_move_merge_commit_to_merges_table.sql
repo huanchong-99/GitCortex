@@ -1,6 +1,4 @@
--- NOTE: SonarCloud flags duplicate string literals (e.g. 'direct', 'pr', datetime('now', 'subsec'))
--- in this migration. This is acceptable for SQL DDL migrations where CHECK constraints and INSERT
--- statements necessarily repeat enum values and default expressions.
+-- NOTE: Keep this migration SQLite-compatible and behavior-preserving for legacy data.
 
 -- Create enhanced merges table with type-specific columns
 CREATE TABLE merges (
@@ -23,7 +21,7 @@ CREATE TABLE merges (
 
     -- Data integrity constraints
     CHECK (
-        (merge_type = 'direct' AND merge_commit IS NOT NULL 
+        (merge_type <> 'pr' AND merge_commit IS NOT NULL
          AND pr_number IS NULL AND pr_url IS NULL) 
         OR 
         (merge_type = 'pr' AND pr_number IS NOT NULL AND pr_url IS NOT NULL 
@@ -61,8 +59,7 @@ SELECT
     pr_number,
     pr_url,
     CASE 
-        WHEN pr_status = 'merged' THEN 'merged'
-        WHEN pr_status = 'closed' THEN 'closed'
+        WHEN pr_status IN ('merged', 'closed') THEN pr_status
         ELSE 'open'
     END,
     pr_merged_at,

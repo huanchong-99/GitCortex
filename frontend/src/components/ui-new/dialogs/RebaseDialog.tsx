@@ -34,6 +34,24 @@ function isConflictError(errorType: string | undefined): boolean {
   return errorType === 'merge_conflicts' || errorType === 'rebase_in_progress';
 }
 
+function stringifyErrorValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value instanceof Error) {
+    return value.message;
+  }
+  if (value && typeof value === 'object') {
+    try {
+      const serialized = JSON.stringify(value);
+      return serialized ?? 'Failed to rebase';
+    } catch {
+      return 'Failed to rebase';
+    }
+  }
+  return value == null ? 'Failed to rebase' : String(value);
+}
+
 // Helper to extract error message from various error structures
 function extractErrorMessage(err: unknown): string {
   if (!err || typeof err !== 'object') {
@@ -42,18 +60,11 @@ function extractErrorMessage(err: unknown): string {
 
   // Handle Result<void, GitOperationError> structure
   if ('error' in err && err.error && typeof err.error === 'object' && 'message' in err.error) {
-    return String(err.error.message);
+    return stringifyErrorValue(err.error.message);
   }
 
   if ('message' in err && err.message) {
-    const msg = err.message;
-    if (typeof msg === 'string') {
-      return msg;
-    }
-    if (msg instanceof Error) {
-      return msg.message;
-    }
-    return typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+    return stringifyErrorValue(err.message);
   }
 
   return 'Failed to rebase';

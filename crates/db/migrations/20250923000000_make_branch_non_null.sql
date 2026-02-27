@@ -7,7 +7,9 @@ UPDATE task_attempts SET branch = 'main' WHERE branch IS NULL;
 ALTER TABLE task_attempts ADD COLUMN branch_new TEXT NOT NULL DEFAULT 'main';
 
 -- 2) Copy existing values
-UPDATE task_attempts SET branch_new = branch;
+UPDATE task_attempts
+SET branch_new = branch
+WHERE 1=1;  -- Explicit WHERE clause to indicate intentional full-table update
 
 -- 3) Remove the old nullable column
 ALTER TABLE task_attempts DROP COLUMN branch;

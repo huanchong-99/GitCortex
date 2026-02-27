@@ -54,20 +54,26 @@ CREATE TABLE IF NOT EXISTS model_config (
 );
 
 -- Insert Claude Code default models
-INSERT INTO model_config (id, cli_type_id, name, display_name, api_model_id, is_default, is_official) VALUES
-    ('model-claude-sonnet', 'cli-claude-code', 'sonnet', 'Claude Sonnet', 'claude-sonnet-4-20250514', 1, 1),
-    ('model-claude-opus', 'cli-claude-code', 'opus', 'Claude Opus', 'claude-opus-4-5-20251101', 0, 1),
-    ('model-claude-haiku', 'cli-claude-code', 'haiku', 'Claude Haiku', 'claude-haiku-4-5-20251001', 0, 1);
-
--- Insert Gemini default models
-INSERT INTO model_config (id, cli_type_id, name, display_name, api_model_id, is_default, is_official) VALUES
-    ('model-gemini-pro', 'cli-gemini', 'gemini-pro', 'Gemini Pro', 'gemini-2.5-pro', 1, 1),
-    ('model-gemini-flash', 'cli-gemini', 'gemini-flash', 'Gemini Flash', 'gemini-2.5-flash', 0, 1);
-
--- Insert Codex default models
-INSERT INTO model_config (id, cli_type_id, name, display_name, api_model_id, is_default, is_official) VALUES
-    ('model-codex-gpt4o', 'cli-codex', 'gpt-4o', 'GPT-4o', 'gpt-4o', 1, 1),
-    ('model-codex-o1', 'cli-codex', 'o1', 'O1', 'o1', 0, 1);
+WITH cli_type_ids AS (
+    SELECT
+        'cli-claude-code' AS claude_cli_id,
+        'cli-gemini' AS gemini_cli_id,
+        'cli-codex' AS codex_cli_id
+)
+INSERT INTO model_config (id, cli_type_id, name, display_name, api_model_id, is_default, is_official)
+SELECT 'model-claude-sonnet', claude_cli_id, 'sonnet', 'Claude Sonnet', 'claude-sonnet-4-20250514', 1, 1 FROM cli_type_ids
+UNION ALL
+SELECT 'model-claude-opus', claude_cli_id, 'opus', 'Claude Opus', 'claude-opus-4-5-20251101', 0, 1 FROM cli_type_ids
+UNION ALL
+SELECT 'model-claude-haiku', claude_cli_id, 'haiku', 'Claude Haiku', 'claude-haiku-4-5-20251001', 0, 1 FROM cli_type_ids
+UNION ALL
+SELECT 'model-gemini-pro', gemini_cli_id, 'gemini-pro', 'Gemini Pro', 'gemini-2.5-pro', 1, 1 FROM cli_type_ids
+UNION ALL
+SELECT 'model-gemini-flash', gemini_cli_id, 'gemini-flash', 'Gemini Flash', 'gemini-2.5-flash', 0, 1 FROM cli_type_ids
+UNION ALL
+SELECT 'model-codex-gpt4o', codex_cli_id, 'gpt-4o', 'GPT-4o', 'gpt-4o', 1, 1 FROM cli_type_ids
+UNION ALL
+SELECT 'model-codex-o1', codex_cli_id, 'o1', 'O1', 'o1', 0, 1 FROM cli_type_ids;
 
 -- ----------------------------------------------------------------------------
 -- 3. Slash Command Preset Table (slash_command_preset)

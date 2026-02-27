@@ -26,8 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { JSONEditor } from '@/components/ui/json-editor';
 import { Loader2 } from 'lucide-react';
-import type { BaseCodingAgent } from 'shared/types';
-import { McpConfig } from 'shared/types';
+import { BaseCodingAgent, McpConfig } from 'shared/types';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { ApiError, mcpServersApi } from '@/lib/api';
 import { McpConfigStrategyGeneral } from '@/lib/mcpStrategies';
@@ -37,6 +36,24 @@ const MCP_NOT_SUPPORTED_ERROR_CODE = 'MCP_NOT_SUPPORTED';
 interface McpUiError {
   code: string | null;
   message: string;
+}
+
+function isMcpUiErrorData(
+  data: unknown
+): data is { code?: string | null; message?: string } {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+
+  const candidate = data as { code?: unknown; message?: unknown };
+  const codeOk =
+    candidate.code === undefined ||
+    candidate.code === null ||
+    typeof candidate.code === 'string';
+  const messageOk =
+    candidate.message === undefined || typeof candidate.message === 'string';
+
+  return codeOk && messageOk;
 }
 
 export const buildMcpServersPayload = (
@@ -66,12 +83,11 @@ export function McpSettings() {
   const [success, setSuccess] = useState(false);
 
   const toMcpUiError = (err: unknown, fallbackMessage: string): McpUiError => {
-    if (err instanceof ApiError && err.error_data) {
-      const errorData = err.error_data as { code?: string; message?: string };
-      if (errorData.code || errorData.message) {
+    if (err instanceof ApiError && err.error_data && isMcpUiErrorData(err.error_data)) {
+      if (err.error_data.code || err.error_data.message) {
         return {
-          code: errorData.code ?? null,
-          message: errorData.message ?? err.message,
+          code: err.error_data.code ?? null,
+          message: err.error_data.message ?? err.message,
         };
       }
     }

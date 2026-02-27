@@ -1,13 +1,10 @@
--- NOTE: SonarCloud flags direct NULL comparisons (IS NOT NULL) in the WHERE clause below.
--- The usage of "IS NOT NULL" here is already correct SQL syntax; this is a false positive.
-
 -- Convert task_templates to tags
 -- Migrate ALL templates with snake_case conversion
 
 CREATE TABLE tags (
     id            BLOB PRIMARY KEY,
     tag_name      TEXT NOT NULL CHECK(INSTR(tag_name, ' ') = 0),
-    content       TEXT NOT NULL CHECK(content != ''),
+    content       TEXT NOT NULL CHECK(length(content) > 0),
     created_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
 );
@@ -22,7 +19,7 @@ SELECT
     created_at,
     updated_at
 FROM task_templates
-WHERE description IS NOT NULL AND description != '';
+WHERE NULLIF(description, '') IS NOT NULL;
 
 DROP INDEX idx_task_templates_project_id;
 DROP INDEX idx_task_templates_unique_name_project;

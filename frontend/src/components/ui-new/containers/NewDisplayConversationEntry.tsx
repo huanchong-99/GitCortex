@@ -52,29 +52,46 @@ type FileEditAction = Extract<ActionType, { action: 'file_edit' }>;
 /**
  * Parse unified diff to extract addition/deletion counts
  */
-function parseDiffStats(unifiedDiff: string): {
+function parseParsedDiffStats(unifiedDiff: string): {
   additions: number;
   deletions: number;
 } {
   let additions = 0;
   let deletions = 0;
-  try {
-    const parsed = parseInstance.parse(unifiedDiff);
-    for (const h of parsed.hunks) {
-      for (const line of h.lines) {
-        if (line.type === DiffLineType.Add) additions++;
-        else if (line.type === DiffLineType.Delete) deletions++;
-      }
-    }
-  } catch {
-    // Fallback: count lines starting with + or -
-    const lines = unifiedDiff.split('\n');
-    for (const line of lines) {
-      if (line.startsWith('+') && !line.startsWith('+++')) additions++;
-      else if (line.startsWith('-') && !line.startsWith('---')) deletions++;
+  const parsed = parseInstance.parse(unifiedDiff);
+  for (const h of parsed.hunks) {
+    for (const line of h.lines) {
+      if (line.type === DiffLineType.Add) additions++;
+      else if (line.type === DiffLineType.Delete) deletions++;
     }
   }
   return { additions, deletions };
+}
+
+function parseFallbackDiffStats(unifiedDiff: string): {
+  additions: number;
+  deletions: number;
+} {
+  let additions = 0;
+  let deletions = 0;
+  const lines = unifiedDiff.split('\n');
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) additions++;
+    else if (line.startsWith('-') && !line.startsWith('---')) deletions++;
+  }
+  return { additions, deletions };
+}
+
+function parseDiffStats(unifiedDiff: string): {
+  additions: number;
+  deletions: number;
+} {
+  try {
+    return parseParsedDiffStats(unifiedDiff);
+  } catch {
+    // Fallback: count lines starting with + or -
+    return parseFallbackDiffStats(unifiedDiff);
+  }
 }
 
 /**
@@ -154,10 +171,14 @@ function getToolCommand(
   return undefined;
 }
 
-const SCRIPT_TOOL_NAMES = ['Setup Script', 'Cleanup Script', 'Tool Install Script'];
+const SCRIPT_TOOL_NAMES = new Set([
+  'Setup Script',
+  'Cleanup Script',
+  'Tool Install Script',
+]);
 
 function isScriptCommandEntry(action_type: ActionType, toolName: string): boolean {
-  return action_type.action === 'command_run' && SCRIPT_TOOL_NAMES.includes(toolName);
+  return action_type.action === 'command_run' && SCRIPT_TOOL_NAMES.has(toolName);
 }
 
 function extractExitCode(action_type: ActionType): number | null {
@@ -165,6 +186,16 @@ function extractExitCode(action_type: ActionType): number | null {
   return action_type.result?.exit_status?.type === 'exit_code'
     ? action_type.result.exit_status.code
     : null;
+}
+
+function getScriptType(title: string): ScriptType {
+  if (title === 'Setup Script') {
+    return 'setup';
+  }
+  if (title === 'Cleanup Script') {
+    return 'cleanup';
+  }
+  return 'dev_server';
 }
 
 /**
@@ -208,7 +239,7 @@ function renderToolUseEntry(
     );
   }
 
-  // Todo management - use ChatTodoList
+  // Task list management - use ChatTodoList
   if (action_type.action === 'todo_management') {
     return (
       <TodoManagementEntry
@@ -594,7 +625,7 @@ function ToolSummaryEntry({
 }
 
 /**
- * Todo management entry with expandable list of todos
+ * Task list entry with expandable list of items
  */
 function TodoManagementEntry({
   todos,
@@ -670,11 +701,7 @@ function ScriptEntryWithFix({
     const currentRepos = reposRef.current;
     if (!workspaceId || currentRepos.length === 0) return;
 
-    // Determine script type based on title
-    const scriptType: ScriptType =
-      title === 'Setup Script' ? 'setup'
-        : title === 'Cleanup Script' ? 'cleanup'
-          : 'dev_server';
+    const scriptType = getScriptType(title);
 
     ScriptFixerDialog.show({
       scriptType,

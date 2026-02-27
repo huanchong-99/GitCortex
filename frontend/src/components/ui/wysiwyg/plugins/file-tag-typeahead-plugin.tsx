@@ -149,15 +149,13 @@ function TagMenuItem({
   const isSelected = index === selectedIndex;
 
   return (
-    <div
+    <button
       key={option.key}
-      role="option"
-      aria-selected={isSelected}
+      type="button"
       tabIndex={-1}
-      className={getItemClassName(isSelected)}
+      className={`w-full text-left ${getItemClassName(isSelected)}`}
       onMouseMove={createMouseMoveHandler(lastMousePositionRef, setHighlightedIndex, index)}
       onClick={() => selectOptionAndCleanUp(option)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOptionAndCleanUp(option); } }}
     >
       <div className="flex items-center gap-2 font-medium">
         <TagIcon className="h-3.5 w-3.5 text-blue-600" />
@@ -169,7 +167,7 @@ function TagMenuItem({
           {tag.content.length > 60 ? '...' : ''}
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -193,22 +191,20 @@ function FileMenuItem({
   const isSelected = index === selectedIndex;
 
   return (
-    <div
+    <button
       key={option.key}
-      role="option"
-      aria-selected={isSelected}
+      type="button"
       tabIndex={-1}
-      className={getItemClassName(isSelected)}
+      className={`w-full text-left ${getItemClassName(isSelected)}`}
       onMouseMove={createMouseMoveHandler(lastMousePositionRef, setHighlightedIndex, index)}
       onClick={() => selectOptionAndCleanUp(option)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOptionAndCleanUp(option); } }}
     >
       <div className="flex items-center gap-2 font-medium truncate">
         <FileText className="h-3.5 w-3.5 flex-shrink-0" />
         <span>{file.name}</span>
       </div>
       <div className="text-xs truncate">{file.path}</div>
-    </div>
+    </button>
   );
 }
 

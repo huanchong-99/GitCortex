@@ -74,7 +74,6 @@ export function ProcessListContainer() {
   const searchBar = showSearch && (
     <div
       className="p-base flex items-center gap-2 shrink-0"
-      role="presentation"
       onKeyDown={handleSearchKeyDown}
     >
       <InputField

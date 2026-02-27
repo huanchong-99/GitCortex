@@ -23,11 +23,11 @@ export function ThemeProvider({
   initialTheme = ThemeMode.SYSTEM,
   ...props
 }: Readonly<ThemeProviderProps>) {
-  const [theme, setThemeState] = useState<ThemeMode>(initialTheme);
+  const [theme, setTheme] = useState<ThemeMode>(initialTheme);
 
   // Update theme when initialTheme changes
   useEffect(() => {
-    setThemeState(initialTheme);
+    setTheme(initialTheme);
   }, [initialTheme]);
 
   useEffect(() => {
@@ -48,14 +48,14 @@ export function ThemeProvider({
     root.classList.add(theme.toLowerCase());
   }, [theme]);
 
-  const setTheme = useCallback((newTheme: ThemeMode) => {
-    setThemeState(newTheme);
+  const applyTheme = useCallback((newTheme: ThemeMode) => {
+    setTheme(newTheme);
   }, []);
 
   const value = useMemo(() => ({
     theme,
-    setTheme,
-  }), [theme, setTheme]);
+    setTheme: applyTheme,
+  }), [theme, applyTheme]);
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>

@@ -120,8 +120,27 @@ export function ChatFileEntry({
     viewInChangesLabel: t('conversation.viewInChangesPanel'),
   };
 
+  const renderHeader = (headerClassName: string) => {
+    if (onToggle) {
+      return (
+        <button
+          type="button"
+          onClick={onToggle}
+          className={cn(headerClassName, 'cursor-pointer text-left')}
+        >
+          <FileHeaderContent {...headerProps} />
+        </button>
+      );
+    }
+
+    return (
+      <div className={headerClassName}>
+        <FileHeaderContent {...headerProps} />
+      </div>
+    );
+  };
+
   if (hasDiffContent) {
-    const HeaderTag = onToggle ? 'button' : 'div';
     return (
       <div
         className={cn(
@@ -130,16 +149,12 @@ export function ChatFileEntry({
           className
         )}
       >
-        <HeaderTag
-          {...(onToggle ? { type: 'button' as const, onClick: onToggle } : {})}
-          className={cn(
+        {renderHeader(
+          cn(
             'flex items-center p-base w-full',
-            isDenied ? 'bg-error/20' : 'bg-panel',
-            onToggle && 'cursor-pointer text-left'
-          )}
-        >
-          <FileHeaderContent {...headerProps} />
-        </HeaderTag>
+            isDenied ? 'bg-error/20' : 'bg-panel'
+          )
+        )}
         {expanded && (
           <DiffViewBody
             diffFile={diffData.diffFile}
@@ -153,25 +168,11 @@ export function ChatFileEntry({
     );
   }
 
-  return (
-    <div
-      role={onToggle ? "button" : undefined}
-      tabIndex={onToggle ? 0 : undefined}
-      className={cn(
-        'flex items-center border rounded-sm p-base w-full',
-        isDenied ? 'bg-error/20 border-error' : 'bg-panel',
-        onToggle && 'cursor-pointer',
-        className
-      )}
-      onClick={onToggle}
-      onKeyDown={onToggle ? (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onToggle();
-        }
-      } : undefined}
-    >
-      <FileHeaderContent {...headerProps} />
-    </div>
+  return renderHeader(
+    cn(
+      'flex items-center border rounded-sm p-base w-full',
+      isDenied ? 'bg-error/20 border-error' : 'bg-panel',
+      className
+    )
   );
 }

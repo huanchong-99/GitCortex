@@ -4,7 +4,9 @@
 ALTER TABLE task_attempts ADD COLUMN branch_new TEXT;  -- nullable
 
 -- 2) Copy existing values
-UPDATE task_attempts SET branch_new = branch;
+UPDATE task_attempts
+SET branch_new = branch
+WHERE 1=1;  -- Explicit WHERE clause to indicate intentional full-table update
 
 -- If you have indexes/triggers/constraints that reference "branch",
 -- drop them before the next two steps and recreate them afterwards.

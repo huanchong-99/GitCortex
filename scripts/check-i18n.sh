@@ -189,7 +189,10 @@ BASE_REF="${GITHUB_BASE_REF:-main}"
 echo "▶️  Fetching $BASE_REF for baseline (shallow clone)..."
 REMOTE_URL=$(git -C "$REPO_ROOT" remote get-url origin)
 BASE_DIR="$(mktemp -d)"
-cleanup_base() { rm -rf "$BASE_DIR"; }
+cleanup_base() {
+  rm -rf "$BASE_DIR"
+  return 0
+}
 trap cleanup_base EXIT
 
 if git clone --depth=1 --branch "$BASE_REF" --single-branch "$REMOTE_URL" "$BASE_DIR" >/dev/null 2>&1; then

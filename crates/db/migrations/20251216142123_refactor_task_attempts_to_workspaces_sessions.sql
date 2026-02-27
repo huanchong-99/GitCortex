@@ -17,7 +17,7 @@ CREATE TABLE sessions (
     id              BLOB PRIMARY KEY,
     workspace_id    BLOB NOT NULL,
     executor        TEXT,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'subsec')), -- NOSONAR: SQLite migration DDL repeats this DEFAULT by design.
     updated_at      TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );

@@ -408,12 +408,12 @@ export function DiffViewCardWithComments({
             )}
             <div className="flex items-center gap-1 shrink-0">
               {attemptId && (
-                <span role="presentation" onClick={(e) => e.stopPropagation()}>
+                <div onClick={(e) => e.stopPropagation()}>
                   <OpenInIdeButton
                     onClick={handleOpenInIde}
                     className="size-icon-xs p-0"
                   />
-                </span>
+                </div>
               )}
               {onToggle && (
                 <CaretDownIcon

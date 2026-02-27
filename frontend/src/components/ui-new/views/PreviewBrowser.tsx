@@ -218,6 +218,7 @@ function DesktopIframeView({
   isResizing,
   containerStyle,
   onResizeStart,
+  t,
 }: Readonly<{
   url: string;
   title: string;
@@ -225,6 +226,7 @@ function DesktopIframeView({
   isResizing: boolean;
   containerStyle: React.CSSProperties;
   onResizeStart: (direction: 'right' | 'bottom' | 'corner') => (e: React.MouseEvent | React.TouchEvent) => void;
+  t: (key: string) => string;
 }>) {
   return (
     <div
@@ -243,20 +245,26 @@ function DesktopIframeView({
       />
       {screenSize === 'responsive' && (
         <>
-          <div
-            className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-brand/30 transition-colors"
+          <button
+            type="button"
+            className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-brand/30 transition-colors bg-transparent border-0 p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
             onMouseDown={onResizeStart('right')}
             onTouchStart={onResizeStart('right')}
+            aria-label={t('preview.toolbar.resizeWidth')}
           />
-          <div
-            className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-brand/30 transition-colors"
+          <button
+            type="button"
+            className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-brand/30 transition-colors bg-transparent border-0 p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
             onMouseDown={onResizeStart('bottom')}
             onTouchStart={onResizeStart('bottom')}
+            aria-label={t('preview.toolbar.resizeHeight')}
           />
-          <div
-            className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize hover:bg-brand/30 transition-colors"
+          <button
+            type="button"
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize hover:bg-brand/30 transition-colors bg-transparent border-0 p-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
             onMouseDown={onResizeStart('corner')}
             onTouchStart={onResizeStart('corner')}
+            aria-label={t('preview.toolbar.resizeBoth')}
           />
         </>
       )}
@@ -486,6 +494,7 @@ export function PreviewBrowser({
                 isResizing={isResizing}
                 containerStyle={getIframeContainerStyle()}
                 onResizeStart={onResizeStart}
+                t={t}
               />
             )}
           </div>

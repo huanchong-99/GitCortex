@@ -15,7 +15,7 @@ CREATE TABLE execution_processes (
     stdout            TEXT,
     stderr            TEXT,
     exit_code         INTEGER,
-    started_at        TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+    started_at        TEXT NOT NULL DEFAULT (datetime('now', 'subsec')), -- NOSONAR: SQLite migration DDL repeats this DEFAULT by design.
     completed_at      TEXT,
     created_at        TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
     updated_at        TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
