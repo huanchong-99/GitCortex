@@ -35,4 +35,4 @@ SET executor_action = CASE
         'next_action', json('null')
     )
 END
-WHERE executor_action = '{}' OR executor_action = '' OR executor_action IS NULL;
+WHERE executor_action IS NULL OR executor_action IN ('{}', '');

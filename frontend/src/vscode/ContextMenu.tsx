@@ -67,6 +67,17 @@ function pasteIntoInput(
   el.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+type LegacyDocumentWithExecCommand = {
+  execCommand?: (commandId: string, showUI?: boolean, value?: string) => boolean;
+};
+
+function runLegacyExecCommand(commandId: string, value?: string): boolean {
+  const legacyDocument = document as unknown as LegacyDocumentWithExecCommand;
+  const execCommand = legacyDocument.execCommand;
+  if (typeof execCommand !== 'function') return false;
+  return execCommand.call(document, commandId, false, value);
+}
+
 export const WebviewContextMenu: React.FC = () => {
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState<Point>({ x: 0, y: 0 });
@@ -176,7 +187,7 @@ export const WebviewContextMenu: React.FC = () => {
     if (!copied) {
       try {
         // Legacy fallback for environments where Clipboard API is unavailable
-        document.execCommand('copy');
+        runLegacyExecCommand('copy');
       } catch {
         /* empty */
       }
@@ -200,7 +211,7 @@ export const WebviewContextMenu: React.FC = () => {
         await writeClipboardText(sel);
         try {
           // Legacy fallback for contentEditable cut operation
-          document.execCommand('delete');
+          runLegacyExecCommand('delete');
         } catch {
           /* empty */
         }
@@ -222,7 +233,7 @@ export const WebviewContextMenu: React.FC = () => {
     } else if (isEditable(tgt)) {
       (tgt as HTMLElement).focus();
       // Legacy fallback for contentEditable paste operation
-      document.execCommand('insertText', false, text);
+      runLegacyExecCommand('insertText', text);
     }
     close();
   };
@@ -230,7 +241,7 @@ export const WebviewContextMenu: React.FC = () => {
   const onUndo = () => {
     try {
       // Legacy fallback for undo operation (no modern API alternative)
-      document.execCommand('undo');
+      runLegacyExecCommand('undo');
     } catch {
       /* empty */
     }
@@ -239,7 +250,7 @@ export const WebviewContextMenu: React.FC = () => {
   const onRedo = () => {
     try {
       // Legacy fallback for redo operation (no modern API alternative)
-      document.execCommand('redo');
+      runLegacyExecCommand('redo');
     } catch {
       /* empty */
     }
@@ -248,7 +259,7 @@ export const WebviewContextMenu: React.FC = () => {
   const onSelectAll = () => {
     try {
       // Legacy fallback for select all operation (no modern API alternative)
-      document.execCommand('selectAll');
+      runLegacyExecCommand('selectAll');
     } catch {
       /* empty */
     }
@@ -263,8 +274,8 @@ export const WebviewContextMenu: React.FC = () => {
     );
     if (items.length === 0) return;
 
-    const currentIndex = items.findIndex((item) => item === document.activeElement);
-    const activeIndex = currentIndex >= 0 ? currentIndex : 0;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    const activeIndex = Math.max(0, currentIndex);
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();

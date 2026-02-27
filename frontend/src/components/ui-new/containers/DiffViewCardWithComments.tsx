@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CaretDownIcon,
@@ -196,6 +196,21 @@ export function DiffViewCardWithComments({
     openInEditor({ filePath });
   }, [openInEditor, filePath]);
 
+  const handleHeaderClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      if (!onToggle) return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('[data-prevent-header-toggle="true"]')
+      ) {
+        return;
+      }
+      onToggle();
+    },
+    [onToggle]
+  );
+
   const FileIcon = getFileIcon(filePath, actualTheme);
   const hasStats = additions > 0 || deletions > 0;
 
@@ -341,7 +356,9 @@ export function DiffViewCardWithComments({
         const HeaderTag = onToggle ? 'button' : 'div';
         return (
           <HeaderTag
-            {...(onToggle ? { type: 'button' as const, onClick: onToggle } : {})}
+            {...(onToggle
+              ? { type: 'button' as const, onClick: handleHeaderClick }
+              : {})}
             className={cn(
               'w-full flex items-center bg-primary px-base gap-base sticky top-0 z-10 border-b border-transparent ',
               onToggle && 'cursor-pointer text-left',
@@ -408,7 +425,7 @@ export function DiffViewCardWithComments({
             )}
             <div className="flex items-center gap-1 shrink-0">
               {attemptId && (
-                <div onClick={(e) => e.stopPropagation()}>
+                <div data-prevent-header-toggle="true">
                   <OpenInIdeButton
                     onClick={handleOpenInIde}
                     className="size-icon-xs p-0"

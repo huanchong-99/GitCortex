@@ -39,6 +39,11 @@ type ExecutionProcessState = {
 };
 
 type ExecutionProcessStateStore = Record<string, ExecutionProcessState>;
+type PatchWithKeyBuilder = (
+  patch: PatchType,
+  executionProcessId: string,
+  index: number | 'user'
+) => PatchTypeWithKey;
 
 interface UseConversationHistoryParams {
   attempt: Workspace;
@@ -120,7 +125,7 @@ function findSetupRequiredText(entries: PatchTypeWithKey[]): string | undefined 
 function createUserMessagePatch(
   executionProcessId: string,
   prompt: string,
-  patchWithKey: (patch: PatchType, executionProcessId: string, index: number | 'user') => PatchTypeWithKey
+  patchWithKey: PatchWithKeyBuilder
 ): PatchTypeWithKey {
   const userNormalizedEntry: NormalizedEntry = {
     entry_type: {
@@ -184,7 +189,7 @@ function createScriptToolPatch(
   toolName: string,
   script: string,
   entries: PatchTypeWithKey[],
-  patchWithKey: (patch: PatchType, executionProcessId: string, index: number | 'user') => PatchTypeWithKey
+  patchWithKey: PatchWithKeyBuilder
 ): PatchTypeWithKey {
   const exitCode = Number(executionProcess?.exitCode) || 0;
   const exit_status = buildCommandExitStatus(executionProcess, exitCode);
@@ -244,6 +249,90 @@ type ScriptProcessResult = {
   processFailedOrKilled: boolean;
 };
 
+type EmitAggregationState = {
+  allEntries: PatchTypeWithKey[];
+  hasPendingApproval: boolean;
+  hasRunningProcess: boolean;
+  lastProcessFailedOrKilled: boolean;
+  needsSetup: boolean;
+  setupHelpText: string | undefined;
+};
+
+function createEmitAggregationState(): EmitAggregationState {
+  return {
+    allEntries: [],
+    hasPendingApproval: false,
+    hasRunningProcess: false,
+    lastProcessFailedOrKilled: false,
+    needsSetup: false,
+    setupHelpText: undefined,
+  };
+}
+
+function isCodingAgentActionType(actionType: ExecutorAction['typ']['type']): boolean {
+  return (
+    actionType === 'CodingAgentInitialRequest' ||
+    actionType === 'CodingAgentFollowUpRequest' ||
+    actionType === 'ReviewRequest'
+  );
+}
+
+function mergeCodingAgentResult(
+  aggregation: EmitAggregationState,
+  result: CodingAgentProcessResult
+): void {
+  if (result.hasPendingApproval) {
+    aggregation.hasPendingApproval = true;
+  }
+  if (result.isProcessRunning) {
+    aggregation.hasRunningProcess = true;
+  }
+  if (result.processFailedOrKilled) {
+    aggregation.lastProcessFailedOrKilled = true;
+    if (result.needsSetup) {
+      aggregation.needsSetup = true;
+      aggregation.setupHelpText = result.setupHelpText;
+    }
+  }
+
+  aggregation.allEntries.push(...result.entries);
+}
+
+function mergeScriptProcessResult(
+  aggregation: EmitAggregationState,
+  result: ScriptProcessResult
+): void {
+  if (result.isProcessRunning) {
+    aggregation.hasRunningProcess = true;
+  }
+  if (result.processFailedOrKilled) {
+    aggregation.lastProcessFailedOrKilled = true;
+  }
+
+  aggregation.allEntries.push(...result.entries);
+}
+
+function mapEntriesWithPatchKey(
+  entries: PatchType[],
+  executionProcessId: string,
+  patchWithKey: PatchWithKeyBuilder
+): PatchTypeWithKey[] {
+  const entriesWithKey: PatchTypeWithKey[] = [];
+  for (const [index, entry] of entries.entries()) {
+    entriesWithKey.push(patchWithKey(entry, executionProcessId, index));
+  }
+  return entriesWithKey;
+}
+
+function createProcessEntriesMutator(
+  executionProcess: ExecutionProcess,
+  entries: PatchTypeWithKey[]
+): (state: ExecutionProcessStateStore) => void {
+  return (state) => {
+    state[executionProcess.id] = { executionProcess, entries };
+  };
+}
+
 function getPromptFromExecutorAction(typ: ExecutorAction['typ']): string {
   if (
     typ.type === 'CodingAgentInitialRequest' ||
@@ -278,11 +367,7 @@ function processCodingAgentEntries(
   index: number,
   totalProcesses: number,
   getLiveExecutionProcess: (executionProcessId: string) => ExecutionProcess | undefined,
-  patchWithKey: (
-    patch: PatchType,
-    executionProcessId: string,
-    index: number | 'user'
-  ) => PatchTypeWithKey
+  patchWithKey: PatchWithKeyBuilder
 ): CodingAgentProcessResult {
   const entries: PatchTypeWithKey[] = [];
 
@@ -339,11 +424,7 @@ function processScriptRequestEntries(
   index: number,
   totalProcesses: number,
   getLiveExecutionProcess: (executionProcessId: string) => ExecutionProcess | undefined,
-  patchWithKey: (
-    patch: PatchType,
-    executionProcessId: string,
-    index: number | 'user'
-  ) => PatchTypeWithKey
+  patchWithKey: PatchWithKeyBuilder
 ): ScriptProcessResult {
   const typ = processState.executionProcess.executorAction.typ;
   const context = typ.type === 'ScriptRequest' ? typ.context : null;
@@ -490,28 +571,18 @@ export const useConversationHistory = ({
 
   const flattenEntriesForEmit = useCallback(
     (executionProcessState: ExecutionProcessStateStore): PatchTypeWithKey[] => {
-      let hasPendingApproval = false;
-      let hasRunningProcess = false;
-      let lastProcessFailedOrKilled = false;
-      let needsSetup = false;
-      let setupHelpText: string | undefined;
-
       const totalProcesses = Object.keys(executionProcessState).length;
       const sortedProcesses = Object.values(executionProcessState).sort(
         (a, b) =>
           new Date(a.executionProcess.createdAt).getTime() -
           new Date(b.executionProcess.createdAt).getTime()
       );
+      const aggregation = createEmitAggregationState();
 
-      const allEntries: PatchTypeWithKey[] = [];
       for (const [index, processState] of sortedProcesses.entries()) {
         const actionType = processState.executionProcess.executorAction.typ.type;
 
-        if (
-          actionType === 'CodingAgentInitialRequest' ||
-          actionType === 'CodingAgentFollowUpRequest' ||
-          actionType === 'ReviewRequest'
-        ) {
+        if (isCodingAgentActionType(actionType)) {
           const result = processCodingAgentEntries(
             processState,
             index,
@@ -519,57 +590,36 @@ export const useConversationHistory = ({
             getLiveExecutionProcess,
             patchWithKey
           );
-
-          if (result.hasPendingApproval) {
-            hasPendingApproval = true;
-          }
-          if (result.isProcessRunning) {
-            hasRunningProcess = true;
-          }
-          if (result.processFailedOrKilled) {
-            lastProcessFailedOrKilled = true;
-            if (result.needsSetup) {
-              needsSetup = true;
-              setupHelpText = result.setupHelpText;
-            }
-          }
-
-          allEntries.push(...result.entries);
+          mergeCodingAgentResult(aggregation, result);
           continue;
         }
 
-        if (actionType === 'ScriptRequest') {
-          const result = processScriptRequestEntries(
-            processState,
-            index,
-            totalProcesses,
-            getLiveExecutionProcess,
-            patchWithKey
-          );
-
-          if (result.isProcessRunning) {
-            hasRunningProcess = true;
-          }
-          if (result.processFailedOrKilled) {
-            lastProcessFailedOrKilled = true;
-          }
-
-          allEntries.push(...result.entries);
+        if (actionType !== 'ScriptRequest') {
+          continue;
         }
+
+        const result = processScriptRequestEntries(
+          processState,
+          index,
+          totalProcesses,
+          getLiveExecutionProcess,
+          patchWithKey
+        );
+        mergeScriptProcessResult(aggregation, result);
       }
 
-      if (!hasRunningProcess && !hasPendingApproval) {
-        allEntries.push(
+      if (!aggregation.hasRunningProcess && !aggregation.hasPendingApproval) {
+        aggregation.allEntries.push(
           nextActionPatch(
-            lastProcessFailedOrKilled,
+            aggregation.lastProcessFailedOrKilled,
             totalProcesses,
-            needsSetup,
-            setupHelpText
+            aggregation.needsSetup,
+            aggregation.setupHelpText
           )
         );
       }
 
-      return allEntries;
+      return aggregation.allEntries;
     },
     []
   );
@@ -610,12 +660,14 @@ export const useConversationHistory = ({
       return new Promise((resolve, reject) => {
         const controller = streamJsonPatchEntries<PatchType>(url, {
           onEntries(entries) {
-            const patchesWithKey = entries.map((entry, index) =>
-              patchWithKey(entry, executionProcess.id, index)
+            const patchesWithKey = mapEntriesWithPatchKey(
+              entries,
+              executionProcess.id,
+              patchWithKey
             );
-            mergeIntoDisplayed((state) => {
-              state[executionProcess.id] = { executionProcess, entries: patchesWithKey };
-            });
+            mergeIntoDisplayed(
+              createProcessEntriesMutator(executionProcess, patchesWithKey)
+            );
             emitEntries(displayedExecutionProcesses.current, 'running', false);
           },
           onFinished: () => {

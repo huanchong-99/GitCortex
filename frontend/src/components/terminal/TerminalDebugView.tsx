@@ -29,7 +29,10 @@ const TERMINAL_HISTORY_LIMIT = 1000;
 const stripControlCharacters = (value: string): string =>
   Array.from(value)
     .filter((char) => {
-      const code = char.charCodeAt(0);
+      const code = char.codePointAt(0);
+      if (code === undefined) {
+        return false;
+      }
       return code === 0x09 || code === 0x0a || code === 0x0d || (code >= 0x20 && code !== 0x7f);
     })
     .join('');

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useExecutionProcessesContext } from '@/contexts/ExecutionProcessesContext';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
@@ -54,8 +54,19 @@ export function ProcessListContainer() {
     [onSelectProcess]
   );
 
+  const searchBarRef = useRef<HTMLDivElement | null>(null);
+
   const handleSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
+    (e: KeyboardEvent) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+        return;
+      }
+
       if (e.key === 'Enter') {
         if (e.shiftKey) {
           onPrevMatch?.();
@@ -71,11 +82,20 @@ export function ProcessListContainer() {
 
   const showSearch = onSearchQueryChange !== undefined;
 
+  useEffect(() => {
+    const searchContainer = searchBarRef.current;
+    if (!searchContainer) {
+      return;
+    }
+
+    searchContainer.addEventListener('keydown', handleSearchKeyDown);
+    return () => {
+      searchContainer.removeEventListener('keydown', handleSearchKeyDown);
+    };
+  }, [handleSearchKeyDown]);
+
   const searchBar = showSearch && (
-    <div
-      className="p-base flex items-center gap-2 shrink-0"
-      onKeyDown={handleSearchKeyDown}
-    >
+    <div className="p-base flex items-center gap-2 shrink-0" ref={searchBarRef}>
       <InputField
         value={searchQuery}
         onChange={onSearchQueryChange}

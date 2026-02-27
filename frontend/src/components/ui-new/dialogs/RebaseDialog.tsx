@@ -49,7 +49,16 @@ function stringifyErrorValue(value: unknown): string {
       return 'Failed to rebase';
     }
   }
-  return value == null ? 'Failed to rebase' : String(value);
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint' ||
+    typeof value === 'symbol' ||
+    typeof value === 'function'
+  ) {
+    return value.toString();
+  }
+  return 'Failed to rebase';
 }
 
 // Helper to extract error message from various error structures

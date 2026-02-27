@@ -631,6 +631,12 @@ export function Workflows() {
 
   const activePromptDecision = activePrompt?.decision ?? null;
 
+  const runAsyncSafely = useCallback((task: Promise<unknown>) => {
+    task.catch((error) => {
+      console.error('Async workflow action failed:', error);
+    });
+  }, []);
+
   const promptDialog = activePrompt ? (
     <WorkflowPromptDialog
       prompt={activePrompt.detected}
@@ -638,7 +644,7 @@ export function Workflows() {
       submitError={promptSubmitError}
       isSubmitting={isSubmittingActivePrompt}
       onSubmit={(response) => {
-        void handleSubmitPromptResponse(response);
+        runAsyncSafely(handleSubmitPromptResponse(response));
       }}
     />
   ) : null;
@@ -910,22 +916,22 @@ export function Workflows() {
             }}
             handlers={{
               onPrepare: (workflowId) => {
-                void handlePrepareWorkflow(workflowId);
+                runAsyncSafely(handlePrepareWorkflow(workflowId));
               },
               onStart: (workflowId) => {
-                void handleStartWorkflow(workflowId);
+                runAsyncSafely(handleStartWorkflow(workflowId));
               },
               onPause: (workflowId) => {
-                void handlePauseWorkflow(workflowId);
+                runAsyncSafely(handlePauseWorkflow(workflowId));
               },
               onStop: (workflowId) => {
-                void handleStopWorkflow(workflowId);
+                runAsyncSafely(handleStopWorkflow(workflowId));
               },
               onMerge: (workflowId) => {
-                void handleMergeWorkflow(workflowId);
+                runAsyncSafely(handleMergeWorkflow(workflowId));
               },
               onDelete: (workflowId) => {
-                void handleDeleteWorkflow(workflowId);
+                runAsyncSafely(handleDeleteWorkflow(workflowId));
               },
             }}
           />
@@ -944,7 +950,7 @@ export function Workflows() {
           onMergeTerminalClick={
             canTriggerMerge
               ? () => {
-                void handleMergeWorkflow(selectedWorkflowDetail.id);
+                runAsyncSafely(handleMergeWorkflow(selectedWorkflowDetail.id));
               }
               : undefined
           }

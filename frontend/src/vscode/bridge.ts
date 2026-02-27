@@ -110,14 +110,8 @@ async function writeClipboardText(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text);
     return true;
   } catch (error) {
-    console.debug('Clipboard write failed, trying execCommand fallback', error);
-    try {
-      // Legacy fallback for environments where Clipboard API is unavailable
-      return document.execCommand('copy');
-    } catch (fallbackError) {
-      console.debug('execCommand copy also failed', fallbackError);
-      return false;
-    }
+    console.debug('Clipboard write failed, using parent bridge fallback', error);
+    return parentClipboardWrite(text);
   }
 }
 
@@ -202,9 +196,42 @@ function pasteIntoInput(
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+/** Insert text into a contentEditable element using Selection/Range APIs. */
+function insertTextIntoContentEditable(
+  el: HTMLElement,
+  text: string
+): boolean {
+  const selection = globalThis.getSelection();
+  if (!selection) return false;
+
+  if (
+    selection.rangeCount === 0 ||
+    (selection.anchorNode && !el.contains(selection.anchorNode))
+  ) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  if (selection.rangeCount === 0) return false;
+
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const textNode = document.createTextNode(text);
+  range.insertNode(textNode);
+  range.setStartAfter(textNode);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+
 /**
  * Insert text at the caret for the currently active editable.
- * Uses native mechanisms (setRangeText/execCommand) and emits input events so
+ * Uses native mechanisms (setRangeText/Selection API) and emits input events so
  * controlled frameworks (like React) update state predictably.
  */
 function insertTextAtCaretGeneric(text: string) {
@@ -215,13 +242,11 @@ function insertTextAtCaretGeneric(text: string) {
     ) as NullableFormInput);
   if (!el) return;
   if ((el as HTMLInputElement).selectionStart === undefined) {
-    try {
-      // Legacy fallback for contentEditable insert (no modern API alternative)
-      document.execCommand('insertText', false, text);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    } catch (error) {
-      console.debug('insertText command failed, using innerText fallback', error);
-      (el as HTMLElement).innerText += text;
+    const editable = el as HTMLElement;
+    if (!insertTextIntoContentEditable(editable, text)) {
+      console.debug('Selection insert failed, using text append fallback');
+      editable.innerText += text;
+      editable.dispatchEvent(new Event('input', { bubbles: true }));
     }
   } else {
     pasteIntoInput(el as HTMLInputElement | HTMLTextAreaElement, text);
@@ -273,14 +298,16 @@ const pasteResolvers: Record<string, (text: string) => void> = {};
 const VSCODE_PARENT_ORIGIN = globalThis.location.origin;
 
 /** Ask the extension to copy text to the OS clipboard (fallback path). */
-export function parentClipboardWrite(text: string) {
+export function parentClipboardWrite(text: string): boolean {
   try {
     globalThis.parent.postMessage(
       { type: 'vscode-iframe-clipboard-copy', text },
       VSCODE_PARENT_ORIGIN
     );
+    return true;
   } catch (error) {
     console.debug('Failed to post clipboard copy message to parent', error);
+    return false;
   }
 }
 
@@ -362,9 +389,9 @@ export function installVSCodeIframeKeyboardBridge() {
     } else if (isCut(e)) {
       if (handleCutShortcut(e)) return;
     } else if (isUndo(e)) {
-      if (handleUndoShortcut(e)) return;
+      if (handleUndoShortcut()) return;
     } else if (isRedo(e)) {
-      if (handleRedoShortcut(e)) return;
+      if (handleRedoShortcut()) return;
     } else if (isPaste(e)) {
       if (await handlePasteShortcut(e)) return;
     }
@@ -408,29 +435,15 @@ function handleCutShortcut(e: KeyboardEvent): boolean {
 }
 
 // Helper to handle undo shortcut
-function handleUndoShortcut(e: KeyboardEvent): boolean {
-  e.preventDefault();
-  e.stopPropagation();
-  try {
-    // Legacy fallback for undo operation (no modern API alternative)
-    document.execCommand('undo');
-  } catch (error) {
-    console.debug('Undo command failed', error);
-  }
-  return true;
+function handleUndoShortcut(): boolean {
+  // Keep undo local to editable elements and let the browser perform native undo.
+  return activeEditable() !== null;
 }
 
 // Helper to handle redo shortcut
-function handleRedoShortcut(e: KeyboardEvent): boolean {
-  e.preventDefault();
-  e.stopPropagation();
-  try {
-    // Legacy fallback for redo operation (no modern API alternative)
-    document.execCommand('redo');
-  } catch (error) {
-    console.debug('Redo command failed', error);
-  }
-  return true;
+function handleRedoShortcut(): boolean {
+  // Keep redo local to editable elements and let the browser perform native redo.
+  return activeEditable() !== null;
 }
 
 // Helper to handle paste shortcut

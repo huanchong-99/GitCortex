@@ -30,7 +30,7 @@ CREATE TABLE git_event_new (
     branch TEXT NOT NULL,
     commit_message TEXT NOT NULL,
     metadata TEXT,
-    process_status TEXT NOT NULL DEFAULT 'pending',
+    process_status TEXT NOT NULL DEFAULT (lower('PENDING')),
     agent_response TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     processed_at TEXT
