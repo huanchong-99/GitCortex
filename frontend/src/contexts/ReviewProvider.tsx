@@ -56,6 +56,85 @@ export function useReviewOptional() {
   return useContext(ReviewContext);
 }
 
+const isAsciiLetterOrDigit = (char: string): boolean => {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122)
+  );
+};
+
+const isPathSeparator = (char: string): boolean => char === '/' || char === '\\';
+
+const isPathSegmentChar = (char: string): boolean =>
+  isAsciiLetterOrDigit(char) || char === '_' || char === '.' || char === '-';
+
+const isPathTokenChar = (char: string): boolean =>
+  isPathSeparator(char) || isPathSegmentChar(char);
+
+const isFormattablePathToken = (token: string): boolean => {
+  if (!token) {
+    return false;
+  }
+
+  let index = 0;
+  if (isPathSeparator(token[index])) {
+    index++;
+  }
+
+  if (index >= token.length) {
+    return false;
+  }
+
+  let hasSeparator = false;
+  let segmentLength = 0;
+
+  for (; index < token.length; index++) {
+    const char = token[index];
+    if (isPathSeparator(char)) {
+      if (segmentLength === 0) {
+        return false;
+      }
+      hasSeparator = true;
+      segmentLength = 0;
+      continue;
+    }
+
+    if (!isPathSegmentChar(char)) {
+      return false;
+    }
+
+    segmentLength++;
+  }
+
+  return hasSeparator && segmentLength > 0;
+};
+
+const formatFilePathsWithBackticks = (text: string): string => {
+  let result = '';
+  let index = 0;
+
+  while (index < text.length) {
+    const char = text[index];
+    if (!isPathTokenChar(char)) {
+      result += char;
+      index++;
+      continue;
+    }
+
+    const start = index;
+    while (index < text.length && isPathTokenChar(text[index])) {
+      index++;
+    }
+
+    const token = text.slice(start, index);
+    result += isFormattablePathToken(token) ? `\`${token}\`` : token;
+  }
+
+  return result;
+};
+
 export function ReviewProvider({
   children,
   attemptId,
@@ -124,9 +203,9 @@ export function ReviewProvider({
       .map((comment) => {
         const codeLine = formatCodeLine(comment.codeLine);
         // Format file paths in comment body with backticks
-        const bodyWithFormattedPaths = comment.text
-          .trim()
-          .replaceAll(/([/\\]?[\w.-]+(?:[/\\][\w.-]+)+)/g, '`$1`');
+        const bodyWithFormattedPaths = formatFilePathsWithBackticks(
+          comment.text.trim()
+        );
         if (codeLine) {
           return `**${comment.filePath}** (Line ${comment.lineNumber})\n${codeLine}\n\n> ${bodyWithFormattedPaths}\n`;
         }
