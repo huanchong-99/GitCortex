@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useProjects } from '@/hooks/useProjects';
 import { useWorkflows } from '@/hooks/useWorkflows';
 import { WorkflowCard } from './WorkflowCard';
@@ -14,6 +15,7 @@ export function WorkflowSidebar({
   selectedWorkflowId,
   onSelectWorkflow,
 }: Readonly<WorkflowSidebarProps>) {
+  const { t } = useTranslation('workflow');
   const navigate = useNavigate();
   const { projects } = useProjects();
   const activeProjectId = projects[0]?.id ?? '';
@@ -21,9 +23,9 @@ export function WorkflowSidebar({
 
   return (
     <aside className="w-64 bg-panel border-r border-border p-4 flex flex-col">
-      <div className="text-sm font-semibold mb-3">Workflows</div>
+      <div className="text-sm font-semibold mb-3">{t('sidebar.title')}</div>
       {isLoading ? (
-        <div className="text-xs text-low">Loading...</div>
+        <div className="text-xs text-low">{t('sidebar.loading')}</div>
       ) : (
         <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
           {workflows.map((workflow) => (
@@ -45,7 +47,7 @@ export function WorkflowSidebar({
           onClick={() => navigate('/wizard')}
         >
           <Plus className="w-4 h-4" />
-          新建工作流
+          {t('management.createWorkflow')}
         </Button>
       </div>
     </aside>

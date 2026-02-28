@@ -426,6 +426,55 @@
     "workflowManagement": "Workflow Management",
     "createWorkspace": "Create Workspace"
   },
+  "sidebar": {
+    "title": "Workflows",
+    "loading": "Loading..."
+  },
+  "management": {
+    "title": "Workflows",
+    "description": "Manage multi-terminal workflows for parallel task execution",
+    "selectProject": "Select project",
+    "createProject": "Create Project",
+    "deleteProject": "Delete Project",
+    "deletingProject": "Deleting...",
+    "createWorkflow": "Create Workflow",
+    "backToWorkflows": "Back to Workflows",
+    "createWorkspace": "Create Workspace",
+    "loadingProjects": "Loading projects...",
+    "loadingWorkflows": "Loading workflows...",
+    "noProjectsTitle": "No Projects Found",
+    "noProjectsDescription": "Please create a project first in Settings -> Projects before creating workflows.",
+    "counts": {
+      "tasks_one": "{{count}} task",
+      "tasks_other": "{{count}} tasks",
+      "terminals_one": "{{count}} terminal",
+      "terminals_other": "{{count}} terminals"
+    },
+    "actions": {
+      "prepare": "Prepare Workflow",
+      "preparing": "Preparing...",
+      "start": "Start Workflow",
+      "pause": "Pause",
+      "stop": "Stop",
+      "merge": "Merge Workflow",
+      "merging": "Merging...",
+      "delete": "Delete"
+    },
+    "dialogs": {
+      "deleteProjectTitle": "Delete Project",
+      "deleteProjectMessage": "Delete project \"{{name}}\"? This cannot be undone.",
+      "stopWorkflowTitle": "Stop Workflow",
+      "deleteWorkflowTitle": "Delete Workflow"
+    },
+    "toasts": {
+      "projectDeleted": "Project deleted",
+      "deleteProjectFailed": "Failed to delete project"
+    },
+    "errors": {
+      "noProjectSelected": "No project selected to create workflow",
+      "createWorkflowFailed": "Failed to create workflow"
+    }
+  },
   "kanban": {
     "columns": {
       "pending": "Pending",

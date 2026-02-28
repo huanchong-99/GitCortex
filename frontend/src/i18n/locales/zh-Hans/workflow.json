@@ -425,6 +425,55 @@
     "workflowManagement": "工作流管理",
     "createWorkspace": "创建工作区"
   },
+  "sidebar": {
+    "title": "工作流",
+    "loading": "加载中..."
+  },
+  "management": {
+    "title": "工作流",
+    "description": "管理多终端并行任务工作流",
+    "selectProject": "选择项目",
+    "createProject": "创建项目",
+    "deleteProject": "删除项目",
+    "deletingProject": "删除中...",
+    "createWorkflow": "创建工作流",
+    "backToWorkflows": "返回工作流列表",
+    "createWorkspace": "创建工作区",
+    "loadingProjects": "正在加载项目...",
+    "loadingWorkflows": "正在加载工作流...",
+    "noProjectsTitle": "未找到项目",
+    "noProjectsDescription": "请先在 设置 -> 项目 中创建项目，然后再创建工作流。",
+    "counts": {
+      "tasks_one": "{{count}} 个任务",
+      "tasks_other": "{{count}} 个任务",
+      "terminals_one": "{{count}} 个终端",
+      "terminals_other": "{{count}} 个终端"
+    },
+    "actions": {
+      "prepare": "预处理工作流",
+      "preparing": "预处理中...",
+      "start": "启动工作流",
+      "pause": "暂停",
+      "stop": "停止",
+      "merge": "合并工作流",
+      "merging": "合并中...",
+      "delete": "删除"
+    },
+    "dialogs": {
+      "deleteProjectTitle": "删除项目",
+      "deleteProjectMessage": "确定删除项目“{{name}}”吗？此操作不可撤销。",
+      "stopWorkflowTitle": "停止工作流",
+      "deleteWorkflowTitle": "删除工作流"
+    },
+    "toasts": {
+      "projectDeleted": "项目已删除",
+      "deleteProjectFailed": "删除项目失败"
+    },
+    "errors": {
+      "noProjectSelected": "未选择可创建工作流的项目",
+      "createWorkflowFailed": "创建工作流失败"
+    }
+  },
   "kanban": {
     "columns": {
       "pending": "待处理",

@@ -173,42 +173,48 @@ function WorkflowDetailActions({
     onDelete: (id: string) => void;
   };
 }>) {
+  const { t } = useTranslation('workflow');
+
   return (
     <div className="flex gap-2">
       {actions.canPrepare && (
         <Button onClick={() => handlers.onPrepare(workflowId)} disabled={mutations.preparePending}>
           <Rocket className="w-4 h-4 mr-2" />
-          {mutations.preparePending ? 'Preparing...' : 'Prepare Workflow'}
+          {mutations.preparePending
+            ? t('management.actions.preparing')
+            : t('management.actions.prepare')}
         </Button>
       )}
       {actions.canStart && (
         <Button onClick={() => handlers.onStart(workflowId)} disabled={mutations.startPending}>
           <Play className="w-4 h-4 mr-2" />
-          Start Workflow
+          {t('management.actions.start')}
         </Button>
       )}
       {actions.canPause && (
         <Button variant="outline" onClick={() => handlers.onPause(workflowId)} disabled={mutations.pausePending}>
           <Pause className="w-4 h-4 mr-2" />
-          Pause
+          {t('management.actions.pause')}
         </Button>
       )}
       {actions.canStop && (
         <Button variant="destructive" onClick={() => handlers.onStop(workflowId)} disabled={mutations.stopPending}>
           <Square className="w-4 h-4 mr-2" />
-          Stop
+          {t('management.actions.stop')}
         </Button>
       )}
       {actions.canMerge && (
         <Button onClick={() => handlers.onMerge(workflowId)} disabled={!hasCompletedAllTasks || mutations.mergePending}>
           <GitMerge className="w-4 h-4 mr-2" />
-          {mutations.mergePending ? 'Merging...' : 'Merge Workflow'}
+          {mutations.mergePending
+            ? t('management.actions.merging')
+            : t('management.actions.merge')}
         </Button>
       )}
       {actions.canDelete && (
         <Button variant="outline" onClick={() => handlers.onDelete(workflowId)}>
           <Trash2 className="w-4 h-4 mr-2" />
-          Delete
+          {t('management.actions.delete')}
         </Button>
       )}
     </div>
@@ -222,6 +228,10 @@ function renderBlockingView({
   workflowsLoading,
   workflowsErrorMessage,
   loadFailedText,
+  loadingProjectsText,
+  noProjectsTitleText,
+  noProjectsDescriptionText,
+  loadingWorkflowsText,
 }: Readonly<{
   projectsLoading: boolean;
   projectsErrorMessage: string | null;
@@ -229,11 +239,15 @@ function renderBlockingView({
   workflowsLoading: boolean;
   workflowsErrorMessage: string | null;
   loadFailedText: string;
+  loadingProjectsText: string;
+  noProjectsTitleText: string;
+  noProjectsDescriptionText: string;
+  loadingWorkflowsText: string;
 }>): JSX.Element | null {
   if (projectsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader message="Loading projects..." />
+        <Loader message={loadingProjectsText} />
       </div>
     );
   }
@@ -256,11 +270,8 @@ function renderBlockingView({
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="max-w-md">
           <CardContent className="pt-6">
-            <h3 className="text-lg font-semibold mb-2">No Projects Found</h3>
-            <p className="text-sm text-low">
-              Please create a project first in Settings → Projects before
-              creating workflows.
-            </p>
+            <h3 className="text-lg font-semibold mb-2">{noProjectsTitleText}</h3>
+            <p className="text-sm text-low">{noProjectsDescriptionText}</p>
           </CardContent>
         </Card>
       </div>
@@ -270,7 +281,7 @@ function renderBlockingView({
   if (workflowsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader message="Loading workflows..." />
+        <Loader message={loadingWorkflowsText} />
       </div>
     );
   }
@@ -757,10 +768,12 @@ export function Workflows() {
 
     const deletingProject = projects.find((project) => project.id === validProjectId);
     const result = await ConfirmDialog.show({
-      title: 'Delete Project',
-      message: `Delete project "${deletingProject?.name ?? validProjectId}"? This cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: t('management.dialogs.deleteProjectTitle'),
+      message: t('management.dialogs.deleteProjectMessage', {
+        name: deletingProject?.name ?? validProjectId,
+      }),
+      confirmText: t('management.actions.delete'),
+      cancelText: t('wizard.buttons.cancel'),
       variant: 'destructive',
     });
 
@@ -785,10 +798,12 @@ export function Workflows() {
 
       setSearchParams(newParams, { replace: true });
       setSelectedWorkflowId(null);
-      showToast('Project deleted', 'success');
+      showToast(t('management.toasts.projectDeleted'), 'success');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to delete project';
+        error instanceof Error
+          ? error.message
+          : t('management.toasts.deleteProjectFailed');
       showToast(message, 'error');
     } finally {
       setIsDeletingProject(false);
@@ -805,6 +820,10 @@ export function Workflows() {
     workflowsLoading: isLoading,
     workflowsErrorMessage: error?.message ?? null,
     loadFailedText: t('errors.loadFailed'),
+    loadingProjectsText: t('management.loadingProjects'),
+    noProjectsTitleText: t('management.noProjectsTitle'),
+    noProjectsDescriptionText: t('management.noProjectsDescription'),
+    loadingWorkflowsText: t('management.loadingWorkflows'),
   });
   if (blockingView) {
     return blockingView;
@@ -821,7 +840,7 @@ export function Workflows() {
         : fallbackProjectId;
 
       if (!projectId) {
-        throw new Error('No project selected to create workflow');
+        throw new Error(t('management.errors.noProjectSelected'));
       }
 
       const request = wizardConfigToCreateRequest(projectId, wizardConfig);
@@ -836,7 +855,7 @@ export function Workflows() {
       console.error('Failed to create workflow:', error);
       throw error instanceof Error
         ? error
-        : new Error('Failed to create workflow');
+        : new Error(t('management.errors.createWorkflowFailed'));
     }
   };
 
@@ -854,12 +873,10 @@ export function Workflows() {
 
   const handleStopWorkflow = async (workflowId: string) => {
     const result = await ConfirmDialog.show({
-      title: 'Stop Workflow',
-      message: t('workflowDebug.confirmStop', {
-        defaultValue: 'Are you sure you want to stop this workflow?',
-      }),
-      confirmText: 'Stop',
-      cancelText: 'Cancel',
+      title: t('management.dialogs.stopWorkflowTitle'),
+      message: t('workflowDebug.confirmStop'),
+      confirmText: t('management.actions.stop'),
+      cancelText: t('wizard.buttons.cancel'),
       variant: 'destructive',
     });
 
@@ -877,10 +894,10 @@ export function Workflows() {
 
   const handleDeleteWorkflow = async (workflowId: string) => {
     const result = await ConfirmDialog.show({
-      title: 'Delete Workflow',
+      title: t('management.dialogs.deleteWorkflowTitle'),
       message: t('errors.deleteConfirm'),
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      confirmText: t('management.actions.delete'),
+      cancelText: t('wizard.buttons.cancel'),
       variant: 'destructive',
     });
 
@@ -901,7 +918,7 @@ export function Workflows() {
       <div className="h-full min-h-0 overflow-auto space-y-6">
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={() => setSelectedWorkflowId(null)}>
-            ← Back to Workflows
+            {`\u2190 ${t('management.backToWorkflows')}`}
           </Button>
           <WorkflowDetailActions
             workflowId={selectedWorkflowDetail.id}
@@ -965,9 +982,9 @@ export function Workflows() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold">Workflows</h1>
+            <h1 className="text-2xl font-bold">{t('management.title')}</h1>
             <p className="text-low">
-              Manage multi-terminal workflows for parallel task execution
+              {t('management.description')}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -976,8 +993,8 @@ export function Workflows() {
               onValueChange={handleProjectChange}
             >
               <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Select project">
-                  {currentProject?.name || 'Select project'}
+                <SelectValue placeholder={t('management.selectProject')}>
+                  {currentProject?.name || t('management.selectProject')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -990,7 +1007,7 @@ export function Workflows() {
             </Select>
             <Button variant="outline" onClick={() => handleCreateProject()}>
               <Plus className="w-4 h-4 mr-2" />
-              Create Project
+              {t('management.createProject')}
             </Button>
             <Button
               variant="outline"
@@ -998,17 +1015,17 @@ export function Workflows() {
               disabled={!validProjectId || projects.length <= 1 || isDeletingProject}
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              {isDeletingProject ? 'Deleting...' : 'Delete Project'}
+              {isDeletingProject ? t('management.deletingProject') : t('management.deleteProject')}
             </Button>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => navigate('/workspaces/create')}>
-            Create Workspace
+            {t('viewSwitcher.createWorkspace')}
           </Button>
           <Button onClick={() => setShowWizard(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Create Workflow
+            {t('management.createWorkflow')}
           </Button>
         </div>
       </div>
@@ -1074,8 +1091,14 @@ export function Workflows() {
                     </p>
                   )}
                   <div className="flex items-center justify-between text-xs text-low">
-                    <span>{workflow.tasksCount} tasks</span>
-                    <span>{workflow.terminalsCount} terminals</span>
+                    <span>
+                      {t('management.counts.tasks', { count: workflow.tasksCount })}
+                    </span>
+                    <span>
+                      {t('management.counts.terminals', {
+                        count: workflow.terminalsCount,
+                      })}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
