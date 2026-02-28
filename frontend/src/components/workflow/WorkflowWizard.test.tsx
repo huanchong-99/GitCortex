@@ -3,6 +3,15 @@ import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { WorkflowWizard } from './WorkflowWizard';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
+vi.mock('@/components/ConfigProvider', () => ({
+  useUserSystem: () => ({
+    config: {
+      workflow_model_library: [],
+    },
+    updateAndSaveConfig: vi.fn().mockResolvedValue({}),
+  }),
+}));
+
 describe('WorkflowWizard', () => {
   beforeEach(() => {
     void setTestLanguage();

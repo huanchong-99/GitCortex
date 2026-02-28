@@ -613,6 +613,49 @@ pnpm run generate-types:check
 
 ---
 
+## Workspace Create Page Manual (`/workspaces/create`)
+
+### What this page is for
+
+This page is the **quick-start entry for execution**.  
+You provide task intent, bind repositories/branches, and create a runnable workspace directly.
+
+### How to read the page layout (left / middle / right)
+
+1. **Left: Workspaces**
+   - Existing workspaces list (active/history).
+   - Used for context switching, not for creation config.
+2. **Middle: Task input box**
+   - Input the task description (chat-style form).
+   - Select executor/model variant and optionally attach images.
+   - Click create to start a new workspace.
+3. **Right: Project / Repositories / Add repositories**
+   - Select project.
+   - Add repositories for this run.
+   - Select target branch per repository.
+
+### Does it conflict with `/wizard`?
+
+No. They are parallel entry points with different goals:
+
+- `/workspaces/create`: fast single-workspace creation and immediate execution.
+- `/wizard`: workflow orchestration and staged pipeline management.
+
+### Minimal operation flow
+
+1. Select project on the right panel.
+2. Add at least one repository and confirm target branch.
+3. Enter task description in the middle input.
+4. Click **Create Workspace**.
+
+### Common confusion and clarification
+
+- “Bottom dialog”: it is not a popup; it is the main creation input area.
+- “Left vs right panels”: left is workspace switching, right is creation context binding.
+- If create button is unavailable, usually task text or repository selection is missing.
+
+---
+
 ## Documentation
 
 ### Implementation Plans

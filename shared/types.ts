@@ -4,7 +4,7 @@
 
 // If you are an AI, and you absolutely have to edit this file, please confirm with the user first.
 
-export type WorkflowDetailDto = { id: string, projectId: string, name: string, description: string | null, status: string, useSlashCommands: boolean, orchestratorEnabled: boolean, orchestratorApiType: string | null, orchestratorBaseUrl: string | null, orchestratorModel: string | null, errorTerminalEnabled: boolean, errorTerminalCliId: string | null, errorTerminalModelId: string | null, mergeTerminalCliId: string | null, mergeTerminalModelId: string | null, targetBranch: string, readyAt: string | null, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, tasks: Array<WorkflowTaskDto>, commands: Array<WorkflowCommandDto>, };
+export type WorkflowDetailDto = { id: string, projectId: string, name: string, description: string | null, status: string, useSlashCommands: boolean, orchestratorEnabled: boolean, orchestratorApiType: string | null, orchestratorBaseUrl: string | null, orchestratorModel: string | null, errorTerminalEnabled: boolean, errorTerminalCliId: string | null, errorTerminalModelId: string | null, mergeTerminalCliId: string | null, mergeTerminalModelId: string | null, targetBranch: string, gitWatcherEnabled: boolean, readyAt: string | null, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, tasks: Array<WorkflowTaskDto>, commands: Array<WorkflowCommandDto>, };
 
 export type WorkflowTaskDto = { id: string, workflowId: string, vkTaskId: string | null, name: string, description: string | null, branch: string, status: string, orderIndex: number, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, terminals: Array<TerminalDto>, };
 
@@ -220,11 +220,11 @@ export type Environment = { os_type: string, os_version: string, os_architecture
 
 export type McpServerQuery = { executor: BaseCodingAgent, };
 
+export type McpConfigError = { code: string, message: string, };
+
 export type UpdateMcpServersBody = { servers: { [key in string]?: JsonValue }, };
 
 export type GetMcpServerResponse = { mcp_config: McpConfig, config_path: string, };
-
-export type McpConfigError = { code: string, message: string, };
 
 export type CheckEditorAvailabilityQuery = { editor_type: EditorType, };
 
@@ -232,7 +232,7 @@ export type CheckEditorAvailabilityResponse = { available: boolean, };
 
 export type CheckAgentAvailabilityQuery = { executor: BaseCodingAgent, };
 
-export type WsMessage = { "type": "input", data: string, } | { "type": "output", data: string, } | { "type": "resize", cols: number, rows: number, } | { "type": "error", message: string, };
+export type WsMessage = { "type": "input", data: string, } | { "type": "output", data: string, } | { "type": "resize", cols: number, rows: number, } | { "type": "heartbeat" } | { "type": "error", message: string, };
 
 export type CurrentUserResponse = { user_id: string, };
 
@@ -254,7 +254,7 @@ export type StartReviewRequest = { executor_profile_id: ExecutorProfileId, addit
 
 export type ReviewError = { "type": "process_already_running" };
 
-export type OpenEditorRequest = { editor_type: string | null, file_path: string | null, git_repo_path?: string | null, };
+export type OpenEditorRequest = { editor_type: string | null, file_path: string | null, git_repo_path?: string, };
 
 export type OpenEditorResponse = { url: string | null, };
 
@@ -390,7 +390,9 @@ export type DirectoryListResponse = { entries: Array<DirectoryEntry>, current_pa
 
 export type SearchMode = "taskform" | "settings";
 
-export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, };
+export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, workflow_model_library: Array<WorkflowModelLibraryItem>, };
+
+export type WorkflowModelLibraryItem = { id: string, displayName: string, apiType: string, baseUrl: string, apiKey: string, modelId: string, isVerified: boolean, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 

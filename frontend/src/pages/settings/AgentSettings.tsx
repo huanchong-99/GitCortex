@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cloneDeep, isEqual } from 'lodash';
 import {
@@ -35,16 +35,53 @@ import { CreateConfigurationDialog } from '@/components/dialogs/settings/CreateC
 import { DeleteConfigurationDialog } from '@/components/dialogs/settings/DeleteConfigurationDialog';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 import { AgentAvailabilityIndicator } from '@/components/AgentAvailabilityIndicator';
+import { Step3Models } from '@/components/workflow/steps/Step3Models';
+import { getDefaultWizardConfig } from '@/components/workflow/types';
 import type {
   BaseCodingAgent,
   ExecutorConfigs,
   ExecutorProfileId,
 } from 'shared/types';
+import type {
+  ModelConfig as WorkflowModelConfig,
+  WizardConfig,
+} from '@/components/workflow/types';
 
 type ExecutorsMap = Record<string, Record<string, Record<string, unknown>>>;
 
+const isWorkflowModelConfig = (
+  value: unknown
+): value is WorkflowModelConfig => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.id === 'string' &&
+    typeof item.displayName === 'string' &&
+    typeof item.apiType === 'string' &&
+    typeof item.baseUrl === 'string' &&
+    typeof item.apiKey === 'string' &&
+    typeof item.modelId === 'string' &&
+    typeof item.isVerified === 'boolean'
+  );
+};
+
+const parseWorkflowModelLibrary = (config: unknown): WorkflowModelConfig[] => {
+  const rawLibrary = (config as { workflow_model_library?: unknown } | null)
+    ?.workflow_model_library;
+  if (!Array.isArray(rawLibrary)) {
+    return [];
+  }
+
+  return rawLibrary
+    .filter(isWorkflowModelConfig)
+    .map((model) => ({ ...model }));
+};
+
 export function AgentSettings() {
-  const { t } = useTranslation(['settings', 'common']);
+  const { t } = useTranslation(['settings', 'common', 'workflow']);
   // Use profiles hook for server state
   const {
     profilesContent: serverProfilesContent,
@@ -80,6 +117,15 @@ export function AgentSettings() {
   const [executorSaving, setExecutorSaving] = useState(false);
   const [executorSuccess, setExecutorSuccess] = useState(false);
   const [executorError, setExecutorError] = useState<string | null>(null);
+
+  // Shared workflow model library draft (settings <-> workflow wizard)
+  const [workflowModelLibraryDraft, setWorkflowModelLibraryDraft] = useState<
+    WorkflowModelConfig[]
+  >([]);
+  const [workflowModelsSaving, setWorkflowModelsSaving] = useState(false);
+  const [workflowModelsError, setWorkflowModelsError] = useState<string | null>(
+    null
+  );
 
   // Check agent availability when draft executor changes
   const agentAvailability = useAgentAvailability(executorDraft?.executor);
@@ -117,6 +163,19 @@ export function AgentSettings() {
       });
     }
   }, [config?.executor_profile]);
+
+  // Sync workflow model library draft from persisted config
+  useEffect(() => {
+    setWorkflowModelLibraryDraft(parseWorkflowModelLibrary(config));
+  }, [config]);
+
+  const workflowModelLibraryWizardConfig = useMemo<WizardConfig>(
+    () => ({
+      ...getDefaultWizardConfig(),
+      models: workflowModelLibraryDraft,
+    }),
+    [workflowModelLibraryDraft]
+  );
 
   // Update executor draft
   const updateExecutorDraft = (newProfile: ExecutorProfileId) => {
@@ -436,6 +495,32 @@ export function AgentSettings() {
     return String(error);
   };
 
+  const handleWorkflowModelLibraryUpdate = (
+    updates: Partial<WizardConfig>
+  ) => {
+    if (!updates.models) {
+      return;
+    }
+
+    const nextModels = updates.models.map((model) => ({ ...model }));
+    setWorkflowModelLibraryDraft(nextModels);
+    setWorkflowModelsError(null);
+    setWorkflowModelsSaving(true);
+
+    void (async () => {
+      try {
+        await updateAndSaveConfig({
+          workflow_model_library: nextModels,
+        } as Partial<NonNullable<typeof config>>);
+      } catch (error) {
+        console.error('Failed to save workflow model library', error);
+        setWorkflowModelsError(t('settings.general.save.error'));
+      } finally {
+        setWorkflowModelsSaving(false);
+      }
+    })();
+  };
+
   if (profilesLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -472,6 +557,12 @@ export function AgentSettings() {
       {executorError && (
         <Alert variant="destructive">
           <AlertDescription>{executorError}</AlertDescription>
+        </Alert>
+      )}
+
+      {workflowModelsError && (
+        <Alert variant="destructive">
+          <AlertDescription>{workflowModelsError}</AlertDescription>
         </Alert>
       )}
 
@@ -805,6 +896,25 @@ export function AgentSettings() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('workflow:step3.title')}</CardTitle>
+          <CardDescription>{t('workflow:steps.models.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {workflowModelsSaving && (
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t('settings.general.save.button')}
+            </div>
+          )}
+          <Step3Models
+            config={workflowModelLibraryWizardConfig}
+            onUpdate={handleWorkflowModelLibraryUpdate}
+          />
         </CardContent>
       </Card>
 

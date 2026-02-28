@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { StepIndicator } from './StepIndicator';
 import { WizardStep, WizardConfig, getDefaultWizardConfig } from './types';
+import type { ModelConfig } from './types';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardValidation } from './hooks/useWizardValidation';
 import { useTranslation } from 'react-i18next';
+import { useUserSystem } from '@/components/ConfigProvider';
 import {
   Step0Project,
   Step1Basic,
@@ -46,6 +48,70 @@ export function WorkflowWizard({
   const validation = useWizardValidation(currentStep);
   const { errors } = validation;
   const { t } = useTranslation('workflow');
+  const { config: userConfig, updateAndSaveConfig } = useUserSystem();
+
+  const globalModelLibrary = useMemo<ModelConfig[]>(() => {
+    const rawLibrary = (userConfig as { workflow_model_library?: unknown } | null)
+      ?.workflow_model_library;
+    if (!Array.isArray(rawLibrary)) {
+      return [];
+    }
+
+    return rawLibrary
+      .filter((item): item is ModelConfig => {
+        if (typeof item !== 'object' || item === null) {
+          return false;
+        }
+        const candidate = item as Record<string, unknown>;
+        return (
+          typeof candidate.id === 'string' &&
+          typeof candidate.displayName === 'string' &&
+          typeof candidate.apiType === 'string' &&
+          typeof candidate.baseUrl === 'string' &&
+          typeof candidate.apiKey === 'string' &&
+          typeof candidate.modelId === 'string' &&
+          typeof candidate.isVerified === 'boolean'
+        );
+      })
+      .map((item) => ({ ...item }));
+  }, [userConfig]);
+
+  useEffect(() => {
+    if (globalModelLibrary.length === 0) {
+      return;
+    }
+
+    setState((prevState) => {
+      if (prevState.config.models.length > 0) {
+        return prevState;
+      }
+
+      return {
+        ...prevState,
+        config: {
+          ...prevState.config,
+          models: globalModelLibrary,
+        },
+      };
+    });
+  }, [globalModelLibrary]);
+
+  const persistWorkflowModelLibrary = useCallback(
+    async (models: ModelConfig[]) => {
+      if (!userConfig) {
+        return;
+      }
+
+      try {
+        await updateAndSaveConfig({
+          workflow_model_library: models,
+        } as Partial<typeof userConfig>);
+      } catch (error) {
+        console.error('Failed to persist workflow model library', error);
+      }
+    },
+    [userConfig, updateAndSaveConfig]
+  );
 
   const handleNext = () => {
     const newErrors = validation.validate(config);
@@ -155,7 +221,12 @@ export function WorkflowWizard({
         return (
           <Step3Models
             config={config}
-            onUpdate={handleUpdateConfig}
+            onUpdate={(updates) => {
+              handleUpdateConfig(updates);
+              if (updates.models) {
+                void persistWorkflowModelLibrary(updates.models);
+              }
+            }}
           />
         );
       case WizardStep.Terminals:
