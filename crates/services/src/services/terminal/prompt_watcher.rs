@@ -48,8 +48,7 @@ const MIN_CONFIDENCE_THRESHOLD: f32 = 0.7;
 
 /// Auto-reply used when Codex asks whether to continue after detecting
 /// "unexpected changes I didn't make" in the working tree.
-const UNEXPECTED_CHANGES_CONTINUE_RESPONSE: &str =
-    "Continue with the current workspace state and proceed to complete the task and commit; do not wait for additional confirmation.\n";
+const UNEXPECTED_CHANGES_CONTINUE_RESPONSE: &str = "Continue with the current workspace state and proceed to complete the task and commit; do not wait for additional confirmation.\n";
 
 /// Max age for line-by-line unexpected-changes follow-up context.
 const UNEXPECTED_CHANGES_CONTEXT_MAX_AGE_SECS: u64 = 12;
@@ -78,7 +77,23 @@ static CLAUDE_CUSTOM_API_KEY_PROMPT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"(?i)(do\s+you\s+want\s+to\s+use\s+this\s+api\s+key\?|detected\s+a\s+custom\s+api\s+key\s+in\s+your\s+environment)",
     )
-        .expect("CLAUDE_CUSTOM_API_KEY_PROMPT_RE must compile")
+    .expect("CLAUDE_CUSTOM_API_KEY_PROMPT_RE must compile")
+});
+
+/// Claude bypass list item variants:
+/// - "No, exit"
+/// - "No,exit"
+/// - "No ,  exit"
+static CLAUDE_BYPASS_NO_EXIT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\bno\s*,?\s*exit\b").expect("CLAUDE_BYPASS_NO_EXIT_RE must compile")
+});
+
+/// Claude bypass acceptance list item variants:
+/// - "Yes, I accept"
+/// - "Yes,I accept"
+/// - "Yes I accept"
+static CLAUDE_BYPASS_YES_ACCEPT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\byes\s*,?\s*i\s*accept\b").expect("CLAUDE_BYPASS_YES_ACCEPT_RE must compile")
 });
 
 /// Notepad launch/open prompt seen in headless Codex flows on Windows.
@@ -130,9 +145,8 @@ fn is_notepad_prompt(text: &str) -> bool {
 fn is_unexpected_changes_followup_prompt(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
 
-    let has_cn_change_marker = text.contains("未发起的变更")
-        || text.contains("未执行的变更")
-        || text.contains("外部变更");
+    let has_cn_change_marker =
+        text.contains("未发起的变更") || text.contains("未执行的变更") || text.contains("外部变更");
     let has_cn_followup = has_cn_change_marker
         && (text.contains("请确认我是否可以")
             || text.contains("请确认是否继续")
@@ -158,11 +172,11 @@ fn has_claude_bypass_mode_text(lower: &str) -> bool {
 }
 
 fn has_claude_bypass_no_exit_text(lower: &str) -> bool {
-    lower.contains("no, exit") || lower.contains("no exit")
+    CLAUDE_BYPASS_NO_EXIT_RE.is_match(lower)
 }
 
 fn has_claude_bypass_yes_accept_text(lower: &str) -> bool {
-    lower.contains("yes, i accept") || lower.contains("yes i accept")
+    CLAUDE_BYPASS_YES_ACCEPT_RE.is_match(lower)
 }
 
 fn has_claude_bypass_confirm_hint_text(lower: &str) -> bool {
@@ -177,6 +191,21 @@ fn is_claude_bypass_accept_prompt(text: &str) -> bool {
     let has_confirm_hint = has_claude_bypass_confirm_hint_text(&lower);
 
     has_mode && has_no_exit && has_yes_accept && has_confirm_hint
+}
+
+fn claude_bypass_accept_response(_text: &str) -> (&'static str, &'static str, &'static str) {
+    (
+        "2\r",
+        "select 'Yes, I accept' via numeric shortcut and confirm",
+        "Select 'Yes, I accept' via numeric shortcut (2) and confirm for Claude bypass permissions prompt",
+    )
+}
+
+fn is_claude_bypass_accept_context_line(lower: &str) -> bool {
+    has_claude_bypass_mode_text(lower)
+        || has_claude_bypass_no_exit_text(lower)
+        || has_claude_bypass_yes_accept_text(lower)
+        || has_claude_bypass_confirm_hint_text(lower)
 }
 
 // ============================================================================
@@ -226,8 +255,9 @@ impl ClaudeBypassContext {
             return false;
         }
 
-        self.last_updated
-            .is_some_and(|ts| ts.elapsed() <= Duration::from_secs(CLAUDE_BYPASS_CONTEXT_MAX_AGE_SECS))
+        self.last_updated.is_some_and(|ts| {
+            ts.elapsed() <= Duration::from_secs(CLAUDE_BYPASS_CONTEXT_MAX_AGE_SECS)
+        })
     }
 
     fn clear(&mut self) {
@@ -642,6 +672,103 @@ impl PromptWatcher {
         }
     }
 
+    async fn try_direct_terminal_input(
+        &self,
+        terminal_id: &str,
+        expected_session_id: &str,
+        input: &str,
+    ) -> bool {
+        let Some(handle) = self.process_manager.get_handle(terminal_id).await else {
+            return false;
+        };
+
+        if handle.session_id.trim() != expected_session_id.trim() {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                expected_session_id = %expected_session_id,
+                active_session_id = %handle.session_id,
+                "Skip direct PTY auto-input due to session mismatch"
+            );
+            return false;
+        }
+
+        let Some(writer) = handle.writer else {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                expected_session_id = %expected_session_id,
+                "Skip direct PTY auto-input: missing PTY writer"
+            );
+            return false;
+        };
+
+        let mut guard = match writer.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        if let Err(e) = guard.write_all(input.as_bytes()) {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                expected_session_id = %expected_session_id,
+                error = %e,
+                "Direct PTY auto-input write failed"
+            );
+            return false;
+        }
+        if let Err(e) = guard.flush() {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                expected_session_id = %expected_session_id,
+                error = %e,
+                "Direct PTY auto-input flush failed"
+            );
+            return false;
+        }
+        true
+    }
+
+    async fn resolve_terminal_input_session_id(
+        &self,
+        terminal_id: &str,
+        preferred_session_id: &str,
+    ) -> String {
+        let preferred = preferred_session_id.trim();
+        let Some(handle) = self.process_manager.get_handle(terminal_id).await else {
+            return preferred.to_string();
+        };
+
+        let active = handle.session_id.trim();
+        if active.is_empty() {
+            return preferred.to_string();
+        }
+
+        if !preferred.is_empty() && preferred != active {
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                preferred_session_id = %preferred_session_id,
+                active_session_id = %handle.session_id,
+                "PromptWatcher terminal-input session mismatch; using active PTY session for message-bus fallback"
+            );
+        }
+
+        active.to_string()
+    }
+
+    async fn publish_terminal_input_with_active_session(
+        &self,
+        terminal_id: &str,
+        preferred_session_id: &str,
+        input: &str,
+        decision: Option<PromptDecision>,
+    ) {
+        let target_session_id = self
+            .resolve_terminal_input_session_id(terminal_id, preferred_session_id)
+            .await;
+        self.message_bus
+            .publish_terminal_input(terminal_id, &target_session_id, input, decision)
+            .await;
+    }
+
     /// Process PTY output for a terminal
     ///
     /// Call this method with each line of PTY output.
@@ -675,30 +802,42 @@ impl PromptWatcher {
             || normalized_output_lower.contains("press ctrl-c again to exit");
         let has_claude_bypass_accept_context = is_claude_bypass_accept_prompt(&normalized_output)
             || state.has_recent_claude_bypass_accept_context();
-        let has_claude_custom_api_key_context =
-            is_claude_custom_api_key_prompt(&normalized_output);
+        let has_claude_custom_api_key_context = is_claude_custom_api_key_prompt(&normalized_output);
         let has_unexpected_changes_followup_context =
             is_unexpected_changes_followup_prompt(&normalized_output)
                 || state.has_recent_unexpected_changes_context();
 
+        let has_any_claude_bypass_chunk_marker =
+            has_claude_bypass_mode_text(&normalized_output_lower)
+                || has_claude_bypass_no_exit_text(&normalized_output_lower)
+                || has_claude_bypass_yes_accept_text(&normalized_output_lower)
+                || has_claude_bypass_confirm_hint_text(&normalized_output_lower);
+        if state.auto_confirm && has_any_claude_bypass_chunk_marker {
+            tracing::info!(
+                terminal_id = %state.terminal_id,
+                session_id = %state.session_id,
+                has_mode = has_claude_bypass_mode_text(&normalized_output_lower),
+                has_no_exit = has_claude_bypass_no_exit_text(&normalized_output_lower),
+                has_yes_accept = has_claude_bypass_yes_accept_text(&normalized_output_lower),
+                has_confirm_hint = has_claude_bypass_confirm_hint_text(&normalized_output_lower),
+                chunk_accept_context = has_claude_bypass_accept_context,
+                chunk_len = normalized_output.len(),
+                "Observed Claude bypass prompt markers in chunk"
+            );
+        }
+
         // Chunk-level fallback: Claude bypass-permissions acceptance prompt.
         // Select "Yes, I accept" via numeric shortcut "2" + Enter.
         // This is more stable than ArrowDown in fast ANSI frame updates.
-        if state.auto_confirm
-            && !state.should_debounce()
-            && has_claude_bypass_accept_context
-        {
+        if state.auto_confirm && !state.should_debounce() && has_claude_bypass_accept_context {
+            let (response, action, reasoning) = claude_bypass_accept_response(&normalized_output);
             let decision = PromptDecision::LLMDecision {
-                response: "2\r".to_string(),
-                reasoning: "Auto-select 'Yes, I accept' for Claude bypass permissions prompt via '2'+CR"
-                    .to_string(),
+                response: response.to_string(),
+                reasoning: reasoning.to_string(),
                 target_index: Some(1),
             };
-            let detected_prompt = DetectedPrompt::new(
-                PromptKind::ArrowSelect,
-                normalized_output.clone(),
-                0.95,
-            );
+            let detected_prompt =
+                DetectedPrompt::new(PromptKind::ArrowSelect, normalized_output.clone(), 0.95);
 
             if !state.state_machine.should_process(&detected_prompt) {
                 tracing::debug!(
@@ -718,37 +857,45 @@ impl PromptWatcher {
                 tracing::info!(
                     terminal_id = %response_terminal_id,
                     session_id = %response_session_id,
-                    "Detected Claude bypass permissions prompt (chunk); sending '2'+Enter to choose 'Yes, I accept'"
+                    action = %action,
+                    "Detected Claude bypass permissions prompt (chunk); sending auto-accept sequence"
                 );
 
                 drop(terminals);
-                self.message_bus
-                    .publish_terminal_input(
+                let sent_direct = self
+                    .try_direct_terminal_input(
                         &response_terminal_id,
                         &response_session_id,
-                        "2\r",
+                        response,
+                    )
+                    .await;
+                if !sent_direct {
+                    tracing::warn!(
+                        terminal_id = %response_terminal_id,
+                        session_id = %response_session_id,
+                        "Direct PTY Claude bypass auto-accept failed; falling back to message bus"
+                    );
+                    self.publish_terminal_input_with_active_session(
+                        &response_terminal_id,
+                        &response_session_id,
+                        response,
                         Some(decision),
                     )
                     .await;
+                }
                 return;
             }
         }
 
-        if state.auto_confirm
-            && !state.should_debounce()
-            && has_claude_custom_api_key_context
-        {
+        if state.auto_confirm && !state.should_debounce() && has_claude_custom_api_key_context {
             let decision = PromptDecision::LLMDecision {
                 response: "\u{1b}[A\n".to_string(),
                 reasoning: "Auto-select 'Yes' for custom API key prompt via ArrowUp + Enter"
                     .to_string(),
                 target_index: Some(0),
             };
-            let detected_prompt = DetectedPrompt::new(
-                PromptKind::ArrowSelect,
-                normalized_output.clone(),
-                0.95,
-            );
+            let detected_prompt =
+                DetectedPrompt::new(PromptKind::ArrowSelect, normalized_output.clone(), 0.95);
 
             if !state.state_machine.should_process(&detected_prompt) {
                 tracing::debug!(
@@ -792,11 +939,8 @@ impl PromptWatcher {
             && is_bypass_permissions_enter_confirm_context(&normalized_output)
         {
             let decision = PromptDecision::auto_enter();
-            let detected_prompt = DetectedPrompt::new(
-                PromptKind::EnterConfirm,
-                normalized_output.clone(),
-                0.95,
-            );
+            let detected_prompt =
+                DetectedPrompt::new(PromptKind::EnterConfirm, normalized_output.clone(), 0.95);
 
             if !state.state_machine.should_process(&detected_prompt) {
                 tracing::debug!(
@@ -833,19 +977,13 @@ impl PromptWatcher {
 
         // Chunk-level fallback: decline Notepad prompts to avoid blocking
         // headless workflow execution in Windows environments.
-        if state.auto_confirm
-            && !state.should_debounce()
-            && is_notepad_prompt(&normalized_output)
-        {
+        if state.auto_confirm && !state.should_debounce() && is_notepad_prompt(&normalized_output) {
             let decision = PromptDecision::llm_yes_no(
                 false,
                 "Auto-decline Notepad prompt to keep workflow non-blocking".to_string(),
             );
-            let detected_prompt = DetectedPrompt::new(
-                PromptKind::YesNo,
-                normalized_output.clone(),
-                0.95,
-            );
+            let detected_prompt =
+                DetectedPrompt::new(PromptKind::YesNo, normalized_output.clone(), 0.95);
 
             if !state.state_machine.should_process(&detected_prompt) {
                 tracing::debug!(
@@ -939,11 +1077,7 @@ impl PromptWatcher {
                 true,
                 "Auto-approve Codex apply_patch confirmation".to_string(),
             );
-            let detected_prompt = DetectedPrompt::new(
-                PromptKind::YesNo,
-                normalized_output,
-                0.95,
-            );
+            let detected_prompt = DetectedPrompt::new(PromptKind::YesNo, normalized_output, 0.95);
 
             if !state.state_machine.should_process(&detected_prompt) {
                 tracing::debug!(
@@ -981,6 +1115,8 @@ impl PromptWatcher {
         // Process each line
         for line in output.lines() {
             let normalized_line = normalize_text_for_detection(line);
+            let normalized_line_lower = normalized_line.to_ascii_lowercase();
+            state.observe_claude_bypass_context(&normalized_line_lower);
             state.observe_unexpected_changes_context(&normalized_line);
 
             // Claude custom API key prompt fallback:
@@ -996,11 +1132,8 @@ impl PromptWatcher {
                         .to_string(),
                     target_index: Some(0),
                 };
-                let detected_prompt = DetectedPrompt::new(
-                    PromptKind::ArrowSelect,
-                    normalized_line.clone(),
-                    0.95,
-                );
+                let detected_prompt =
+                    DetectedPrompt::new(PromptKind::ArrowSelect, normalized_line.clone(), 0.95);
 
                 if !state.state_machine.should_process(&detected_prompt) {
                     tracing::debug!(
@@ -1037,6 +1170,70 @@ impl PromptWatcher {
                 return;
             }
 
+            // Line-level fallback for Claude bypass-permissions acceptance prompt.
+            // This handles frames where each render only emits a single line.
+            let has_claude_bypass_line_context = is_claude_bypass_accept_prompt(&normalized_line)
+                || (state.has_recent_claude_bypass_accept_context()
+                    && is_claude_bypass_accept_context_line(&normalized_line_lower));
+            if state.auto_confirm && !state.should_debounce() && has_claude_bypass_line_context {
+                let (response, action, reasoning) = claude_bypass_accept_response(&normalized_line);
+                let decision = PromptDecision::LLMDecision {
+                    response: response.to_string(),
+                    reasoning: reasoning.to_string(),
+                    target_index: Some(1),
+                };
+                let detected_prompt =
+                    DetectedPrompt::new(PromptKind::ArrowSelect, normalized_line.clone(), 0.95);
+
+                if !state.state_machine.should_process(&detected_prompt) {
+                    tracing::debug!(
+                        terminal_id = %state.terminal_id,
+                        "Skipping duplicate line-level Claude bypass accept fallback injection"
+                    );
+                    continue;
+                }
+
+                state.last_detection = Some(Instant::now());
+                state.state_machine.on_prompt_detected(detected_prompt);
+                state.state_machine.on_response_sent(decision.clone());
+                state.detector.clear_buffer();
+                state.clear_claude_bypass_context();
+
+                let response_terminal_id = state.terminal_id.clone();
+                let response_session_id = state.session_id.clone();
+
+                tracing::info!(
+                    terminal_id = %response_terminal_id,
+                    session_id = %response_session_id,
+                    action = %action,
+                    "Detected Claude bypass permissions prompt (line); sending auto-accept sequence"
+                );
+
+                drop(terminals);
+                let sent_direct = self
+                    .try_direct_terminal_input(
+                        &response_terminal_id,
+                        &response_session_id,
+                        response,
+                    )
+                    .await;
+                if !sent_direct {
+                    tracing::warn!(
+                        terminal_id = %response_terminal_id,
+                        session_id = %response_session_id,
+                        "Direct PTY Claude bypass auto-accept failed (line mode); falling back to message bus"
+                    );
+                    self.publish_terminal_input_with_active_session(
+                        &response_terminal_id,
+                        &response_session_id,
+                        response,
+                        Some(decision),
+                    )
+                    .await;
+                }
+                return;
+            }
+
             // Fallback for bypass-permissions prompts only when explicit confirmation context appears.
             if state.auto_confirm
                 && !state.should_debounce()
@@ -1044,11 +1241,8 @@ impl PromptWatcher {
                 && is_bypass_permissions_enter_confirm_context(&normalized_line)
             {
                 let decision = PromptDecision::auto_enter();
-                let detected_prompt = DetectedPrompt::new(
-                    PromptKind::EnterConfirm,
-                    normalized_line.clone(),
-                    0.95,
-                );
+                let detected_prompt =
+                    DetectedPrompt::new(PromptKind::EnterConfirm, normalized_line.clone(), 0.95);
 
                 if !state.state_machine.should_process(&detected_prompt) {
                     tracing::debug!(
@@ -1086,19 +1280,14 @@ impl PromptWatcher {
             }
 
             // Notepad fallback in line-by-line mode.
-            if state.auto_confirm
-                && !state.should_debounce()
-                && is_notepad_prompt(&normalized_line)
+            if state.auto_confirm && !state.should_debounce() && is_notepad_prompt(&normalized_line)
             {
                 let decision = PromptDecision::llm_yes_no(
                     false,
                     "Auto-decline Notepad prompt to keep workflow non-blocking".to_string(),
                 );
-                let detected_prompt = DetectedPrompt::new(
-                    PromptKind::YesNo,
-                    normalized_line.clone(),
-                    0.95,
-                );
+                let detected_prompt =
+                    DetectedPrompt::new(PromptKind::YesNo, normalized_line.clone(), 0.95);
 
                 if !state.state_machine.should_process(&detected_prompt) {
                     tracing::debug!(
@@ -1490,9 +1679,7 @@ mod tests {
                 assert_eq!(input, "\n");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1542,9 +1729,7 @@ mod tests {
                 assert_eq!(input, "\n");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::AutoConfirm { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1598,9 +1783,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "2\r");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1608,8 +1791,8 @@ Enter to confirm 路 Esc to cancel
     }
 
     #[tokio::test]
-    async fn test_process_output_claude_bypass_permissions_prompt_line_by_line_auto_selects_yes_accept(
-    ) {
+    async fn test_process_output_claude_bypass_permissions_prompt_line_by_line_auto_selects_yes_accept()
+     {
         let message_bus = Arc::new(MessageBus::new(100));
         let process_manager = Arc::new(ProcessManager::new());
         let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
@@ -1658,9 +1841,63 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "2\r");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
+                ));
+            }
+            other => panic!("expected TerminalInput event, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_output_claude_bypass_prompt_accepts_compact_no_space_variants() {
+        let message_bus = Arc::new(MessageBus::new(100));
+        let process_manager = Arc::new(ProcessManager::new());
+        let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
+        let mut broadcast_rx = message_bus.subscribe_broadcast();
+
+        {
+            let mut terminals = watcher.terminals.write().await;
+            terminals.insert(
+                "term-1".to_string(),
+                TerminalWatchState::new(
+                    "term-1".to_string(),
+                    "workflow-1".to_string(),
+                    "task-1".to_string(),
+                    "session-1".to_string(),
+                    true,
+                ),
+            );
+        }
+
+        let lines = [
+            "WARNING: Claude Code running in Bypass Permissions mode",
+            "1.No,exit",
+            "2.Yes,I accept",
+            "Enter to confirm · Esc to cancel",
+        ];
+
+        for line in lines {
+            watcher.process_output("term-1", line).await;
+        }
+
+        let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
+            .await
+            .expect("expected terminal input broadcast")
+            .expect("broadcast channel should be open");
+
+        match event {
+            BusMessage::TerminalInput {
+                terminal_id,
+                session_id,
+                input,
+                decision,
+            } => {
+                assert_eq!(terminal_id, "term-1");
+                assert_eq!(session_id, "session-1");
+                assert_eq!(input, "2\r");
+                assert!(matches!(
+                    decision,
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1688,7 +1925,9 @@ Enter to confirm 路 Esc to cancel
             );
         }
 
-        watcher.process_output("term-1", "Open in Notepad? (y/N)").await;
+        watcher
+            .process_output("term-1", "Open in Notepad? (y/N)")
+            .await;
 
         let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
             .await
@@ -1707,9 +1946,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "n\n");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1759,9 +1996,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "n\n");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1813,9 +2048,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, UNEXPECTED_CHANGES_CONTINUE_RESPONSE);
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1823,8 +2056,8 @@ Enter to confirm 路 Esc to cancel
     }
 
     #[tokio::test]
-    async fn test_process_output_unexpected_changes_followup_auto_continues_when_auto_confirm_disabled(
-    ) {
+    async fn test_process_output_unexpected_changes_followup_auto_continues_when_auto_confirm_disabled()
+     {
         let message_bus = Arc::new(MessageBus::new(100));
         let process_manager = Arc::new(ProcessManager::new());
         let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
@@ -1868,9 +2101,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, UNEXPECTED_CHANGES_CONTINUE_RESPONSE);
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1906,7 +2137,10 @@ Enter to confirm 路 Esc to cancel
             .await;
 
         let first_poll = tokio::time::timeout(Duration::from_millis(80), broadcast_rx.recv()).await;
-        assert!(first_poll.is_err(), "first fragment should not auto-send yet");
+        assert!(
+            first_poll.is_err(),
+            "first fragment should not auto-send yet"
+        );
 
         watcher
             .process_output(
@@ -1932,9 +2166,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, UNEXPECTED_CHANGES_CONTINUE_RESPONSE);
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -1986,9 +2218,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "y");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -2032,15 +2262,17 @@ Enter to confirm 路 Esc to cancel
 
         {
             let mut terminals = watcher.terminals.write().await;
-            let state = terminals.get_mut("term-1").expect("terminal state should exist");
+            let state = terminals
+                .get_mut("term-1")
+                .expect("terminal state should exist");
             state.last_detection =
                 Some(Instant::now() - Duration::from_millis(PROMPT_DEBOUNCE_MS + 1));
         }
 
         watcher.process_output("term-1", prompt_text).await;
 
-        let second_event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
-            .await;
+        let second_event =
+            tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv()).await;
         assert!(
             second_event.is_err(),
             "duplicate codex fallback injection should be skipped"
@@ -2085,15 +2317,17 @@ Enter to confirm 路 Esc to cancel
 
         {
             let mut terminals = watcher.terminals.write().await;
-            let state = terminals.get_mut("term-1").expect("terminal state should exist");
+            let state = terminals
+                .get_mut("term-1")
+                .expect("terminal state should exist");
             state.last_detection =
                 Some(Instant::now() - Duration::from_millis(PROMPT_DEBOUNCE_MS + 1));
         }
 
         watcher.process_output("term-1", bypass_prompt).await;
 
-        let second_event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv())
-            .await;
+        let second_event =
+            tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv()).await;
         assert!(
             second_event.is_err(),
             "duplicate bypass fallback injection should be skipped"
@@ -2177,9 +2411,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "\u{1b}[A\n");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
@@ -2231,9 +2463,7 @@ Enter to confirm 路 Esc to cancel
                 assert_eq!(input, "\u{1b}[A\n");
                 assert!(matches!(
                     decision,
-                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision {
-                        ..
-                    })
+                    Some(crate::services::orchestrator::types::PromptDecision::LLMDecision { .. })
                 ));
             }
             other => panic!("expected TerminalInput event, got: {other:?}"),
