@@ -89,30 +89,30 @@ function clearPorts() {
 
 // CLI interface
 if (require.main === module) {
-  async function main() {
+  function main() {
     const command = process.argv[2];
 
     switch (command) {
       case "get": {
-        const ports = await getPorts();
-        console.log(JSON.stringify(ports));
-        break;
+        return getPorts().then((ports) => {
+          console.log(JSON.stringify(ports));
+        });
       }
 
       case "clear":
         clearPorts();
-        break;
+        return;
 
       case "frontend": {
-        const ports = await getPorts();
-        console.log(JSON.stringify(ports.frontend, null, 2));
-        break;
+        return getPorts().then((ports) => {
+          console.log(JSON.stringify(ports.frontend, null, 2));
+        });
       }
 
       case "backend": {
-        const ports = await getPorts();
-        console.log(JSON.stringify(ports.backend, null, 2));
-        break;
+        return getPorts().then((ports) => {
+          console.log(JSON.stringify(ports.backend, null, 2));
+        });
       }
 
       default:
@@ -129,7 +129,7 @@ if (require.main === module) {
         console.log(
           "  node setup-dev-environment.js clear    - No-op (fixed ports are used)"
         );
-        break;
+        return;
     }
   }
 
@@ -137,7 +137,7 @@ if (require.main === module) {
     console.error(error);
     process.exit(1);
   });
-  main(); // NOSONAR: CommonJS CLI entrypoint cannot use top-level await.
+  main();
 }
 
 module.exports = { getPorts, clearPorts };
