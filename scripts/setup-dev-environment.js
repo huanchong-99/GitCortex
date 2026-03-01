@@ -133,10 +133,11 @@ if (require.main === module) {
     }
   }
 
-  main().catch((error) => {
+  process.once("unhandledRejection", (error) => {
     console.error(error);
     process.exit(1);
   });
+  main();
 }
 
 module.exports = { getPorts, clearPorts };
