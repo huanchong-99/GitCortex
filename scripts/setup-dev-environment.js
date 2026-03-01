@@ -133,14 +133,10 @@ if (require.main === module) {
     }
   }
 
-  (async () => {
-    try {
-      await main();
-    } catch (error) {
-      console.error(error);
-      process.exit(1);
-    }
-  })();
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 }
 
 module.exports = { getPorts, clearPorts };

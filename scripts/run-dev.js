@@ -499,14 +499,16 @@ async function main() {
   console.log("[dev] Press Ctrl+C to stop");
 }
 
-async function start() {
-  try {
-    await main();
-  } catch (err) {
-    releaseDevLock();
-    console.error("[dev] Failed to start development environment:", err);
-    process.exit(1);
-  }
+function handleStartupFailure(err) {
+  releaseDevLock();
+  console.error("[dev] Failed to start development environment:", err);
+  process.exit(1);
+}
+
+function start() {
+  // CommonJS entrypoint: keep startup async handling inside a sync launcher.
+  const startup = main();
+  startup.catch(handleStartupFailure);
 }
 
 start();

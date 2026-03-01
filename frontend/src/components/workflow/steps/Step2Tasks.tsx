@@ -44,7 +44,7 @@ function slugify(text: string): string {
     }
   }
 
-  if (slugChars[slugChars.length - 1] === '-') {
+  if (slugChars.at(-1) === '-') {
     slugChars.pop();
   }
 
