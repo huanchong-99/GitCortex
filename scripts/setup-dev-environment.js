@@ -137,7 +137,7 @@ if (require.main === module) {
     console.error(error);
     process.exit(1);
   });
-  main();
+  main(); // NOSONAR: CommonJS CLI entrypoint cannot use top-level await.
 }
 
 module.exports = { getPorts, clearPorts };
