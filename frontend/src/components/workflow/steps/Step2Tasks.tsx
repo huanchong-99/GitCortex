@@ -13,13 +13,42 @@ const MAX_TERMINAL_COUNT = 10;
 const MIN_TERMINAL_COUNT = 1;
 
 function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replaceAll(/[^\w\s-]/g, '')
-    .replaceAll(/[\s_-]+/g, '-')
-    .replaceAll(/^-+/g, '')
-    .replaceAll(/-+$/g, '');
+  const normalized = text.toLowerCase().trim();
+  const slugChars: string[] = [];
+  let lastWasSeparator = false;
+
+  for (const char of normalized) {
+    const codePoint = char.codePointAt(0);
+    if (codePoint === undefined) {
+      continue;
+    }
+
+    const isAsciiAlphaNumeric =
+      (codePoint >= 97 && codePoint <= 122) ||
+      (codePoint >= 48 && codePoint <= 57);
+
+    if (isAsciiAlphaNumeric) {
+      slugChars.push(char);
+      lastWasSeparator = false;
+      continue;
+    }
+
+    const isSeparator =
+      codePoint === 45 || // -
+      codePoint === 95 || // _
+      char.trim().length === 0;
+
+    if (isSeparator && !lastWasSeparator && slugChars.length > 0) {
+      slugChars.push('-');
+      lastWasSeparator = true;
+    }
+  }
+
+  if (slugChars[slugChars.length - 1] === '-') {
+    slugChars.pop();
+  }
+
+  return slugChars.join('');
 }
 
 interface Step2TasksProps {

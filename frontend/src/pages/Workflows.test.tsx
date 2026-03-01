@@ -243,6 +243,34 @@ const mockWorkflows: WorkflowListItemDto[] = [
   },
 ];
 
+type MockFetchRouteHandler = (
+  init?: RequestInit
+) => Promise<Partial<Response>>;
+
+type WorkflowFetchMockOptions = {
+  listData?: WorkflowListItemDto[];
+  handlers?: Record<string, MockFetchRouteHandler>;
+};
+
+const createWorkflowFetchMock = ({
+  listData = mockWorkflows,
+  handlers = {},
+}: WorkflowFetchMockOptions = {}) =>
+  vi.fn((input: string | URL, init?: RequestInit) => {
+    const url = toRequestUrl(input);
+
+    if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+      return createApiSuccess(listData);
+    }
+
+    const handler = handlers[url];
+    if (handler) {
+      return handler(init);
+    }
+
+    return rejectUnexpectedRequest(url);
+  });
+
 const stubWorkflowsListFetch = (data: WorkflowListItemDto[] = mockWorkflows) => {
   vi.stubGlobal('fetch', vi.fn(() => createApiSuccess(data)));
 };
@@ -520,28 +548,19 @@ describe('Workflows Page', () => {
     });
 
     it('should trigger merge API from workflow detail view', async () => {
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess(mockWorkflows);
-        }
-
-        if (url === '/api/workflows/workflow-3/merge') {
-          return createApiSuccess({
-            success: true,
-            message: 'Merge completed successfully',
-            workflowId: 'workflow-3',
-            targetBranch: 'main',
-            mergedTasks: [],
-          });
-        }
-
-        if (url === '/api/workflows/workflow-3') {
-          return createApiSuccess(mockCompletedWorkflowDetail);
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        handlers: {
+          '/api/workflows/workflow-3': () =>
+            createApiSuccess(mockCompletedWorkflowDetail),
+          '/api/workflows/workflow-3/merge': () =>
+            createApiSuccess({
+              success: true,
+              message: 'Merge completed successfully',
+              workflowId: 'workflow-3',
+              targetBranch: 'main',
+              mergedTasks: [],
+            }),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -657,22 +676,13 @@ describe('Workflows Page', () => {
     });
 
     it('shows prompt dialog and submits yes/no response via API', async () => {
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess(mockWorkflows);
-        }
-
-        if (url === '/api/workflows/workflow-3') {
-          return createApiSuccess(mockCompletedWorkflowDetail);
-        }
-
-        if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return createApiSuccess(null);
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        handlers: {
+          '/api/workflows/workflow-3': () =>
+            createApiSuccess(mockCompletedWorkflowDetail),
+          '/api/workflows/workflow-3/prompts/respond': () =>
+            createApiSuccess(null),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -706,22 +716,13 @@ describe('Workflows Page', () => {
     });
 
     it('submits choice and input/password prompt responses', async () => {
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess(mockWorkflows);
-        }
-
-        if (url === '/api/workflows/workflow-3') {
-          return createApiSuccess(mockCompletedWorkflowDetail);
-        }
-
-        if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return createApiSuccess(null);
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        handlers: {
+          '/api/workflows/workflow-3': () =>
+            createApiSuccess(mockCompletedWorkflowDetail),
+          '/api/workflows/workflow-3/prompts/respond': () =>
+            createApiSuccess(null),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -833,18 +834,11 @@ describe('Workflows Page', () => {
     });
 
     it('prevents duplicate prompt enqueue and closes by prompt decision', async () => {
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess(mockWorkflows);
-        }
-
-        if (url === '/api/workflows/workflow-3') {
-          return createApiSuccess(mockCompletedWorkflowDetail);
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        handlers: {
+          '/api/workflows/workflow-3': () =>
+            createApiSuccess(mockCompletedWorkflowDetail),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -878,22 +872,13 @@ describe('Workflows Page', () => {
     });
 
     it('falls back to workflow WS submission for enter_confirm when API rejects empty response', async () => {
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess(mockWorkflows);
-        }
-
-        if (url === '/api/workflows/workflow-3') {
-          return createApiSuccess(mockCompletedWorkflowDetail);
-        }
-
-        if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return createApiFailure(400, 'Bad Request', 'response is required');
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        handlers: {
+          '/api/workflows/workflow-3': () =>
+            createApiSuccess(mockCompletedWorkflowDetail),
+          '/api/workflows/workflow-3/prompts/respond': () =>
+            createApiFailure(400, 'Bad Request', 'response is required'),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -937,22 +922,13 @@ describe('Workflows Page', () => {
     it('keeps enter_confirm dialog open when workflow WS fallback send fails', async () => {
       wsStoreMock.sendPromptResponse.mockReturnValue(false);
 
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess(mockWorkflows);
-        }
-
-        if (url === '/api/workflows/workflow-3') {
-          return createApiSuccess(mockCompletedWorkflowDetail);
-        }
-
-        if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return createApiFailure(400, 'Bad Request', 'response is required');
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        handlers: {
+          '/api/workflows/workflow-3': () =>
+            createApiSuccess(mockCompletedWorkflowDetail),
+          '/api/workflows/workflow-3/prompts/respond': () =>
+            createApiFailure(400, 'Bad Request', 'response is required'),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -987,24 +963,18 @@ describe('Workflows Page', () => {
 
   describe('Project and Pipeline Consistency', () => {
     it('renders tasks and terminals in orderIndex order', async () => {
-      const fetchMock = vi.fn((input: string | URL) => {
-        const url = toRequestUrl(input);
-
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess([
-            {
-              ...mockWorkflows[0],
-              id: 'workflow-unordered',
-              name: 'Unordered Workflow',
-            },
-          ]);
-        }
-
-        if (url === '/api/workflows/workflow-unordered') {
-          return createApiSuccess(mockUnorderedWorkflowDetail);
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        listData: [
+          {
+            ...mockWorkflows[0],
+            id: 'workflow-unordered',
+            name: 'Unordered Workflow',
+          },
+        ],
+        handlers: {
+          '/api/workflows/workflow-unordered': () =>
+            createApiSuccess(mockUnorderedWorkflowDetail),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -1038,41 +1008,26 @@ describe('Workflows Page', () => {
 
   describe('Workflow Creation', () => {
     it('falls back to selected project when resolve-by-path fails', async () => {
-      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = toRequestUrl(input);
+      const workflowNewDetail = {
+        ...mockCompletedWorkflowDetail,
+        id: 'workflow-new',
+        projectId: 'proj-1',
+        name: 'Wizard Created Workflow',
+        status: 'draft' as const,
+      };
 
-        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
-          return createApiSuccess([]);
-        }
-
-        if (url === '/api/projects/resolve-by-path') {
-          return createApiFailure(500, 'Internal Server Error', 'resolve failed');
-        }
-
-        if (url === '/api/workflows') {
-          const body = init?.body ? JSON.parse(init.body as string) : null;
-          expect(body?.projectId).toBe('proj-1');
-
-          return createApiSuccess({
-            ...mockCompletedWorkflowDetail,
-            id: 'workflow-new',
-            projectId: 'proj-1',
-            name: 'Wizard Created Workflow',
-            status: 'draft',
-          });
-        }
-
-        if (url === '/api/workflows/workflow-new') {
-          return createApiSuccess({
-            ...mockCompletedWorkflowDetail,
-            id: 'workflow-new',
-            projectId: 'proj-1',
-            name: 'Wizard Created Workflow',
-            status: 'draft',
-          });
-        }
-
-        return rejectUnexpectedRequest(url);
+      const fetchMock = createWorkflowFetchMock({
+        listData: [],
+        handlers: {
+          '/api/projects/resolve-by-path': () =>
+            createApiFailure(500, 'Internal Server Error', 'resolve failed'),
+          '/api/workflows': (init) => {
+            const body = init?.body ? JSON.parse(init.body as string) : null;
+            expect(body?.projectId).toBe('proj-1');
+            return createApiSuccess(workflowNewDetail);
+          },
+          '/api/workflows/workflow-new': () => createApiSuccess(workflowNewDetail),
+        },
       });
 
       vi.stubGlobal('fetch', fetchMock);

@@ -499,8 +499,14 @@ async function main() {
   console.log("[dev] Press Ctrl+C to stop");
 }
 
-main().catch((err) => {
-  releaseDevLock();
-  console.error("[dev] Failed to start development environment:", err);
-  process.exit(1);
-});
+async function start() {
+  try {
+    await main();
+  } catch (err) {
+    releaseDevLock();
+    console.error("[dev] Failed to start development environment:", err);
+    process.exit(1);
+  }
+}
+
+start();

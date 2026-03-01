@@ -68,8 +68,11 @@ const InviteMemberDialogImpl = NiceModal.create<InviteMemberDialogProps>(
 
       // Keep validation intentionally lightweight while avoiding regex backtracking hotspots.
       const containsWhitespace = (input: string) => {
-        for (let i = 0; i < input.length; i++) {
-          const code = input.charCodeAt(i);
+        for (const char of input) {
+          const code = char.codePointAt(0);
+          if (code === undefined) {
+            continue;
+          }
           if (
             code === 9 || // \t
             code === 10 || // \n

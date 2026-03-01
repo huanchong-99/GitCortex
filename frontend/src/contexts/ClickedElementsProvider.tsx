@@ -88,7 +88,7 @@ function normalizeMacPrivateAliases(p: string): string {
 
 function trimTrailingSlashes(value: string): string {
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return value.slice(0, end);
@@ -110,7 +110,7 @@ function splitOnWhitespace(value: string): string[] {
   let start = -1;
 
   for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
+    const code = value.codePointAt(i) ?? -1;
     if (isAsciiWhitespace(code)) {
       if (start !== -1) {
         out.push(value.slice(start, i));

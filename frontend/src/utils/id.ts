@@ -12,7 +12,7 @@ export function secureRandomIdFragment(length = 8): string {
   if (typeof cryptoApi?.randomUUID === 'function') {
     let randomValue = '';
     while (randomValue.length < normalizedLength) {
-      randomValue += cryptoApi.randomUUID().replace(/-/g, '');
+      randomValue += cryptoApi.randomUUID().replaceAll('-', '');
     }
     return randomValue.slice(0, normalizedLength);
   }
