@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { create } from 'zustand';
+import { secureRandomIdFragment } from '@/utils/id';
 
 /**
  * WebSocket message structure following design specification
@@ -96,7 +97,7 @@ const BASE_RECONNECT_DELAY = 1000; // 1 second
  * Generate a unique message ID
  */
 function generateMessageId(): string {
-  return `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  return `msg-${Date.now()}-${secureRandomIdFragment(7)}`;
 }
 
 type JsonRecord = Record<string, unknown>;

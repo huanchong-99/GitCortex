@@ -143,16 +143,18 @@ vi.mock('@/stores/wsStore', () => ({
 // ============================================================================
 
 const createMockQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-      mutations: {
-        retry: false,
-      },
+{
+  const queryClient = new QueryClient();
+  queryClient.setDefaultOptions({
+    queries: {
+      retry: false,
+    },
+    mutations: {
+      retry: false,
     },
   });
+  return queryClient;
+};
 
 const wrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
   <I18nextProvider i18n={i18n}>
@@ -167,6 +169,31 @@ const wrapper = ({ children }: Readonly<{ children: React.ReactNode }>) => (
     </ToastProvider>
   </I18nextProvider>
 );
+
+const WORKFLOWS_LIST_ENDPOINT_PREFIX = '/api/workflows?project_id=';
+const toRequestUrl = (input: string | URL) =>
+  typeof input === 'string' ? input : input.toString();
+
+const createApiSuccess = <TData,>(data: TData) =>
+  Promise.resolve({
+    ok: true,
+    json: async () => ({ success: true, data }),
+  } satisfies Partial<Response>);
+
+const createApiFailure = (
+  status: number,
+  statusText: string,
+  message: string
+) =>
+  Promise.resolve({
+    ok: false,
+    status,
+    statusText,
+    json: async () => ({ success: false, message }),
+  } satisfies Partial<Response>);
+
+const rejectUnexpectedRequest = (url: string) =>
+  Promise.reject(new Error(`Unexpected request: ${url}`));
 
 // Mock workflow list data matching WorkflowListItemDto
 const mockWorkflows: WorkflowListItemDto[] = [
@@ -215,6 +242,26 @@ const mockWorkflows: WorkflowListItemDto[] = [
     terminalsCount: 3,
   },
 ];
+
+const stubWorkflowsListFetch = (data: WorkflowListItemDto[] = mockWorkflows) => {
+  vi.stubGlobal('fetch', vi.fn(() => createApiSuccess(data)));
+};
+
+async function renderAndOpenWorkflowDetail(workflowName: string) {
+  render(<Workflows />, { wrapper });
+
+  await waitFor(() => {
+    expect(screen.getByText(workflowName)).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByText(workflowName).closest('.cursor-pointer'));
+
+  await waitFor(() => {
+    expect(
+      screen.getByRole('button', { name: 'Merge Workflow' })
+    ).toBeInTheDocument();
+  });
+}
 
 const mockCompletedWorkflowDetail: WorkflowDetailDto = {
   id: 'workflow-3',
@@ -380,15 +427,7 @@ describe('Workflows Page', () => {
   describe('List Rendering', () => {
     it('should render workflow list from API', async () => {
       // Mock fetch for workflows list
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch();
 
       render(<Workflows />, { wrapper });
 
@@ -404,15 +443,7 @@ describe('Workflows Page', () => {
     });
 
     it('should display workflow descriptions', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch();
 
       render(<Workflows />, { wrapper });
 
@@ -425,15 +456,7 @@ describe('Workflows Page', () => {
     });
 
     it('should display tasks and terminals count from DTO', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch();
 
       render(<Workflows />, { wrapper });
 
@@ -450,15 +473,7 @@ describe('Workflows Page', () => {
 
   describe('Status Badge', () => {
     it('should render status badges with correct styling', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch();
 
       render(<Workflows />, { wrapper });
 
@@ -485,15 +500,7 @@ describe('Workflows Page', () => {
 
   describe('Navigation', () => {
     it('should navigate to workflow detail when clicking a workflow card', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch();
 
       render(<Workflows />, { wrapper });
 
@@ -513,43 +520,28 @@ describe('Workflows Page', () => {
     });
 
     it('should trigger merge API from workflow detail view', async () => {
-      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input.toString();
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess(mockWorkflows);
         }
 
         if (url === '/api/workflows/workflow-3/merge') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: {
-                success: true,
-                message: 'Merge completed successfully',
-                workflowId: 'workflow-3',
-                targetBranch: 'main',
-                mergedTasks: [],
-              },
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess({
+            success: true,
+            message: 'Merge completed successfully',
+            workflowId: 'workflow-3',
+            targetBranch: 'main',
+            mergedTasks: [],
+          });
         }
 
         if (url === '/api/workflows/workflow-3') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: mockCompletedWorkflowDetail,
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockCompletedWorkflowDetail);
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -593,15 +585,7 @@ describe('Workflows Page', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no workflows exist', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: [] }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch([]);
 
       render(<Workflows />, { wrapper });
 
@@ -634,12 +618,7 @@ describe('Workflows Page', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn(() =>
-          Promise.resolve({
-            ok: false,
-            status: 500,
-            statusText: 'Internal Server Error',
-            json: async () => ({ success: false, message: 'Failed to fetch' }),
-          } satisfies Partial<Response>)
+          createApiFailure(500, 'Internal Server Error', 'Failed to fetch')
         )
       );
 
@@ -655,15 +634,7 @@ describe('Workflows Page', () => {
 
   describe('Prompt Interaction', () => {
     it('registers realtime workflow status event handlers', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>)
-        )
-      );
+      stubWorkflowsListFetch();
 
       render(<Workflows />, { wrapper });
 
@@ -686,51 +657,26 @@ describe('Workflows Page', () => {
     });
 
     it('shows prompt dialog and submits yes/no response via API', async () => {
-      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input.toString();
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess(mockWorkflows);
         }
 
         if (url === '/api/workflows/workflow-3') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: mockCompletedWorkflowDetail,
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockCompletedWorkflowDetail);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: null }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(null);
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
-
-      render(<Workflows />, { wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: 'Merge Workflow' })
-        ).toBeInTheDocument();
-      });
+      await renderAndOpenWorkflowDetail('Completed Workflow');
 
       emitPromptDetected({
         workflowId: 'workflow-3',
@@ -760,51 +706,26 @@ describe('Workflows Page', () => {
     });
 
     it('submits choice and input/password prompt responses', async () => {
-      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input.toString();
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess(mockWorkflows);
         }
 
         if (url === '/api/workflows/workflow-3') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: mockCompletedWorkflowDetail,
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockCompletedWorkflowDetail);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: null }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(null);
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
-
-      render(<Workflows />, { wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: 'Merge Workflow' })
-        ).toBeInTheDocument();
-      });
+      await renderAndOpenWorkflowDetail('Completed Workflow');
 
       emitPromptDetected({
         promptKind: 'choice',
@@ -913,43 +834,21 @@ describe('Workflows Page', () => {
 
     it('prevents duplicate prompt enqueue and closes by prompt decision', async () => {
       const fetchMock = vi.fn((input: string | URL) => {
-        const url = typeof input === 'string' ? input : input.toString();
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess(mockWorkflows);
         }
 
         if (url === '/api/workflows/workflow-3') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: mockCompletedWorkflowDetail,
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockCompletedWorkflowDetail);
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
-
-      render(<Workflows />, { wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: 'Merge Workflow' })
-        ).toBeInTheDocument();
-      });
+      await renderAndOpenWorkflowDetail('Completed Workflow');
 
       emitPromptDetected({
         promptKind: 'yes_no',
@@ -979,53 +878,26 @@ describe('Workflows Page', () => {
     });
 
     it('falls back to workflow WS submission for enter_confirm when API rejects empty response', async () => {
-      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input.toString();
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess(mockWorkflows);
         }
 
         if (url === '/api/workflows/workflow-3') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: mockCompletedWorkflowDetail,
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockCompletedWorkflowDetail);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return Promise.resolve({
-            ok: false,
-            status: 400,
-            statusText: 'Bad Request',
-            json: async () => ({ success: false, message: 'response is required' }),
-          } satisfies Partial<Response>);
+          return createApiFailure(400, 'Bad Request', 'response is required');
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
-
-      render(<Workflows />, { wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: 'Merge Workflow' })
-        ).toBeInTheDocument();
-      });
+      await renderAndOpenWorkflowDetail('Completed Workflow');
 
       emitPromptDetected({
         promptKind: 'enter_confirm',
@@ -1065,53 +937,26 @@ describe('Workflows Page', () => {
     it('keeps enter_confirm dialog open when workflow WS fallback send fails', async () => {
       wsStoreMock.sendPromptResponse.mockReturnValue(false);
 
-      const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input.toString();
+      const fetchMock = vi.fn((input: string | URL) => {
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockWorkflows }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess(mockWorkflows);
         }
 
         if (url === '/api/workflows/workflow-3') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: mockCompletedWorkflowDetail,
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockCompletedWorkflowDetail);
         }
 
         if (url === '/api/workflows/workflow-3/prompts/respond') {
-          return Promise.resolve({
-            ok: false,
-            status: 400,
-            statusText: 'Bad Request',
-            json: async () => ({ success: false, message: 'response is required' }),
-          } satisfies Partial<Response>);
+          return createApiFailure(400, 'Bad Request', 'response is required');
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
-
-      render(<Workflows />, { wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText('Completed Workflow')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Completed Workflow').closest('.cursor-pointer'));
-
-      await waitFor(() => {
-        expect(
-          screen.getByRole('button', { name: 'Merge Workflow' })
-        ).toBeInTheDocument();
-      });
+      await renderAndOpenWorkflowDetail('Completed Workflow');
 
       emitPromptDetected({
         promptKind: 'enter_confirm',
@@ -1143,32 +988,23 @@ describe('Workflows Page', () => {
   describe('Project and Pipeline Consistency', () => {
     it('renders tasks and terminals in orderIndex order', async () => {
       const fetchMock = vi.fn((input: string | URL) => {
-        const url = typeof input === 'string' ? input : input.toString();
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: [
-                {
-                  ...mockWorkflows[0],
-                  id: 'workflow-unordered',
-                  name: 'Unordered Workflow',
-                },
-              ],
-            }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess([
+            {
+              ...mockWorkflows[0],
+              id: 'workflow-unordered',
+              name: 'Unordered Workflow',
+            },
+          ]);
         }
 
         if (url === '/api/workflows/workflow-unordered') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: mockUnorderedWorkflowDetail }),
-          } satisfies Partial<Response>);
+          return createApiSuccess(mockUnorderedWorkflowDetail);
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);
@@ -1203,59 +1039,40 @@ describe('Workflows Page', () => {
   describe('Workflow Creation', () => {
     it('falls back to selected project when resolve-by-path fails', async () => {
       const fetchMock = vi.fn((input: string | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input.toString();
+        const url = toRequestUrl(input);
 
-        if (url.startsWith('/api/workflows?project_id=')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ success: true, data: [] }),
-          } satisfies Partial<Response>);
+        if (url.startsWith(WORKFLOWS_LIST_ENDPOINT_PREFIX)) {
+          return createApiSuccess([]);
         }
 
         if (url === '/api/projects/resolve-by-path') {
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            json: async () => ({ success: false, message: 'resolve failed' }),
-          } satisfies Partial<Response>);
+          return createApiFailure(500, 'Internal Server Error', 'resolve failed');
         }
 
         if (url === '/api/workflows') {
           const body = init?.body ? JSON.parse(init.body as string) : null;
           expect(body?.projectId).toBe('proj-1');
 
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: {
-                ...mockCompletedWorkflowDetail,
-                id: 'workflow-new',
-                projectId: 'proj-1',
-                name: 'Wizard Created Workflow',
-                status: 'draft',
-              },
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess({
+            ...mockCompletedWorkflowDetail,
+            id: 'workflow-new',
+            projectId: 'proj-1',
+            name: 'Wizard Created Workflow',
+            status: 'draft',
+          });
         }
 
         if (url === '/api/workflows/workflow-new') {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              success: true,
-              data: {
-                ...mockCompletedWorkflowDetail,
-                id: 'workflow-new',
-                projectId: 'proj-1',
-                name: 'Wizard Created Workflow',
-                status: 'draft',
-              },
-            }),
-          } satisfies Partial<Response>);
+          return createApiSuccess({
+            ...mockCompletedWorkflowDetail,
+            id: 'workflow-new',
+            projectId: 'proj-1',
+            name: 'Wizard Created Workflow',
+            status: 'draft',
+          });
         }
 
-        return Promise.reject(new Error(`Unexpected request: ${url}`));
+        return rejectUnexpectedRequest(url);
       });
 
       vi.stubGlobal('fetch', fetchMock);

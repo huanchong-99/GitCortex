@@ -66,9 +66,39 @@ const InviteMemberDialogImpl = NiceModal.create<InviteMemberDialogProps>(
       const trimmedValue = value.trim();
       if (!trimmedValue) return 'Email is required';
 
-      // Basic email validation regex
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(trimmedValue)) {
+      // Keep validation intentionally lightweight while avoiding regex backtracking hotspots.
+      const containsWhitespace = (input: string) => {
+        for (let i = 0; i < input.length; i++) {
+          const code = input.charCodeAt(i);
+          if (
+            code === 9 || // \t
+            code === 10 || // \n
+            code === 11 || // \v
+            code === 12 || // \f
+            code === 13 || // \r
+            code === 32 // space
+          ) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const atIndex = trimmedValue.indexOf('@');
+      const hasSingleAt =
+        atIndex > 0 &&
+        atIndex === trimmedValue.lastIndexOf('@') &&
+        atIndex < trimmedValue.length - 1;
+
+      if (!hasSingleAt || containsWhitespace(trimmedValue)) {
+        return 'Please enter a valid email address';
+      }
+
+      const domain = trimmedValue.slice(atIndex + 1);
+      const dotIndex = domain.indexOf('.');
+      const hasValidDomainDot = dotIndex > 0 && dotIndex < domain.length - 1;
+
+      if (!hasValidDomainDot) {
         return 'Please enter a valid email address';
       }
 

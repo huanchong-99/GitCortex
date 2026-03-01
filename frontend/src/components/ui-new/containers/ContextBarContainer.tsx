@@ -5,57 +5,9 @@ import { ContextBar } from '../primitives/ContextBar';
 import {
   ContextBarActionGroups,
   type ActionDefinition,
-  type ActionVisibilityContext,
-  type ContextBarItem,
 } from '../actions';
-import {
-  useActionVisibilityContext,
-  isActionVisible,
-} from '../actions/useActionVisibility';
-
-/**
- * Check if a ContextBarItem is a divider
- */
-function isDivider(item: ContextBarItem): item is { readonly type: 'divider' } {
-  return 'type' in item && item.type === 'divider';
-}
-
-/**
- * Filter context bar items by visibility, keeping dividers but removing them
- * if they would appear at the start, end, or consecutively.
- */
-function filterContextBarItems(
-  items: readonly ContextBarItem[],
-  ctx: ActionVisibilityContext
-): ContextBarItem[] {
-  // Filter actions by visibility, keep dividers
-  const filtered = items.filter((item) => {
-    if (isDivider(item)) return true;
-    return isActionVisible(item, ctx);
-  });
-
-  // Remove leading/trailing dividers and consecutive dividers
-  const result: ContextBarItem[] = [];
-  for (const item of filtered) {
-    if (isDivider(item)) {
-      // Only add divider if we have items before it and last item wasn't a divider
-      const lastItem = result.at(-1);
-      if (result.length > 0 && lastItem && !isDivider(lastItem)) {
-        result.push(item);
-      }
-    } else {
-      result.push(item);
-    }
-  }
-
-  // Remove trailing divider
-  const lastItem = result.at(-1);
-  if (result.length > 0 && lastItem && isDivider(lastItem)) {
-    result.pop();
-  }
-
-  return result;
-}
+import { useActionVisibilityContext } from '../actions/useActionVisibility';
+import { filterVisibleItemPair } from './NavbarContainer';
 
 export interface ContextBarContainerProps {
   readonly containerRef: RefObject<HTMLElement | null>;
@@ -82,12 +34,13 @@ export function ContextBarContainer({
   );
 
   // Filter visible actions
-  const primaryItems = useMemo(
-    () => filterContextBarItems(ContextBarActionGroups.primary, actionCtx),
-    [actionCtx]
-  );
-  const secondaryItems = useMemo(
-    () => filterContextBarItems(ContextBarActionGroups.secondary, actionCtx),
+  const [primaryItems, secondaryItems] = useMemo(
+    () =>
+      filterVisibleItemPair(
+        ContextBarActionGroups.primary,
+        ContextBarActionGroups.secondary,
+        actionCtx
+      ),
     [actionCtx]
   );
 

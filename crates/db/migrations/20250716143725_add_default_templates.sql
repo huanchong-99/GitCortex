@@ -2,6 +2,7 @@
 -- This is intentional - template content contains multi-line markdown text that requires embedded newlines.
 -- NOTE: SonarCloud flags duplicate string literals in this migration.
 -- This is acceptable for SQL DDL migrations where repeated INSERT patterns share common column names.
+-- NOTE: Keep historical migration semantics unchanged to avoid checksum drift on already-applied databases.
 
 -- Add default global templates
 
@@ -50,7 +51,7 @@ INSERT INTO task_templates (
     '3. Estimated effort for addressing each issue',
     'Bug Analysis',
     datetime('now', 'subsec'), -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
-    datetime('now', 'subsec')
+    datetime('now', 'subsec') -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
 );
 
 -- 2. Unit Test template
@@ -95,8 +96,8 @@ INSERT INTO task_templates (
     '2. Updated coverage report' || char(10) ||
     '3. All tests passing',
     'Add Unit Tests',
-    datetime('now', 'subsec'),
-    datetime('now', 'subsec')
+    datetime('now', 'subsec'), -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
+    datetime('now', 'subsec') -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
 );
 
 -- 3. Code Refactoring template
@@ -152,6 +153,6 @@ INSERT INTO task_templates (
     '2. All tests passing' || char(10) ||
     '3. Brief summary of changes made',
     'Code Refactoring',
-    datetime('now', 'subsec'),
-    datetime('now', 'subsec')
+    datetime('now', 'subsec'), -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
+    datetime('now', 'subsec') -- NOSONAR: Reused timestamp literal is intentional for deterministic migration inserts.
 );

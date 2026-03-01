@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/useAuth';
+import { secureRandomIdFragment } from '@/utils/id';
 
 const MAX_VISITED_PATHS = 50;
 const SESSION_STORAGE_KEY = 'gitcortex.previous-path.session-id';
 const visitedByScope = new Map<string, string[]>();
 
 function createSessionId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${Date.now()}-${secureRandomIdFragment(8)}`;
 }
 
 function getSessionId(): string {

@@ -18,7 +18,8 @@ function slugify(text: string): string {
     .trim()
     .replaceAll(/[^\w\s-]/g, '')
     .replaceAll(/[\s_-]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
+    .replaceAll(/^-+/g, '')
+    .replaceAll(/-+$/g, '');
 }
 
 interface Step2TasksProps {

@@ -12,6 +12,49 @@ let shuttingDown = false;
 const devLockPath = path.join(os.tmpdir(), "gitcortex", "run-dev.lock");
 let lockFd = null;
 
+function getPathKey(env) {
+  return Object.keys(env).find((name) => name.toLowerCase() === "path") ?? "PATH";
+}
+
+function resolveExecutable(command, env = process.env) {
+  if (typeof command !== "string" || command.length === 0) {
+    return command;
+  }
+  if (path.isAbsolute(command) || command.includes("/") || command.includes("\\")) {
+    return command;
+  }
+
+  const pathValue = env[getPathKey(env)];
+  if (typeof pathValue !== "string" || pathValue.length === 0) {
+    return command;
+  }
+
+  const extensions =
+    process.platform === "win32"
+      ? (env.PATHEXT ?? process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM")
+          .split(";")
+          .filter(Boolean)
+      : [""];
+  const names =
+    process.platform === "win32" && path.extname(command) === ""
+      ? extensions.map((ext) => `${command}${ext}`)
+      : [command];
+
+  for (const dir of pathValue.split(path.delimiter).filter(Boolean)) {
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return candidate;
+      } catch {
+        // Ignore and continue checking other PATH entries.
+      }
+    }
+  }
+
+  return command;
+}
+
 function isProcessAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -105,7 +148,7 @@ function taskkillPidWindows(pid, { force = false } = {}) {
   if (force) {
     args.push("/f");
   }
-  const result = spawnSync("taskkill", args, { stdio: "ignore" });
+  const result = spawnSync(resolveExecutable("taskkill"), args, { stdio: "ignore" });
   return result.status === 0;
 }
 
@@ -163,14 +206,16 @@ function resolveCommand(command, args) {
  */
 function run(name, command, args, options) {
   const resolved = resolveCommand(command, args);
+  const spawnOptions = {
+    stdio: "inherit",
+    ...options
+  };
+  const executable = resolveExecutable(resolved.command, spawnOptions.env ?? process.env);
   console.log(
     `[dev] Starting ${name}: ${resolved.command} ${resolved.args.join(" ")}`
   );
 
-  const child = spawn(resolved.command, resolved.args, {
-    stdio: "inherit",
-    ...options
-  });
+  const child = spawn(executable, resolved.args, spawnOptions);
 
   children.add(child);
 
@@ -297,7 +342,7 @@ async function canBindPort(port) {
  * Find TCP LISTEN PIDs for a port (Windows only).
  */
 function findListeningPidsWindows(port) {
-  const result = spawnSync("netstat", ["-ano", "-p", "tcp"], {
+  const result = spawnSync(resolveExecutable("netstat"), ["-ano", "-p", "tcp"], {
     encoding: "utf8",
   });
 
@@ -454,12 +499,8 @@ async function main() {
   console.log("[dev] Press Ctrl+C to stop");
 }
 
-void (async () => {
-  try {
-    await main();
-  } catch (err) {
-    releaseDevLock();
-    console.error("[dev] Failed to start development environment:", err);
-    process.exit(1);
-  }
-})();
+main().catch((err) => {
+  releaseDevLock();
+  console.error("[dev] Failed to start development environment:", err);
+  process.exit(1);
+});

@@ -4,9 +4,7 @@ import { useActions } from '@/contexts/ActionsContext';
 import { Navbar } from '../views/Navbar';
 import {
   NavbarActionGroups,
-  NavbarDivider,
   type ActionDefinition,
-  type NavbarItem,
   type ActionVisibilityContext,
 } from '../actions';
 import {
@@ -14,21 +12,24 @@ import {
   isActionVisible,
 } from '../actions/useActionVisibility';
 
-/**
- * Check if a NavbarItem is a divider
- */
-function isDivider(item: NavbarItem): item is typeof NavbarDivider {
+type DividerItem = { readonly type: 'divider' };
+
+function isDivider(
+  item: ActionDefinition | DividerItem
+): item is DividerItem {
   return 'type' in item && item.type === 'divider';
 }
 
 /**
- * Filter navbar items by visibility, keeping dividers but removing them
- * if they would appear at the start, end, or consecutively.
+ * Filter items by visibility while normalizing divider placement
+ * (no leading, trailing, or consecutive dividers).
  */
-function filterNavbarItems(
-  items: readonly NavbarItem[],
+export function filterVisibleItemsWithDividers<
+  T extends ActionDefinition | DividerItem,
+>(
+  items: readonly T[],
   ctx: ActionVisibilityContext
-): NavbarItem[] {
+): T[] {
   // Filter actions by visibility, keep dividers
   const filtered = items.filter((item) => {
     if (isDivider(item)) return true;
@@ -36,7 +37,7 @@ function filterNavbarItems(
   });
 
   // Remove leading/trailing dividers and consecutive dividers
-  const result: NavbarItem[] = [];
+  const result: T[] = [];
   for (const item of filtered) {
     if (isDivider(item)) {
       // Only add divider if we have items before it and last item wasn't a divider
@@ -56,6 +57,20 @@ function filterNavbarItems(
   }
 
   return result;
+}
+
+export function filterVisibleItemPair<
+  TLeft extends ActionDefinition | DividerItem,
+  TRight extends ActionDefinition | DividerItem,
+>(
+  leftItems: readonly TLeft[],
+  rightItems: readonly TRight[],
+  ctx: ActionVisibilityContext
+): [TLeft[], TRight[]] {
+  return [
+    filterVisibleItemsWithDividers(leftItems, ctx),
+    filterVisibleItemsWithDividers(rightItems, ctx),
+  ];
 }
 
 export function NavbarContainer() {
@@ -78,13 +93,13 @@ export function NavbarContainer() {
   );
 
   // Filter visible actions for each section
-  const leftItems = useMemo(
-    () => filterNavbarItems(NavbarActionGroups.left, actionCtx),
-    [actionCtx]
-  );
-
-  const rightItems = useMemo(
-    () => filterNavbarItems(NavbarActionGroups.right, actionCtx),
+  const [leftItems, rightItems] = useMemo(
+    () =>
+      filterVisibleItemPair(
+        NavbarActionGroups.left,
+        NavbarActionGroups.right,
+        actionCtx
+      ),
     [actionCtx]
   );
 

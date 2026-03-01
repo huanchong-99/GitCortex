@@ -224,7 +224,12 @@ export function WorkflowWizard({
             onUpdate={(updates) => {
               handleUpdateConfig(updates);
               if (updates.models) {
-                void persistWorkflowModelLibrary(updates.models);
+                persistWorkflowModelLibrary(updates.models).catch((error) => {
+                  console.error(
+                    'Unexpected failure while persisting workflow model library',
+                    error
+                  );
+                });
               }
             }}
           />
@@ -280,7 +285,15 @@ export function WorkflowWizard({
 
   const handlePrimaryButtonClick = () => {
     if (currentStep === WizardStep.Advanced) {
-      void handleSubmit();
+      handleSubmit().catch((error) => {
+        const errorObj =
+          error instanceof Error
+            ? error
+            : new Error(t('wizard.errors.submitUnknown'));
+        onError?.(errorObj);
+        setSubmitError(errorObj.message);
+        setState((prevState) => ({ ...prevState, isSubmitting: false }));
+      });
     } else {
       handleNext();
     }

@@ -52,29 +52,83 @@ interface ClickedElementsProviderProps {
 }
 
 const MAX_ELEMENTS = 20;
+const MAC_PRIVATE_PREFIX = '/private';
+const MAC_PRIVATE_ALIAS_ROOTS = new Set(['var', 'tmp']);
 
 // Helpers
 
+function stripPrefix(value: string, prefix: string): string {
+  return value.startsWith(prefix) ? value.slice(prefix.length) : value;
+}
+
 function stripPrefixes(p?: string): string {
   if (!p) return '';
-  return p
-    .replace(/^file:\/\//, '')
-    .replace(/^webpack:\/\/\//, '')
-    .replace(/^webpack:\/\//, '')
-    .trim();
+  return stripPrefix(
+    stripPrefix(stripPrefix(p, 'file://'), 'webpack:///'),
+    'webpack://'
+  ).trim();
 }
 
 // macOS alias handling; no-ops on other OSes
 function normalizeMacPrivateAliases(p: string): string {
   if (!p) return p;
-  // Very light normalization mimicking path.rs logic
-  if (p === '/private/var') return '/var';
-  if (p.startsWith('/private/var/'))
-    return '/var/' + p.slice('/private/var/'.length);
-  if (p === '/private/tmp') return '/tmp';
-  if (p.startsWith('/private/tmp/'))
-    return '/tmp/' + p.slice('/private/tmp/'.length);
-  return p;
+
+  if (!p.startsWith(`${MAC_PRIVATE_PREFIX}/`)) return p;
+
+  // Security constraint: this normalization is only for UI/display strings.
+  // This provider does not perform filesystem writes and never builds writable paths.
+  const candidate = p.slice(MAC_PRIVATE_PREFIX.length);
+  if (!candidate.startsWith('/')) return p;
+
+  const root = candidate.slice(1).split('/', 1)[0];
+  if (!MAC_PRIVATE_ALIAS_ROOTS.has(root)) return p;
+
+  return candidate;
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
+function isAsciiWhitespace(code: number): boolean {
+  return (
+    code === 9 || // \t
+    code === 10 || // \n
+    code === 11 || // \v
+    code === 12 || // \f
+    code === 13 || // \r
+    code === 32 // space
+  );
+}
+
+function splitOnWhitespace(value: string): string[] {
+  const out: string[] = [];
+  let start = -1;
+
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (isAsciiWhitespace(code)) {
+      if (start !== -1) {
+        out.push(value.slice(start, i));
+        start = -1;
+      }
+      continue;
+    }
+
+    if (start === -1) {
+      start = i;
+    }
+  }
+
+  if (start !== -1) {
+    out.push(value.slice(start));
+  }
+
+  return out;
 }
 
 // Return { path, line?, col? } where `path` has no trailing :line(:col).
@@ -113,7 +167,7 @@ function relativizePath(p: string, workspaceRoot?: string): string {
 
   // Simple prefix strip; robust handling is on backend (path.rs).
   // This keeps the UI stable even when run inside macOS /private/var containers.
-  const wr = normalizeMacPrivateAliases(workspaceRoot.replace(/\/+$/, ''));
+  const wr = normalizeMacPrivateAliases(trimTrailingSlashes(workspaceRoot));
   if (
     normalized.startsWith(wr.endsWith('/') ? wr : wr + '/') ||
     normalized === wr
@@ -144,7 +198,10 @@ function formatDomBits(ce?: OpenInEditorPayload['clickedElement']) {
 
 function normalizeClassName(className?: string): string {
   if (!className) return '';
-  return className.split(/\s+/).filter(Boolean).sort((a, b) => a.localeCompare(b)).join('.');
+  return splitOnWhitespace(className)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .join('.');
 }
 
 function makeDedupeKey(

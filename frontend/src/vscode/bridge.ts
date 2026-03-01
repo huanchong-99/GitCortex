@@ -1,3 +1,5 @@
+import { secureRandomIdFragment } from '@/utils/id';
+
 // VS Code Webview iframe keyboard bridge
 //
 // Purpose
@@ -314,7 +316,7 @@ export function parentClipboardWrite(text: string): boolean {
 /** Ask the extension to read text from the OS clipboard (fallback path). */
 export function parentClipboardRead(): Promise<string> {
   return new Promise((resolve) => {
-    const requestId = Math.random().toString(36).slice(2);
+    const requestId = secureRandomIdFragment(12);
     pasteResolvers[requestId] = (text: string) => resolve(text);
     try {
       globalThis.parent.postMessage(

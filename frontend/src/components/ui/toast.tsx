@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { secureRandomIdFragment } from '@/utils/id';
 import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -35,7 +36,7 @@ export function ToastProvider({ children }: Readonly<ToastProviderProps>) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3000) => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const id = `toast-${Date.now()}-${secureRandomIdFragment(7)}`;
     setToasts((prev) => [...prev, { id, message, type, duration }]);
   }, []);
 
