@@ -106,6 +106,7 @@ impl OrchestratorAgent {
     const STALL_RECOVERY_COOLDOWN: Duration = Duration::from_secs(30);
     #[cfg(test)]
     const STALL_RECOVERY_COOLDOWN: Duration = Duration::from_millis(220);
+    const STALL_RECOVERY_CLAUDE_SUBMIT_DELAY_MS: u64 = 260;
     const STALL_RECOVERY_SUFFIX: &str = "Watchdog notice: execution appears stalled. Resume this same task from current workspace state immediately and continue implementation; do not wait for a new task.";
 
     /// Builds a new orchestrator agent with a configured LLM client.
@@ -387,7 +388,7 @@ impl OrchestratorAgent {
                 .map_err(|e| anyhow!("Failed to publish stalled-terminal instruction: {e}"))?;
         }
 
-        for (attempt, delay_ms) in Self::submit_keystroke_schedule_ms(terminal, false)
+        for (attempt, delay_ms) in Self::stall_recovery_submit_keystroke_schedule_ms(terminal)
             .iter()
             .enumerate()
         {
@@ -2295,6 +2296,19 @@ impl OrchestratorAgent {
         }
     }
 
+    fn stall_recovery_submit_keystroke_schedule_ms(
+        terminal: &db::models::Terminal,
+    ) -> &'static [u64] {
+        if Self::is_claude_code_cli(terminal) {
+            // Stall recovery means we've seen a prolonged quiet window while terminal is
+            // still marked working. Claude can occasionally keep the injected recovery
+            // instruction in composer; send one delayed submit to force execution.
+            &[Self::STALL_RECOVERY_CLAUDE_SUBMIT_DELAY_MS]
+        } else {
+            Self::submit_keystroke_schedule_ms(terminal, false)
+        }
+    }
+
     /// Builds a task instruction from task and terminal information.
     fn build_task_instruction(
         workflow_id: &str,
@@ -3239,6 +3253,48 @@ mod tests {
         }
 
         assert!(tracker.last_recoveries.contains_key(&terminal_id));
+    }
+
+    #[tokio::test]
+    async fn recover_stalled_terminals_claude_sends_submit_keystroke_once() {
+        let (agent, message_bus, _db, terminal_id, pty_session_id) =
+            setup_stalled_recovery_fixture().await;
+        let mut terminal_rx = message_bus.subscribe(&pty_session_id).await;
+        let mut tracker = StallRecoveryTracker::default();
+
+        agent.recover_stalled_terminals(&mut tracker).await.unwrap();
+
+        let first = tokio::time::timeout(std::time::Duration::from_millis(500), terminal_rx.recv())
+            .await
+            .expect("stalled terminal should receive redispatch message")
+            .expect("message should exist");
+        match first {
+            BusMessage::TerminalMessage { message } => {
+                assert!(message.contains("Watchdog notice"));
+            }
+            other => panic!("Expected TerminalMessage, got {other:?}"),
+        }
+
+        let second = tokio::time::timeout(std::time::Duration::from_millis(1200), terminal_rx.recv())
+            .await
+            .expect("Claude stall recovery should emit a submit keystroke")
+            .expect("message should exist");
+        match second {
+            BusMessage::TerminalInput {
+                terminal_id: input_terminal_id,
+                session_id,
+                input,
+                ..
+            } => {
+                assert_eq!(input_terminal_id, terminal_id);
+                assert_eq!(session_id, pty_session_id);
+                assert!(
+                    input.is_empty(),
+                    "stall recovery submit keystroke should use empty input payload"
+                );
+            }
+            other => panic!("Expected TerminalInput, got {other:?}"),
+        }
     }
 
     #[tokio::test]
