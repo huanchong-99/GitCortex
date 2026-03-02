@@ -309,10 +309,10 @@ impl OrchestratorAgent {
                     continue;
                 }
 
-                let now = Instant::now();
+                let cooldown_check_at = Instant::now();
                 if tracker.should_skip_due_to_cooldown(
                     &terminal.id,
-                    now,
+                    cooldown_check_at,
                     Self::STALL_RECOVERY_COOLDOWN,
                 ) {
                     continue;
@@ -337,7 +337,7 @@ impl OrchestratorAgent {
                     continue;
                 }
 
-                tracker.mark_recovered(&terminal.id, now);
+                tracker.mark_recovered(&terminal.id, Instant::now());
             }
         }
 
@@ -3305,17 +3305,30 @@ mod tests {
         let mut tracker = StallRecoveryTracker::default();
 
         agent.recover_stalled_terminals(&mut tracker).await.unwrap();
-        let _ = tokio::time::timeout(std::time::Duration::from_millis(500), terminal_rx.recv())
-            .await
-            .expect("first re-dispatch should arrive")
-            .expect("message should exist");
-
         agent.recover_stalled_terminals(&mut tracker).await.unwrap();
 
-        let second_message =
-            tokio::time::timeout(std::time::Duration::from_millis(120), terminal_rx.recv()).await;
-        assert!(
-            second_message.is_err(),
+        let wait_window = std::time::Duration::from_millis(700);
+        let poll_slice = std::time::Duration::from_millis(80);
+        let deadline = tokio::time::Instant::now() + wait_window;
+        let mut redispatch_count = 0usize;
+
+        while tokio::time::Instant::now() < deadline {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            let timeout = remaining.min(poll_slice);
+            match tokio::time::timeout(timeout, terminal_rx.recv()).await {
+                Ok(Some(BusMessage::TerminalMessage { message })) => {
+                    if message.contains("Watchdog notice") {
+                        redispatch_count += 1;
+                    }
+                }
+                Ok(Some(_)) => {}
+                Ok(None) => break,
+                Err(_) => {}
+            }
+        }
+
+        assert_eq!(
+            redispatch_count, 1,
             "cooldown should suppress duplicate immediate re-dispatches"
         );
     }
