@@ -95,6 +95,22 @@ export function AgentSettings() {
     output: string;
     exitCode: number;
   } | null>(null);
+  const [installElapsedSec, setInstallElapsedSec] = useState(0);
+
+  useEffect(() => {
+    if (!installingCli) {
+      setInstallElapsedSec(0);
+      return;
+    }
+
+    setInstallElapsedSec(0);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setInstallElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [installingCli]);
 
   // Sync server state to local state when not dirty
   useEffect(() => {
@@ -175,6 +191,41 @@ export function AgentSettings() {
     } finally {
       setInstallingCli(false);
     }
+  };
+
+  const getInstallPhaseText = (elapsedSec: number) => {
+    if (elapsedSec < 8) {
+      return t('settings.agents.installAiCliPhasePreparing', {
+        defaultValue: 'Preparing installation environment...',
+      });
+    }
+    if (elapsedSec < 90) {
+      return t('settings.agents.installAiCliPhaseCore', {
+        defaultValue: 'Installing core CLIs (Claude/Codex/Gemini)...',
+      });
+    }
+    if (elapsedSec < 180) {
+      return t('settings.agents.installAiCliPhaseExtended', {
+        defaultValue: 'Installing extended CLIs (Qwen/Amp/OpenCode/Kilo)...',
+      });
+    }
+    return t('settings.agents.installAiCliPhaseVerifying', {
+      defaultValue: 'Verifying installation results...',
+    });
+  };
+
+  const parseInstalledCliNames = (output: string): string[] => {
+    const names = new Set<string>();
+    const matches = output.matchAll(/\bOK\s+([^:\r\n]+):/g);
+
+    for (const match of matches) {
+      const name = match[1]?.trim();
+      if (name) {
+        names.add(name);
+      }
+    }
+
+    return Array.from(names);
   };
 
   // Sync raw profiles with parsed profiles
@@ -479,6 +530,11 @@ export function AgentSettings() {
     );
   }
 
+  const installedCliNames =
+    installCliResult?.installed && installCliResult.output
+      ? parseInstalledCliNames(installCliResult.output)
+      : [];
+
   return (
     <div className="space-y-6">
       {!!profilesError && (
@@ -648,12 +704,25 @@ export function AgentSettings() {
                 type="button"
                 variant="ghost"
                 onClick={() => setAvailabilityRefreshToken((token) => token + 1)}
+                disabled={installingCli}
               >
                 {t('settings.agents.refreshAvailability', {
                   defaultValue: 'Refresh availability',
                 })}
               </Button>
             </div>
+            {installingCli && (
+              <Alert>
+                <AlertDescription className="text-xs">
+                  {getInstallPhaseText(installElapsedSec)}
+                  {'\n'}
+                  {t('settings.agents.installAiCliInProgress', {
+                    defaultValue: 'Installing AI CLIs... elapsed {{seconds}}s',
+                    seconds: installElapsedSec,
+                  })}
+                </AlertDescription>
+              </Alert>
+            )}
             {installCliResult && (
               <Alert
                 variant={installCliResult.installed ? 'default' : 'destructive'}
@@ -666,6 +735,15 @@ export function AgentSettings() {
                     : t('settings.agents.installAiCliFailed', {
                         defaultValue: 'AI CLI installation failed.',
                       })}
+                  {installCliResult.installed && installedCliNames.length > 0 && (
+                    <>
+                      {'\n'}
+                      {t('settings.agents.installAiCliInstalledList', {
+                        defaultValue: 'Installed successfully: {{names}}',
+                        names: installedCliNames.join(', '),
+                      })}
+                    </>
+                  )}
                   {'\n'}
                   {t('settings.agents.installAiCliExitCode', {
                     defaultValue: 'Exit code: {{code}}',

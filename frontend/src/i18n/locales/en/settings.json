@@ -259,6 +259,17 @@
         "notFound": "Unknown",
         "notFoundTooltip": "We couldn't verify this agent is set up, but go ahead and try it."
       },
+      "installAiCli": "One-click Install AI CLIs",
+      "refreshAvailability": "Refresh availability",
+      "installAiCliSuccess": "AI CLI installation finished successfully.",
+      "installAiCliInstalledList": "Installed successfully: {{names}}",
+      "installAiCliFailed": "AI CLI installation failed.",
+      "installAiCliExitCode": "Exit code: {{code}}",
+      "installAiCliInProgress": "Installing AI CLIs... elapsed {{seconds}}s",
+      "installAiCliPhasePreparing": "Preparing installation environment...",
+      "installAiCliPhaseCore": "Installing core CLIs (Claude/Codex/Gemini)...",
+      "installAiCliPhaseExtended": "Installing extended CLIs (Qwen/Amp/OpenCode/Kilo)...",
+      "installAiCliPhaseVerifying": "Verifying installation results...",
       "editor": {
         "formLabel": "Edit JSON",
         "agentLabel": "Agent",

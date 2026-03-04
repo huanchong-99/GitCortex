@@ -259,6 +259,17 @@
         "notFound": "未知",
         "notFoundTooltip": "我們無法驗證此代理是否已設定，但請繼續嘗試。"
       },
+      "installAiCli": "一鍵安裝 AI CLI",
+      "refreshAvailability": "重新整理可用性",
+      "installAiCliSuccess": "AI CLI 安裝完成。",
+      "installAiCliInstalledList": "\u5df2\u5b89\u88dd\u6210\u529f\uff1a{{names}}",
+      "installAiCliFailed": "AI CLI 安裝失敗。",
+      "installAiCliExitCode": "退出碼：{{code}}",
+      "installAiCliInProgress": "正在安裝 AI CLI，已耗時 {{seconds}} 秒",
+      "installAiCliPhasePreparing": "正在準備安裝環境...",
+      "installAiCliPhaseCore": "正在安裝核心 CLI（Claude/Codex/Gemini）...",
+      "installAiCliPhaseExtended": "正在安裝擴展 CLI（Qwen/Amp/OpenCode/Kilo）...",
+      "installAiCliPhaseVerifying": "正在校驗安裝結果...",
       "editor": {
         "formLabel": "編輯 JSON",
         "agentLabel": "代理",
