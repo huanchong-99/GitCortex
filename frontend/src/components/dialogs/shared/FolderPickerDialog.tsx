@@ -104,11 +104,28 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
       }
     };
 
+    const buildParentPath = (path: string): string => {
+      const trimmedPath = path.trim();
+      if (!trimmedPath) {
+        return '';
+      }
+
+      const separator = trimmedPath.includes('\\') ? '\\' : '/';
+      const withTrailingSeparator = /[\\/]$/.test(trimmedPath)
+        ? trimmedPath
+        : `${trimmedPath}${separator}`;
+
+      // Delegate cross-platform parent resolution to backend std::path canonicalization.
+      return `${withTrailingSeparator}..`;
+    };
+
     const handleParentDirectory = () => {
-      const parentPath = currentPath.split('/').slice(0, -1).join('/');
-      const newPath = parentPath || '/';
-      loadDirectory(newPath);
-      setManualPath(newPath);
+      const parentPath = buildParentPath(currentPath);
+      if (!parentPath) {
+        return;
+      }
+      loadDirectory(parentPath);
+      setManualPath(parentPath);
     };
 
     const handleHomeDirectory = () => {

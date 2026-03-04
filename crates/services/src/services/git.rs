@@ -161,7 +161,9 @@ impl GitService {
 
     /// Open the repository
     pub fn open_repo(&self, repo_path: &Path) -> Result<Repository, GitServiceError> {
-        Repository::open(repo_path).map_err(GitServiceError::from)
+        Repository::open(repo_path)
+            .or_else(|_| Repository::discover(repo_path))
+            .map_err(GitServiceError::from)
     }
 
     /// Ensure local (repo-scoped) identity exists for CLI commits.

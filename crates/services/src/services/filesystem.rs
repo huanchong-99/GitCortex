@@ -57,6 +57,7 @@ impl FilesystemService {
             allowed_roots.push(cwd);
         }
         allowed_roots.extend(Self::get_env_allowed_roots());
+        allowed_roots.extend(Self::get_windows_drive_roots(&allowed_roots));
         Self::new_with_roots(allowed_roots)
     }
 
@@ -72,6 +73,48 @@ impl FilesystemService {
             }
         }
         roots
+    }
+
+    #[cfg(windows)]
+    fn get_windows_drive_roots(existing_roots: &[PathBuf]) -> Vec<PathBuf> {
+        let mut drive_roots = Vec::new();
+
+        for root in existing_roots {
+            if let Some(drive_root) = Self::extract_windows_drive_root(root)
+                && !drive_roots.iter().any(|existing| existing == &drive_root)
+            {
+                drive_roots.push(drive_root);
+            }
+        }
+
+        // Include mounted common drive roots to support browsing from drive root.
+        for drive in 'C'..='Z' {
+            let candidate = PathBuf::from(format!("{drive}:\\"));
+            if candidate.is_dir() && !drive_roots.iter().any(|existing| existing == &candidate) {
+                drive_roots.push(candidate);
+            }
+        }
+
+        drive_roots
+    }
+
+    #[cfg(not(windows))]
+    fn get_windows_drive_roots(_existing_roots: &[PathBuf]) -> Vec<PathBuf> {
+        Vec::new()
+    }
+
+    #[cfg(windows)]
+    fn extract_windows_drive_root(path: &Path) -> Option<PathBuf> {
+        match path.components().next() {
+            Some(std::path::Component::Prefix(prefix)) => match prefix.kind() {
+                std::path::Prefix::Disk(drive) | std::path::Prefix::VerbatimDisk(drive) => {
+                    let drive_letter = char::from(drive).to_ascii_uppercase();
+                    Some(PathBuf::from(format!("{drive_letter}:\\")))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     pub fn new_with_roots(allowed_roots: Vec<PathBuf>) -> Self {
