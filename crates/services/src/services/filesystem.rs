@@ -18,6 +18,71 @@ pub struct FilesystemService {
     allowed_roots: Vec<PathBuf>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::FilesystemService;
+
+    #[test]
+    fn list_directory_prefers_workspace_root_when_allowed() {
+        let workspace = tempfile::tempdir().expect("workspace tempdir");
+        std::fs::create_dir_all(workspace.path().join("repo-a")).expect("create repo-a");
+
+        let service = FilesystemService::new_with_roots(vec![workspace.path().to_path_buf()]);
+
+        unsafe {
+            std::env::set_var(
+                "GITCORTEX_WORKSPACE_ROOT",
+                workspace.path().to_string_lossy().to_string(),
+            );
+        }
+
+        let result = service
+            .list_directory(None)
+            .expect("workspace root should be browsable");
+
+        let canonical_workspace =
+            std::fs::canonicalize(workspace.path()).expect("canonical workspace");
+        assert_eq!(
+            result.current_path,
+            canonical_workspace.to_string_lossy().to_string()
+        );
+
+        unsafe {
+            std::env::remove_var("GITCORTEX_WORKSPACE_ROOT");
+        }
+    }
+
+    #[test]
+    fn list_directory_falls_back_to_allowed_root_when_workspace_root_outside_boundary() {
+        let allowed = tempfile::tempdir().expect("allowed tempdir");
+        std::fs::create_dir_all(allowed.path().join("repo-b")).expect("create repo-b");
+
+        let outside = tempfile::tempdir().expect("outside tempdir");
+        let service = FilesystemService::new_with_roots(vec![allowed.path().to_path_buf()]);
+
+        unsafe {
+            std::env::set_var(
+                "GITCORTEX_WORKSPACE_ROOT",
+                outside.path().to_string_lossy().to_string(),
+            );
+        }
+
+        let result = service
+            .list_directory(None)
+            .expect("should fall back to allowed root");
+
+        let canonical_allowed = std::fs::canonicalize(allowed.path()).expect("canonical allowed");
+        assert_eq!(
+            result.current_path,
+            canonical_allowed.to_string_lossy().to_string()
+        );
+
+        unsafe {
+            std::env::remove_var("GITCORTEX_WORKSPACE_ROOT");
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum FilesystemError {
     #[error("Directory does not exist")]
@@ -193,7 +258,7 @@ impl FilesystemService {
 
         #[cfg(not(feature = "qa-mode"))]
         {
-            let base_path = path.map_or_else(Self::get_home_directory, PathBuf::from);
+            let base_path = path.map_or_else(|| self.default_browse_root(), PathBuf::from);
             Self::verify_directory(&base_path)?;
             let base_path = self.resolve_path(&base_path)?;
             self.list_git_repos_with_timeout(
@@ -400,6 +465,41 @@ impl FilesystemService {
             })
     }
 
+    fn default_browse_root(&self) -> PathBuf {
+        let mut preferred_paths: Vec<PathBuf> = Vec::new();
+
+        if let Ok(workspace_root) = std::env::var("GITCORTEX_WORKSPACE_ROOT") {
+            let trimmed = workspace_root.trim();
+            if !trimmed.is_empty() {
+                preferred_paths.push(PathBuf::from(trimmed));
+            }
+        }
+
+        preferred_paths.extend(Self::get_env_allowed_roots());
+
+        if let Ok(cwd) = std::env::current_dir() {
+            preferred_paths.push(cwd);
+        }
+
+        preferred_paths.push(Self::get_home_directory());
+
+        for candidate in preferred_paths {
+            if !candidate.exists() || !candidate.is_dir() {
+                continue;
+            }
+
+            if let Ok(resolved) = self.resolve_path(&candidate) {
+                return resolved;
+            }
+        }
+
+        self.allowed_roots
+            .iter()
+            .find(|path| path.exists() && path.is_dir())
+            .cloned()
+            .unwrap_or_else(Self::get_home_directory)
+    }
+
     fn verify_directory(path: &Path) -> Result<(), FilesystemError> {
         if !path.exists() {
             return Err(FilesystemError::DirectoryDoesNotExist);
@@ -441,7 +541,7 @@ impl FilesystemService {
         &self,
         path: Option<String>,
     ) -> Result<DirectoryListResponse, FilesystemError> {
-        let path = path.map_or_else(Self::get_home_directory, PathBuf::from);
+        let path = path.map_or_else(|| self.default_browse_root(), PathBuf::from);
         Self::verify_directory(&path)?;
         let path = self.resolve_path(&path)?;
 

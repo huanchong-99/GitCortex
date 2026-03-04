@@ -183,6 +183,88 @@ fn is_git_repo_via_cli(path: &Path) -> bool {
     }
 }
 
+fn git_current_branch_via_cli(path: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("branch")
+        .arg("--show-current")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if branch.is_empty() || branch == "HEAD" {
+        None
+    } else {
+        Some(branch)
+    }
+}
+
+fn git_uncommitted_change_count_via_cli(path: &Path) -> Option<usize> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("status")
+        .arg("--porcelain")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    Some(String::from_utf8_lossy(&output.stdout).lines().count())
+}
+
+fn git_remote_url_for_branch_via_cli(path: &Path, branch: &str) -> Option<String> {
+    let remote_config_key = format!("branch.{branch}.remote");
+    let remote_name_output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("config")
+        .arg("--get")
+        .arg(&remote_config_key)
+        .output()
+        .ok()?;
+
+    if !remote_name_output.status.success() {
+        return None;
+    }
+
+    let remote_name = String::from_utf8_lossy(&remote_name_output.stdout)
+        .trim()
+        .to_string();
+    if remote_name.is_empty() {
+        return None;
+    }
+
+    let remote_url_output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("remote")
+        .arg("get-url")
+        .arg(&remote_name)
+        .output()
+        .ok()?;
+
+    if !remote_url_output.status.success() {
+        return None;
+    }
+
+    let remote_url = String::from_utf8_lossy(&remote_url_output.stdout)
+        .trim()
+        .to_string();
+    if remote_url.is_empty() {
+        None
+    } else {
+        Some(remote_url)
+    }
+}
+
 #[derive(Debug, Deserialize, TS)]
 #[ts(export)]
 pub struct GitStatusRequest {
@@ -212,6 +294,13 @@ pub async fn git_status(
 
     if let Err(err) = git.open_repo(&repo_path) {
         if is_git_repo_via_cli(&repo_path) {
+            let current_branch = git_current_branch_via_cli(&repo_path);
+            let uncommitted_changes = git_uncommitted_change_count_via_cli(&repo_path);
+            let is_dirty = uncommitted_changes.unwrap_or(0) > 0;
+            let remote_url = current_branch
+                .as_deref()
+                .and_then(|branch| git_remote_url_for_branch_via_cli(&repo_path, branch));
+
             tracing::warn!(
                 repo_path = %repo_path.display(),
                 error = %err,
@@ -219,10 +308,10 @@ pub async fn git_status(
             );
             return Ok(ResponseJson(ApiResponse::success(GitStatusResponse {
                 is_git_repo: true,
-                is_dirty: false,
-                current_branch: None,
-                remote_url: None,
-                uncommitted_changes: None,
+                is_dirty,
+                current_branch,
+                remote_url,
+                uncommitted_changes,
             })));
         }
 
@@ -290,7 +379,8 @@ mod path_boundary_tests {
 
     use super::{
         canonicalize_with_existing_ancestor, ensure_path_within_allowed_roots,
-        get_env_allowed_roots, is_git_repo_via_cli, resolve_request_path,
+        get_env_allowed_roots, git_current_branch_via_cli, git_uncommitted_change_count_via_cli,
+        is_git_repo_via_cli, resolve_request_path,
     };
     use crate::error::ApiError;
 
@@ -429,5 +519,41 @@ mod path_boundary_tests {
             !is_git_repo_via_cli(dir.path()),
             "plain directory should not be treated as git repo"
         );
+    }
+
+    #[test]
+    fn cli_fallback_reads_current_branch() {
+        let repo_dir = tempdir().expect("failed to create repo dir");
+
+        let init_status = std::process::Command::new("git")
+            .arg("init")
+            .arg("-b")
+            .arg("main")
+            .arg(repo_dir.path())
+            .status()
+            .expect("git init should run");
+        assert!(init_status.success(), "git init should succeed");
+
+        let branch = git_current_branch_via_cli(repo_dir.path());
+        assert_eq!(branch.as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn cli_fallback_counts_uncommitted_changes() {
+        let repo_dir = tempdir().expect("failed to create repo dir");
+
+        let init_status = std::process::Command::new("git")
+            .arg("init")
+            .arg(repo_dir.path())
+            .status()
+            .expect("git init should run");
+        assert!(init_status.success(), "git init should succeed");
+
+        std::fs::write(repo_dir.path().join("new_file.txt"), "hello")
+            .expect("should write test file");
+
+        let change_count =
+            git_uncommitted_change_count_via_cli(repo_dir.path()).expect("status should be readable");
+        assert!(change_count >= 1, "should detect at least one uncommitted change");
     }
 }

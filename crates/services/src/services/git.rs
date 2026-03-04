@@ -1217,6 +1217,31 @@ impl GitService {
     }
 
     pub fn get_all_branches(&self, repo_path: &Path) -> Result<Vec<GitBranch>, git2::Error> {
+        match self.get_all_branches_libgit2(repo_path) {
+            Ok(branches) => Ok(branches),
+            Err(err) => match self.get_all_branches_via_cli(repo_path) {
+                Ok(branches) => {
+                    tracing::warn!(
+                        repo_path = %repo_path.display(),
+                        error = %err,
+                        "libgit2 get_all_branches failed; using git CLI fallback"
+                    );
+                    Ok(branches)
+                }
+                Err(cli_err) => {
+                    tracing::warn!(
+                        repo_path = %repo_path.display(),
+                        error = %err,
+                        cli_error = %cli_err,
+                        "failed to list branches via both libgit2 and git CLI"
+                    );
+                    Err(err)
+                }
+            },
+        }
+    }
+
+    fn get_all_branches_libgit2(&self, repo_path: &Path) -> Result<Vec<GitBranch>, git2::Error> {
         let repo = Repository::open(repo_path)?;
         let current_branch = self.get_current_branch(repo_path).unwrap_or_default();
         let mut branches = Vec::new();
@@ -1273,6 +1298,91 @@ impl GitService {
                 std::cmp::Ordering::Greater
             } else {
                 // Sort by most recent commit date (newest first)
+                b.last_commit_date.cmp(&a.last_commit_date)
+            }
+        });
+
+        Ok(branches)
+    }
+
+    fn get_all_branches_via_cli(&self, repo_path: &Path) -> Result<Vec<GitBranch>, GitCliError> {
+        let git = GitCli::new();
+        let current_branch = git
+            .git(repo_path, ["branch", "--show-current"])?
+            .trim()
+            .to_string();
+
+        let local_output = git.git(
+            repo_path,
+            [
+                "for-each-ref",
+                "refs/heads",
+                "--format=%(refname:short)%09%(committerdate:iso8601-strict)",
+            ],
+        )?;
+        let remote_output = git.git(
+            repo_path,
+            [
+                "for-each-ref",
+                "refs/remotes",
+                "--format=%(refname:short)%09%(committerdate:iso8601-strict)",
+            ],
+        )?;
+
+        let parse_date = |raw: Option<&str>| -> DateTime<Utc> {
+            raw.and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now)
+        };
+
+        let mut branches = Vec::new();
+
+        for line in local_output.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let mut parts = trimmed.splitn(2, '\t');
+            let Some(name) = parts.next().map(str::trim) else {
+                continue;
+            };
+            if name.is_empty() {
+                continue;
+            }
+            branches.push(GitBranch {
+                name: name.to_string(),
+                is_current: name == current_branch,
+                is_remote: false,
+                last_commit_date: parse_date(parts.next().map(str::trim)),
+            });
+        }
+
+        for line in remote_output.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let mut parts = trimmed.splitn(2, '\t');
+            let Some(name) = parts.next().map(str::trim) else {
+                continue;
+            };
+            if name.is_empty() || name.ends_with("/HEAD") || !name.contains('/') {
+                continue;
+            }
+            branches.push(GitBranch {
+                name: name.to_string(),
+                is_current: false,
+                is_remote: true,
+                last_commit_date: parse_date(parts.next().map(str::trim)),
+            });
+        }
+
+        branches.sort_by(|a, b| {
+            if a.is_current && !b.is_current {
+                std::cmp::Ordering::Less
+            } else if !a.is_current && b.is_current {
+                std::cmp::Ordering::Greater
+            } else {
                 b.last_commit_date.cmp(&a.last_commit_date)
             }
         });
