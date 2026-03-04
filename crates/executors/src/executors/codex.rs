@@ -36,7 +36,7 @@ use serde_json::Value;
 use strum_macros::AsRefStr;
 use tokio::process::Command;
 use ts_rs::TS;
-use workspace_utils::msg_store::MsgStore;
+use workspace_utils::{msg_store::MsgStore, shell::resolve_executable_path_blocking};
 
 use self::{
     client::{AppServerClient, LogWriter},
@@ -223,8 +223,9 @@ impl StandardCodingAgentExecutor for Codex {
 
         let installation_indicator_found =
             codex_home().is_some_and(|home| home.join("version.json").exists());
+        let binary_found = resolve_executable_path_blocking("codex").is_some();
 
-        if mcp_config_found || installation_indicator_found {
+        if mcp_config_found || installation_indicator_found || binary_found {
             AvailabilityInfo::InstallationFound
         } else {
             AvailabilityInfo::NotFound

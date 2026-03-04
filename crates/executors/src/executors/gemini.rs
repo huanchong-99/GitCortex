@@ -5,7 +5,7 @@ use derivative::Derivative;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
-use workspace_utils::msg_store::MsgStore;
+use workspace_utils::{msg_store::MsgStore, shell::resolve_executable_path_blocking};
 
 pub use super::acp::AcpAgentHarness;
 use crate::{
@@ -137,8 +137,9 @@ impl StandardCodingAgentExecutor for Gemini {
 
         let installation_indicator_found = dirs::home_dir()
             .is_some_and(|home| home.join(".gemini").join("installation_id").exists());
+        let binary_found = resolve_executable_path_blocking("gemini").is_some();
 
-        if mcp_config_found || installation_indicator_found {
+        if mcp_config_found || installation_indicator_found || binary_found {
             AvailabilityInfo::InstallationFound
         } else {
             AvailabilityInfo::NotFound

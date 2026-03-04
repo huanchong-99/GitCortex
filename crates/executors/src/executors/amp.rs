@@ -6,13 +6,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command};
 use ts_rs::TS;
-use workspace_utils::msg_store::MsgStore;
+use workspace_utils::{msg_store::MsgStore, shell::resolve_executable_path_blocking};
 
 use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides},
     env::ExecutionEnv,
     executors::{
-        AppendPrompt, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
+        AppendPrompt, AvailabilityInfo, ExecutorError, SpawnedChild, StandardCodingAgentExecutor,
         claude::{ClaudeLogProcessor, HistoryStrategy},
     },
     logs::{stderr_processor::normalize_stderr_logs, utils::EntryIndexProvider},
@@ -171,5 +171,16 @@ impl StandardCodingAgentExecutor for Amp {
     // MCP configuration methods
     fn default_mcp_config_path(&self) -> Option<std::path::PathBuf> {
         dirs::home_dir().map(|home| home.join(".config").join("amp").join("settings.json"))
+    }
+
+    fn get_availability_info(&self) -> AvailabilityInfo {
+        let config_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
+        let binary_found = resolve_executable_path_blocking("amp").is_some();
+
+        if config_found || binary_found {
+            AvailabilityInfo::InstallationFound
+        } else {
+            AvailabilityInfo::NotFound
+        }
     }
 }

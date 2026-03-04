@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncBufReadExt, process::Command};
 use ts_rs::TS;
-use workspace_utils::msg_store::MsgStore;
+use workspace_utils::{msg_store::MsgStore, shell::resolve_executable_path_blocking};
 
 use crate::{
     approvals::ExecutorApprovalService,
@@ -236,8 +236,9 @@ impl StandardCodingAgentExecutor for Opencode {
 
         let installation_indicator_found =
             dirs::config_dir().is_some_and(|config| config.join("opencode").exists());
+        let binary_found = resolve_executable_path_blocking("opencode").is_some();
 
-        if mcp_config_found || installation_indicator_found {
+        if mcp_config_found || installation_indicator_found || binary_found {
             AvailabilityInfo::InstallationFound
         } else {
             AvailabilityInfo::NotFound

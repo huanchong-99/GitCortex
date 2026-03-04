@@ -14,7 +14,7 @@ use tokio::process::Command;
 use ts_rs::TS;
 use workspace_utils::{
     approvals::ApprovalStatus, diff::create_unified_diff, log_msg::LogMsg, msg_store::MsgStore,
-    path::make_path_relative,
+    path::make_path_relative, shell::resolve_executable_path_blocking,
 };
 
 use self::{
@@ -214,6 +214,7 @@ impl StandardCodingAgentExecutor for ClaudeCode {
 
     fn get_availability_info(&self) -> AvailabilityInfo {
         let auth_file_path = dirs::home_dir().map(|home| home.join(".claude.json"));
+        let binary_found = resolve_executable_path_blocking("claude").is_some();
 
         if let Some(path) = auth_file_path
             && let Some(timestamp) = std::fs::metadata(&path)
@@ -226,7 +227,14 @@ impl StandardCodingAgentExecutor for ClaudeCode {
                 last_auth_timestamp: timestamp,
             };
         }
-        AvailabilityInfo::NotFound
+
+        let config_found = self.default_mcp_config_path().is_some_and(|p| p.exists());
+
+        if binary_found || config_found {
+            AvailabilityInfo::InstallationFound
+        } else {
+            AvailabilityInfo::NotFound
+        }
     }
 }
 
