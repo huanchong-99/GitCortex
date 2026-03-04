@@ -1,6 +1,7 @@
 use std::{
     ffi::OsString,
     path::{Component, Path, PathBuf},
+    process::Command,
 };
 
 use axum::{Router, extract::State, response::Json as ResponseJson, routing::post};
@@ -54,6 +55,20 @@ fn user_home_directory() -> Option<PathBuf> {
     }
 }
 
+fn get_env_allowed_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(raw) = std::env::var("GITCORTEX_ALLOWED_ROOTS") {
+        for item in raw.split([',', ';']) {
+            let trimmed = item.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            roots.push(PathBuf::from(trimmed));
+        }
+    }
+    roots
+}
+
 fn allowed_git_roots() -> Result<Vec<PathBuf>, ApiError> {
     let mut roots = Vec::new();
 
@@ -61,6 +76,7 @@ fn allowed_git_roots() -> Result<Vec<PathBuf>, ApiError> {
         roots.push(home);
     }
     roots.push(std::env::current_dir()?);
+    roots.extend(get_env_allowed_roots());
 
     #[cfg(windows)]
     {
@@ -137,7 +153,7 @@ fn normalize_allowed_roots(allowed_roots: &[PathBuf]) -> Vec<PathBuf> {
 fn ensure_path_within_allowed_roots(
     path: &Path,
     allowed_roots: &[PathBuf],
-) -> Result<(), ApiError> {
+) -> Result<PathBuf, ApiError> {
     let canonical_path = canonicalize_with_existing_ancestor(path)?;
     let normalized_roots = normalize_allowed_roots(allowed_roots);
     let in_allowed_roots = normalized_roots
@@ -145,9 +161,25 @@ fn ensure_path_within_allowed_roots(
         .any(|root| canonical_path.starts_with(root));
 
     if in_allowed_roots {
-        Ok(())
+        Ok(canonical_path)
     } else {
         Err(ApiError::BadRequest("Path is not allowed".to_string()))
+    }
+}
+
+fn is_git_repo_via_cli(path: &Path) -> bool {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("rev-parse")
+        .arg("--is-inside-work-tree")
+        .output();
+
+    match output {
+        Ok(result) if result.status.success() => {
+            String::from_utf8_lossy(&result.stdout).trim() == "true"
+        }
+        _ => false,
     }
 }
 
@@ -172,13 +204,28 @@ pub async fn git_status(
     State(deployment): State<DeploymentImpl>,
     ResponseJson(payload): ResponseJson<GitStatusRequest>,
 ) -> Result<ResponseJson<ApiResponse<GitStatusResponse>>, ApiError> {
-    let repo_path = resolve_request_path(&payload.path)?;
+    let requested_path = resolve_request_path(&payload.path)?;
     let allowed_roots = allowed_git_roots()?;
-    ensure_path_within_allowed_roots(&repo_path, &allowed_roots)?;
+    let repo_path = ensure_path_within_allowed_roots(&requested_path, &allowed_roots)?;
 
     let git = deployment.git();
 
-    if git.open_repo(&repo_path).is_err() {
+    if let Err(err) = git.open_repo(&repo_path) {
+        if is_git_repo_via_cli(&repo_path) {
+            tracing::warn!(
+                repo_path = %repo_path.display(),
+                error = %err,
+                "libgit2 open_repo failed but git CLI confirms repository; using fallback status"
+            );
+            return Ok(ResponseJson(ApiResponse::success(GitStatusResponse {
+                is_git_repo: true,
+                is_dirty: false,
+                current_branch: None,
+                remote_url: None,
+                uncommitted_changes: None,
+            })));
+        }
+
         return Ok(ResponseJson(ApiResponse::success(GitStatusResponse {
             is_git_repo: false,
             is_dirty: false,
@@ -219,9 +266,9 @@ pub async fn git_init(
     State(deployment): State<DeploymentImpl>,
     ResponseJson(payload): ResponseJson<GitInitRequest>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    let repo_path = resolve_request_path(&payload.path)?;
+    let requested_path = resolve_request_path(&payload.path)?;
     let allowed_roots = allowed_git_roots()?;
-    ensure_path_within_allowed_roots(&repo_path, &allowed_roots)?;
+    let repo_path = ensure_path_within_allowed_roots(&requested_path, &allowed_roots)?;
 
     deployment
         .git()
@@ -242,7 +289,8 @@ mod path_boundary_tests {
     use tempfile::tempdir;
 
     use super::{
-        canonicalize_with_existing_ancestor, ensure_path_within_allowed_roots, resolve_request_path,
+        canonicalize_with_existing_ancestor, ensure_path_within_allowed_roots,
+        get_env_allowed_roots, is_git_repo_via_cli, resolve_request_path,
     };
     use crate::error::ApiError;
 
@@ -334,5 +382,52 @@ mod path_boundary_tests {
             &[PathBuf::from(allowed_root.path())],
         );
         assert!(matches!(result, Err(ApiError::BadRequest(_))));
+    }
+
+    #[test]
+    fn parses_allowed_roots_from_environment() {
+        unsafe {
+            std::env::set_var(
+                "GITCORTEX_ALLOWED_ROOTS",
+                "/workspace,/var/lib/gitcortex; /tmp/test-root ",
+            );
+        }
+
+        let roots = get_env_allowed_roots();
+
+        assert_eq!(roots.len(), 3);
+        assert_eq!(roots[0], PathBuf::from("/workspace"));
+        assert_eq!(roots[1], PathBuf::from("/var/lib/gitcortex"));
+        assert_eq!(roots[2], PathBuf::from("/tmp/test-root"));
+
+        unsafe {
+            std::env::remove_var("GITCORTEX_ALLOWED_ROOTS");
+        }
+    }
+
+    #[test]
+    fn detects_git_repo_with_cli_fallback() {
+        let repo_dir = tempdir().expect("failed to create repo dir");
+
+        let status = std::process::Command::new("git")
+            .arg("init")
+            .arg(repo_dir.path())
+            .status()
+            .expect("git init should run");
+        assert!(status.success(), "git init should succeed");
+
+        assert!(
+            is_git_repo_via_cli(repo_dir.path()),
+            "cli fallback should detect git repo"
+        );
+    }
+
+    #[test]
+    fn cli_fallback_returns_false_for_non_repo() {
+        let dir = tempdir().expect("failed to create dir");
+        assert!(
+            !is_git_repo_via_cli(dir.path()),
+            "plain directory should not be treated as git repo"
+        );
     }
 }

@@ -25,4 +25,43 @@ echo "git: $(git --version)"
 echo "Asset dir: ${GITCORTEX_ASSET_DIR}"
 echo "Temp dir: ${GITCORTEX_TEMP_DIR}"
 
+configure_git_safe_directories() {
+    local roots_raw roots_normalized
+    roots_raw="${GITCORTEX_ALLOWED_ROOTS:-}"
+    if [[ -n "${GITCORTEX_WORKSPACE_ROOT:-}" ]]; then
+        if [[ -n "${roots_raw}" ]]; then
+            roots_raw="${roots_raw},${GITCORTEX_WORKSPACE_ROOT}"
+        else
+            roots_raw="${GITCORTEX_WORKSPACE_ROOT}"
+        fi
+    fi
+
+    if [[ -z "${roots_raw}" ]]; then
+        return
+    fi
+
+    # Normalize separators and configure both root and root/* for nested repositories.
+    roots_normalized="${roots_raw//;/,}"
+    IFS=',' read -r -a root_items <<< "${roots_normalized}"
+
+    for item in "${root_items[@]}"; do
+        local root
+        root="$(echo "${item}" | xargs)"
+        if [[ -z "${root}" ]]; then
+            continue
+        fi
+
+        for safe_path in "${root}" "${root%/}/*"; do
+            if ! git config --global --get-all safe.directory | grep -Fqx "${safe_path}"; then
+                git config --global --add safe.directory "${safe_path}"
+            fi
+        done
+    done
+
+    echo "Configured git safe.directory entries:"
+    git config --global --get-all safe.directory | sed 's/^/  - /'
+}
+
+configure_git_safe_directories
+
 exec "$@"
