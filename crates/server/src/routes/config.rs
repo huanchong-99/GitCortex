@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, process::Stdio, time::Duration};
+use std::{
+    collections::HashMap,
+    path::{Path as StdPath, PathBuf},
+    process::Stdio,
+    time::Duration,
+};
 
 use axum::{
     Json, Router,
@@ -52,6 +57,8 @@ pub struct Environment {
     pub os_version: String,
     pub os_architecture: String,
     pub bitness: String,
+    pub is_containerized: bool,
+    pub workspace_root_hint: Option<String>,
 }
 
 impl Default for Environment {
@@ -63,11 +70,18 @@ impl Default for Environment {
 impl Environment {
     pub fn new() -> Self {
         let info = os_info::get();
+        let workspace_root_hint = std::env::var("GITCORTEX_WORKSPACE_ROOT")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+
         Environment {
             os_type: info.os_type().to_string(),
             os_version: info.version().to_string(),
             os_architecture: info.architecture().unwrap_or("unknown").to_string(),
             bitness: info.bitness().to_string(),
+            is_containerized: StdPath::new("/.dockerenv").exists(),
+            workspace_root_hint,
         }
     }
 }
@@ -637,39 +651,38 @@ async fn install_ai_clis(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let install_result = match tokio::time::timeout(Duration::from_secs(1800), command.output())
-        .await
-    {
-        Ok(Ok(output)) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let combined = if stderr.trim().is_empty() {
-                stdout.to_string()
-            } else if stdout.trim().is_empty() {
-                stderr.to_string()
-            } else {
-                format!("{stdout}\n{stderr}")
-            };
-            InstallAiClisResponse {
-                installed: output.status.success(),
-                exit_code: output.status.code().unwrap_or(-1),
-                script_path: script_path.display().to_string(),
-                output: truncate_output(&combined, 16_000),
+    let install_result =
+        match tokio::time::timeout(Duration::from_secs(1800), command.output()).await {
+            Ok(Ok(output)) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let combined = if stderr.trim().is_empty() {
+                    stdout.to_string()
+                } else if stdout.trim().is_empty() {
+                    stderr.to_string()
+                } else {
+                    format!("{stdout}\n{stderr}")
+                };
+                InstallAiClisResponse {
+                    installed: output.status.success(),
+                    exit_code: output.status.code().unwrap_or(-1),
+                    script_path: script_path.display().to_string(),
+                    output: truncate_output(&combined, 16_000),
+                }
             }
-        }
-        Ok(Err(err)) => InstallAiClisResponse {
-            installed: false,
-            exit_code: -1,
-            script_path: script_path.display().to_string(),
-            output: format!("Failed to execute install script: {err}"),
-        },
-        Err(_) => InstallAiClisResponse {
-            installed: false,
-            exit_code: -1,
-            script_path: script_path.display().to_string(),
-            output: "AI CLI installation timed out after 30 minutes".to_string(),
-        },
-    };
+            Ok(Err(err)) => InstallAiClisResponse {
+                installed: false,
+                exit_code: -1,
+                script_path: script_path.display().to_string(),
+                output: format!("Failed to execute install script: {err}"),
+            },
+            Err(_) => InstallAiClisResponse {
+                installed: false,
+                exit_code: -1,
+                script_path: script_path.display().to_string(),
+                output: "AI CLI installation timed out after 30 minutes".to_string(),
+            },
+        };
 
     Ok(ResponseJson(ApiResponse::success(install_result)))
 }

@@ -71,6 +71,7 @@
     "fieldLabel": "Working directory",
     "placeholder": "Enter a project path",
     "browse": "Browse",
+    "containerHint": "Docker mode detected. Choose a repository inside {{path}} or another mounted workspace path.",
     "refreshLabel": "Refresh git status",
     "branchLabel": "Branch",
     "remoteLabel": "Remote",

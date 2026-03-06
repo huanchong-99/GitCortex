@@ -70,6 +70,7 @@
     "fieldLabel": "工作目录",
     "placeholder": "输入项目路径",
     "browse": "浏览",
+    "containerHint": "检测到 Docker 运行环境，请优先选择 {{path}} 或其他已挂载到容器内的仓库路径。",
     "refreshLabel": "刷新 Git 状态",
     "branchLabel": "分支",
     "remoteLabel": "远程",

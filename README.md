@@ -351,6 +351,8 @@ One-click installer (recommended on Windows):
 powershell -ExecutionPolicy Bypass -File .\scripts\docker\install-docker.ps1
 ```
 
+If `docker/compose/.env` already exists, the installer can now reuse it and switch into update flow automatically.
+
 The script will interactively ask:
 - Which host folder to mount into container `/workspace`
 - Whether to install AI CLIs during build (`INSTALL_AI_CLIS`)
@@ -402,6 +404,25 @@ Verify:
 ```bash
 curl http://localhost:23456/readyz
 docker compose -f docker/compose/docker-compose.yml ps
+```
+
+Docker/runtime path note:
+- In Docker mode, workflow repo browsing now prefers `GITCORTEX_WORKSPACE_ROOT` (default `/workspace`).
+- In direct local mode, the same picker falls back to the backend-selected local browse root instead of assuming Docker-only paths exist.
+
+Update an existing Docker deployment:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker\update-docker.ps1 -PullLatest
+```
+
+Manual update flow:
+
+```bash
+git pull --ff-only
+docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env build --pull
+docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env up -d --force-recreate --remove-orphans --no-build
+curl http://localhost:23456/readyz
 ```
 
 For detailed operations, backup, and troubleshooting, see:

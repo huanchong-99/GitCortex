@@ -4,6 +4,33 @@ import { Step0Project } from './Step0Project';
 import type { ProjectConfig } from '../types';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
+const environmentMock = vi.hoisted(() => ({
+  value: {
+    os_type: 'Windows',
+    os_version: '11',
+    os_architecture: 'x86_64',
+    bitness: '64',
+    is_containerized: false,
+    workspace_root_hint: null as string | null,
+  },
+}));
+
+const folderPickerMock = vi.hoisted(() => ({
+  show: vi.fn(),
+}));
+
+vi.mock('@/components/ConfigProvider', () => ({
+  useUserSystem: () => ({
+    environment: environmentMock.value,
+  }),
+}));
+
+vi.mock('@/components/dialogs/shared/FolderPickerDialog', () => ({
+  FolderPickerDialog: {
+    show: folderPickerMock.show,
+  },
+}));
+
 describe('Step0Project', () => {
   const mockOnChange = vi.fn<(updates: Partial<ProjectConfig>) => void>();
 
@@ -18,6 +45,15 @@ describe('Step0Project', () => {
   beforeEach(() => {
     mockOnChange.mockClear();
     void setTestLanguage();
+    environmentMock.value = {
+      os_type: 'Windows',
+      os_version: '11',
+      os_architecture: 'x86_64',
+      bitness: '64',
+      is_containerized: false,
+      workspace_root_hint: null,
+    };
+    folderPickerMock.show.mockResolvedValue(null);
     globalThis.fetch = vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -36,7 +72,9 @@ describe('Step0Project', () => {
     );
 
     expect(screen.getByText(i18n.t('workflow:step0.fieldLabel'))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t('workflow:step0.placeholder'))).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(i18n.t('workflow:step0.placeholder'))
+    ).toBeInTheDocument();
     expect(screen.getByText(i18n.t('workflow:step0.browse'))).toBeInTheDocument();
   });
 
@@ -52,6 +90,74 @@ describe('Step0Project', () => {
     expect(
       screen.getByText(i18n.t('workflow:validation.project.workingDirectoryRequired'))
     ).toBeInTheDocument();
+  });
+
+  it('should show Docker workspace hint when running in a container', () => {
+    environmentMock.value = {
+      ...environmentMock.value,
+      is_containerized: true,
+      workspace_root_hint: '/workspace',
+    };
+
+    renderWithI18n(
+      <Step0Project
+        config={defaultConfig}
+        onChange={mockOnChange}
+        errors={{}}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        i18n.t('workflow:step0.containerHint', { path: '/workspace' })
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('should use the container workspace hint as the folder picker default', async () => {
+    environmentMock.value = {
+      ...environmentMock.value,
+      is_containerized: true,
+      workspace_root_hint: '/workspace',
+    };
+
+    renderWithI18n(
+      <Step0Project
+        config={defaultConfig}
+        onChange={mockOnChange}
+        errors={{}}
+      />
+    );
+
+    fireEvent.click(screen.getByText(i18n.t('workflow:step0.browse')));
+
+    await waitFor(() => {
+      expect(folderPickerMock.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          value: '/workspace',
+        })
+      );
+    });
+  });
+
+  it('should not hardcode a Docker path when running outside a container', async () => {
+    renderWithI18n(
+      <Step0Project
+        config={defaultConfig}
+        onChange={mockOnChange}
+        errors={{}}
+      />
+    );
+
+    fireEvent.click(screen.getByText(i18n.t('workflow:step0.browse')));
+
+    await waitFor(() => {
+      expect(folderPickerMock.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          value: '',
+        })
+      );
+    });
   });
 
   it('should display git repo status when directory is selected', () => {

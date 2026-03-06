@@ -1,4 +1,4 @@
-﻿# GitCortex Docker Deployment Guide
+# GitCortex Docker Deployment Guide
 
 ## Quick Start
 
@@ -10,6 +10,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\docker\install-docker.ps1
 
 The installer asks where to mount host files into `/workspace`, generates `docker/compose/.env`, validates compose, builds, starts, and checks readiness.
 It also supports disabling starter project bootstrap and cleaning old data volume before startup.
+If `docker/compose/.env` already exists, the installer can now switch directly into update flow and reuse the existing deployment settings.
 
 Manual flow:
 
@@ -34,6 +35,36 @@ Access: http://localhost:23456
   - named volume mounted at `/var/lib/gitcortex`
   - only the host path you map to `/workspace` (`HOST_WORKSPACE_ROOT`)
 - To expand accessible host files, change `HOST_WORKSPACE_ROOT` and recreate containers.
+
+## Runtime Path Behavior
+
+- GitCortex now distinguishes containerized runtime from direct host runtime.
+- In Docker mode, repo browsing prefers `GITCORTEX_WORKSPACE_ROOT` (default `/workspace`) so the workflow wizard starts from the mounted workspace instead of a host-only default path.
+- In direct local mode, the same picker falls back to the backend-selected local browse root instead of assuming Docker paths exist.
+
+## Update Existing Deployment
+
+Recommended Windows update flow:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker\update-docker.ps1 -PullLatest
+```
+
+What it does:
+- optionally runs `git pull --ff-only`
+- validates `docker/compose/.env`
+- rebuilds the image
+- recreates containers
+- waits for `/readyz`
+
+Manual cross-platform update flow:
+
+```bash
+git pull --ff-only
+docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env build --pull
+docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env up -d --force-recreate --remove-orphans --no-build
+curl http://localhost:23456/readyz
+```
 
 ## Environment Variables
 
@@ -80,6 +111,9 @@ docker compose -f docker/compose/docker-compose.yml restart
 
 # Rebuild after code changes
 docker compose -f docker/compose/docker-compose.yml up -d --build
+
+# Update an existing deployment using the current .env
+powershell -ExecutionPolicy Bypass -File .\scripts\docker\update-docker.ps1 -PullLatest
 
 # Clean old data volume (destructive)
 docker compose -f docker/compose/docker-compose.yml down -v --remove-orphans

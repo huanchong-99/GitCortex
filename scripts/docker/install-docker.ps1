@@ -1,4 +1,6 @@
-﻿param(
+param(
+    [ValidateSet("install", "update")]
+    [string]$Mode = "",
     [string]$HostWorkspaceRoot,
     [string]$Port = "23456",
     [string]$RustLog = "info",
@@ -13,6 +15,9 @@
     [switch]$ResetDataVolume,
     [switch]$NonInteractive,
     [switch]$Force,
+    [switch]$PullLatest,
+    [switch]$PullBaseImages,
+    [switch]$AllowDirty,
     [switch]$EnableAutoSetupProjects,
     [ValidateSet("zh", "en")]
     [string]$Lang = ""
@@ -40,6 +45,7 @@ $script:Messages = @{
         ERR_HOST_PATH_REQUIRED = "没有可用的主机工作区路径，安装终止。"
         ERR_KEY_LEN = "GITCORTEX_ENCRYPTION_KEY 必须恰好 32 个字符。"
         ERR_ENV_EXISTS = ".env 已存在于 {0}。如需覆盖，请加 -Force。"
+        ERR_UPDATE_ENV_MISSING = "更新模式需要现有的 .env 文件，但未找到: {0}"
         ERR_INSTALL_CANCELLED = "用户取消安装。"
         ERR_COMPOSE_CONFIG = "docker compose 配置校验失败。"
         ERR_BUILD_FAILED = "docker compose build 失败。"
@@ -68,6 +74,7 @@ $script:Messages = @{
         PROMPT_SET_GOOGLE = "现在设置 GOOGLE_API_KEY"
         PROMPT_CREATE_MISSING_PATH = "目录不存在，是否立即创建"
         PROMPT_OVERWRITE_ENV = ".env 已存在，是否覆盖"
+        PROMPT_RUN_UPDATE_FLOW = "检测到已有 Docker 配置，是否改为执行更新流程"
 
         INFO_KEY_GENERATED = "已生成加密密钥。"
         INFO_KEY_GENERATED_NON_INTERACTIVE = "非交互模式：已自动生成 32 位加密密钥。"
@@ -79,6 +86,8 @@ $script:Messages = @{
         INFO_RESETTING_DATA = "正在清理旧容器和数据卷..."
         INFO_CHECKING_READY = "正在检查服务就绪: {0}"
         INFO_ENV_REUSED = "保留已有配置文件: {0}"
+        INFO_EXISTING_ENV = "检测到现有 Docker 配置文件: {0}"
+        INFO_HANDOFF_UPDATE = "将复用当前 Docker 配置并切换到更新流程..."
 
         OK_ENV_WRITTEN = "已写入配置文件: {0}"
         OK_COMPOSE_VALID = "Compose 配置校验通过。"
@@ -92,6 +101,7 @@ $script:Messages = @{
 
         OPEN_URL = "访问地址: http://localhost:{0}"
         USEFUL_COMMANDS = "常用命令："
+        UPDATE_COMMAND = "后续更新命令："
     }
     en = @{
         YESNO_INVALID = "Please answer y or n."
@@ -104,6 +114,7 @@ $script:Messages = @{
         ERR_HOST_PATH_REQUIRED = "Cannot continue without host workspace path."
         ERR_KEY_LEN = "GITCORTEX_ENCRYPTION_KEY must be exactly 32 chars."
         ERR_ENV_EXISTS = ".env already exists at {0}. Re-run with -Force to overwrite."
+        ERR_UPDATE_ENV_MISSING = "Update mode requires an existing .env file, but none was found: {0}"
         ERR_INSTALL_CANCELLED = "Installation cancelled by user."
         ERR_COMPOSE_CONFIG = "docker compose config validation failed."
         ERR_BUILD_FAILED = "docker compose build failed."
@@ -132,6 +143,7 @@ $script:Messages = @{
         PROMPT_SET_GOOGLE = "Set GOOGLE_API_KEY now"
         PROMPT_CREATE_MISSING_PATH = "Path does not exist. Create it now"
         PROMPT_OVERWRITE_ENV = ".env already exists. Overwrite it"
+        PROMPT_RUN_UPDATE_FLOW = "Existing Docker config detected. Switch to update flow instead"
 
         INFO_KEY_GENERATED = "Encryption key generated."
         INFO_KEY_GENERATED_NON_INTERACTIVE = "Non-interactive mode: generated 32-char encryption key."
@@ -143,6 +155,8 @@ $script:Messages = @{
         INFO_RESETTING_DATA = "Removing existing containers and data volume..."
         INFO_CHECKING_READY = "Checking readiness: {0}"
         INFO_ENV_REUSED = "Keeping existing config file: {0}"
+        INFO_EXISTING_ENV = "Detected existing Docker config file: {0}"
+        INFO_HANDOFF_UPDATE = "Reusing the current Docker config and switching to update flow..."
 
         OK_ENV_WRITTEN = "Wrote config file: {0}"
         OK_COMPOSE_VALID = "Compose configuration is valid."
@@ -156,6 +170,7 @@ $script:Messages = @{
 
         OPEN_URL = "Open: http://localhost:{0}"
         USEFUL_COMMANDS = "Useful commands:"
+        UPDATE_COMMAND = "Next update command:"
     }
 }
 
@@ -316,6 +331,7 @@ $repoRoot = (Resolve-Path (Join-Path $scriptDir "..\..")).Path
 $composeDir = Join-Path $repoRoot "docker\compose"
 $composeFile = Join-Path $composeDir "docker-compose.yml"
 $envFile = Join-Path $composeDir ".env"
+$updateScript = Join-Path $scriptDir "update-docker.ps1"
 $workspaceMount = "/workspace"
 $dataRoot = "/var/lib/gitcortex"
 
@@ -329,6 +345,8 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw (T "ERR_DOCKER_NOT_FOUND")
 }
 
+$envExists = Test-Path -LiteralPath $envFile
+
 Write-Host ""
 Write-Host (T "TITLE") -ForegroundColor Magenta
 Write-Host ""
@@ -337,6 +355,61 @@ Write-Host (T "ISOLATION_1")
 Write-Host (Tf "ISOLATION_2" @($workspaceMount))
 Write-Host (T "ISOLATION_3")
 Write-Host ""
+
+if ($envExists) {
+    Write-Info (Tf "INFO_EXISTING_ENV" @($envFile))
+}
+
+if ([string]::IsNullOrWhiteSpace($Mode)) {
+    if ($envExists) {
+        if ($NonInteractive) {
+            $Mode = "update"
+        }
+        else {
+            $Mode = if (Read-YesNo (T "PROMPT_RUN_UPDATE_FLOW") $true) {
+                "update"
+            }
+            else {
+                "install"
+            }
+        }
+    }
+    else {
+        $Mode = "install"
+    }
+}
+
+if ($Mode -eq "update") {
+    if (-not $envExists) {
+        throw (Tf "ERR_UPDATE_ENV_MISSING" @($envFile))
+    }
+
+    Write-Info (T "INFO_HANDOFF_UPDATE")
+    $updateArgs = @(
+        "-ComposeFile", $composeFile,
+        "-EnvFile", $envFile,
+        "-Lang", $script:CurrentLang
+    )
+
+    if ($PSBoundParameters.ContainsKey("Port") -and -not [string]::IsNullOrWhiteSpace($Port)) {
+        $updateArgs += @("-Port", $Port)
+    }
+    if ($PullLatest) {
+        $updateArgs += "-PullLatest"
+    }
+    if ($PullBaseImages) {
+        $updateArgs += "-PullBaseImages"
+    }
+    if ($SkipBuild) {
+        $updateArgs += "-SkipBuild"
+    }
+    if ($AllowDirty) {
+        $updateArgs += "-AllowDirty"
+    }
+
+    & $updateScript @updateArgs
+    exit $LASTEXITCODE
+}
 
 if ([string]::IsNullOrWhiteSpace($HostWorkspaceRoot)) {
     $HostWorkspaceRoot = $repoRoot
@@ -515,3 +588,5 @@ Write-Host ""
 Write-Host (T "USEFUL_COMMANDS")
 Write-Host "  docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env ps"
 Write-Host "  docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env logs -f"
+Write-Host (T "UPDATE_COMMAND")
+Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\docker\update-docker.ps1 -PullLatest"

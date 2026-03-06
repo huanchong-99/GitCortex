@@ -216,7 +216,7 @@ export type UserSystemInfo = { config: Config, analytics_user_id: string, login_
  */
 capabilities: { [key in string]?: Array<BaseAgentCapability> }, remote_features_enabled: boolean, executors: { [key in BaseCodingAgent]?: ExecutorConfig }, };
 
-export type Environment = { os_type: string, os_version: string, os_architecture: string, bitness: string, };
+export type Environment = { os_type: string, os_version: string, os_architecture: string, bitness: string, is_containerized: boolean, workspace_root_hint: string | null, };
 
 export type McpServerQuery = { executor: BaseCodingAgent, };
 

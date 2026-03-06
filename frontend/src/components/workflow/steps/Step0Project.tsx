@@ -7,6 +7,7 @@ import type { ProjectConfig, GitStatus } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useErrorNotification } from '@/hooks/useErrorNotification';
 import { FolderPickerDialog } from '@/components/dialogs/shared/FolderPickerDialog';
+import { useUserSystem } from '@/components/ConfigProvider';
 
 interface Step0ProjectProps {
   config: ProjectConfig;
@@ -55,13 +56,18 @@ export const Step0Project: React.FC<Step0ProjectProps> = ({
 }) => {
   const { t } = useTranslation(['workflow', 'common']);
   const { notifyError } = useErrorNotification({ onError, context: 'Step0Project' });
+  const { environment } = useUserSystem();
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const folderPickerInitialPath =
+    config.workingDirectory ||
+    (environment?.is_containerized ? environment.workspace_root_hint ?? '' : '');
 
   const handleSelectFolder = async () => {
     try {
       const selectedPath = await FolderPickerDialog.show({
-        value: config.workingDirectory || '/workspace',
+        value: folderPickerInitialPath,
         title: t('common:dialogs.selectGitRepository', {
           defaultValue: 'Select Git Repository',
         }),
@@ -168,6 +174,13 @@ export const Step0Project: React.FC<Step0ProjectProps> = ({
           <div className="flex items-center gap-half text-sm text-error mt-half">
             <XCircle className="size-icon-xs" />
             <span>{apiError}</span>
+          </div>
+        )}
+        {environment?.is_containerized && environment.workspace_root_hint && (
+          <div className="mt-half text-xs text-low">
+            {t('workflow:step0.containerHint', {
+              path: environment.workspace_root_hint,
+            })}
           </div>
         )}
       </Field>

@@ -351,6 +351,8 @@ Windows 推荐使用一键安装脚本：
 powershell -ExecutionPolicy Bypass -File .\scripts\docker\install-docker.ps1
 ```
 
+如果 `docker/compose/.env` 已存在，安装脚本现在可以直接复用现有配置并自动切换到更新流程。
+
 脚本会交互式询问：
 - 挂载到容器 `/workspace` 的主机目录
 - 是否在构建阶段安装 AI CLI（`INSTALL_AI_CLIS`）
@@ -402,6 +404,25 @@ docker compose -f docker/compose/docker-compose.yml up -d
 ```bash
 curl http://localhost:23456/readyz
 docker compose -f docker/compose/docker-compose.yml ps
+```
+
+Docker / 本地运行态说明：
+- Docker 模式下，工作流目录浏览会优先从 `GITCORTEX_WORKSPACE_ROOT`（默认 `/workspace`）开始。
+- 直接本地运行时，目录选择器会回退到后端判定的本地可浏览根目录，而不再假定 Docker 路径存在。
+
+更新现有 Docker 部署：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\docker\update-docker.ps1 -PullLatest
+```
+
+手动更新流程：
+
+```bash
+git pull --ff-only
+docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env build --pull
+docker compose -f docker/compose/docker-compose.yml --env-file docker/compose/.env up -d --force-recreate --remove-orphans --no-build
+curl http://localhost:23456/readyz
 ```
 
 详细部署、备份与排障文档见：
