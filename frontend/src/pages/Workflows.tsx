@@ -426,6 +426,117 @@ function mapOrchestratorMessageRole(
   return role;
 }
 
+function getOrchestratorChatHint({
+  hasConfiguredModels,
+  orchestratorEnabled,
+  isRunning,
+  t,
+}: Readonly<{
+  hasConfiguredModels: boolean;
+  orchestratorEnabled: boolean;
+  isRunning: boolean;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}>): string | null {
+  if (hasConfiguredModels === false) {
+    return t('management.orchestratorChat.noModels', {
+      defaultValue:
+        'You must configure at least one AI model before using orchestrator chat.',
+    });
+  }
+
+  if (orchestratorEnabled === false) {
+    return t('management.orchestratorChat.disabled', {
+      defaultValue: 'Current workflow does not have orchestrator enabled.',
+    });
+  }
+
+  if (isRunning === false) {
+    return t('management.orchestratorChat.notRunning', {
+      defaultValue: 'Only running workflows support orchestrator chat.',
+    });
+  }
+
+  return null;
+}
+
+function getOrchestratorMessageBubbleClass(
+  role: OrchestratorChatMessage['role']
+): string {
+  switch (role) {
+    case 'assistant':
+      return 'border-blue-200/60 bg-blue-50/40';
+    case 'user':
+      return 'border-border/60 bg-panel';
+    case 'tool-summary':
+      return 'border-amber-300/60 bg-amber-50/40';
+    default:
+      return 'border-zinc-300/60 bg-zinc-50/60';
+  }
+}
+
+function renderOrchestratorConversationContent({
+  canSendMessage,
+  isLoading,
+  error,
+  visibleMessages,
+  t,
+}: Readonly<{
+  canSendMessage: boolean;
+  isLoading: boolean;
+  error: Error | null;
+  visibleMessages: OrchestratorChatMessage[];
+  t: (key: string, options?: Record<string, unknown>) => string;
+}>): ReactNode {
+  if (canSendMessage === false) {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <p className="text-xs text-low">
+        {t('management.orchestratorChat.loading', {
+          defaultValue: 'Loading conversation...',
+        })}
+      </p>
+    );
+  }
+
+  if (error) {
+    return <p className="text-xs text-error">{error.message}</p>;
+  }
+
+  if (visibleMessages.length === 0) {
+    return (
+      <p className="text-xs text-low">
+        {t('management.orchestratorChat.empty', {
+          defaultValue: 'No messages yet. Send your first instruction.',
+        })}
+      </p>
+    );
+  }
+
+  return (
+    <div className="max-h-64 overflow-y-auto space-y-3">
+      {visibleMessages.map((message, index) => (
+        <div
+          key={`${message.role}-${index}`}
+          className={cn(
+            'rounded border px-3 py-2',
+            getOrchestratorMessageBubbleClass(message.role)
+          )}
+        >
+          <div className="text-[11px] font-medium text-low mb-1">
+            {mapOrchestratorMessageRole(message.role, t)}
+          </div>
+          <div className="text-sm whitespace-pre-wrap break-words">
+            {message.content}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function hasConfiguredWorkflowModelLibrary(config: unknown): boolean {
   const rawLibrary =
     (config as {
@@ -501,7 +612,7 @@ function OrchestratorChatPanel({
 
   const handleSendMessage = async () => {
     const trimmedMessage = messageInput.trim();
-    if (!trimmedMessage || !canSendMessage) {
+    if (canSendMessage === false || trimmedMessage.length === 0) {
       return;
     }
 
@@ -532,30 +643,29 @@ function OrchestratorChatPanel({
       setMessageInput('');
       await refetch();
     } catch (sendError) {
-      setSubmitError(
-        sendError instanceof Error
+      const errorMessage =
+        sendError instanceof Error && sendError.message
           ? sendError.message
           : t('management.orchestratorChat.sendFailed', {
               defaultValue: 'Failed to send orchestrator message.',
-            })
-      );
+            });
+      setSubmitError(errorMessage);
     }
   };
 
-  const hint = !hasConfiguredModels
-    ? t('management.orchestratorChat.noModels', {
-        defaultValue:
-          'You must configure at least one AI model before using orchestrator chat.',
-      })
-    : !orchestratorEnabled
-      ? t('management.orchestratorChat.disabled', {
-          defaultValue: 'Current workflow does not have orchestrator enabled.',
-        })
-      : !isRunning
-        ? t('management.orchestratorChat.notRunning', {
-            defaultValue: 'Only running workflows support orchestrator chat.',
-          })
-        : null;
+  const hint = getOrchestratorChatHint({
+    hasConfiguredModels,
+    orchestratorEnabled,
+    isRunning,
+    t,
+  });
+  const conversationContent = renderOrchestratorConversationContent({
+    canSendMessage,
+    isLoading,
+    error,
+    visibleMessages,
+    t,
+  });
 
   return (
     <Card>
@@ -585,51 +695,7 @@ function OrchestratorChatPanel({
 
         <div className="rounded-md border bg-background/60 p-3">
           {hint ? <p className="text-xs text-low">{hint}</p> : null}
-
-          {canSendMessage ? (
-            isLoading ? (
-              <p className="text-xs text-low">
-                {t('management.orchestratorChat.loading', {
-                  defaultValue: 'Loading conversation...',
-                })}
-              </p>
-            ) : error ? (
-              <p className="text-xs text-error">
-                {error.message}
-              </p>
-            ) : visibleMessages.length === 0 ? (
-              <p className="text-xs text-low">
-                {t('management.orchestratorChat.empty', {
-                  defaultValue: 'No messages yet. Send your first instruction.',
-                })}
-              </p>
-            ) : (
-              <div className="max-h-64 overflow-y-auto space-y-3">
-                {visibleMessages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={cn(
-                      'rounded border px-3 py-2',
-                      message.role === 'assistant'
-                        ? 'border-blue-200/60 bg-blue-50/40'
-                        : message.role === 'user'
-                          ? 'border-border/60 bg-panel'
-                          : message.role === 'tool-summary'
-                            ? 'border-amber-300/60 bg-amber-50/40'
-                            : 'border-zinc-300/60 bg-zinc-50/60'
-                    )}
-                  >
-                    <div className="text-[11px] font-medium text-low mb-1">
-                      {mapOrchestratorMessageRole(message.role, t)}
-                    </div>
-                    <div className="text-sm whitespace-pre-wrap break-words">
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : null}
+          {conversationContent}
         </div>
 
         <div className="space-y-2">
