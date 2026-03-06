@@ -226,6 +226,30 @@ export interface SubmitWorkflowPromptResponseRequest {
   [key: string]: unknown;
 }
 
+export interface SubmitOrchestratorChatRequest {
+  workflow_id: string;
+  message: string;
+  source?: 'web' | 'api' | 'social';
+  externalMessageId?: string;
+}
+
+export interface SubmitOrchestratorChatResponse {
+  command_id: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  error?: string | null;
+  retryable: boolean;
+}
+
+export interface OrchestratorChatMessage {
+  role: string;
+  content: string;
+}
+
+export interface ListOrchestratorMessagesParams {
+  cursor?: number;
+  limit?: number;
+}
+
 export interface WorkflowExecution {
   execution_id: string;
   workflow_id: string;
@@ -391,6 +415,48 @@ const workflowsApi = {
       }
     );
     return handleApiResponse<void>(response);
+  },
+
+  /**
+   * Submit a direct chat message to the workflow orchestrator.
+   */
+  submitOrchestratorChat: async (
+    data: SubmitOrchestratorChatRequest
+  ): Promise<SubmitOrchestratorChatResponse> => {
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(data.workflow_id)}/orchestrator/chat`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: data.message,
+          source: data.source ?? 'web',
+          externalMessageId: data.externalMessageId,
+        }),
+      }
+    );
+    return handleApiResponse<SubmitOrchestratorChatResponse>(response);
+  },
+
+  /**
+   * List orchestrator conversation messages for a workflow.
+   */
+  getOrchestratorMessages: async (
+    workflowId: string,
+    params?: ListOrchestratorMessagesParams
+  ): Promise<OrchestratorChatMessage[]> => {
+    const query = new URLSearchParams();
+    if (typeof params?.cursor === 'number') {
+      query.set('cursor', String(params.cursor));
+    }
+    if (typeof params?.limit === 'number') {
+      query.set('limit', String(params.limit));
+    }
+    const querySuffix = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(
+      `/api/workflows/${encodeURIComponent(workflowId)}/orchestrator/messages${querySuffix}`
+    );
+    return handleApiResponse<OrchestratorChatMessage[]>(response);
   },
 
   /**
@@ -622,6 +688,59 @@ export function useSubmitWorkflowPromptResponse() {
     onError: (error) => {
       logApiError('Failed to submit workflow prompt response:', error);
     },
+  });
+}
+
+/**
+ * Hook to send a direct chat message to orchestrator
+ * @returns Mutation object for sending orchestrator chat messages
+ */
+export function useSubmitOrchestratorChat() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: SubmitOrchestratorChatRequest) =>
+      workflowsApi.submitOrchestratorChat(data),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(variables.workflow_id),
+      });
+    },
+    onError: (error) => {
+      logApiError('Failed to submit orchestrator chat message:', error);
+    },
+  });
+}
+
+interface UseOrchestratorMessagesOptions {
+  enabled?: boolean;
+  refetchInterval?: number | false;
+  cursor?: number;
+  limit?: number;
+}
+
+/**
+ * Hook to fetch orchestrator conversation messages.
+ */
+export function useOrchestratorMessages(
+  workflowId: string,
+  options?: UseOrchestratorMessagesOptions
+): UseQueryResult<OrchestratorChatMessage[], Error> {
+  return useQuery({
+    queryKey: [
+      ...workflowKeys.byId(workflowId),
+      'orchestratorMessages',
+      options?.cursor ?? null,
+      options?.limit ?? null,
+    ],
+    queryFn: () =>
+      workflowsApi.getOrchestratorMessages(workflowId, {
+        cursor: options?.cursor,
+        limit: options?.limit,
+      }),
+    enabled: Boolean(workflowId) && (options?.enabled ?? true),
+    refetchInterval: options?.refetchInterval ?? false,
+    staleTime: 1000,
   });
 }
 

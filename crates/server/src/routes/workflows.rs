@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use services::services::{
     cc_switch::CCSwitchService,
+    config::Config as AppConfig,
     git::GitServiceError,
     orchestrator::{BusMessage, OrchestratorRuntime, TerminalCoordinator},
     terminal::TerminalLauncher,
@@ -144,6 +145,11 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
             "/{workflow_id}/prompts/respond",
             post(submit_prompt_response),
         )
+        .route("/{workflow_id}/orchestrator/chat", post(submit_orchestrator_chat))
+        .route(
+            "/{workflow_id}/orchestrator/messages",
+            get(list_orchestrator_messages),
+        )
         .route("/{workflow_id}/merge", post(merge_workflow))
         .route(
             "/{workflow_id}/tasks",
@@ -250,6 +256,13 @@ fn validate_runtime_mutation_workflow_status(status: &str) -> Result<(), ApiErro
     }
 
     Ok(())
+}
+
+fn has_configured_workflow_models(config: &AppConfig) -> bool {
+    config
+        .workflow_model_library
+        .iter()
+        .any(|item| !item.model_id.trim().is_empty())
 }
 
 async fn broadcast_task_status(
@@ -1650,14 +1663,16 @@ async fn create_runtime_terminal(
         )));
     }
 
-    let model_exists = ModelConfig::find_by_id(&deployment.db().pool, model_config_id)
+    let model_config = ModelConfig::find_by_id(&deployment.db().pool, model_config_id)
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to validate model config: {e}")))?
-        .is_some();
-    if !model_exists {
+        .ok_or_else(|| {
+            ApiError::BadRequest(format!("Model config not found: {}", model_config_id))
+        })?;
+    if model_config.cli_type_id != cli_type_id {
         return Err(ApiError::BadRequest(format!(
-            "Model config not found: {}",
-            model_config_id
+            "Model config {} does not belong to CLI type {}",
+            model_config_id, cli_type_id
         )));
     }
 
@@ -1805,6 +1820,54 @@ pub struct SubmitPromptResponseRequest {
     pub response: String,
 }
 
+/// Request body for sending a direct chat message to orchestrator
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitOrchestratorChatRequest {
+    pub message: String,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub external_message_id: Option<String>,
+}
+
+/// Response item for orchestrator conversation message
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrchestratorChatMessageResponse {
+    pub role: String,
+    pub content: String,
+}
+
+/// Response for direct orchestrator chat submission command lifecycle.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitOrchestratorChatResponse {
+    pub command_id: String,
+    pub status: String,
+    pub error: Option<String>,
+    pub retryable: bool,
+}
+
+/// Query params for listing orchestrator messages with pagination.
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ListOrchestratorMessagesQuery {
+    pub cursor: Option<usize>,
+    pub limit: Option<usize>,
+}
+
+fn paginate_orchestrator_messages(
+    total: usize,
+    cursor: Option<usize>,
+    limit: Option<usize>,
+) -> (usize, usize) {
+    let limit = limit.unwrap_or(50).clamp(1, 200);
+    let start = cursor.unwrap_or_else(|| total.saturating_sub(limit)).min(total);
+    let end = start.saturating_add(limit).min(total);
+    (start, end)
+}
+
 /// PUT /api/workflows/:workflow_id/tasks/:task_id/status
 /// Update task status (for Kanban drag-and-drop)
 async fn update_task_status(
@@ -1944,6 +2007,161 @@ async fn submit_prompt_response(
     );
 
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+/// POST /api/workflows/:workflow_id/orchestrator/chat
+/// Submit a direct chat message to the running orchestrator agent
+async fn submit_orchestrator_chat(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+    Json(payload): Json<SubmitOrchestratorChatRequest>,
+) -> Result<ResponseJson<ApiResponse<SubmitOrchestratorChatResponse>>, ApiError> {
+    let message = payload.message.trim();
+    if message.is_empty() {
+        return Err(ApiError::BadRequest("message is required".to_string()));
+    }
+    let source = payload
+        .source
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("web");
+    if !matches!(source, "web" | "api" | "social") {
+        return Err(ApiError::BadRequest(format!(
+            "source must be one of: web, api, social (got '{source}')"
+        )));
+    }
+
+    let external_message_id = payload
+        .external_message_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if source != "web" && external_message_id.is_none() {
+        return Err(ApiError::BadRequest(
+            "externalMessageId is required when source is not 'web'".to_string(),
+        ));
+    }
+
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    if !workflow.orchestrator_enabled {
+        return Err(ApiError::Conflict(
+            "Cannot submit orchestrator chat: orchestrator is not enabled".to_string(),
+        ));
+    }
+
+    let has_models_configured = {
+        let config = deployment.config().read().await;
+        has_configured_workflow_models(&config)
+    };
+    if !has_models_configured {
+        return Err(ApiError::Conflict(
+            "Cannot submit orchestrator chat: configure at least one AI model first".to_string(),
+        ));
+    }
+
+    let runtime = deployment.orchestrator_runtime();
+    if !runtime.is_running(&workflow_id).await {
+        return Err(ApiError::Conflict(format!(
+            "Cannot submit orchestrator chat: workflow '{}' is not running",
+            workflow_id
+        )));
+    }
+
+    let command_result = runtime
+        .submit_orchestrator_chat(&workflow_id, message, source, external_message_id)
+        .await
+        .map_err(|e| {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to submit orchestrator chat message"
+            );
+            ApiError::BadRequest(format!("Failed to submit orchestrator chat message: {e}"))
+        })?;
+
+    let response = SubmitOrchestratorChatResponse {
+        command_id: command_result.command_id,
+        status: command_result.status.as_str().to_string(),
+        retryable: matches!(
+            command_result.status.as_str(),
+            "failed" | "cancelled"
+        ),
+        error: command_result.error,
+    };
+
+    tracing::info!(
+        workflow_id = %workflow_id,
+        status = %response.status,
+        command_id = %response.command_id,
+        "Submitted orchestrator chat message"
+    );
+
+    Ok(ResponseJson(ApiResponse::success(response)))
+}
+
+/// GET /api/workflows/:workflow_id/orchestrator/messages
+/// List orchestrator conversation messages for a running workflow
+async fn list_orchestrator_messages(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<String>,
+    Query(params): Query<ListOrchestratorMessagesQuery>,
+) -> Result<ResponseJson<ApiResponse<Vec<OrchestratorChatMessageResponse>>>, ApiError> {
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    if !workflow.orchestrator_enabled {
+        return Err(ApiError::Conflict(
+            "Cannot list orchestrator messages: orchestrator is not enabled".to_string(),
+        ));
+    }
+
+    let has_models_configured = {
+        let config = deployment.config().read().await;
+        has_configured_workflow_models(&config)
+    };
+    if !has_models_configured {
+        return Err(ApiError::Conflict(
+            "Cannot list orchestrator messages: configure at least one AI model first".to_string(),
+        ));
+    }
+
+    let runtime = deployment.orchestrator_runtime();
+    if !runtime.is_running(&workflow_id).await {
+        return Err(ApiError::Conflict(format!(
+            "Cannot list orchestrator messages: workflow '{}' is not running",
+            workflow_id
+        )));
+    }
+
+    let messages = runtime
+        .get_orchestrator_messages(&workflow_id)
+        .await
+        .map_err(|e| {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to list orchestrator messages"
+            );
+            ApiError::BadRequest(format!("Failed to list orchestrator messages: {e}"))
+        })?;
+
+    let (start, end) = paginate_orchestrator_messages(messages.len(), params.cursor, params.limit);
+    let response = messages
+        .into_iter()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .map(|message| OrchestratorChatMessageResponse {
+            role: message.role,
+            content: message.content,
+        })
+        .collect();
+
+    Ok(ResponseJson(ApiResponse::success(response)))
 }
 
 /// POST /api/workflows/:workflow_id/merge
@@ -2627,5 +2845,207 @@ mod prompt_response_route_tests {
             .expect("Failed to execute request");
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+}
+
+#[cfg(test)]
+mod orchestrator_chat_route_tests {
+    use axum::{
+        body::{Body, to_bytes},
+        http::{Request, StatusCode},
+    };
+    use serde_json::json;
+    use serial_test::serial;
+    use tower::ServiceExt;
+
+    use super::*;
+
+    #[tokio::test]
+    #[serial]
+    async fn submit_orchestrator_chat_requires_message() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+        let app = workflows_routes().with_state(deployment);
+
+        let payload = json!({
+            "message": "   "
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/orchestrator/chat")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let body_json: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse response JSON");
+        assert_eq!(
+            body_json.get("message").and_then(serde_json::Value::as_str),
+            Some("message is required")
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn submit_orchestrator_chat_rejects_invalid_source() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+        let app = workflows_routes().with_state(deployment);
+
+        let payload = json!({
+            "message": "Hello orchestrator",
+            "source": "invalid"
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/orchestrator/chat")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let body_json: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse response JSON");
+        assert_eq!(
+            body_json.get("message").and_then(serde_json::Value::as_str),
+            Some("source must be one of: web, api, social (got 'invalid')")
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn submit_orchestrator_chat_requires_external_message_id_for_non_web_source() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+        let app = workflows_routes().with_state(deployment);
+
+        let payload = json!({
+            "message": "Hello orchestrator",
+            "source": "social"
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/orchestrator/chat")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+        let body_json: serde_json::Value =
+            serde_json::from_slice(&body).expect("Failed to parse response JSON");
+        assert_eq!(
+            body_json.get("message").and_then(serde_json::Value::as_str),
+            Some("externalMessageId is required when source is not 'web'")
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn submit_orchestrator_chat_returns_not_found_for_unknown_workflow() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+        let app = workflows_routes().with_state(deployment);
+
+        let payload = json!({
+            "message": "Hello orchestrator"
+        })
+        .to_string();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/wf-test/orchestrator/chat")
+            .header("content-type", "application/json")
+            .body(Body::from(payload))
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn list_orchestrator_messages_returns_not_found_for_unknown_workflow() {
+        let deployment = DeploymentImpl::new()
+            .await
+            .expect("Failed to create deployment");
+        let app = workflows_routes().with_state(deployment);
+
+        let request = Request::builder()
+            .method("GET")
+            .uri("/wf-test/orchestrator/messages")
+            .body(Body::empty())
+            .expect("Failed to build request");
+
+        let response = app
+            .oneshot(request)
+            .await
+            .expect("Failed to execute request");
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+}
+
+#[cfg(test)]
+mod orchestrator_pagination_tests {
+    use super::paginate_orchestrator_messages;
+
+    #[test]
+    fn defaults_to_latest_window_when_cursor_missing() {
+        let (start, end) = paginate_orchestrator_messages(120, None, None);
+        assert_eq!((start, end), (70, 120));
+    }
+
+    #[test]
+    fn applies_cursor_and_limit() {
+        let (start, end) = paginate_orchestrator_messages(100, Some(10), Some(5));
+        assert_eq!((start, end), (10, 15));
+    }
+
+    #[test]
+    fn clamps_values_to_safe_bounds() {
+        let (start, end) = paginate_orchestrator_messages(30, Some(40), Some(500));
+        assert_eq!((start, end), (30, 30));
     }
 }

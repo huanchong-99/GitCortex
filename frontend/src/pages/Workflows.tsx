@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,10 @@ import {
   workflowKeys,
   getWorkflowActions,
   type WorkflowStatusEnum,
+  useOrchestratorMessages,
+  useSubmitOrchestratorChat,
   useSubmitWorkflowPromptResponse,
+  type OrchestratorChatMessage,
 } from '@/hooks/useWorkflows';
 import { useProjects } from '@/hooks/useProjects';
 import type {
@@ -66,6 +69,7 @@ import {
   WorkflowPromptDialog,
 } from '@/components/workflow/WorkflowPromptDialog';
 import { useToast } from '@/components/ui/toast';
+import { useUserSystem } from '@/components/ConfigProvider';
 
 interface WorkflowPromptQueueItem {
   id: string;
@@ -391,6 +395,255 @@ function mapWorkflowTasks(
     }));
 }
 
+function mapOrchestratorMessageRole(
+  role: OrchestratorChatMessage['role'],
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  if (role === 'assistant') {
+    return t('management.orchestratorChat.roles.assistant', {
+      defaultValue: 'Agent',
+    });
+  }
+
+  if (role === 'user') {
+    return t('management.orchestratorChat.roles.user', {
+      defaultValue: 'You',
+    });
+  }
+
+  return role;
+}
+
+function hasConfiguredWorkflowModelLibrary(config: unknown): boolean {
+  const rawLibrary =
+    (config as {
+      workflow_model_library?: unknown;
+      workflowModelLibrary?: unknown;
+    } | null)?.workflow_model_library ??
+    (config as { workflowModelLibrary?: unknown } | null)
+      ?.workflowModelLibrary;
+  if (!Array.isArray(rawLibrary)) {
+    return false;
+  }
+
+  return rawLibrary.some((item) => {
+    if (typeof item !== 'object' || item === null) {
+      return false;
+    }
+    const candidate = item as Record<string, unknown>;
+    return (
+      typeof candidate.modelId === 'string' &&
+      candidate.modelId.trim().length > 0
+    );
+  });
+}
+
+function OrchestratorChatPanel({
+  workflowId,
+  workflowStatus,
+  orchestratorEnabled,
+}: Readonly<{
+  workflowId: string;
+  workflowStatus: string;
+  orchestratorEnabled: boolean;
+}>) {
+  const { t } = useTranslation('workflow');
+  const { config: userConfig } = useUserSystem();
+  const [messageInput, setMessageInput] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitReceipt, setSubmitReceipt] = useState<string | null>(null);
+
+  const isRunning = workflowStatus === 'running';
+  const hasConfiguredModels = useMemo(
+    () => hasConfiguredWorkflowModelLibrary(userConfig),
+    [userConfig]
+  );
+  const canSendMessage = orchestratorEnabled && isRunning && hasConfiguredModels;
+
+  const {
+    data: messages,
+    isLoading,
+    error,
+    refetch,
+  } = useOrchestratorMessages(workflowId, {
+    enabled: canSendMessage,
+    refetchInterval: canSendMessage ? 2000 : false,
+    limit: 80,
+  });
+  const submitOrchestratorChatMutation = useSubmitOrchestratorChat();
+
+  const visibleMessages = useMemo(
+    () =>
+      (messages ?? [])
+        .filter((message) =>
+          ['user', 'assistant'].includes(message.role.toLowerCase())
+        )
+        .slice(-24),
+    [messages]
+  );
+
+  const handleSendMessage = async () => {
+    const trimmedMessage = messageInput.trim();
+    if (!trimmedMessage || !canSendMessage) {
+      return;
+    }
+
+    setSubmitError(null);
+    setSubmitReceipt(null);
+    try {
+      const submitResult = await submitOrchestratorChatMutation.mutateAsync({
+        workflow_id: workflowId,
+        message: trimmedMessage,
+        source: 'web',
+      });
+
+      if (submitResult.status === 'failed' || submitResult.status === 'cancelled') {
+        setSubmitError(
+          submitResult.error ??
+            t('management.orchestratorChat.sendFailed', {
+              defaultValue: 'Failed to send orchestrator message.',
+            })
+        );
+        return;
+      }
+
+      setSubmitReceipt(
+        t('management.orchestratorChat.commandAccepted', {
+          defaultValue: `Command ${submitResult.command_id} accepted (${submitResult.status}).`,
+        })
+      );
+      setMessageInput('');
+      await refetch();
+    } catch (sendError) {
+      setSubmitError(
+        sendError instanceof Error
+          ? sendError.message
+          : t('management.orchestratorChat.sendFailed', {
+              defaultValue: 'Failed to send orchestrator message.',
+            })
+      );
+    }
+  };
+
+  const hint = !hasConfiguredModels
+    ? t('management.orchestratorChat.noModels', {
+        defaultValue:
+          'You must configure at least one AI model before using orchestrator chat.',
+      })
+    : !orchestratorEnabled
+      ? t('management.orchestratorChat.disabled', {
+          defaultValue: 'Current workflow does not have orchestrator enabled.',
+        })
+      : !isRunning
+        ? t('management.orchestratorChat.notRunning', {
+            defaultValue: 'Only running workflows support orchestrator chat.',
+          })
+        : null;
+
+  return (
+    <Card>
+      <CardContent className="pt-6 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold">
+            {t('management.orchestratorChat.title', {
+              defaultValue: 'Orchestrator Chat',
+            })}
+          </h3>
+          <p className="text-xs text-low mt-1">
+            {t('management.orchestratorChat.description', {
+              defaultValue:
+                'Send instructions to the orchestrator agent to intervene in task coordination.',
+            })}
+          </p>
+        </div>
+
+        <div className="rounded-md border bg-background/60 p-3">
+          {hint ? <p className="text-xs text-low">{hint}</p> : null}
+
+          {canSendMessage ? (
+            isLoading ? (
+              <p className="text-xs text-low">
+                {t('management.orchestratorChat.loading', {
+                  defaultValue: 'Loading conversation...',
+                })}
+              </p>
+            ) : error ? (
+              <p className="text-xs text-error">
+                {error.message}
+              </p>
+            ) : visibleMessages.length === 0 ? (
+              <p className="text-xs text-low">
+                {t('management.orchestratorChat.empty', {
+                  defaultValue: 'No messages yet. Send your first instruction.',
+                })}
+              </p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-3">
+                {visibleMessages.map((message, index) => (
+                  <div
+                    key={`${message.role}-${index}`}
+                    className="rounded border border-border/60 bg-panel px-3 py-2"
+                  >
+                    <div className="text-[11px] font-medium text-low mb-1">
+                      {mapOrchestratorMessageRole(message.role, t)}
+                    </div>
+                    <div className="text-sm whitespace-pre-wrap break-words">
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <textarea
+            value={messageInput}
+            onChange={(event) => {
+              setMessageInput(event.target.value);
+            }}
+            placeholder={t('management.orchestratorChat.placeholder', {
+              defaultValue:
+                'For example: reprioritize tasks and complete the auth module first.',
+            })}
+            className="w-full min-h-[88px] rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            disabled={!canSendMessage || submitOrchestratorChatMutation.isPending}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-low">
+              {t('management.orchestratorChat.note', {
+                defaultValue:
+                  'Messages enter orchestrator context and may trigger new scheduling actions.',
+              })}
+            </p>
+            <Button
+              onClick={() => {
+                void handleSendMessage();
+              }}
+              disabled={
+                !canSendMessage ||
+                submitOrchestratorChatMutation.isPending ||
+                messageInput.trim().length === 0
+              }
+            >
+              {submitOrchestratorChatMutation.isPending
+                ? t('management.orchestratorChat.sending', {
+                    defaultValue: 'Sending...',
+                  })
+                : t('management.orchestratorChat.send', {
+                    defaultValue: 'Send to Agent',
+                  })}
+            </Button>
+          </div>
+          {submitError ? <p className="text-xs text-error">{submitError}</p> : null}
+          {submitReceipt ? <p className="text-xs text-low">{submitReceipt}</p> : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SelectedWorkflowView({
   workflow,
   mutations,
@@ -493,6 +746,12 @@ function SelectedWorkflowView({
           ) : null}
         </CardContent>
       </Card>
+
+      <OrchestratorChatPanel
+        workflowId={workflow.id}
+        workflowStatus={workflow.status}
+        orchestratorEnabled={workflow.orchestratorEnabled}
+      />
 
       <PipelineView
         name={workflow.name}
@@ -1242,3 +1501,4 @@ export function Workflows() {
     </div>
   );
 }
+
