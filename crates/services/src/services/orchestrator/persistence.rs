@@ -27,6 +27,10 @@ pub struct PersistedState {
     /// Per-task execution state
     pub task_states: HashMap<String, PersistedTaskState>,
 
+    /// Whether workflow planning has finished and no more tasks should be added.
+    #[serde(default = "default_true")]
+    pub workflow_planning_complete: bool,
+
     /// Conversation history for LLM context
     pub conversation_history: Vec<LLMMessage>,
 
@@ -46,9 +50,17 @@ pub struct PersistedTaskState {
     pub task_id: String,
     pub current_terminal_index: usize,
     pub total_terminals: usize,
+    #[serde(default)]
+    pub terminal_ids: Vec<String>,
     pub completed_terminals: Vec<String>,
     pub failed_terminals: Vec<String>,
+    #[serde(default = "default_true")]
+    pub planning_complete: bool,
     pub is_completed: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl From<TaskExecutionState> for PersistedTaskState {
@@ -57,8 +69,10 @@ impl From<TaskExecutionState> for PersistedTaskState {
             task_id: state.task_id,
             current_terminal_index: state.current_terminal_index,
             total_terminals: state.total_terminals,
+            terminal_ids: state.terminal_ids,
             completed_terminals: state.completed_terminals,
             failed_terminals: state.failed_terminals,
+            planning_complete: state.planning_complete,
             is_completed: state.is_completed,
         }
     }
@@ -70,8 +84,10 @@ impl From<PersistedTaskState> for TaskExecutionState {
             task_id: state.task_id,
             current_terminal_index: state.current_terminal_index,
             total_terminals: state.total_terminals,
+            terminal_ids: state.terminal_ids,
             completed_terminals: state.completed_terminals,
             failed_terminals: state.failed_terminals,
+            planning_complete: state.planning_complete,
             is_completed: state.is_completed,
         }
     }
@@ -86,6 +102,7 @@ impl From<OrchestratorState> for PersistedState {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect(),
+            workflow_planning_complete: state.workflow_planning_complete,
             conversation_history: state.conversation_history,
             total_tokens_used: state.total_tokens_used,
             error_count: state.error_count,
@@ -103,6 +120,7 @@ impl From<&OrchestratorState> for PersistedState {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone().into()))
                 .collect(),
+            workflow_planning_complete: state.workflow_planning_complete,
             conversation_history: state.conversation_history.clone(),
             total_tokens_used: state.total_tokens_used,
             error_count: state.error_count,
@@ -186,6 +204,7 @@ impl StatePersistence {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect();
+            state.workflow_planning_complete = persisted.workflow_planning_complete;
             state.conversation_history = persisted.conversation_history;
             state.total_tokens_used = persisted.total_tokens_used;
             state.error_count = persisted.error_count;

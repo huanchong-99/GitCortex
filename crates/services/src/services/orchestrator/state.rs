@@ -28,8 +28,10 @@ pub struct TaskExecutionState {
     pub task_id: String,
     pub current_terminal_index: usize,
     pub total_terminals: usize,
+    pub terminal_ids: Vec<String>,
     pub completed_terminals: Vec<String>,
     pub failed_terminals: Vec<String>,
+    pub planning_complete: bool,
     pub is_completed: bool,
 }
 
@@ -43,6 +45,9 @@ pub struct OrchestratorState {
 
     /// Per-task execution state.
     pub task_states: HashMap<String, TaskExecutionState>,
+
+    /// Whether the workflow planner has declared the execution graph complete.
+    pub workflow_planning_complete: bool,
 
     /// Conversation history for LLM context.
     pub conversation_history: Vec<LLMMessage>,
@@ -69,6 +74,7 @@ impl OrchestratorState {
             run_state: OrchestratorRunState::Idle,
             workflow_id,
             task_states: HashMap::new(),
+            workflow_planning_complete: true,
             conversation_history: Vec::new(),
             pending_events: Vec::new(),
             total_tokens_used: 0,
@@ -78,19 +84,88 @@ impl OrchestratorState {
         }
     }
 
+    fn recompute_task_completion(state: &mut TaskExecutionState) {
+        let total_done = state.completed_terminals.len() + state.failed_terminals.len();
+        state.is_completed = state.planning_complete && total_done >= state.total_terminals;
+    }
+
+    fn first_unfinished_terminal_index(state: &TaskExecutionState) -> Option<usize> {
+        state.terminal_ids.iter().position(|terminal_id| {
+            !state.completed_terminals.iter().any(|id| id == terminal_id)
+                && !state.failed_terminals.iter().any(|id| id == terminal_id)
+        })
+    }
+
     /// Initializes execution state for a task.
-    pub fn init_task(&mut self, task_id: String, terminal_count: usize) {
+    pub fn init_task(&mut self, task_id: String, terminal_ids: Vec<String>) {
+        let terminal_count = terminal_ids.len();
         self.task_states.insert(
             task_id.clone(),
             TaskExecutionState {
                 task_id,
                 current_terminal_index: 0,
                 total_terminals: terminal_count,
+                terminal_ids,
                 completed_terminals: Vec::new(),
                 failed_terminals: Vec::new(),
+                planning_complete: true,
                 is_completed: false,
             },
         );
+    }
+
+    /// Synchronize the in-memory terminal membership for a task with the database.
+    pub fn sync_task_terminals(
+        &mut self,
+        task_id: String,
+        terminal_ids: Vec<String>,
+        planning_complete: bool,
+    ) {
+        let state = self
+            .task_states
+            .entry(task_id.clone())
+            .or_insert_with(|| TaskExecutionState {
+                task_id,
+                current_terminal_index: 0,
+                total_terminals: 0,
+                terminal_ids: Vec::new(),
+                completed_terminals: Vec::new(),
+                failed_terminals: Vec::new(),
+                planning_complete,
+                is_completed: false,
+            });
+
+        state.terminal_ids = terminal_ids;
+        state.total_terminals = state.terminal_ids.len();
+        state.planning_complete = planning_complete;
+        state.completed_terminals
+            .retain(|terminal_id| state.terminal_ids.iter().any(|id| id == terminal_id));
+        state.failed_terminals
+            .retain(|terminal_id| state.terminal_ids.iter().any(|id| id == terminal_id));
+
+        state.current_terminal_index = Self::first_unfinished_terminal_index(state)
+            .unwrap_or(state.total_terminals);
+        Self::recompute_task_completion(state);
+    }
+
+    pub fn set_workflow_planning_complete(&mut self, planning_complete: bool) {
+        self.workflow_planning_complete = planning_complete;
+    }
+
+    pub fn set_task_planning_complete(&mut self, task_id: &str, planning_complete: bool) {
+        if let Some(state) = self.task_states.get_mut(task_id) {
+            state.planning_complete = planning_complete;
+            Self::recompute_task_completion(state);
+        }
+    }
+
+    pub fn mark_terminal_dispatched(&mut self, task_id: &str, terminal_id: &str) {
+        if let Some(state) = self.task_states.get_mut(task_id)
+            && let Some(index) = state.terminal_ids.iter().position(|id| id == terminal_id)
+        {
+            state.current_terminal_index = index;
+            state.is_completed = false;
+        }
     }
 
     /// Records a terminal completion for a task.
@@ -115,11 +190,7 @@ impl OrchestratorState {
                 state.failed_terminals.push(terminal_id.to_string());
             }
 
-            // 检查任务是否完成
-            let total_done = state.completed_terminals.len() + state.failed_terminals.len();
-            if total_done >= state.total_terminals {
-                state.is_completed = true;
-            }
+            Self::recompute_task_completion(state);
         }
     }
 
@@ -128,10 +199,18 @@ impl OrchestratorState {
     /// Returns `true` if there is a next terminal to dispatch, `false` otherwise.
     pub fn advance_terminal(&mut self, task_id: &str) -> bool {
         if let Some(state) = self.task_states.get_mut(task_id) {
-            if state.current_terminal_index + 1 < state.total_terminals {
-                state.current_terminal_index += 1;
-                return true;
+            let mut next_index = state.current_terminal_index.saturating_add(1);
+            while next_index < state.total_terminals {
+                let terminal_id = &state.terminal_ids[next_index];
+                let already_finished = state.completed_terminals.iter().any(|id| id == terminal_id)
+                    || state.failed_terminals.iter().any(|id| id == terminal_id);
+                if !already_finished {
+                    state.current_terminal_index = next_index;
+                    return true;
+                }
+                next_index += 1;
             }
+            state.current_terminal_index = state.total_terminals;
         }
         false
     }
@@ -144,10 +223,15 @@ impl OrchestratorState {
         if state.is_completed {
             return None;
         }
-        if state.current_terminal_index >= state.total_terminals {
-            return None;
+        for index in state.current_terminal_index..state.total_terminals {
+            let terminal_id = &state.terminal_ids[index];
+            let already_finished = state.completed_terminals.iter().any(|id| id == terminal_id)
+                || state.failed_terminals.iter().any(|id| id == terminal_id);
+            if !already_finished {
+                return Some(index);
+            }
         }
-        Some(state.current_terminal_index)
+        None
     }
 
     /// Checks if a task is completed.
@@ -197,7 +281,9 @@ impl OrchestratorState {
 
     /// Returns true if all tasks are completed.
     pub fn all_tasks_completed(&self) -> bool {
-        self.task_states.values().all(|s| s.is_completed)
+        self.workflow_planning_complete
+            && !self.task_states.is_empty()
+            && self.task_states.values().all(|s| s.is_completed)
     }
 
     /// Returns true if any task has failed terminals.

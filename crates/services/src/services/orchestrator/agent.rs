@@ -795,7 +795,8 @@ impl OrchestratorAgent {
             return Ok(());
         }
 
-        let total_terminals = terminals.len();
+        let terminal_ids: Vec<String> = terminals.iter().map(|terminal| terminal.id.clone()).collect();
+        let total_terminals = terminal_ids.len();
         let mut current_terminal_index = 0usize;
         let mut found_active_terminal = false;
         let mut completed_terminals = Vec::new();
@@ -823,15 +824,15 @@ impl OrchestratorAgent {
             return Ok(());
         }
 
-        state.init_task(task_id.to_string(), total_terminals);
+        state.sync_task_terminals(task_id.to_string(), terminal_ids, true);
 
         if let Some(task_state) = state.task_states.get_mut(task_id) {
             task_state.current_terminal_index = current_terminal_index;
             task_state.completed_terminals = completed_terminals;
             task_state.failed_terminals = failed_terminals;
-            task_state.is_completed = task_state.completed_terminals.len()
-                + task_state.failed_terminals.len()
-                >= task_state.total_terminals;
+            task_state.is_completed = task_state.planning_complete
+                && task_state.completed_terminals.len() + task_state.failed_terminals.len()
+                    >= task_state.total_terminals;
         }
 
         Ok(())
@@ -1550,14 +1551,27 @@ impl OrchestratorAgent {
         total_terminals: usize,
     ) {
         let mut state = self.state.write().await;
-        let safe_total = total_terminals.max(1);
-        if !state.task_states.contains_key(task_id) {
-            state.init_task(task_id.to_string(), safe_total);
-        }
+        let terminals = match db::models::Terminal::find_by_task(&self.db.pool, task_id).await {
+            Ok(terminals) => terminals,
+            Err(error) => {
+                tracing::warn!(
+                    task_id = %task_id,
+                    error = %error,
+                    "Failed to sync task terminals while aligning no-metadata completion"
+                );
+                return;
+            }
+        };
+        let terminal_ids: Vec<String> = terminals.iter().map(|terminal| terminal.id.clone()).collect();
+        state.sync_task_terminals(task_id.to_string(), terminal_ids, true);
 
         if let Some(task_state) = state.task_states.get_mut(task_id) {
-            task_state.total_terminals = safe_total;
-            task_state.current_terminal_index = terminal_index.min(safe_total.saturating_sub(1));
+            if task_state.total_terminals == 0 && total_terminals == 0 {
+                task_state.current_terminal_index = 0;
+            } else {
+                let safe_total = task_state.total_terminals.max(total_terminals).max(1);
+                task_state.current_terminal_index = terminal_index.min(safe_total.saturating_sub(1));
+            }
             if task_state.is_completed {
                 task_state.is_completed = false;
             }
@@ -1921,7 +1935,16 @@ impl OrchestratorAgent {
                     {
                         let mut state = self.state.write().await;
                         if !state.task_states.contains_key(&task_id) {
-                            state.init_task(task_id.clone(), terminals.len());
+                            state.init_task(
+                                task_id.clone(),
+                                terminals.iter().map(|terminal| terminal.id.clone()).collect(),
+                            );
+                        } else {
+                            state.sync_task_terminals(
+                                task_id.clone(),
+                                terminals.iter().map(|terminal| terminal.id.clone()).collect(),
+                                true,
+                            );
                         }
                     }
 
@@ -1995,6 +2018,11 @@ impl OrchestratorAgent {
                     terminal.id
                 )
             })?;
+
+        {
+            let mut state = self.state.write().await;
+            state.mark_terminal_dispatched(task_id, &active_terminal.id);
+        }
 
         // 3. Get PTY session ID, fail if not available.
         let pty_session_id = match active_terminal.pty_session_id.as_deref() {
@@ -2452,7 +2480,16 @@ impl OrchestratorAgent {
             {
                 let mut state = self.state.write().await;
                 if !state.task_states.contains_key(&task.id) {
-                    state.init_task(task.id.clone(), terminals.len());
+                    state.init_task(
+                        task.id.clone(),
+                        terminals.iter().map(|terminal| terminal.id.clone()).collect(),
+                    );
+                } else {
+                    state.sync_task_terminals(
+                        task.id.clone(),
+                        terminals.iter().map(|terminal| terminal.id.clone()).collect(),
+                        true,
+                    );
                 }
             }
 
@@ -2606,8 +2643,27 @@ impl OrchestratorAgent {
             return Ok(());
         }
 
+        let planning_complete = {
+            let state = self.state.read().await;
+            state.workflow_planning_complete
+        };
+        if !planning_complete {
+            return Ok(());
+        }
+
         let tasks = db::models::WorkflowTask::find_by_workflow(&self.db.pool, workflow_id).await?;
         if tasks.is_empty() || tasks.iter().any(|task| task.status != "completed") {
+            return Ok(());
+        }
+
+        let terminals = db::models::Terminal::find_by_workflow(&self.db.pool, workflow_id).await?;
+        let has_runnable_terminals = terminals.iter().any(|terminal| {
+            matches!(
+                terminal.status.as_str(),
+                "not_started" | "starting" | "waiting" | "working"
+            )
+        });
+        if has_runnable_terminals {
             return Ok(());
         }
 
