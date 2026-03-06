@@ -12,7 +12,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use db::{DBService, models::terminal::Terminal};
+use db::{
+    DBService,
+    models::{WorkflowOrchestratorCommand, terminal::Terminal},
+};
 use deployment::{Deployment, DeploymentError};
 use executors::profile::ExecutorConfigs;
 use services::services::{
@@ -203,6 +206,22 @@ impl Deployment for LocalDeployment {
             }
             Err(e) => {
                 tracing::warn!("Failed to recover interrupted workflows on startup: {}", e);
+            }
+        }
+
+        match WorkflowOrchestratorCommand::recover_incomplete_commands(&db.pool).await {
+            Ok(0) => {}
+            Ok(recovered_count) => {
+                tracing::warn!(
+                    recovered_count,
+                    "Recovered interrupted orchestrator commands during startup"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to recover interrupted orchestrator commands on startup: {}",
+                    e
+                );
             }
         }
 

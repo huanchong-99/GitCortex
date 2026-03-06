@@ -101,16 +101,12 @@ pub struct WorkflowOrchestratorCommand {
 }
 
 impl WorkflowOrchestratorCommand {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new_queued(
         id: &str,
         workflow_id: &str,
         source: &str,
         external_message_id: Option<&str>,
         request_message: &str,
-        status: &str,
-        error: Option<&str>,
-        retryable: bool,
     ) -> Self {
         let now = Utc::now();
         Self {
@@ -119,11 +115,11 @@ impl WorkflowOrchestratorCommand {
             source: source.to_string(),
             external_message_id: external_message_id.map(ToString::to_string),
             request_message: request_message.to_string(),
-            status: status.to_string(),
-            error: error.map(ToString::to_string),
-            retryable,
-            started_at: Some(now),
-            completed_at: Some(now),
+            status: "queued".to_string(),
+            error: None,
+            retryable: false,
+            started_at: None,
+            completed_at: None,
             created_at: now,
             updated_at: now,
         }
@@ -178,6 +174,74 @@ impl WorkflowOrchestratorCommand {
         .fetch_optional(pool)
         .await
     }
+
+    pub async fn find_by_id(pool: &SqlitePool, command_id: &str) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, WorkflowOrchestratorCommand>(
+            r#"
+            SELECT *
+            FROM workflow_orchestrator_command
+            WHERE id = ?1
+            LIMIT 1
+            "#,
+        )
+        .bind(command_id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn update_status(
+        pool: &SqlitePool,
+        command_id: &str,
+        status: &str,
+        error: Option<&str>,
+        retryable: bool,
+        started_at: Option<DateTime<Utc>>,
+        completed_at: Option<DateTime<Utc>>,
+    ) -> sqlx::Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE workflow_orchestrator_command
+            SET status = ?1,
+                error = ?2,
+                retryable = ?3,
+                started_at = COALESCE(?4, started_at),
+                completed_at = ?5,
+                updated_at = ?6
+            WHERE id = ?7
+            "#,
+        )
+        .bind(status)
+        .bind(error)
+        .bind(retryable)
+        .bind(started_at)
+        .bind(completed_at)
+        .bind(Utc::now())
+        .bind(command_id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn recover_incomplete_commands(pool: &SqlitePool) -> sqlx::Result<u64> {
+        let rows = sqlx::query(
+            r#"
+            UPDATE workflow_orchestrator_command
+            SET status = 'failed',
+                error = COALESCE(
+                    error,
+                    'Recovered after service restart before command completed'
+                ),
+                retryable = 1,
+                completed_at = datetime('now'),
+                updated_at = datetime('now')
+            WHERE status IN ('queued', 'running')
+            "#,
+        )
+        .execute(pool)
+        .await?;
+        Ok(rows.rows_affected())
+    }
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
@@ -223,5 +287,47 @@ impl ExternalConversationBinding {
         .execute(pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn find_active(
+        pool: &SqlitePool,
+        provider: &str,
+        conversation_id: &str,
+    ) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, ExternalConversationBinding>(
+            r#"
+            SELECT *
+            FROM external_conversation_binding
+            WHERE provider = ?1
+              AND conversation_id = ?2
+              AND is_active = 1
+            LIMIT 1
+            "#,
+        )
+        .bind(provider)
+        .bind(conversation_id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    pub async fn deactivate(
+        pool: &SqlitePool,
+        provider: &str,
+        conversation_id: &str,
+    ) -> sqlx::Result<u64> {
+        let rows = sqlx::query(
+            r#"
+            UPDATE external_conversation_binding
+            SET is_active = 0,
+                updated_at = datetime('now')
+            WHERE provider = ?1
+              AND conversation_id = ?2
+            "#,
+        )
+        .bind(provider)
+        .bind(conversation_id)
+        .execute(pool)
+        .await?;
+        Ok(rows.rows_affected())
     }
 }

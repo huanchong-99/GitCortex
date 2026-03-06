@@ -1,13 +1,20 @@
 //! Workflow API Routes
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
+    http::HeaderMap,
     response::Json as ResponseJson,
     routing::{get, post, put},
 };
+use chrono::Utc;
 use db::models::{
     CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
     Workflow, WorkflowCommand, WorkflowOrchestratorCommand, WorkflowOrchestratorMessage,
@@ -24,6 +31,9 @@ use services::services::{
     orchestrator::{BusMessage, OrchestratorRuntime, TerminalCoordinator},
     terminal::TerminalLauncher,
 };
+use once_cell::sync::Lazy;
+use regex::Regex;
+use sha2::{Digest, Sha256};
 use utils::{response::ApiResponse, text};
 use uuid::Uuid;
 
@@ -76,6 +86,7 @@ pub struct UpdateWorkflowStatusRequest {
 pub struct RecoveryResponse {
     pub message: String,
     pub recovered_workflows: usize,
+    pub recovered_commands: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -126,6 +137,29 @@ const WORKFLOW_EXECUTION_MODES: [&str; 2] = ["diy", "agent_planned"];
 const MERGE_ALLOWED_WORKFLOW_STATUSES: [&str; 2] = ["completed", "merging"];
 const RUNTIME_MUTABLE_WORKFLOW_STATUSES: [&str; 5] =
     ["created", "starting", "ready", "running", "paused"];
+const ORCHESTRATOR_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
+const ORCHESTRATOR_RATE_LIMIT_MAX_REQUESTS: usize = 12;
+const ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD: usize = 3;
+const ORCHESTRATOR_CIRCUIT_BREAKER_COOLDOWN: Duration = Duration::from_secs(120);
+const ORCHESTRATOR_CHAT_ALLOWED_ROLES: [&str; 3] = ["owner", "admin", "operator"];
+
+#[derive(Debug, Default)]
+struct OrchestratorGovernanceState {
+    rate_windows: HashMap<String, VecDeque<Instant>>,
+    failure_streaks: HashMap<String, usize>,
+    circuit_open_until: HashMap<String, Instant>,
+}
+
+static ORCHESTRATOR_GOVERNANCE_STATE: Lazy<tokio::sync::Mutex<OrchestratorGovernanceState>> =
+    Lazy::new(|| tokio::sync::Mutex::new(OrchestratorGovernanceState::default()));
+
+static SENSITIVE_INLINE_CREDENTIAL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\b(api[_-]?key|token|authorization|bearer)\s*[:=]\s*[^\s,;]+")
+        .expect("credential regex must be valid")
+});
+static SECRET_PREFIX_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\b(sk-[A-Za-z0-9_\-]{12,})\b").expect("secret prefix regex must be valid")
+});
 
 // ============================================================================
 // Route Definition
@@ -264,6 +298,188 @@ fn has_configured_workflow_models(config: &AppConfig) -> bool {
         .workflow_model_library
         .iter()
         .any(|item| !item.model_id.trim().is_empty())
+}
+
+fn is_orchestrator_chat_feature_enabled() -> bool {
+    std::env::var("GITCORTEX_ORCHESTRATOR_CHAT_ENABLED")
+        .ok()
+        .map(|value| value.trim().eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+}
+
+fn redact_sensitive_content(content: &str) -> String {
+    let redacted_pairs = SENSITIVE_INLINE_CREDENTIAL_REGEX
+        .replace_all(content, "$1=<redacted>")
+        .into_owned();
+    let redacted_secrets = SECRET_PREFIX_REGEX
+        .replace_all(&redacted_pairs, "<redacted-secret>")
+        .into_owned();
+    if redacted_secrets.chars().count() <= 220 {
+        redacted_secrets
+    } else {
+        let preview: String = redacted_secrets.chars().take(220).collect();
+        format!("{preview}...(truncated)")
+    }
+}
+
+fn digest_message(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    let digest = hasher.finalize();
+    format!("{digest:x}")
+}
+
+fn normalize_operator_id(candidate: Option<&str>) -> Option<String> {
+    candidate
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn extract_role_from_headers(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-orchestrator-role")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_ascii_lowercase())
+}
+
+fn ensure_orchestrator_permission(
+    source: &str,
+    role: Option<&str>,
+    workflow_execution_mode: &str,
+    operator_id: Option<&str>,
+) -> Result<(), ApiError> {
+    if source != "web" && workflow_execution_mode != "agent_planned" {
+        return Err(ApiError::Forbidden(
+            "Only agent_planned workflows accept external orchestrator command sources".to_string(),
+        ));
+    }
+
+    if source != "web" && operator_id.is_none() {
+        return Err(ApiError::Forbidden(
+            "operatorId is required for non-web orchestrator command sources".to_string(),
+        ));
+    }
+
+    if let Some(role) = role
+        && !ORCHESTRATOR_CHAT_ALLOWED_ROLES.contains(&role)
+    {
+        return Err(ApiError::Forbidden(format!(
+            "orchestrator role '{role}' is not allowed to issue commands"
+        )));
+    }
+
+    Ok(())
+}
+
+async fn enforce_orchestrator_rate_limit(
+    workflow_id: &str,
+    source: &str,
+    operator_scope: Option<&str>,
+) -> Result<(), ApiError> {
+    let scope = operator_scope.unwrap_or("anonymous");
+    let key = format!("{workflow_id}:{source}:{scope}");
+    let now = Instant::now();
+    let mut state = ORCHESTRATOR_GOVERNANCE_STATE.lock().await;
+    let bucket = state.rate_windows.entry(key).or_default();
+
+    while let Some(timestamp) = bucket.front().copied() {
+        if now.duration_since(timestamp) <= ORCHESTRATOR_RATE_LIMIT_WINDOW {
+            break;
+        }
+        bucket.pop_front();
+    }
+
+    if bucket.len() >= ORCHESTRATOR_RATE_LIMIT_MAX_REQUESTS {
+        return Err(ApiError::Conflict(format!(
+            "Orchestrator chat rate limit exceeded: max {} requests per {}s",
+            ORCHESTRATOR_RATE_LIMIT_MAX_REQUESTS,
+            ORCHESTRATOR_RATE_LIMIT_WINDOW.as_secs()
+        )));
+    }
+
+    bucket.push_back(now);
+    Ok(())
+}
+
+async fn ensure_orchestrator_circuit_closed(workflow_id: &str) -> Result<(), ApiError> {
+    let now = Instant::now();
+    let mut state = ORCHESTRATOR_GOVERNANCE_STATE.lock().await;
+    if let Some(open_until) = state.circuit_open_until.get(workflow_id).copied() {
+        if now < open_until {
+            return Err(ApiError::Conflict(
+                "Orchestrator circuit breaker is open due to repeated failures. Please retry later."
+                    .to_string(),
+            ));
+        }
+        state.circuit_open_until.remove(workflow_id);
+        state.failure_streaks.remove(workflow_id);
+    }
+
+    Ok(())
+}
+
+async fn update_orchestrator_circuit_breaker(workflow_id: &str, status: &str) -> bool {
+    let mut state = ORCHESTRATOR_GOVERNANCE_STATE.lock().await;
+    if status == "succeeded" {
+        state.failure_streaks.remove(workflow_id);
+        state.circuit_open_until.remove(workflow_id);
+        return false;
+    }
+
+    if status == "failed" || status == "cancelled" {
+        let streak_key = workflow_id.to_string();
+        let streak_count = {
+            let streak = state.failure_streaks.entry(streak_key.clone()).or_insert(0);
+            *streak += 1;
+            *streak
+        };
+
+        if streak_count >= ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD {
+            state.circuit_open_until.insert(
+                streak_key.clone(),
+                Instant::now() + ORCHESTRATOR_CIRCUIT_BREAKER_COOLDOWN,
+            );
+            state.failure_streaks.insert(streak_key, 0);
+            return true;
+        }
+    }
+
+    false
+}
+
+fn build_orchestrator_receipt_message(
+    command_id: &str,
+    status: &str,
+    error: Option<&str>,
+    retryable: bool,
+) -> String {
+    let mut receipt = format!("Command {command_id} -> {status}");
+    if let Some(error) = error {
+        let redacted = redact_sensitive_content(error);
+        receipt.push_str(&format!(". Error: {redacted}"));
+    }
+    if retryable {
+        receipt.push_str(". Retryable: yes");
+    }
+    receipt
+}
+
+fn build_orchestrator_summary_message(status: &str, source: &str) -> String {
+    match status {
+        "succeeded" => format!(
+            "Execution summary: command completed successfully (source={source})."
+        ),
+        "failed" => format!(
+            "Execution summary: command failed and requires operator attention (source={source})."
+        ),
+        "cancelled" => {
+            format!("Execution summary: command was cancelled (source={source}).")
+        }
+        other => format!("Execution summary: command finished with status={other} (source={source})."),
+    }
 }
 
 async fn broadcast_task_status(
@@ -1772,15 +1988,23 @@ async fn run_workflow_recovery(
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to recover workflows: {e}")))?;
 
-    let message = if recovered_workflows == 0 {
-        "No interrupted workflows required recovery".to_string()
+    let recovered_commands = runtime
+        .recover_incomplete_orchestrator_commands()
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to recover commands: {e}")))?;
+
+    let message = if recovered_workflows == 0 && recovered_commands == 0 {
+        "No interrupted workflows or commands required recovery".to_string()
     } else {
-        format!("Recovered {recovered_workflows} interrupted workflow(s)")
+        format!(
+            "Recovered {recovered_workflows} interrupted workflow(s) and {recovered_commands} command(s)"
+        )
     };
 
     Ok(RecoveryResponse {
         message,
         recovered_workflows,
+        recovered_commands: recovered_commands as usize,
     })
 }
 
@@ -1830,6 +2054,19 @@ pub struct SubmitOrchestratorChatRequest {
     pub source: Option<String>,
     #[serde(default)]
     pub external_message_id: Option<String>,
+    #[serde(default)]
+    pub metadata: OrchestratorChatRequestMetadata,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct OrchestratorChatRequestMetadata {
+    #[serde(default)]
+    pub operator_id: Option<String>,
+    #[serde(default)]
+    pub client_ts: Option<String>,
+    #[serde(default)]
+    pub conversation_id: Option<String>,
 }
 
 /// Response item for orchestrator conversation message
@@ -2012,11 +2249,18 @@ async fn submit_prompt_response(
 
 /// POST /api/workflows/:workflow_id/orchestrator/chat
 /// Submit a direct chat message to the running orchestrator agent
-async fn submit_orchestrator_chat(
+pub(crate) async fn submit_orchestrator_chat(
     State(deployment): State<DeploymentImpl>,
+    headers: HeaderMap,
     Path(workflow_id): Path<String>,
     Json(payload): Json<SubmitOrchestratorChatRequest>,
 ) -> Result<ResponseJson<ApiResponse<SubmitOrchestratorChatResponse>>, ApiError> {
+    if !is_orchestrator_chat_feature_enabled() {
+        return Err(ApiError::Conflict(
+            "Orchestrator chat feature is disabled by rollout flag".to_string(),
+        ));
+    }
+
     let message = payload.message.trim();
     if message.is_empty() {
         return Err(ApiError::BadRequest("message is required".to_string()));
@@ -2044,6 +2288,19 @@ async fn submit_orchestrator_chat(
         ));
     }
 
+    let operator_id = normalize_operator_id(
+        payload
+            .metadata
+            .operator_id
+            .as_deref()
+            .or_else(|| {
+                headers
+                    .get("x-orchestrator-operator-id")
+                    .and_then(|value| value.to_str().ok())
+            }),
+    );
+    let role = extract_role_from_headers(&headers);
+
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
@@ -2053,6 +2310,13 @@ async fn submit_orchestrator_chat(
             "Cannot submit orchestrator chat: orchestrator is not enabled".to_string(),
         ));
     }
+
+    ensure_orchestrator_permission(
+        source,
+        role.as_deref(),
+        workflow.execution_mode.as_str(),
+        operator_id.as_deref(),
+    )?;
 
     let has_models_configured = {
         let config = deployment.config().read().await;
@@ -2071,6 +2335,14 @@ async fn submit_orchestrator_chat(
             workflow_id
         )));
     }
+
+    ensure_orchestrator_circuit_closed(&workflow_id).await?;
+    enforce_orchestrator_rate_limit(
+        &workflow_id,
+        source,
+        operator_id.as_deref().or(external_message_id),
+    )
+    .await?;
 
     if let Some(external_id) = external_message_id
         && let Some(existing_command) = WorkflowOrchestratorCommand::find_by_external_message(
@@ -2091,45 +2363,32 @@ async fn submit_orchestrator_chat(
         return Ok(ResponseJson(ApiResponse::success(response)));
     }
 
-    let command_result = runtime
-        .submit_orchestrator_chat(&workflow_id, message, source, external_message_id)
-        .await
-        .map_err(|e| {
-            tracing::warn!(
-                workflow_id = %workflow_id,
-                error = %e,
-                "Failed to submit orchestrator chat message"
-            );
-            ApiError::BadRequest(format!("Failed to submit orchestrator chat message: {e}"))
-        })?;
-
-    let response = SubmitOrchestratorChatResponse {
-        command_id: command_result.command_id.clone(),
-        status: command_result.status.as_str().to_string(),
-        retryable: matches!(
-            command_result.status.as_str(),
-            "failed" | "cancelled"
-        ),
-        error: command_result.error.clone(),
-    };
-
-    let persisted_command = WorkflowOrchestratorCommand::new(
-        &response.command_id,
+    let command_id = Uuid::new_v4().to_string();
+    let queued_command = WorkflowOrchestratorCommand::new_queued(
+        &command_id,
         &workflow_id,
         source,
         external_message_id,
         message,
-        &response.status,
-        response.error.as_deref(),
-        response.retryable,
     );
-    WorkflowOrchestratorCommand::insert(&deployment.db().pool, &persisted_command)
+    WorkflowOrchestratorCommand::insert(&deployment.db().pool, &queued_command)
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to persist orchestrator command: {e}")))?;
+    WorkflowOrchestratorCommand::update_status(
+        &deployment.db().pool,
+        &command_id,
+        "running",
+        None,
+        false,
+        Some(Utc::now()),
+        None,
+    )
+    .await
+    .map_err(|e| ApiError::Internal(format!("Failed to update command status: {e}")))?;
 
     let user_message = WorkflowOrchestratorMessage::new(
         &workflow_id,
-        Some(&response.command_id),
+        Some(&command_id),
         "user",
         message,
         source,
@@ -2139,6 +2398,70 @@ async fn submit_orchestrator_chat(
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to persist user message: {e}")))?;
 
+    let message_digest = digest_message(message);
+    let message_preview = redact_sensitive_content(message);
+
+    tracing::info!(
+        target: "audit.orchestrator_chat",
+        workflow_id = %workflow_id,
+        source = %source,
+        role = %role.as_deref().unwrap_or("unset"),
+        operator_id = %operator_id.as_deref().unwrap_or("unknown"),
+        command_id = %command_id,
+        message_digest = %message_digest,
+        message_preview = %message_preview,
+        "Orchestrator command accepted"
+    );
+
+    let command_result = runtime
+        .submit_orchestrator_chat_with_command_id(
+            &workflow_id,
+            message,
+            source,
+            external_message_id,
+            Some(command_id.clone()),
+        )
+        .await;
+
+    let (status, error, retryable) = match command_result {
+        Ok(result) => (
+            result.status.as_str().to_string(),
+            result.error.map(|value| redact_sensitive_content(&value)),
+            matches!(result.status.as_str(), "failed" | "cancelled"),
+        ),
+        Err(error) => {
+            let redacted_error =
+                redact_sensitive_content(&format!("Failed to submit orchestrator chat: {error}"));
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                command_id = %command_id,
+                source = %source,
+                error = %redacted_error,
+                "Failed to submit orchestrator chat message"
+            );
+            ("failed".to_string(), Some(redacted_error), true)
+        }
+    };
+
+    let response = SubmitOrchestratorChatResponse {
+        command_id: command_id.clone(),
+        status: status.clone(),
+        retryable,
+        error: error.clone(),
+    };
+
+    WorkflowOrchestratorCommand::update_status(
+        &deployment.db().pool,
+        &command_id,
+        &response.status,
+        response.error.as_deref(),
+        response.retryable,
+        None,
+        Some(Utc::now()),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(format!("Failed to update command completion: {e}")))?;
+
     if response.status == "succeeded" {
         if let Ok(messages) = runtime.get_orchestrator_messages(&workflow_id).await
             && let Some(last_assistant) =
@@ -2146,7 +2469,7 @@ async fn submit_orchestrator_chat(
         {
             let assistant_message = WorkflowOrchestratorMessage::new(
                 &workflow_id,
-                Some(&response.command_id),
+                Some(&command_id),
                 "assistant",
                 &last_assistant.content,
                 "orchestrator",
@@ -2157,10 +2480,60 @@ async fn submit_orchestrator_chat(
         }
     }
 
+    let receipt_message = WorkflowOrchestratorMessage::new(
+        &workflow_id,
+        Some(&command_id),
+        "system",
+        &build_orchestrator_receipt_message(
+            &command_id,
+            &response.status,
+            response.error.as_deref(),
+            response.retryable,
+        ),
+        "orchestrator",
+        None,
+    );
+    let _ = WorkflowOrchestratorMessage::insert(&deployment.db().pool, &receipt_message).await;
+
+    let summary_message = WorkflowOrchestratorMessage::new(
+        &workflow_id,
+        Some(&command_id),
+        "tool-summary",
+        &build_orchestrator_summary_message(&response.status, source),
+        "orchestrator",
+        None,
+    );
+    let _ = WorkflowOrchestratorMessage::insert(&deployment.db().pool, &summary_message).await;
+
+    let circuit_opened = update_orchestrator_circuit_breaker(&workflow_id, &response.status).await;
+    if circuit_opened && workflow.status == "running" {
+        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "paused").await;
+        tracing::warn!(
+            target: "audit.orchestrator_chat",
+            workflow_id = %workflow_id,
+            command_id = %command_id,
+            "Circuit breaker opened; workflow auto-paused"
+        );
+
+        let breaker_notice = WorkflowOrchestratorMessage::new(
+            &workflow_id,
+            Some(&command_id),
+            "system",
+            "Safety breaker triggered after repeated command failures. Workflow was auto-paused.",
+            "orchestrator",
+            None,
+        );
+        let _ = WorkflowOrchestratorMessage::insert(&deployment.db().pool, &breaker_notice).await;
+    }
+
     tracing::info!(
+        target: "audit.orchestrator_chat",
         workflow_id = %workflow_id,
+        source = %source,
+        operator_id = %operator_id.as_deref().unwrap_or("unknown"),
         status = %response.status,
         command_id = %response.command_id,
+        retryable = response.retryable,
         "Submitted orchestrator chat message"
     );
 
@@ -2174,6 +2547,10 @@ async fn list_orchestrator_messages(
     Path(workflow_id): Path<String>,
     Query(params): Query<ListOrchestratorMessagesQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<OrchestratorChatMessageResponse>>>, ApiError> {
+    if !is_orchestrator_chat_feature_enabled() {
+        return Ok(ResponseJson(ApiResponse::success(Vec::new())));
+    }
+
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
@@ -2806,7 +3183,11 @@ mod recovery_response_tests {
             .expect("workflow recovery should succeed");
 
         assert_eq!(response.recovered_workflows, 1);
-        assert_eq!(response.message, "Recovered 1 interrupted workflow(s)");
+        assert_eq!(response.recovered_commands, 0);
+        assert_eq!(
+            response.message,
+            "Recovered 1 interrupted workflow(s) and 0 command(s)"
+        );
 
         let workflow = Workflow::find_by_id(&pool, &workflow_id)
             .await

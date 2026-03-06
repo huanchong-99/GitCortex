@@ -9,6 +9,7 @@ use std::{
 };
 
 use anyhow::{Result, anyhow};
+use db::models::WorkflowOrchestratorCommand;
 use db::DBService;
 use sqlx::Row;
 use tokio::{
@@ -535,6 +536,25 @@ impl OrchestratorRuntime {
         source: &str,
         external_message_id: Option<&str>,
     ) -> Result<OrchestratorChatCommandResult> {
+        self.submit_orchestrator_chat_with_command_id(
+            workflow_id,
+            message,
+            source,
+            external_message_id,
+            None,
+        )
+        .await
+    }
+
+    /// Submit a direct chat message with an optional caller-provided command id.
+    pub async fn submit_orchestrator_chat_with_command_id(
+        &self,
+        workflow_id: &str,
+        message: &str,
+        source: &str,
+        external_message_id: Option<&str>,
+        command_id: Option<String>,
+    ) -> Result<OrchestratorChatCommandResult> {
         let dedup_key = external_message_id.map(|value| format!("{source}:{value}"));
         if let Some(key) = dedup_key.as_ref() {
             let existing = {
@@ -557,7 +577,7 @@ impl OrchestratorRuntime {
         }
 
         let mut command_result = OrchestratorChatCommandResult {
-            command_id: Uuid::new_v4().to_string(),
+            command_id: command_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
             status: OrchestratorChatCommandStatus::Queued,
             error: None,
         };
@@ -812,6 +832,28 @@ impl OrchestratorRuntime {
         }
 
         Ok(recovered_workflow_count)
+    }
+
+    /// Recover incomplete orchestrator commands that were interrupted during restart.
+    pub async fn recover_incomplete_orchestrator_commands(&self) -> Result<usize> {
+        let recovered =
+            match WorkflowOrchestratorCommand::recover_incomplete_commands(&self.db.pool).await {
+                Ok(rows) => rows,
+                Err(sqlx::Error::Database(db_error))
+                    if db_error
+                        .message()
+                        .contains("no such table: workflow_orchestrator_command") =>
+                {
+                    // Older test fixtures may not include this table. Keep startup recovery resilient.
+                    return Ok(0);
+                }
+                Err(e) => {
+                    return Err(anyhow!(
+                        "Failed to recover incomplete orchestrator commands: {e}"
+                    ));
+                }
+            };
+        Ok(recovered as usize)
     }
 }
 
