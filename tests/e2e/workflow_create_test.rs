@@ -6,17 +6,21 @@ fn test_create_workflow_request_with_tasks() {
         project_id: "proj-test".to_string(),
         name: "Test Workflow".to_string(),
         description: Some("Test description".to_string()),
+        execution_mode: "diy".to_string(),
+        initial_goal: None,
         use_slash_commands: false,
-        command_preset_ids: None,
+        commands: None,
         orchestrator_config: None,
         error_terminal_config: None,
         merge_terminal_config: TerminalConfig {
             cli_type_id: "cli-claude-code".to_string(),
             model_config_id: "model-sonnet".to_string(),
+            model_config: None,
             custom_base_url: None,
             custom_api_key: None,
         },
         target_branch: Some("main".to_string()),
+        git_watcher_enabled: Some(true),
         tasks: vec![
             CreateWorkflowTaskRequest {
                 id: None,
@@ -33,6 +37,7 @@ fn test_create_workflow_request_with_tasks() {
                         custom_api_key: None,
                         role: Some("Code Writer".to_string()),
                         role_description: None,
+                        auto_confirm: true,
                         order_index: 0,
                     }
                 ],

@@ -12,20 +12,24 @@ async fn test_create_workflow_with_tasks_and_terminals(pool: SqlitePool) -> sqlx
         .execute(&pool).await?;
 
     let req = CreateWorkflowRequest {
-        project_id: "proj-test".to_string(),
+        project_id: Uuid::new_v4().to_string(),
         name: "Integration Test Workflow".to_string(),
         description: Some("Test workflow with tasks".to_string()),
+        execution_mode: "diy".to_string(),
+        initial_goal: None,
         use_slash_commands: false,
-        command_preset_ids: None,
+        commands: None,
         orchestrator_config: None,
         error_terminal_config: None,
         merge_terminal_config: TerminalConfig {
             cli_type_id: "cli-test".to_string(),
             model_config_id: "model-test".to_string(),
+            model_config: None,
             custom_base_url: None,
             custom_api_key: None,
         },
         target_branch: Some("main".to_string()),
+        git_watcher_enabled: Some(true),
         tasks: vec![
             CreateWorkflowTaskRequest {
                 id: None,
@@ -42,6 +46,7 @@ async fn test_create_workflow_with_tasks_and_terminals(pool: SqlitePool) -> sqlx
                         custom_api_key: None,
                         role: Some("Writer".to_string()),
                         role_description: None,
+                        auto_confirm: true,
                         order_index: 0,
                     }
                 ],
@@ -54,10 +59,12 @@ async fn test_create_workflow_with_tasks_and_terminals(pool: SqlitePool) -> sqlx
 
     let workflow = Workflow {
         id: workflow_id.clone(),
-        project_id: req.project_id.clone(),
+        project_id: Uuid::parse_str(&req.project_id).expect("valid project id"),
         name: req.name.clone(),
         description: req.description.clone(),
         status: "created".to_string(),
+        execution_mode: req.execution_mode.clone(),
+        initial_goal: req.initial_goal.clone(),
         use_slash_commands: req.use_slash_commands,
         orchestrator_enabled: false,
         orchestrator_api_type: None,
@@ -70,6 +77,7 @@ async fn test_create_workflow_with_tasks_and_terminals(pool: SqlitePool) -> sqlx
         merge_terminal_cli_id: req.merge_terminal_config.cli_type_id.clone(),
         merge_terminal_model_id: req.merge_terminal_config.model_config_id.clone(),
         target_branch: req.target_branch.unwrap(),
+        git_watcher_enabled: req.git_watcher_enabled.unwrap_or(true),
         ready_at: None,
         started_at: None,
         completed_at: None,

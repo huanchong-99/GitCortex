@@ -8,8 +8,8 @@
 use std::sync::Arc;
 
 use db::models::{
-    CliType, CreateTaskRequest, CreateTerminalRequest, CreateWorkflowRequest, MergeTerminalConfig,
-    ModelConfig, OrchestratorConfig, Workflow,
+    CliType, CreateTaskRequest, CreateTerminalRequest, CreateWorkflowRequest, ModelConfig,
+    OrchestratorConfig, TerminalConfig, Workflow,
 };
 use serde_json::json;
 use server::{DeploymentImpl, routes::subscription_hub::SubscriptionHub};
@@ -94,25 +94,33 @@ async fn create_minimal_workflow(
         project_id: project_id.to_string(),
         name: "Test Workflow".to_string(),
         description: Some("Test description".to_string()),
+        execution_mode: "diy".to_string(),
+        initial_goal: None,
         use_slash_commands: false,
         orchestrator_config,
-        command_preset_ids: None,
-        merge_terminal_config: MergeTerminalConfig {
+        commands: None,
+        merge_terminal_config: TerminalConfig {
             cli_type_id: "test-cli".to_string(),
             model_config_id: "test-model".to_string(),
+            model_config: None,
+            custom_base_url: None,
+            custom_api_key: None,
         },
         error_terminal_config: None,
         target_branch: Some("main".to_string()),
+        git_watcher_enabled: Some(true),
         tasks: vec![],
     };
 
     // Create workflow directly in database
     let workflow = Workflow {
         id: workflow_id.clone(),
-        project_id: project_id.to_string(),
+        project_id: Uuid::parse_str(project_id).expect("valid project id"),
         name: request.name,
         description: request.description,
         status: "created".to_string(),
+        execution_mode: request.execution_mode,
+        initial_goal: request.initial_goal,
         use_slash_commands: request.use_slash_commands,
         orchestrator_enabled: request.orchestrator_config.is_some(),
         orchestrator_api_type: request

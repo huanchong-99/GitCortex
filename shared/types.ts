@@ -4,7 +4,7 @@
 
 // If you are an AI, and you absolutely have to edit this file, please confirm with the user first.
 
-export type WorkflowDetailDto = { id: string, projectId: string, name: string, description: string | null, status: string, useSlashCommands: boolean, orchestratorEnabled: boolean, orchestratorApiType: string | null, orchestratorBaseUrl: string | null, orchestratorModel: string | null, errorTerminalEnabled: boolean, errorTerminalCliId: string | null, errorTerminalModelId: string | null, mergeTerminalCliId: string | null, mergeTerminalModelId: string | null, targetBranch: string, gitWatcherEnabled: boolean, readyAt: string | null, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, tasks: Array<WorkflowTaskDto>, commands: Array<WorkflowCommandDto>, };
+export type WorkflowDetailDto = { id: string, projectId: string, name: string, description: string | null, status: string, executionMode: string, initialGoal: string | null, useSlashCommands: boolean, orchestratorEnabled: boolean, orchestratorApiType: string | null, orchestratorBaseUrl: string | null, orchestratorModel: string | null, errorTerminalEnabled: boolean, errorTerminalCliId: string | null, errorTerminalModelId: string | null, mergeTerminalCliId: string | null, mergeTerminalModelId: string | null, targetBranch: string, gitWatcherEnabled: boolean, readyAt: string | null, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, tasks: Array<WorkflowTaskDto>, commands: Array<WorkflowCommandDto>, };
 
 export type WorkflowTaskDto = { id: string, workflowId: string, vkTaskId: string | null, name: string, description: string | null, branch: string, status: string, orderIndex: number, startedAt: string | null, completedAt: string | null, createdAt: string, updatedAt: string, terminals: Array<TerminalDto>, };
 
@@ -14,7 +14,7 @@ export type WorkflowCommandDto = { id: string, workflowId: string, presetId: str
 
 export type SlashCommandPresetDto = { id: string, command: string, description: string, promptTemplate: string, isSystem: boolean, createdAt: string, updatedAt: string, };
 
-export type WorkflowListItemDto = { id: string, projectId: string, name: string, description: string | null, status: string, createdAt: string, updatedAt: string, tasksCount: number, terminalsCount: number, };
+export type WorkflowListItemDto = { id: string, projectId: string, name: string, description: string | null, status: string, executionMode: string, createdAt: string, updatedAt: string, tasksCount: number, terminalsCount: number, };
 
 export type SharedTaskResponse = { task: SharedTask, user: UserData | null, };
 

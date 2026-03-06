@@ -146,6 +146,8 @@ export interface CreateWorkflowRequest {
   projectId: string;
   name: string;
   description?: string;
+  executionMode?: 'diy' | 'agent_planned';
+  initialGoal?: string;
   useSlashCommands?: boolean;
   commandPresetIds?: string[];
   commands?: Array<{

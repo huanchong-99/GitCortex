@@ -3,8 +3,7 @@
 //! This module defines the API contract for Workflow responses.
 //! All structs use explicit field mappings (no flatten) to prevent conflicts.
 
-use db::models::{SlashCommandPreset, WorkflowCommand};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use ts_rs::TS;
 
 /// Workflow detail response DTO
@@ -18,6 +17,8 @@ pub struct WorkflowDetailDto {
     pub name: String,
     pub description: Option<String>,
     pub status: String,
+    pub execution_mode: String,
+    pub initial_goal: Option<String>,
     pub use_slash_commands: bool,
     pub orchestrator_enabled: bool,
     pub orchestrator_api_type: Option<String>,
@@ -122,6 +123,7 @@ pub struct WorkflowListItemDto {
     pub name: String,
     pub description: Option<String>,
     pub status: String,
+    pub execution_mode: String,
     pub created_at: String,
     pub updated_at: String,
     pub tasks_count: i32,
@@ -153,6 +155,8 @@ impl WorkflowDetailDto {
             name: workflow.name.clone(),
             description: workflow.description.clone(),
             status: workflow.status.clone(),
+            execution_mode: workflow.execution_mode.clone(),
+            initial_goal: workflow.initial_goal.clone(),
             use_slash_commands: workflow.use_slash_commands,
             orchestrator_enabled: workflow.orchestrator_enabled,
             orchestrator_api_type: workflow.orchestrator_api_type.clone(),
@@ -197,6 +201,8 @@ impl WorkflowDetailDto {
             name: workflow.name.clone(),
             description: workflow.description.clone(),
             status: workflow.status.clone(),
+            execution_mode: workflow.execution_mode.clone(),
+            initial_goal: workflow.initial_goal.clone(),
             use_slash_commands: workflow.use_slash_commands,
             orchestrator_enabled: workflow.orchestrator_enabled,
             orchestrator_api_type: workflow.orchestrator_api_type.clone(),
@@ -307,6 +313,8 @@ mod tests {
             name: "Test Workflow".to_string(),
             description: Some("Test description".to_string()),
             status: "created".to_string(),
+            execution_mode: "diy".to_string(),
+            initial_goal: None,
             use_slash_commands: true,
             orchestrator_enabled: true,
             orchestrator_api_type: Some("openai-compatible".to_string()),
@@ -332,6 +340,7 @@ mod tests {
 
         // Verify camelCase serialization
         assert!(json.contains("\"projectId\""));
+        assert!(json.contains("\"executionMode\""));
         assert!(json.contains("\"useSlashCommands\""));
         assert!(json.contains("\"orchestratorEnabled\""));
         assert!(json.contains("\"createdAt\""));
@@ -339,6 +348,7 @@ mod tests {
 
         // Verify no snake_case
         assert!(!json.contains("\"project_id\""));
+        assert!(!json.contains("\"execution_mode\""));
         assert!(!json.contains("\"use_slash_commands\""));
         assert!(!json.contains("\"created_at\""));
     }
@@ -364,6 +374,8 @@ mod tests {
                 name: "Test".to_string(),
                 description: None,
                 status: status.to_string(),
+                execution_mode: "diy".to_string(),
+                initial_goal: None,
                 use_slash_commands: false,
                 orchestrator_enabled: false,
                 orchestrator_api_type: None,
@@ -441,6 +453,8 @@ mod conversion_tests {
             name: "Test Workflow".to_string(),
             description: Some("Test".to_string()),
             status: "created".to_string(),
+            execution_mode: "diy".to_string(),
+            initial_goal: Some("Ship dual-mode orchestration".to_string()),
             use_slash_commands: true,
             orchestrator_enabled: true,
             orchestrator_api_type: Some("openai-compatible".to_string()),
@@ -465,6 +479,8 @@ mod conversion_tests {
 
         assert_eq!(dto.name, "Test Workflow");
         assert_eq!(dto.status, "created");
+        assert_eq!(dto.execution_mode, "diy");
+        assert_eq!(dto.initial_goal.as_deref(), Some("Ship dual-mode orchestration"));
         assert!(dto.use_slash_commands);
     }
 }

@@ -8,7 +8,7 @@
 
 use db::models::{
     CliType, CreateTerminalRequest, CreateWorkflowRequest, CreateWorkflowTaskRequest,
-    MergeTerminalConfig, ModelConfig, SlashCommandPreset, TerminalConfig, Workflow,
+    ModelConfig, SlashCommandPreset, TerminalConfig, Workflow,
     WorkflowCommand, WorkflowCommandRequest,
 };
 use serde_json::json;
@@ -197,10 +197,12 @@ async fn test_workflow_with_commands() {
 
     let workflow = Workflow {
         id: workflow_id.clone(),
-        project_id: project_id.clone(),
+        project_id: Uuid::parse_str(&project_id).expect("valid project id"),
         name: "Test Workflow".to_string(),
         description: Some("Test".to_string()),
         status: "created".to_string(),
+        execution_mode: "diy".to_string(),
+        initial_goal: None,
         use_slash_commands: true,
         orchestrator_enabled: false,
         orchestrator_api_type: None,
@@ -338,6 +340,8 @@ async fn test_full_workflow_with_commands_api() {
         project_id: project_id.clone(),
         name: "Deploy Workflow".to_string(),
         description: Some("Deployment workflow".to_string()),
+        execution_mode: "agent_planned".to_string(),
+        initial_goal: Some("Deploy the configured service safely".to_string()),
         use_slash_commands: true,
         commands: Some(vec![WorkflowCommandRequest {
             preset_id: preset.id.clone(),
@@ -350,10 +354,12 @@ async fn test_full_workflow_with_commands_api() {
         merge_terminal_config: TerminalConfig {
             cli_type_id: "test-cli".to_string(),
             model_config_id: "test-model".to_string(),
+            model_config: None,
             custom_base_url: None,
             custom_api_key: None,
         },
         target_branch: Some("main".to_string()),
+        git_watcher_enabled: Some(true),
         tasks: vec![],
     };
 
@@ -361,10 +367,12 @@ async fn test_full_workflow_with_commands_api() {
     let now = chrono::Utc::now();
     let workflow = Workflow {
         id: workflow_id.clone(),
-        project_id: project_id.clone(),
+        project_id: Uuid::parse_str(&project_id).expect("valid project id"),
         name: request.name.clone(),
         description: request.description.clone(),
         status: "created".to_string(),
+        execution_mode: request.execution_mode.clone(),
+        initial_goal: request.initial_goal.clone(),
         use_slash_commands: request.use_slash_commands,
         orchestrator_enabled: request.orchestrator_config.is_some(),
         orchestrator_api_type: request
@@ -392,7 +400,7 @@ async fn test_full_workflow_with_commands_api() {
         merge_terminal_cli_id: request.merge_terminal_config.cli_type_id.clone(),
         merge_terminal_model_id: request.merge_terminal_config.model_config_id.clone(),
         target_branch: request.target_branch.unwrap_or_else(|| "main".to_string()),
-        git_watcher_enabled: true,
+        git_watcher_enabled: request.git_watcher_enabled.unwrap_or(true),
         ready_at: None,
         started_at: None,
         completed_at: None,
@@ -442,10 +450,12 @@ async fn test_workflow_without_commands() {
 
     let workflow = Workflow {
         id: workflow_id.clone(),
-        project_id: project_id.clone(),
+        project_id: Uuid::parse_str(&project_id).expect("valid project id"),
         name: "No Commands Workflow".to_string(),
         description: None,
         status: "created".to_string(),
+        execution_mode: "diy".to_string(),
+        initial_goal: None,
         use_slash_commands: false,
         orchestrator_enabled: false,
         orchestrator_api_type: None,

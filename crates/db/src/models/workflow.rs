@@ -114,6 +114,13 @@ pub struct Workflow {
     /// Status
     pub status: String,
 
+    /// Execution mode: diy | agent_planned
+    #[serde(default = "default_execution_mode_diy")]
+    pub execution_mode: String,
+
+    /// Initial goal for agent-planned workflows
+    pub initial_goal: Option<String>,
+
     /// Use slash commands
     #[serde(default)]
     pub use_slash_commands: bool,
@@ -394,6 +401,11 @@ fn default_true() -> bool {
     true
 }
 
+/// Default execution mode for new workflows
+fn default_execution_mode_diy() -> String {
+    "diy".to_string()
+}
+
 /// Create Terminal Request
 #[derive(Debug, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -433,6 +445,11 @@ pub struct CreateWorkflowRequest {
     pub name: String,
     /// Workflow description
     pub description: Option<String>,
+    /// Workflow execution mode
+    #[serde(default = "default_execution_mode_diy")]
+    pub execution_mode: String,
+    /// High-level goal for agent-planned workflows
+    pub initial_goal: Option<String>,
     /// Use slash commands
     pub use_slash_commands: bool,
     /// Workflow commands with custom parameters (in order)
@@ -450,6 +467,7 @@ pub struct CreateWorkflowRequest {
 
     // ========== 新增字段 ==========
     /// Workflow tasks with terminals
+    #[serde(default)]
     pub tasks: Vec<CreateWorkflowTaskRequest>,
 }
 
@@ -495,13 +513,14 @@ impl Workflow {
             r"
             INSERT INTO workflow (
                 id, project_id, name, description, status,
+                execution_mode, initial_goal,
                 use_slash_commands, orchestrator_enabled,
                 orchestrator_api_type, orchestrator_base_url,
                 orchestrator_api_key, orchestrator_model,
                 error_terminal_enabled, error_terminal_cli_id, error_terminal_model_id,
                 merge_terminal_cli_id, merge_terminal_model_id,
                 target_branch, git_watcher_enabled, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)
             RETURNING *
             "
         )
@@ -510,6 +529,8 @@ impl Workflow {
         .bind(&workflow.name)
         .bind(&workflow.description)
         .bind(&workflow.status)
+        .bind(&workflow.execution_mode)
+        .bind(&workflow.initial_goal)
         .bind(workflow.use_slash_commands)
         .bind(workflow.orchestrator_enabled)
         .bind(&workflow.orchestrator_api_type)
@@ -572,6 +593,7 @@ pub struct WorkflowWithCounts {
     pub name: String,
     pub description: Option<String>,
     pub status: String,
+    pub execution_mode: String,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
     pub tasks_count: i64,
@@ -596,6 +618,7 @@ impl Workflow {
                 w.name,
                 w.description,
                 w.status,
+                w.execution_mode,
                 w.created_at,
                 w.updated_at,
                 COUNT(DISTINCT t.id) as tasks_count,
@@ -712,13 +735,14 @@ impl Workflow {
             r"
             INSERT INTO workflow (
                 id, project_id, name, description, status,
+                execution_mode, initial_goal,
                 use_slash_commands, orchestrator_enabled,
                 orchestrator_api_type, orchestrator_base_url,
                 orchestrator_api_key, orchestrator_model,
                 error_terminal_enabled, error_terminal_cli_id, error_terminal_model_id,
                 merge_terminal_cli_id, merge_terminal_model_id,
                 target_branch, git_watcher_enabled, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)
             "
         )
         .bind(&workflow.id)
@@ -726,6 +750,8 @@ impl Workflow {
         .bind(&workflow.name)
         .bind(&workflow.description)
         .bind(&workflow.status)
+        .bind(&workflow.execution_mode)
+        .bind(&workflow.initial_goal)
         .bind(workflow.use_slash_commands)
         .bind(workflow.orchestrator_enabled)
         .bind(&workflow.orchestrator_api_type)
@@ -1063,6 +1089,8 @@ mod encryption_tests {
                     name: "Test Workflow".to_string(),
                     description: None,
                     status: "pending".to_string(),
+                    execution_mode: "diy".to_string(),
+                    initial_goal: None,
                     use_slash_commands: false,
                     orchestrator_enabled: false,
                     orchestrator_api_type: None,
@@ -1111,6 +1139,8 @@ mod encryption_tests {
                 name: "Test Workflow".to_string(),
                 description: None,
                 status: "pending".to_string(),
+                execution_mode: "diy".to_string(),
+                initial_goal: None,
                 use_slash_commands: false,
                 orchestrator_enabled: false,
                 orchestrator_api_type: None,
@@ -1153,6 +1183,8 @@ mod encryption_tests {
                 name: "Test Workflow".to_string(),
                 description: None,
                 status: "pending".to_string(),
+                execution_mode: "diy".to_string(),
+                initial_goal: None,
                 use_slash_commands: false,
                 orchestrator_enabled: false,
                 orchestrator_api_type: None,
@@ -1192,6 +1224,8 @@ mod encryption_tests {
                     name: "Test Workflow".to_string(),
                     description: None,
                     status: "pending".to_string(),
+                    execution_mode: "diy".to_string(),
+                    initial_goal: None,
                     use_slash_commands: false,
                     orchestrator_enabled: false,
                     orchestrator_api_type: None,
@@ -1231,6 +1265,8 @@ mod encryption_tests {
                     name: "Test Workflow".to_string(),
                     description: None,
                     status: "pending".to_string(),
+                    execution_mode: "diy".to_string(),
+                    initial_goal: None,
                     use_slash_commands: false,
                     orchestrator_enabled: false,
                     orchestrator_api_type: None,

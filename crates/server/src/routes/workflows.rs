@@ -12,7 +12,6 @@ use db::models::{
     CliType, CreateWorkflowRequest, InlineModelConfig, ModelConfig, SlashCommandPreset, Terminal,
     Workflow, WorkflowCommand, WorkflowTask,
     project::Project,
-    workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest},
 };
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
@@ -29,6 +28,9 @@ use uuid::Uuid;
 // Import DTOs
 use crate::routes::workflows_dto::{WorkflowDetailDto, WorkflowListItemDto};
 use crate::{DeploymentImpl, error::ApiError};
+
+#[cfg(test)]
+use db::models::workflow::{CreateTerminalRequest, CreateWorkflowTaskRequest};
 
 // ============================================================================
 // Request/Response Types
@@ -88,6 +90,8 @@ const WORKFLOW_STATUSES: [&str; 9] = [
     "failed",
     "cancelled",
 ];
+
+const WORKFLOW_EXECUTION_MODES: [&str; 2] = ["diy", "agent_planned"];
 
 const MERGE_ALLOWED_WORKFLOW_STATUSES: [&str; 2] = ["completed", "merging"];
 
@@ -222,8 +226,30 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
         return Err(ApiError::BadRequest("name is required".to_string()));
     }
 
-    // Validate tasks is not empty
-    if req.tasks.is_empty() {
+    if !WORKFLOW_EXECUTION_MODES.contains(&req.execution_mode.as_str()) {
+        return Err(ApiError::BadRequest(format!(
+            "executionMode must be one of: {}",
+            WORKFLOW_EXECUTION_MODES.join(", ")
+        )));
+    }
+
+    if req.execution_mode == "agent_planned" {
+        if req.orchestrator_config.is_none() {
+            return Err(ApiError::BadRequest(
+                "orchestratorConfig is required for agent_planned workflows".to_string(),
+            ));
+        }
+
+        if req
+            .initial_goal
+            .as_ref()
+            .is_none_or(|goal| goal.trim().is_empty())
+        {
+            return Err(ApiError::BadRequest(
+                "initialGoal is required for agent_planned workflows".to_string(),
+            ));
+        }
+    } else if req.tasks.is_empty() {
         return Err(ApiError::BadRequest("tasks must not be empty".to_string()));
     }
 
@@ -431,6 +457,7 @@ async fn list_workflows(
             name: w.name,
             description: w.description,
             status: w.status,
+            execution_mode: w.execution_mode,
             created_at: w.created_at.to_rfc3339(),
             updated_at: w.updated_at.to_rfc3339(),
             tasks_count: w.tasks_count as i32,
@@ -477,6 +504,8 @@ async fn create_workflow(
         name: req.name,
         description: req.description,
         status: "created".to_string(),
+        execution_mode: req.execution_mode,
+        initial_goal: req.initial_goal,
         use_slash_commands: req.use_slash_commands,
         orchestrator_enabled: req.orchestrator_config.is_some(),
         orchestrator_api_type: req.orchestrator_config.as_ref().map(|c| c.api_type.clone()),
@@ -1936,6 +1965,112 @@ mod workflow_guard_tests {
         ];
         assert!(!should_auto_complete_workflow("running", &mixed_tasks));
         assert!(!should_auto_complete_workflow("running", &[]));
+    }
+}
+
+#[cfg(test)]
+mod create_request_validation_tests {
+    use super::*;
+
+    fn minimal_terminal_config() -> db::models::TerminalConfig {
+        db::models::TerminalConfig {
+            cli_type_id: "cli-test".to_string(),
+            model_config_id: "model-test".to_string(),
+            model_config: None,
+            custom_base_url: None,
+            custom_api_key: None,
+        }
+    }
+
+    fn minimal_diy_request() -> CreateWorkflowRequest {
+        CreateWorkflowRequest {
+            project_id: Uuid::new_v4().to_string(),
+            name: "Test Workflow".to_string(),
+            description: None,
+            execution_mode: "diy".to_string(),
+            initial_goal: None,
+            use_slash_commands: false,
+            commands: None,
+            orchestrator_config: None,
+            error_terminal_config: None,
+            merge_terminal_config: minimal_terminal_config(),
+            target_branch: Some("main".to_string()),
+            git_watcher_enabled: Some(true),
+            tasks: vec![CreateWorkflowTaskRequest {
+                id: None,
+                name: "Task 1".to_string(),
+                description: None,
+                branch: None,
+                order_index: 0,
+                terminals: vec![CreateTerminalRequest {
+                    id: None,
+                    cli_type_id: "cli-test".to_string(),
+                    model_config_id: "model-test".to_string(),
+                    model_config: None,
+                    custom_base_url: None,
+                    custom_api_key: None,
+                    role: Some("writer".to_string()),
+                    role_description: None,
+                    order_index: 0,
+                    auto_confirm: true,
+                }],
+            }],
+        }
+    }
+
+    #[test]
+    fn diy_mode_requires_tasks() {
+        let mut request = minimal_diy_request();
+        request.tasks.clear();
+
+        let error = validate_create_request(&request).expect_err("expected diy validation error");
+        assert!(matches!(error, ApiError::BadRequest(_)));
+    }
+
+    #[test]
+    fn agent_planned_mode_allows_empty_tasks_with_goal() {
+        let mut request = minimal_diy_request();
+        request.execution_mode = "agent_planned".to_string();
+        request.initial_goal = Some("Plan and implement the feature".to_string());
+        request.orchestrator_config = Some(db::models::OrchestratorConfig {
+            api_type: "openai-compatible".to_string(),
+            base_url: "https://api.example.com".to_string(),
+            api_key: "secret".to_string(),
+            model: "gpt-4.1".to_string(),
+        });
+        request.tasks.clear();
+
+        validate_create_request(&request).expect("agent planned request should be valid");
+    }
+
+    #[test]
+    fn agent_planned_mode_requires_initial_goal() {
+        let mut request = minimal_diy_request();
+        request.execution_mode = "agent_planned".to_string();
+        request.initial_goal = None;
+        request.orchestrator_config = Some(db::models::OrchestratorConfig {
+            api_type: "openai-compatible".to_string(),
+            base_url: "https://api.example.com".to_string(),
+            api_key: "secret".to_string(),
+            model: "gpt-4.1".to_string(),
+        });
+        request.tasks.clear();
+
+        let error =
+            validate_create_request(&request).expect_err("expected missing initial_goal error");
+        assert!(matches!(error, ApiError::BadRequest(_)));
+    }
+
+    #[test]
+    fn agent_planned_mode_requires_orchestrator_config() {
+        let mut request = minimal_diy_request();
+        request.execution_mode = "agent_planned".to_string();
+        request.initial_goal = Some("Plan and implement the feature".to_string());
+        request.tasks.clear();
+
+        let error = validate_create_request(&request)
+            .expect_err("expected missing orchestrator_config error");
+        assert!(matches!(error, ApiError::BadRequest(_)));
     }
 }
 
