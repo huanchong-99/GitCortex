@@ -168,7 +168,7 @@ RUN set -eux; \
     printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
         > /etc/apt/apt.conf.d/80gitcortex-retries; \
     apt-get update && apt-get install -y --no-install-recommends \
-        libsqlite3-0 libgit2-1.9 git curl ca-certificates bash gnupg \
+        libsqlite3-0 libgit2-1.9 git curl ca-certificates bash gnupg xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js from nodesource — lightweight, single-purpose
