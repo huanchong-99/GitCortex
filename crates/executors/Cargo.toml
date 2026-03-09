@@ -35,7 +35,6 @@ strip-ansi-escapes = "0.2.1"
 strum = "0.27.2"
 strum_macros = "0.27.2"
 convert_case = "0.6"
-sqlx = "0.8.6"
 axum = { workspace = true }
 shlex = "1.3.0"
 agent-client-protocol = { version = "0.8", features = ["unstable"] }
