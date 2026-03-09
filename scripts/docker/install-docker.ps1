@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet("install", "update")]
     [string]$Mode = "",
     [string]$HostWorkspaceRoot,
@@ -19,6 +19,8 @@
     [switch]$PullBaseImages,
     [switch]$AllowDirty,
     [switch]$EnableAutoSetupProjects,
+    [ValidateSet("official", "china")]
+    [string]$BuildNetworkProfile = "",
     [ValidateSet("zh", "en")]
     [string]$Lang = ""
 )
@@ -62,6 +64,7 @@ $script:Messages = @{
         PROMPT_PORT = "GitCortex 主机端口"
         PROMPT_RUST_LOG = "RUST_LOG 日志级别"
         PROMPT_INSTALL_AI_CLIS = "构建镜像时安装 AI CLI（更慢，但更省事）"
+        PROMPT_WEAK_NETWORK_PROFILE = "启用弱网/中国网络优化（推荐中国用户开启）"
         PROMPT_AUTO_SETUP_PROJECTS = "首次启动自动创建项目（最多 3 个）"
         PROMPT_RUN_BUILD = "现在执行 docker compose build"
         PROMPT_RUN_UP = "现在执行 docker compose up -d"
@@ -82,6 +85,11 @@ $script:Messages = @{
         INFO_MOUNT_SUMMARY = "挂载摘要："
         INFO_VALIDATING = "正在校验 compose 配置..."
         INFO_BUILDING = "正在构建 Docker 镜像..."
+        INFO_BUILD_NETWORK_PROFILE = "构建网络配置: {0}"
+        INFO_BUILD_WATCHDOG = "构建已超过 5 分钟，开始巡检是否卡住..."
+        INFO_BUILD_POLL = "构建仍在进行，已耗时 {0}，距上次输出 {1} 秒。"
+        INFO_BUILD_RETRY = "检测到可重试的构建失败，准备进行第 {0}/{1} 次重试..."
+        INFO_PRUNING_BUILD_CACHE = "正在清理 BuildKit 执行缓存后重试..."
         INFO_STARTING = "正在启动容器..."
         INFO_RESETTING_DATA = "正在清理旧容器和数据卷..."
         INFO_CHECKING_READY = "正在检查服务就绪: {0}"
@@ -98,6 +106,12 @@ $script:Messages = @{
 
         WARN_READY_TIMEOUT = "服务未在预期时间内就绪，请查看日志: docker compose -f {0} logs -f"
         WARN_KEY_LEN = "密钥长度必须恰好为 32。"
+        WARN_BUILD_STALLED = "构建连续 {0} 秒无输出，判定为卡住。"
+        WARN_BUILD_LOG_TAIL = "最后 60 行构建日志："
+
+        INFO_EXISTING_IMAGE = "检测到已有镜像: {0}"
+        INFO_BUILD_SKIPPED = "已跳过构建，复用现有镜像。"
+        PROMPT_REBUILD_IMAGE = "是否重新构建镜像（选 N 复用现有镜像）"
 
         OPEN_URL = "访问地址: http://localhost:{0}"
         USEFUL_COMMANDS = "常用命令："
@@ -131,6 +145,7 @@ $script:Messages = @{
         PROMPT_PORT = "Host port for GitCortex"
         PROMPT_RUST_LOG = "RUST_LOG level"
         PROMPT_INSTALL_AI_CLIS = "Install AI CLIs during image build (slower but turnkey)"
+        PROMPT_WEAK_NETWORK_PROFILE = "Enable weak-network / China optimizations (recommended for users in China)"
         PROMPT_AUTO_SETUP_PROJECTS = "Auto-create starter projects on first launch (up to 3)"
         PROMPT_RUN_BUILD = "Run docker compose build now"
         PROMPT_RUN_UP = "Run docker compose up -d now"
@@ -151,6 +166,11 @@ $script:Messages = @{
         INFO_MOUNT_SUMMARY = "Mount summary:"
         INFO_VALIDATING = "Validating compose file..."
         INFO_BUILDING = "Building Docker image..."
+        INFO_BUILD_NETWORK_PROFILE = "Build network profile: {0}"
+        INFO_BUILD_WATCHDOG = "Build has run for over 5 minutes. Starting stall watchdog..."
+        INFO_BUILD_POLL = "Build still running. Elapsed {0}, last output {1}s ago."
+        INFO_BUILD_RETRY = "Detected a retryable build failure. Starting retry {0}/{1}..."
+        INFO_PRUNING_BUILD_CACHE = "Pruning BuildKit exec cache before retry..."
         INFO_STARTING = "Starting containers..."
         INFO_RESETTING_DATA = "Removing existing containers and data volume..."
         INFO_CHECKING_READY = "Checking readiness: {0}"
@@ -167,6 +187,12 @@ $script:Messages = @{
 
         WARN_READY_TIMEOUT = "Service did not become ready in time. Check: docker compose -f {0} logs -f"
         WARN_KEY_LEN = "Key length must be exactly 32."
+        WARN_BUILD_STALLED = "Build produced no output for {0}s and is treated as stalled."
+        WARN_BUILD_LOG_TAIL = "Last 60 build log lines:"
+
+        INFO_EXISTING_IMAGE = "Existing image detected: {0}"
+        INFO_BUILD_SKIPPED = "Build skipped, reusing existing image."
+        PROMPT_REBUILD_IMAGE = "Rebuild image (choose N to reuse existing)"
 
         OPEN_URL = "Open: http://localhost:{0}"
         USEFUL_COMMANDS = "Useful commands:"
@@ -239,6 +265,283 @@ function Write-Ok {
     Write-Host "[OK] $Message" -ForegroundColor Green
 }
 
+function Format-Duration {
+    param([TimeSpan]$Duration)
+
+    if ($Duration.TotalHours -ge 1) {
+        return $Duration.ToString("hh\:mm\:ss")
+    }
+
+    return $Duration.ToString("mm\:ss")
+}
+
+function Write-NewProcessOutput {
+    param(
+        [string]$Path,
+        [ref]$LineCount
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $lines = @(Get-Content -LiteralPath $Path)
+    if ($lines.Count -le $LineCount.Value) {
+        return
+    }
+
+    for ($i = $LineCount.Value; $i -lt $lines.Count; $i++) {
+        Write-Host $lines[$i]
+    }
+
+    $LineCount.Value = $lines.Count
+}
+
+function Get-LatestOutputTime {
+    param(
+        [string[]]$Paths,
+        [datetime]$Fallback
+    )
+
+    $latest = $Fallback
+    foreach ($path in $Paths) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+
+        $item = Get-Item -LiteralPath $path
+        if ($item.Length -gt 0 -and $item.LastWriteTime -gt $latest) {
+            $latest = $item.LastWriteTime
+        }
+    }
+
+    return $latest
+}
+
+function Read-FileTextWithRetry {
+    param(
+        [string]$Path,
+        [int]$MaxAttempts = 5,
+        [int]$DelayMilliseconds = 200
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            return [System.IO.File]::ReadAllText($Path)
+        }
+        catch [System.IO.IOException] {
+            if ($attempt -eq $MaxAttempts) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+
+    return ""
+}
+
+function Get-CombinedProcessOutput {
+    param([string[]]$Paths)
+
+    $chunks = @()
+    foreach ($path in $Paths) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+
+        $content = Read-FileTextWithRetry -Path $path
+        if (-not [string]::IsNullOrWhiteSpace($content)) {
+            $chunks += $content
+        }
+    }
+
+    return ($chunks -join [Environment]::NewLine)
+}
+
+function Get-OutputTail {
+    param(
+        [string]$Output,
+        [int]$MaxLines = 60
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Output)) {
+        return ""
+    }
+
+    $lines = @($Output -split "`r?`n")
+    if ($lines.Count -eq 0) {
+        return ""
+    }
+
+    $start = [Math]::Max(0, $lines.Count - $MaxLines)
+    return (($lines[$start..($lines.Count - 1)]) -join [Environment]::NewLine)
+}
+
+function Test-RetryableBuildFailure {
+    param(
+        [string]$Output,
+        [bool]$Stalled
+    )
+
+    if ($Stalled) {
+        return $true
+    }
+
+    $patterns = @(
+        "ETIMEDOUT",
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "EAI_AGAIN",
+        "socket hang up",
+        "TLS handshake timeout",
+        "i/o timeout",
+        "Temporary failure resolving",
+        "Could not resolve",
+        "no such host",
+        "connection reset by peer",
+        "Connection timed out",
+        "network is unreachable",
+        "unexpected EOF",
+        "context deadline exceeded",
+        "502 Bad Gateway",
+        "503 Service Unavailable",
+        "504 Gateway Timeout",
+        "failed to fetch",
+        "Unable to update https://github.com",
+        "failed to clone into",
+        "could not execute process `git fetch",
+        "failed to resolve source metadata",
+        "error pulling image configuration"
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($Output -match $pattern) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Invoke-ProcessWithWatchdog {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [int]$StallTimeoutSeconds = 300,
+        [int]$PollIntervalSeconds = 15
+    )
+
+    $stdoutFile = [System.IO.Path]::GetTempFileName()
+    $stderrFile = [System.IO.Path]::GetTempFileName()
+    $stdoutLineCount = 0
+    $stderrLineCount = 0
+    $startedAt = Get-Date
+    $lastOutputAt = $startedAt
+    $watchdogStarted = $false
+    $stalled = $false
+
+    try {
+        $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+
+        while (-not $process.HasExited) {
+            Start-Sleep -Seconds $PollIntervalSeconds
+            $process.Refresh()
+
+            Write-NewProcessOutput -Path $stdoutFile -LineCount ([ref]$stdoutLineCount)
+            Write-NewProcessOutput -Path $stderrFile -LineCount ([ref]$stderrLineCount)
+
+            $lastOutputAt = Get-LatestOutputTime -Paths @($stdoutFile, $stderrFile) -Fallback $lastOutputAt
+            $elapsed = (Get-Date) - $startedAt
+
+            if ($elapsed.TotalSeconds -ge $StallTimeoutSeconds) {
+                if (-not $watchdogStarted) {
+                    Write-Info (T "INFO_BUILD_WATCHDOG")
+                    $watchdogStarted = $true
+                }
+
+                $silentFor = (Get-Date) - $lastOutputAt
+                Write-Info (Tf "INFO_BUILD_POLL" @((Format-Duration $elapsed), [int][Math]::Floor($silentFor.TotalSeconds)))
+
+                if ($silentFor.TotalSeconds -ge $StallTimeoutSeconds) {
+                    $stalled = $true
+                    Write-Warn (Tf "WARN_BUILD_STALLED" @([int][Math]::Floor($silentFor.TotalSeconds)))
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                    break
+                }
+            }
+        }
+
+        $process.WaitForExit()
+        $process.Refresh()
+
+        Write-NewProcessOutput -Path $stdoutFile -LineCount ([ref]$stdoutLineCount)
+        Write-NewProcessOutput -Path $stderrFile -LineCount ([ref]$stderrLineCount)
+
+        return @{
+            ExitCode = if ($stalled) { -1 } else { $process.ExitCode }
+            Stalled = $stalled
+            Output = Get-CombinedProcessOutput -Paths @($stdoutFile, $stderrFile)
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-ComposeBuildWithRetry {
+    param(
+        [string]$ComposeFilePath,
+        [string]$EnvFilePath,
+        [bool]$ShouldPullBaseImages
+    )
+
+    $maxAttempts = 3
+    $stallTimeoutSeconds = 180
+    $pollIntervalSeconds = 10
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        if ($attempt -gt 1) {
+            Write-Info (Tf "INFO_BUILD_RETRY" @($attempt, $maxAttempts))
+        }
+
+        $buildArgs = @(
+            "compose",
+            "--ansi", "never",
+            "--progress", "plain",
+            "-f", $ComposeFilePath,
+            "--env-file", $EnvFilePath,
+            "build"
+        )
+        if ($ShouldPullBaseImages) {
+            $buildArgs += "--pull"
+        }
+
+        $result = Invoke-ProcessWithWatchdog -FilePath "docker" -ArgumentList $buildArgs `
+            -StallTimeoutSeconds $stallTimeoutSeconds -PollIntervalSeconds $pollIntervalSeconds
+
+        if (-not $result.Stalled -and $result.ExitCode -eq 0) {
+            return
+        }
+
+        $retryable = Test-RetryableBuildFailure -Output $result.Output -Stalled $result.Stalled
+        if (-not $retryable -or $attempt -eq $maxAttempts) {
+            $tail = Get-OutputTail -Output $result.Output
+            if (-not [string]::IsNullOrWhiteSpace($tail)) {
+                Write-Warn (T "WARN_BUILD_LOG_TAIL")
+                Write-Host $tail
+            }
+
+            throw (T "ERR_BUILD_FAILED")
+        }
+
+        Write-Info (T "INFO_PRUNING_BUILD_CACHE")
+        & docker builder prune --force --filter type=exec.cachemount | Out-Null
+        Start-Sleep -Seconds ([Math]::Min(30, 10 * $attempt))
+    }
+}
+
 function Read-Default {
     param(
         [string]$Prompt,
@@ -294,6 +597,26 @@ function New-RandomEncryptionKey {
         $null = $builder.Append($chars[$b % $chars.Length])
     }
     return $builder.ToString()
+}
+
+function Get-EnvValue {
+    param(
+        [string]$Path,
+        [string]$Name
+    )
+
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith("#")) {
+            continue
+        }
+
+        $parts = $line -split "=", 2
+        if ($parts.Count -eq 2 -and $parts[0].Trim() -eq $Name) {
+            return $parts[1].Trim()
+        }
+    }
+
+    return $null
 }
 
 function Resolve-ComposePath {
@@ -417,12 +740,24 @@ if ([string]::IsNullOrWhiteSpace($HostWorkspaceRoot)) {
 
 $autoSetupProjectsEnabled = $EnableAutoSetupProjects.IsPresent
 $resetDataVolume = $ResetDataVolume.IsPresent
+$resolvedBuildNetworkProfile = if ([string]::IsNullOrWhiteSpace($BuildNetworkProfile)) {
+    "official"
+}
+else {
+    $BuildNetworkProfile
+}
 
 if (-not $NonInteractive) {
     $HostWorkspaceRoot = Read-Default (Tf "PROMPT_HOST_WORKSPACE" @($workspaceMount)) $HostWorkspaceRoot
     $Port = Read-Default (T "PROMPT_PORT") $Port
     $RustLog = Read-Default (T "PROMPT_RUST_LOG") $RustLog
     $InstallAiClis = Read-YesNo (T "PROMPT_INSTALL_AI_CLIS") $InstallAiClis.IsPresent
+    $resolvedBuildNetworkProfile = if (Read-YesNo (T "PROMPT_WEAK_NETWORK_PROFILE") ($resolvedBuildNetworkProfile -eq "china")) {
+        "china"
+    }
+    else {
+        "official"
+    }
     $autoSetupProjectsEnabled = Read-YesNo (T "PROMPT_AUTO_SETUP_PROJECTS") $autoSetupProjectsEnabled
     $resetDataVolume = Read-YesNo (T "PROMPT_RESET_DATA_VOLUME") $resetDataVolume
     $SkipBuild = -not (Read-YesNo (T "PROMPT_RUN_BUILD") (-not $SkipBuild.IsPresent))
@@ -518,6 +853,7 @@ RUST_LOG=$RustLog
 HOST_WORKSPACE_ROOT=$composeHostWorkspaceRoot
 GITCORTEX_WORKSPACE_ROOT=$workspaceMount
 GITCORTEX_ALLOWED_ROOTS=$allowedRoots
+GITCORTEX_BUILD_NETWORK_PROFILE=$resolvedBuildNetworkProfile
 INSTALL_AI_CLIS=$installAiClisValue
 GITCORTEX_AUTO_SETUP_PROJECTS=$autoSetupProjectsValue
 "@
@@ -526,10 +862,22 @@ GITCORTEX_AUTO_SETUP_PROJECTS=$autoSetupProjectsValue
 Write-Ok (Tf "OK_ENV_WRITTEN" @($envFile))
 }
 
+$effectiveBuildNetworkProfile = $resolvedBuildNetworkProfile
+if (-not $shouldWriteEnv -and (Test-Path -LiteralPath $envFile)) {
+    $existingBuildNetworkProfile = Get-EnvValue -Path $envFile -Name "GITCORTEX_BUILD_NETWORK_PROFILE"
+    if (-not [string]::IsNullOrWhiteSpace($existingBuildNetworkProfile)) {
+        $effectiveBuildNetworkProfile = $existingBuildNetworkProfile
+    }
+    else {
+        $effectiveBuildNetworkProfile = "official"
+    }
+}
+
 Write-Info (T "INFO_MOUNT_SUMMARY")
 Write-Host "  Host:      $composeHostWorkspaceRoot"
 Write-Host "  Container: $workspaceMount"
 Write-Host "  Allowed roots: $allowedRoots"
+Write-Info (Tf "INFO_BUILD_NETWORK_PROFILE" @($effectiveBuildNetworkProfile))
 
 Push-Location $repoRoot
 try {
@@ -541,14 +889,37 @@ try {
     Write-Ok (T "OK_COMPOSE_VALID")
 
     if (-not $SkipBuild) {
-        Write-Info (T "INFO_BUILDING")
-        $env:DOCKER_BUILDKIT = "1"
-        $env:COMPOSE_DOCKER_CLI_BUILD = "1"
-        & docker compose --ansi never --progress plain -f $composeFile --env-file $envFile build
-        if ($LASTEXITCODE -ne 0) {
-            throw (T "ERR_BUILD_FAILED")
+        # Smart skip: detect existing image and offer to reuse it
+        $imageName = "docker-compose-gitcortex"
+        $existingImage = $null
+        try {
+            $inspectOutput = & docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedSince}} {{.Size}}" 2>$null |
+                Where-Object { $_ -match "gitcortex" } |
+                Select-Object -First 1
+            if (-not [string]::IsNullOrWhiteSpace($inspectOutput)) {
+                $existingImage = $inspectOutput
+            }
+        } catch {
+            # Ignore — proceed with build
         }
-        Write-Ok (T "OK_BUILD_DONE")
+
+        $shouldBuild = $true
+        if ($null -ne $existingImage -and -not $Force) {
+            if (-not $NonInteractive) {
+                Write-Info (Tf "INFO_EXISTING_IMAGE" @($existingImage))
+                $shouldBuild = Read-YesNo (T "PROMPT_REBUILD_IMAGE") $false
+            }
+        }
+
+        if ($shouldBuild) {
+            Write-Info (T "INFO_BUILDING")
+            $env:DOCKER_BUILDKIT = "1"
+            $env:COMPOSE_DOCKER_CLI_BUILD = "1"
+            Invoke-ComposeBuildWithRetry -ComposeFilePath $composeFile -EnvFilePath $envFile -ShouldPullBaseImages $PullBaseImages.IsPresent
+            Write-Ok (T "OK_BUILD_DONE")
+        } else {
+            Write-Info (T "INFO_BUILD_SKIPPED")
+        }
     }
 
     if ($resetDataVolume) {

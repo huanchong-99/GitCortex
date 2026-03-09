@@ -4,7 +4,9 @@ services:
       context: ../..
       dockerfile: docker/Dockerfile
       args:
+        GITCORTEX_BUILD_NETWORK_PROFILE: ${GITCORTEX_BUILD_NETWORK_PROFILE:-official}
         INSTALL_AI_CLIS: ${INSTALL_AI_CLIS:-0}
+        BUILDKIT_INLINE_CACHE: "1"
     working_dir: ${GITCORTEX_WORKSPACE_ROOT:-/workspace}
     ports:
       - "23456:23456"

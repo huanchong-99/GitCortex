@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$PullLatest,
     [switch]$AllowDirty,
     [switch]$PullBaseImages,
@@ -37,6 +37,11 @@ $script:Messages = @{
         INFO_PULLING = "正在拉取最新代码..."
         INFO_VALIDATING = "正在校验 compose 配置..."
         INFO_BUILDING = "正在重建 Docker 镜像..."
+        INFO_BUILD_NETWORK_PROFILE = "构建网络配置: {0}"
+        INFO_BUILD_WATCHDOG = "构建已超过 5 分钟，开始巡检是否卡住..."
+        INFO_BUILD_POLL = "构建仍在进行，已耗时 {0}，距上次输出 {1} 秒。"
+        INFO_BUILD_RETRY = "检测到可重试的构建失败，准备进行第 {0}/{1} 次重试..."
+        INFO_PRUNING_BUILD_CACHE = "正在清理 BuildKit 执行缓存后重试..."
         INFO_STARTING = "正在应用更新并重启容器..."
         INFO_CHECKING_READY = "正在检查服务就绪: {0}"
         OK_PULL_DONE = "代码更新完成。"
@@ -46,6 +51,8 @@ $script:Messages = @{
         OK_READY = "服务已就绪。"
         OK_DONE = "Docker 更新完成。"
         WARN_READY_TIMEOUT = "服务未在预期时间内就绪，请查看日志: docker compose -f {0} logs -f"
+        WARN_BUILD_STALLED = "构建连续 {0} 秒无输出，判定为卡住。"
+        WARN_BUILD_LOG_TAIL = "最后 60 行构建日志："
         USEFUL_COMMANDS = "常用命令："
         OPEN_URL = "访问地址: http://localhost:{0}"
     }
@@ -63,6 +70,11 @@ $script:Messages = @{
         INFO_PULLING = "Pulling latest code..."
         INFO_VALIDATING = "Validating compose configuration..."
         INFO_BUILDING = "Rebuilding Docker image..."
+        INFO_BUILD_NETWORK_PROFILE = "Build network profile: {0}"
+        INFO_BUILD_WATCHDOG = "Build has run for over 5 minutes. Starting stall watchdog..."
+        INFO_BUILD_POLL = "Build still running. Elapsed {0}, last output {1}s ago."
+        INFO_BUILD_RETRY = "Detected a retryable build failure. Starting retry {0}/{1}..."
+        INFO_PRUNING_BUILD_CACHE = "Pruning BuildKit exec cache before retry..."
         INFO_STARTING = "Applying update and restarting container..."
         INFO_CHECKING_READY = "Checking readiness: {0}"
         OK_PULL_DONE = "Source update completed."
@@ -72,6 +84,8 @@ $script:Messages = @{
         OK_READY = "Service is ready."
         OK_DONE = "Docker update completed."
         WARN_READY_TIMEOUT = "Service did not become ready in time. Check logs: docker compose -f {0} logs -f"
+        WARN_BUILD_STALLED = "Build produced no output for {0}s and is treated as stalled."
+        WARN_BUILD_LOG_TAIL = "Last 60 build log lines:"
         USEFUL_COMMANDS = "Useful commands:"
         OPEN_URL = "Open: http://localhost:{0}"
     }
@@ -113,6 +127,283 @@ function Write-Warn {
 function Write-Ok {
     param([string]$Message)
     Write-Host "[OK] $Message" -ForegroundColor Green
+}
+
+function Format-Duration {
+    param([TimeSpan]$Duration)
+
+    if ($Duration.TotalHours -ge 1) {
+        return $Duration.ToString("hh\:mm\:ss")
+    }
+
+    return $Duration.ToString("mm\:ss")
+}
+
+function Write-NewProcessOutput {
+    param(
+        [string]$Path,
+        [ref]$LineCount
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $lines = @(Get-Content -LiteralPath $Path)
+    if ($lines.Count -le $LineCount.Value) {
+        return
+    }
+
+    for ($i = $LineCount.Value; $i -lt $lines.Count; $i++) {
+        Write-Host $lines[$i]
+    }
+
+    $LineCount.Value = $lines.Count
+}
+
+function Get-LatestOutputTime {
+    param(
+        [string[]]$Paths,
+        [datetime]$Fallback
+    )
+
+    $latest = $Fallback
+    foreach ($path in $Paths) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+
+        $item = Get-Item -LiteralPath $path
+        if ($item.Length -gt 0 -and $item.LastWriteTime -gt $latest) {
+            $latest = $item.LastWriteTime
+        }
+    }
+
+    return $latest
+}
+
+function Read-FileTextWithRetry {
+    param(
+        [string]$Path,
+        [int]$MaxAttempts = 5,
+        [int]$DelayMilliseconds = 200
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            return [System.IO.File]::ReadAllText($Path)
+        }
+        catch [System.IO.IOException] {
+            if ($attempt -eq $MaxAttempts) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+
+    return ""
+}
+
+function Get-CombinedProcessOutput {
+    param([string[]]$Paths)
+
+    $chunks = @()
+    foreach ($path in $Paths) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            continue
+        }
+
+        $content = Read-FileTextWithRetry -Path $path
+        if (-not [string]::IsNullOrWhiteSpace($content)) {
+            $chunks += $content
+        }
+    }
+
+    return ($chunks -join [Environment]::NewLine)
+}
+
+function Get-OutputTail {
+    param(
+        [string]$Output,
+        [int]$MaxLines = 60
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Output)) {
+        return ""
+    }
+
+    $lines = @($Output -split "`r?`n")
+    if ($lines.Count -eq 0) {
+        return ""
+    }
+
+    $start = [Math]::Max(0, $lines.Count - $MaxLines)
+    return (($lines[$start..($lines.Count - 1)]) -join [Environment]::NewLine)
+}
+
+function Test-RetryableBuildFailure {
+    param(
+        [string]$Output,
+        [bool]$Stalled
+    )
+
+    if ($Stalled) {
+        return $true
+    }
+
+    $patterns = @(
+        "ETIMEDOUT",
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "EAI_AGAIN",
+        "socket hang up",
+        "TLS handshake timeout",
+        "i/o timeout",
+        "Temporary failure resolving",
+        "Could not resolve",
+        "no such host",
+        "connection reset by peer",
+        "Connection timed out",
+        "network is unreachable",
+        "unexpected EOF",
+        "context deadline exceeded",
+        "502 Bad Gateway",
+        "503 Service Unavailable",
+        "504 Gateway Timeout",
+        "failed to fetch",
+        "Unable to update https://github.com",
+        "failed to clone into",
+        "could not execute process `git fetch",
+        "failed to resolve source metadata",
+        "error pulling image configuration"
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($Output -match $pattern) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Invoke-ProcessWithWatchdog {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [int]$StallTimeoutSeconds = 300,
+        [int]$PollIntervalSeconds = 15
+    )
+
+    $stdoutFile = [System.IO.Path]::GetTempFileName()
+    $stderrFile = [System.IO.Path]::GetTempFileName()
+    $stdoutLineCount = 0
+    $stderrLineCount = 0
+    $startedAt = Get-Date
+    $lastOutputAt = $startedAt
+    $watchdogStarted = $false
+    $stalled = $false
+
+    try {
+        $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+
+        while (-not $process.HasExited) {
+            Start-Sleep -Seconds $PollIntervalSeconds
+            $process.Refresh()
+
+            Write-NewProcessOutput -Path $stdoutFile -LineCount ([ref]$stdoutLineCount)
+            Write-NewProcessOutput -Path $stderrFile -LineCount ([ref]$stderrLineCount)
+
+            $lastOutputAt = Get-LatestOutputTime -Paths @($stdoutFile, $stderrFile) -Fallback $lastOutputAt
+            $elapsed = (Get-Date) - $startedAt
+
+            if ($elapsed.TotalSeconds -ge $StallTimeoutSeconds) {
+                if (-not $watchdogStarted) {
+                    Write-Info (T "INFO_BUILD_WATCHDOG")
+                    $watchdogStarted = $true
+                }
+
+                $silentFor = (Get-Date) - $lastOutputAt
+                Write-Info (Tf "INFO_BUILD_POLL" @((Format-Duration $elapsed), [int][Math]::Floor($silentFor.TotalSeconds)))
+
+                if ($silentFor.TotalSeconds -ge $StallTimeoutSeconds) {
+                    $stalled = $true
+                    Write-Warn (Tf "WARN_BUILD_STALLED" @([int][Math]::Floor($silentFor.TotalSeconds)))
+                    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                    break
+                }
+            }
+        }
+
+        $process.WaitForExit()
+        $process.Refresh()
+
+        Write-NewProcessOutput -Path $stdoutFile -LineCount ([ref]$stdoutLineCount)
+        Write-NewProcessOutput -Path $stderrFile -LineCount ([ref]$stderrLineCount)
+
+        return @{
+            ExitCode = if ($stalled) { -1 } else { $process.ExitCode }
+            Stalled = $stalled
+            Output = Get-CombinedProcessOutput -Paths @($stdoutFile, $stderrFile)
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-ComposeBuildWithRetry {
+    param(
+        [string]$ComposeFilePath,
+        [string]$EnvFilePath,
+        [bool]$ShouldPullBaseImages
+    )
+
+    $maxAttempts = 3
+    $stallTimeoutSeconds = 180
+    $pollIntervalSeconds = 10
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        if ($attempt -gt 1) {
+            Write-Info (Tf "INFO_BUILD_RETRY" @($attempt, $maxAttempts))
+        }
+
+        $buildArgs = @(
+            "compose",
+            "--ansi", "never",
+            "--progress", "plain",
+            "-f", $ComposeFilePath,
+            "--env-file", $EnvFilePath,
+            "build"
+        )
+        if ($ShouldPullBaseImages) {
+            $buildArgs += "--pull"
+        }
+
+        $result = Invoke-ProcessWithWatchdog -FilePath "docker" -ArgumentList $buildArgs `
+            -StallTimeoutSeconds $stallTimeoutSeconds -PollIntervalSeconds $pollIntervalSeconds
+
+        if (-not $result.Stalled -and $result.ExitCode -eq 0) {
+            return
+        }
+
+        $retryable = Test-RetryableBuildFailure -Output $result.Output -Stalled $result.Stalled
+        if (-not $retryable -or $attempt -eq $maxAttempts) {
+            $tail = Get-OutputTail -Output $result.Output
+            if (-not [string]::IsNullOrWhiteSpace($tail)) {
+                Write-Warn (T "WARN_BUILD_LOG_TAIL")
+                Write-Host $tail
+            }
+
+            throw (T "ERR_BUILD_FAILED")
+        }
+
+        Write-Info (T "INFO_PRUNING_BUILD_CACHE")
+        & docker builder prune --force --filter type=exec.cachemount | Out-Null
+        Start-Sleep -Seconds ([Math]::Min(30, 10 * $attempt))
+    }
 }
 
 function Get-EnvValue {
@@ -219,6 +510,12 @@ try {
         $resolvedPort = "23456"
     }
 
+    $buildNetworkProfile = Get-EnvValue -Path $envFilePath -Name "GITCORTEX_BUILD_NETWORK_PROFILE"
+    if ([string]::IsNullOrWhiteSpace($buildNetworkProfile)) {
+        $buildNetworkProfile = "official"
+    }
+    Write-Info (Tf "INFO_BUILD_NETWORK_PROFILE" @($buildNetworkProfile))
+
     Write-Info (T "INFO_VALIDATING")
     & docker compose -f $composeFilePath --env-file $envFilePath config -q
     if ($LASTEXITCODE -ne 0) {
@@ -230,23 +527,7 @@ try {
         Write-Info (T "INFO_BUILDING")
         $env:DOCKER_BUILDKIT = "1"
         $env:COMPOSE_DOCKER_CLI_BUILD = "1"
-
-        $buildArgs = @(
-            "compose",
-            "--ansi", "never",
-            "--progress", "plain",
-            "-f", $composeFilePath,
-            "--env-file", $envFilePath,
-            "build"
-        )
-        if ($PullBaseImages) {
-            $buildArgs += "--pull"
-        }
-
-        & docker @buildArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw (T "ERR_BUILD_FAILED")
-        }
+        Invoke-ComposeBuildWithRetry -ComposeFilePath $composeFilePath -EnvFilePath $envFilePath -ShouldPullBaseImages $PullBaseImages.IsPresent
         Write-Ok (T "OK_BUILD_DONE")
     }
 

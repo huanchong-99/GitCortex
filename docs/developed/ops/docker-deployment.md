@@ -144,6 +144,27 @@ docker compose -f docker/compose/docker-compose.yml restart
 2. Run `cargo run -p server` directly (no env vars needed, original paths used)
 3. SQLite can be copied from Docker volume if needed
 
+## Build Times and Stability
+
+Typical first-time build on gigabit network:
+
+| Stage | Time | Notes |
+|-------|------|-------|
+| pnpm install | ~30s | Uses cache mount + corepack (no npm install -g); subsequent builds near-instant |
+| Frontend (Vite) | ~2 min | ~8500 modules |
+| Rust deps (skeleton) | ~8 min | First build only; cached until Cargo.toml changes |
+| Rust final build | ~2 min | Only recompiles changed crates (deps from cache mount) |
+| **Total (cold)** | **~13 min** | First build compiles everything |
+| **Total (warm)** | **~3 min** | Incremental: only changed source recompiled |
+
+**Stability**: `.npmrc` includes `network-timeout=300000` and `fetch-retries=5` to reduce hangs on flaky networks. If pnpm gets stuck at a specific package (e.g. 685/686), the store cache may be corrupted:
+
+```powershell
+docker builder prune --filter type=exec.cachemount
+```
+
+Then rebuild. After pruning, first build will be cold again; subsequent builds reuse the fresh cache.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -155,3 +176,4 @@ docker compose -f docker/compose/docker-compose.yml restart
 | CLI not detected | Install disabled/failed | Set `INSTALL_AI_CLIS=1` and rebuild, or use `Settings -> Agents -> One-click Install AI CLIs`; run `/opt/gitcortex/install/verify-all-clis.sh` |
 | Unexpected starter projects | Old data volume reused or auto-setup enabled | Set `GITCORTEX_AUTO_SETUP_PROJECTS=0`; run `docker compose down -v --remove-orphans` for a clean state |
 | Permission denied | Volume ownership | Ensure volume owned by `gitcortex` user |
+| pnpm install stuck at last package | Corrupted pnpm store cache | `docker builder prune --filter type=exec.cachemount` then rebuild |
