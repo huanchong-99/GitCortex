@@ -42,6 +42,10 @@ pub const COMPLETION_CONTEXT_LOG_MAX_CHARS: usize = 2000;
 pub const COMPLETION_CONTEXT_DIFF_MAX_CHARS: usize = 1000;
 pub const COMPLETION_CONTEXT_BODY_MAX_CHARS: usize = 500;
 
+// Phase 28C: Agent event loop fault tolerance
+pub const MAX_CONSECUTIVE_LLM_FAILURES: u32 = 10;
+pub const STATE_SAVE_DEBOUNCE_SECS: u64 = 5;
+
 // Phase 28A: Handoff context limits
 pub const HANDOFF_CONTEXT_MAX_CHARS: usize = 1500;
 pub const HANDOFF_COMMIT_MAX_CHARS: usize = 500;

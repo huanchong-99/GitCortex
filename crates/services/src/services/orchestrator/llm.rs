@@ -311,11 +311,58 @@ pub fn build_terminal_completion_prompt(
 }
 
 /// Validates configuration and returns a rate-limited LLM client.
+///
+/// When `config.fallback_providers` is non-empty, the returned client is a
+/// [`ResilientLLMClient`] that wraps the primary provider plus all fallbacks
+/// with automatic circuit-breaking and failover.  Otherwise the original
+/// single-provider path is used (fully backward compatible).
 pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
     config.validate().map_err(|e| anyhow::anyhow!(e))?;
-    let client = OpenAICompatibleClient::new(config);
-    let client = RateLimitedClient::new(client, config.rate_limit_requests_per_second)?;
-    Ok(Box::new(client))
+
+    if config.fallback_providers.is_empty() {
+        // Original single-provider path.
+        let client = OpenAICompatibleClient::new(config);
+        let client = RateLimitedClient::new(client, config.rate_limit_requests_per_second)?;
+        Ok(Box::new(client))
+    } else {
+        // Multi-provider resilient path.
+        let primary_name = format!("primary({})", config.model);
+        let primary_client = OpenAICompatibleClient::new(config);
+        let primary_client =
+            RateLimitedClient::new(primary_client, config.rate_limit_requests_per_second)?;
+
+        let mut providers: Vec<(String, Box<dyn LLMClient>)> =
+            vec![(primary_name, Box::new(primary_client))];
+
+        let mut fallbacks: Vec<_> = config.fallback_providers.clone();
+        fallbacks.sort_by_key(|p| p.priority);
+
+        for fb in &fallbacks {
+            let fb_config = OrchestratorConfig {
+                api_type: fb.api_type.clone(),
+                base_url: fb.base_url.clone(),
+                api_key: fb.api_key.clone(),
+                model: fb.model.clone(),
+                timeout_secs: config.timeout_secs,
+                rate_limit_requests_per_second: config.rate_limit_requests_per_second,
+                ..Default::default()
+            };
+            let fb_client = OpenAICompatibleClient::new(&fb_config);
+            let fb_client =
+                RateLimitedClient::new(fb_client, config.rate_limit_requests_per_second)?;
+            providers.push((fb.name.clone(), Box::new(fb_client)));
+        }
+
+        tracing::info!(
+            "ResilientLLMClient created with {} providers: {:?}",
+            providers.len(),
+            providers.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(),
+        );
+
+        Ok(Box::new(
+            super::resilient_llm::ResilientLLMClient::new(providers),
+        ))
+    }
 }
 
 #[cfg(test)]

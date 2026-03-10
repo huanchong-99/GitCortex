@@ -381,6 +381,7 @@ impl OrchestratorRuntime {
         if let Some(runtime_actions) = self.runtime_actions.read().await.clone() {
             agent.attach_runtime_actions(runtime_actions);
         }
+        agent.attach_persistence(Arc::new(StatePersistence::new(self.db.clone())));
         let agent = Arc::new(agent);
 
         // Update workflow status to running AFTER agent is successfully created

@@ -24,10 +24,12 @@ use super::{
         COMPLETION_CONTEXT_BODY_MAX_CHARS, COMPLETION_CONTEXT_DIFF_MAX_CHARS,
         COMPLETION_CONTEXT_LOG_LINES, COMPLETION_CONTEXT_LOG_MAX_CHARS,
         GIT_COMMIT_METADATA_SEPARATOR, HANDOFF_COMMIT_MAX_CHARS, HANDOFF_NOTES_MAX_CHARS,
-        TERMINAL_STATUS_COMPLETED, TERMINAL_STATUS_FAILED, TERMINAL_STATUS_REVIEW_PASSED,
-        TERMINAL_STATUS_REVIEW_REJECTED, WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
-        WORKFLOW_STATUS_MERGING, WORKFLOW_STATUS_RUNNING, WORKFLOW_TOPIC_PREFIX,
+        MAX_CONSECUTIVE_LLM_FAILURES, STATE_SAVE_DEBOUNCE_SECS, TERMINAL_STATUS_COMPLETED,
+        TERMINAL_STATUS_FAILED, TERMINAL_STATUS_REVIEW_PASSED, TERMINAL_STATUS_REVIEW_REJECTED,
+        WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_MERGING,
+        WORKFLOW_STATUS_RUNNING, WORKFLOW_TOPIC_PREFIX,
     },
+    persistence::StatePersistence,
     llm::{LLMClient, build_terminal_completion_prompt, create_llm_client},
     message_bus::{BusMessage, SharedMessageBus},
     prompt_handler::PromptHandler,
@@ -54,6 +56,8 @@ pub struct OrchestratorAgent {
     error_handler: ErrorHandler,
     prompt_handler: PromptHandler,
     runtime_actions: Option<Arc<RuntimeActionService>>,
+    persistence: Option<Arc<StatePersistence>>,
+    last_state_save: Arc<tokio::sync::Mutex<tokio::time::Instant>>,
 }
 
 static TASK_HINT_FROM_COMMIT_RE: Lazy<Regex> = Lazy::new(|| {
@@ -136,6 +140,8 @@ impl OrchestratorAgent {
             error_handler,
             prompt_handler,
             runtime_actions: None,
+            persistence: None,
+            last_state_save: Arc::new(tokio::sync::Mutex::new(tokio::time::Instant::now())),
         })
     }
 
@@ -161,11 +167,42 @@ impl OrchestratorAgent {
             error_handler,
             prompt_handler,
             runtime_actions: None,
+            persistence: None,
+            last_state_save: Arc::new(tokio::sync::Mutex::new(tokio::time::Instant::now())),
         })
     }
 
     pub fn attach_runtime_actions(&mut self, runtime_actions: Arc<RuntimeActionService>) {
         self.runtime_actions = Some(runtime_actions);
+    }
+
+    pub fn attach_persistence(&mut self, persistence: Arc<StatePersistence>) {
+        self.persistence = Some(persistence);
+    }
+
+    /// Debounced state persistence - saves at most once every STATE_SAVE_DEBOUNCE_SECS seconds.
+    /// Failures are logged but do not block the main flow.
+    async fn maybe_save_state(&self) {
+        let Some(ref persistence) = self.persistence else {
+            return;
+        };
+
+        let mut last_save = self.last_state_save.lock().await;
+        if last_save.elapsed() < std::time::Duration::from_secs(STATE_SAVE_DEBOUNCE_SECS) {
+            return;
+        }
+        *last_save = tokio::time::Instant::now();
+        drop(last_save);
+
+        let state = self.state.read().await;
+        if let Err(e) = persistence.save_state(&state).await {
+            let workflow_id = &state.workflow_id;
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                error = %e,
+                "Failed to persist orchestrator state"
+            );
+        }
     }
 
     fn runtime_actions(&self) -> anyhow::Result<Arc<RuntimeActionService>> {
@@ -1025,7 +1062,23 @@ impl OrchestratorAgent {
         let mut completion_response: Option<String> = None;
         if should_run_completion_llm {
             let prompt = self.build_completion_prompt(&event).await?;
-            completion_response = Some(self.call_llm(&prompt).await?);
+            match self.call_llm_safe(&prompt).await {
+                Some(response) => {
+                    completion_response = Some(response);
+                }
+                None => {
+                    let wf_id = {
+                        let state = self.state.read().await;
+                        state.workflow_id.clone()
+                    };
+                    tracing::warn!(
+                        workflow_id = %wf_id,
+                        task_id = %event.task_id,
+                        terminal_id = %event.terminal_id,
+                        "LLM unavailable, falling back to auto-dispatch only"
+                    );
+                }
+            }
         }
 
         // Parse and execute orchestrator instructions from completion response.
@@ -1047,6 +1100,8 @@ impl OrchestratorAgent {
         }
 
         self.auto_sync_workflow_completion(&workflow_id).await?;
+
+        self.maybe_save_state().await;
 
         // Restore idle state before returning.
         {
@@ -1495,6 +1550,8 @@ impl OrchestratorAgent {
             None,
         )
         .await;
+
+        self.maybe_save_state().await;
 
         Ok(())
     }
@@ -2225,6 +2282,73 @@ impl OrchestratorAgent {
         }
 
         Ok(response.content)
+    }
+
+    /// Wrapper around `call_llm` that catches errors instead of propagating them.
+    /// Returns `None` on failure, allowing the agent event loop to continue.
+    async fn call_llm_safe(&self, prompt: &str) -> Option<String> {
+        match self.call_llm(prompt).await {
+            Ok(response) => {
+                // Reset consecutive failure count on success
+                let mut state = self.state.write().await;
+                state.error_count = 0;
+                drop(state);
+                self.maybe_save_state().await;
+                Some(response)
+            }
+            Err(e) => {
+                let mut state = self.state.write().await;
+                state.error_count += 1;
+                let count = state.error_count;
+                let workflow_id = state.workflow_id.clone();
+                drop(state);
+
+                tracing::error!(
+                    workflow_id = %workflow_id,
+                    error = %e,
+                    consecutive_failures = count,
+                    "LLM call failed, skipping decision"
+                );
+
+                // Publish system event for frontend notification
+                let _ = self
+                    .message_bus
+                    .publish_workflow_event(
+                        &workflow_id,
+                        BusMessage::Error {
+                            workflow_id: workflow_id.clone(),
+                            error: format!(
+                                "LLM call failed ({} consecutive): {}",
+                                count, e
+                            ),
+                        },
+                    )
+                    .await;
+
+                // Check if we've hit the exhaustion threshold
+                if count >= MAX_CONSECUTIVE_LLM_FAILURES {
+                    tracing::error!(
+                        workflow_id = %workflow_id,
+                        consecutive_failures = count,
+                        "LLM failed {} consecutive times, provider may be exhausted",
+                        count
+                    );
+                    let _ = self
+                        .message_bus
+                        .publish_workflow_event(
+                            &workflow_id,
+                            BusMessage::Error {
+                                workflow_id: workflow_id.clone(),
+                                error: "LLM provider exhausted - all retries failed"
+                                    .to_string(),
+                            },
+                        )
+                        .await;
+                }
+
+                None
+            }
+        }
     }
 
     /// Executes orchestrator instructions returned by the LLM.
@@ -3426,6 +3550,8 @@ impl OrchestratorAgent {
                 }
             }
         }
+
+        self.maybe_save_state().await;
 
         Ok(())
     }

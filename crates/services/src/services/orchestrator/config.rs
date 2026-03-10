@@ -7,6 +7,23 @@ use super::constants::{
     DEFAULT_MAX_RETRIES, DEFAULT_RETRY_DELAY_MS,
 };
 
+/// Configuration for a fallback LLM provider
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    /// Human-readable provider name (e.g. "anthropic-fallback")
+    pub name: String,
+    /// API type: "openai", "anthropic", "custom"
+    pub api_type: String,
+    /// API base URL
+    pub base_url: String,
+    /// API key
+    pub api_key: String,
+    /// Model name
+    pub model: String,
+    /// Priority (lower = higher priority); used for ordering fallbacks
+    pub priority: u32,
+}
+
 /// Orchestrator 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -49,6 +66,10 @@ pub struct OrchestratorConfig {
     /// Auto-merge completed task branches when workflow completes
     #[serde(default = "default_auto_merge_on_completion")]
     pub auto_merge_on_completion: bool,
+
+    /// Fallback LLM providers for multi-provider failover
+    #[serde(default)]
+    pub fallback_providers: Vec<ProviderConfig>,
 }
 
 fn default_max_retries() -> u32 {
@@ -195,6 +216,7 @@ impl Default for OrchestratorConfig {
             max_conversation_history: default_max_history(),
             system_prompt: default_system_prompt(),
             auto_merge_on_completion: default_auto_merge_on_completion(),
+            fallback_providers: Vec::new(),
         }
     }
 }

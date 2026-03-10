@@ -9,6 +9,7 @@ pub mod llm;
 pub mod message_bus;
 pub mod persistence;
 pub mod prompt_handler;
+pub mod resilient_llm;
 pub mod runtime;
 pub mod runtime_actions;
 pub mod state;
@@ -22,6 +23,7 @@ pub use llm::MockLLMClient;
 pub use llm::{
     LLMClient, OpenAICompatibleClient, build_terminal_completion_prompt, create_llm_client,
 };
+pub use resilient_llm::{ProviderStatusReport, ResilientLLMClient};
 pub use message_bus::{BusMessage, MessageBus, SharedMessageBus};
 pub use prompt_handler::PromptHandler;
 pub use runtime::{OrchestratorRuntime, RuntimeConfig};
