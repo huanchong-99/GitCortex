@@ -68,3 +68,33 @@
 
 ### 文档
 - [x] 验证报告、回滚手册已补齐
+
+## Phase 28 周期已完成项（2026-03-11 归档）
+
+### Phase 28A: 信息流补全
+- [x] PHASE28A-001 终端完成上下文采集器 ✅ 2026-03-11
+- [x] PHASE28A-002 注入上下文到 LLM Completion Prompt ✅ 2026-03-11
+- [x] PHASE28A-003 跨终端上下文传递 Handoff Notes ✅ 2026-03-11
+
+### Phase 28B: 闭环补全
+- [x] PHASE28B-001 Workflow 完成后自动合并 ✅ 2026-03-11
+- [x] PHASE28B-002 启用 ReviewCode/FixIssues/MergeBranch 指令 ✅ 2026-03-11
+- [x] PHASE28B-003 连接 Error Handler 到 Agent ✅ 2026-03-11
+
+### Phase 28C: 韧性补全
+- [x] PHASE28C-001 Agent 事件循环容错 ✅ 2026-03-11
+- [x] PHASE28C-002 状态持久化激活 ✅ 2026-03-11
+- [x] PHASE28C-003 崩溃恢复实现 ✅ 2026-03-11
+- [x] PHASE28C-004 Planning Draft 接入 LLM 对话 ✅ 2026-03-11
+
+### Phase 28D: 飞书长连接接入
+- [x] PHASE28D-001 飞书连接器 Crate ✅ 2026-03-11
+- [x] PHASE28D-002 飞书服务集成 ✅ 2026-03-11
+- [x] PHASE28D-003 ChatConnector Trait 抽象 ✅ 2026-03-11
+- [x] PHASE28D-004 数据库与配置 ✅ 2026-03-11
+- [x] PHASE28D-005 Server 集成 ✅ 2026-03-11
+
+### Phase 28E: 智能熔断与提供商轮转
+- [x] PHASE28E-001 ResilientLLMClient 实现 ✅ 2026-03-11
+- [x] PHASE28E-002 终端级提供商故障转移 ✅ 2026-03-11
+- [x] PHASE28E-003 提供商健康监控 API ✅ 2026-03-11
