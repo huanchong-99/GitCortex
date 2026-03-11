@@ -119,6 +119,9 @@ impl ConditionEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gate::condition::{Condition, Operator};
+    use crate::gate::status::Level;
+    use crate::metrics::MetricKey;
 
     #[test]
     fn test_evaluate_gt_triggered() {
