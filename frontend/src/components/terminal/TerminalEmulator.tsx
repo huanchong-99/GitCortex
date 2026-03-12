@@ -345,6 +345,7 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
         <div
           ref={containerRef}
           className="w-full h-full bg-[#1e1e1e] rounded-lg overflow-hidden"
+          role="terminal"
           aria-label="Terminal emulator"
         />
         {showConnectingHint ? (

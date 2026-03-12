@@ -2227,6 +2227,7 @@ mod orchestrator_tests {
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2318,6 +2319,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2403,6 +2405,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2504,6 +2507,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2579,6 +2583,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2665,6 +2670,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2749,6 +2755,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -2823,6 +2830,7 @@ reviewed_terminal: {}"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -3029,6 +3037,7 @@ next_action: handoff"#;
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -3117,6 +3126,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -3262,6 +3272,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));
@@ -3374,6 +3385,7 @@ next_action: handoff"#,
             system_prompt: String::new(),
             auto_merge_on_completion: true,
             fallback_providers: Vec::new(),
+            quality_gate_mode: "shadow".to_string(),
         };
 
         let message_bus = Arc::new(MessageBus::new(100));

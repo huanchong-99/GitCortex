@@ -144,10 +144,8 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(/No slash commands yet/i)).toBeInTheDocument();
+        expect(screen.getByText('empty.title')).toBeInTheDocument();
       });
-
-      expect(screen.getByText(/No slash commands yet/i)).toBeInTheDocument();
     });
   });
 
@@ -157,7 +155,8 @@ describe('SlashCommands Page', () => {
 
       render(<SlashCommands />, { wrapper });
 
-      expect(screen.getByText(/Loading slash commands/i)).toBeInTheDocument();
+      // The Loader component receives t('loading') which resolves to 'loading' (raw key)
+      expect(screen.getByText('loading')).toBeInTheDocument();
     });
   });
 
@@ -175,7 +174,7 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(/Failed to load slash commands/i)).toBeInTheDocument();
+        expect(screen.getByText('errors.loadFailed')).toBeInTheDocument();
       });
     });
   });
@@ -192,10 +191,10 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('Slash Commands')).toBeInTheDocument();
+        expect(screen.getByText('title')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Create Slash Command')).toBeInTheDocument();
+      expect(screen.getByText('createButton')).toBeInTheDocument();
     });
 
     it('should open create dialog when clicking Create button', async () => {
@@ -211,15 +210,15 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('Slash Commands')).toBeInTheDocument();
+        expect(screen.getByText('title')).toBeInTheDocument();
       });
 
-      const createButton = screen.getByText('Create Slash Command');
+      const createButton = screen.getByText('createButton');
       await user.click(createButton);
 
-      // Dialog should appear
+      // Dialog should appear with form title
       await waitFor(() => {
-        expect(screen.getByText(/Create Slash Command/)).toBeInTheDocument();
+        expect(screen.getByText('form.createTitle')).toBeInTheDocument();
       });
     });
   });

@@ -174,7 +174,7 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText(i18n.t('workflow:step5.presets.writeCode.name'))).toBeInTheDocument();
+        expect(screen.getByText('/write-code')).toBeInTheDocument();
       });
 
       const addButtons = screen.getAllByLabelText(i18n.t('workflow:step5.add'));
@@ -194,7 +194,8 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText(i18n.t('workflow:step5.presets.writeCode.name'))).toHaveLength(2);
+        // /write-code appears in both selected and available sections
+        expect(screen.getAllByText('/write-code')).toHaveLength(2);
       });
 
       const removeButtons = screen.getAllByLabelText(i18n.t('workflow:step5.remove'));
@@ -252,7 +253,8 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText(i18n.t('workflow:step5.presets.review.name'))).toHaveLength(2);
+        // /review appears in both selected and available sections
+        expect(screen.getAllByText('/review')).toHaveLength(2);
       });
 
       const moveUpButtons = screen.getAllByLabelText(i18n.t('workflow:step5.moveUp'));
@@ -272,7 +274,8 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText(i18n.t('workflow:step5.presets.writeCode.name'))).toHaveLength(2);
+        // /write-code appears in both selected and available sections
+        expect(screen.getAllByText('/write-code')).toHaveLength(2);
       });
 
       const moveDownButtons = screen.getAllByLabelText(i18n.t('workflow:step5.moveDown'));
@@ -292,7 +295,8 @@ describe('Step5Commands', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText(i18n.t('workflow:step5.presets.writeCode.name'))).toHaveLength(2);
+        // /write-code appears in both selected and available sections
+        expect(screen.getAllByText('/write-code')).toHaveLength(2);
       });
 
       const addButtons = screen.getAllByLabelText(i18n.t('workflow:step5.add'));
@@ -303,15 +307,16 @@ describe('Step5Commands', () => {
   });
 
   describe('System Presets', () => {
-    it('should have 5 system presets', async () => {
+    it('should have 6 system presets', async () => {
       renderWithI18n(<Step5Commands {...defaultProps} config={{ ...mockConfig, enabled: true }} />);
 
       await waitFor(() => {
-        expect(screen.getByText(i18n.t('workflow:step5.presets.writeCode.name'))).toBeInTheDocument();
-        expect(screen.getByText(i18n.t('workflow:step5.presets.review.name'))).toBeInTheDocument();
-        expect(screen.getByText(i18n.t('workflow:step5.presets.fixIssues.name'))).toBeInTheDocument();
-        expect(screen.getByText(i18n.t('workflow:step5.presets.test.name'))).toBeInTheDocument();
-        expect(screen.getByText(i18n.t('workflow:step5.presets.refactor.name'))).toBeInTheDocument();
+        expect(screen.getByText('/write-code')).toBeInTheDocument();
+        expect(screen.getByText('/review')).toBeInTheDocument();
+        expect(screen.getByText('/fix-issues')).toBeInTheDocument();
+        expect(screen.getByText('/test')).toBeInTheDocument();
+        expect(screen.getByText('/refactor')).toBeInTheDocument();
+        expect(screen.getByText('/document')).toBeInTheDocument();
       });
     });
   });

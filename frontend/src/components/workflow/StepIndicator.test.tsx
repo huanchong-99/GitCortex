@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { StepIndicator } from './StepIndicator';
-import { WizardStep } from './types';
+import { WizardStep, WIZARD_STEPS } from './types';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
 describe('StepIndicator', () => {
@@ -14,6 +14,7 @@ describe('StepIndicator', () => {
       <StepIndicator
         currentStep={WizardStep.Project}
         completedSteps={[]}
+        steps={[...WIZARD_STEPS]}
       />
     );
 
@@ -31,6 +32,7 @@ describe('StepIndicator', () => {
       <StepIndicator
         currentStep={WizardStep.Basic}
         completedSteps={[]}
+        steps={[...WIZARD_STEPS]}
       />
     );
 
@@ -43,6 +45,7 @@ describe('StepIndicator', () => {
       <StepIndicator
         currentStep={WizardStep.Tasks}
         completedSteps={[WizardStep.Project, WizardStep.Basic]}
+        steps={[...WIZARD_STEPS]}
       />
     );
 
@@ -55,6 +58,7 @@ describe('StepIndicator', () => {
       <StepIndicator
         currentStep={WizardStep.Tasks}
         completedSteps={[WizardStep.Project, WizardStep.Basic]}
+        steps={[...WIZARD_STEPS]}
       />
     );
 

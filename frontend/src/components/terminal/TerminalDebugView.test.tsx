@@ -48,6 +48,10 @@ vi.mock('@xterm/addon-fit', () => {
   return { FitAddon: MockFitAddon };
 });
 
+vi.mock('@/components/quality/QualityGateStatusBadge', () => ({
+  QualityGateStatusBadge: () => null,
+}));
+
 class MockWebSocket {
   url = '';
   readyState = 0;

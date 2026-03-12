@@ -7,7 +7,7 @@ describe('TerminalCard', () => {
   const createMockTerminal = (overrides: Partial<Terminal> = {}): Terminal => ({
     id: 'terminal-1',
     orderIndex: 0,
-    cliTypeId: 'claude-code',
+    cliTypeId: 'cli-claude-code',
     role: 'Developer',
     status: 'not_started',
     ...overrides,
@@ -108,7 +108,7 @@ describe('TerminalCard', () => {
     });
 
     it('should display CLI type label from constants', () => {
-      const terminal = createMockTerminal({ cliTypeId: 'claude-code' });
+      const terminal = createMockTerminal({ cliTypeId: 'cli-claude-code' });
       renderWithI18n(<TerminalCard terminal={terminal} />);
 
       expect(screen.getByText('Claude Code')).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe('TerminalCard', () => {
       const terminal = createMockTerminal({
         orderIndex: 0,
         role: 'Developer',
-        cliTypeId: 'claude-code',
+        cliTypeId: 'cli-claude-code',
         status: 'working',
       });
       const { container } = renderWithI18n(<TerminalCard terminal={terminal} />);
@@ -224,7 +224,7 @@ describe('TerminalCard', () => {
     });
 
     it('should apply text-xs text-low to CLI type', () => {
-      const terminal = createMockTerminal({ cliTypeId: 'claude-code' });
+      const terminal = createMockTerminal({ cliTypeId: 'cli-claude-code' });
       renderWithI18n(<TerminalCard terminal={terminal} />);
 
       const cliType = screen.getByText('Claude Code');

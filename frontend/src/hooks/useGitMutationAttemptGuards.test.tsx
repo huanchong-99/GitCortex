@@ -102,10 +102,7 @@ describe('git mutation hooks attempt guards', () => {
       result.current.mutateAsync({
         repoId: 'repo-1',
       })
-    ).rejects.toMatchObject({
-      success: false,
-      message: 'Attempt id is not set',
-    });
+    ).rejects.toThrow('Attempt id is not set');
 
     expect(mockRebase).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
