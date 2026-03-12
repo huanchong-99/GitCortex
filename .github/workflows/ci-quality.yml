@@ -1,0 +1,27 @@
+name: Quality Gate Check
+
+on:
+  push:
+    branches: [ main, phase-18-release-readiness ]
+  pull_request:
+    branches: [ main, phase-18-release-readiness ]
+
+jobs:
+  sonar-analysis:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Full history for better blame/analysis
+
+    # Usually SonarQube would be run here using the official action
+    # Note: Requires SONAR_TOKEN secret to be configured in GitHub repository
+    - name: SonarScan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      continue-on-error: true # Allowed to fail if token not set during initial phases

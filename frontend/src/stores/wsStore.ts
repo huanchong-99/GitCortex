@@ -27,7 +27,17 @@ export type WsEventType =
   | 'system.lagged'
   | 'system.error'
   | 'terminal.prompt_detected'
-  | 'terminal.prompt_decision';
+  | 'terminal.prompt_decision'
+  | 'terminal.quality_gate_result';
+
+export interface TerminalQualityGateResultPayload {
+  workflowId: string;
+  taskId: string;
+  terminalId: string;
+  isPassed: boolean;
+  mode: string;
+  fixInstructions: string | null;
+}
 
 type ConnectionStatus =
   | 'disconnected'

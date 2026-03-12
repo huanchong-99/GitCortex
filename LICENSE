@@ -4,6 +4,7 @@ This project is a derivative work based on two open source projects:
 
 1. **Vibe Kanban** - Licensed under Apache License 2.0
 2. **CC-Switch** - Licensed under MIT License
+3. **SonarQube Quality Gate Models (Ported)** - Licensed under LGPL 3.0
 
 ## Apache License 2.0 (Vibe Kanban)
 
@@ -53,6 +54,9 @@ Copyright 2026 GitCortex Contributors
 
 GitCortex is licensed under the Apache License 2.0, consistent with the
 Vibe Kanban upstream project. The integration of CC-Switch components
-is permitted under the MIT License's terms.
+is permitted under the MIT License's terms. 
+
+**SonarQube Ported Models**: The models and evaluation logic for Quality Gates (in `crates/quality/src/gate`) are ported from SonarQube (Community Edition) and are subject to the **GNU Lesser General Public License v3.0 (LGPL-3.0)**. 
 
 For the full Apache License 2.0 text, see: http://www.apache.org/licenses/LICENSE-2.0
+For the full LGPL-3.0 text, see: https://www.gnu.org/licenses/lgpl-3.0.html

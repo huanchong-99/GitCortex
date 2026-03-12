@@ -70,6 +70,10 @@ export type CreateTask = { projectId: string, title: string, description: string
 
 export type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, parentWorkspaceId: string | null, imageIds: Array<string> | null, };
 
+export type QualityRun = { id: string, project_id: string, workflow_id: string | null, task_id: string | null, terminal_id: string | null, level: string, status: string, mode: string, gate_name: string, duration_ms: bigint | null, summary: string | null, created_at: string, updated_at: string, };
+
+export type QualityIssue = { id: string, run_id: string, provider: string, rule_id: string, severity: string, message: string, file_path: string | null, line_start: bigint | null, line_end: bigint | null, column_start: bigint | null, column_end: bigint | null, created_at: string, };
+
 export type DraftFollowUpData = { message: string, variant: string | null, };
 
 export type DraftWorkspaceData = { message: string, projectId: string | null, repos: Array<DraftWorkspaceRepo>, selectedProfile: ExecutorProfileId | null, };
@@ -392,7 +396,7 @@ export type SearchMode = "taskform" | "settings";
 
 export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, workflow_model_library: Array<WorkflowModelLibraryItem>, };
 
-export type WorkflowModelLibraryItem = { id: string, displayName: string, apiType: string, baseUrl: string, apiKey: string, modelId: string, isVerified: boolean, };
+export type WorkflowModelLibraryItem = { id: string, displayName: string, cliTypeId: string | null, apiType: string, baseUrl: string, apiKey: string, modelId: string, isVerified: boolean, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 

@@ -70,6 +70,8 @@ pub enum BusMessage {
         workflow_id: String,
         event: ProviderEvent,
     },
+    /// Terminal quality gate result
+    TerminalQualityGateResult(super::types::TerminalQualityGateResultEvent),
     Shutdown,
 }
 
@@ -225,6 +227,14 @@ impl MessageBus {
         let workflow_id = event.workflow_id.clone();
         let _ = self
             .publish_workflow_event(&workflow_id, BusMessage::TerminalCompleted(event))
+            .await;
+    }
+
+    /// Publishes a terminal quality gate result event.
+    pub async fn publish_terminal_quality_gate_result(&self, event: super::types::TerminalQualityGateResultEvent) {
+        let workflow_id = event.original_event.workflow_id.clone();
+        let _ = self
+            .publish_workflow_event(&workflow_id, BusMessage::TerminalQualityGateResult(event))
             .await;
     }
 

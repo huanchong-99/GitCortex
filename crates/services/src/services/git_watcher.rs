@@ -541,7 +541,7 @@ impl GitWatcher {
         match status.as_str() {
             "completed" => {
                 if matches!(next_action.as_str(), "continue" | "retry") {
-                    None
+                    Some(TerminalCompletionStatus::Checkpoint)
                 } else {
                     Some(TerminalCompletionStatus::Completed)
                 }

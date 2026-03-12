@@ -104,6 +104,8 @@ GitCortex doesn't define tools — it commands the best tools to complete tasks 
 
 - ✅ Upper-layer orchestrator Agent commanding full workflow lifecycle
 - ✅ Multi-task parallel execution (5–10 tasks simultaneously)
+- ✅ **Built-in Quality Gates** with three-layer verification (Terminal → Task → Repo)
+- ✅ Local **SonarQube integration** for deep code analysis (zero external API dependencies)
 - ✅ Serial quality gates within each task (code → review → fix)
 - ✅ Mixed CLI types within the same task (Claude Code + Gemini + Codex + more)
 - ✅ Mixed providers/models within the same CLI via CC-Switch integration
@@ -190,6 +192,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\docker\install-docker.ps1
 ```
 
 The installer supports interactive setup (mount path, keys, port, optional AI CLI install), `.env` reuse, and automatic handoff to update flow.
+
+**Optional: SonarQube Integration**
+GitCortex features an integrated, three-layer Quality Gate system using the SonarQube code analysis engine running locally.
+To spin up the local SonarQube instance, navigate to the docker directory:
+```bash
+cd docker/compose
+docker-compose -f docker-compose.dev.yml up -d sonarqube
+```
 
 ### Docker Update
 

@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { TerminalEmulator, type TerminalEmulatorRef } from './TerminalEmulator';
+import { QualityGateStatusBadge } from '@/components/quality/QualityGateStatusBadge';
+import { QualityReportPanel } from '@/components/quality/QualityReportPanel';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Terminal } from '@/components/workflow/TerminalCard';
@@ -50,6 +53,7 @@ const sanitizeTerminalHistoryContent = (content: string) =>
 export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
   const { t } = useTranslation('workflow');
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null);
+  const [isQualityPanelOpen, setIsQualityPanelOpen] = useState(false);
   const [historyByTerminalId, setHistoryByTerminalId] = useState<Record<string, TerminalHistoryState>>({});
   const readyTerminalIdsRef = useRef<Set<string>>(new Set());
   const startingTerminalIdsRef = useRef<Set<string>>(new Set());
@@ -426,9 +430,14 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
                   >
                     <div className="font-medium text-sm">{terminalLabel}</div>
                     <div className="text-xs opacity-70">{terminal.taskName}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <StatusDot status={terminal.status} />
-                      <span className="text-xs">{statusLabel}</span>
+                    <div className="flex flex-col gap-1.5 mt-1.5">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={terminal.status} />
+                        <span className="text-xs">{statusLabel}</span>
+                      </div>
+                      <div className="mt-0.5">
+                        <QualityGateStatusBadge terminalId={terminal.id} />
+                      </div>
                     </div>
                   </button>
                 </li>
@@ -442,11 +451,25 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
         {selectedTerminal ? (
           <>
             <div className="p-4 border-b flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">{getTerminalLabel(selectedTerminal)}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {selectedTerminal.cliTypeId} - {selectedTerminal.modelConfigId}
-                </p>
+              <div className="flex items-center gap-3">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    {getTerminalLabel(selectedTerminal)}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedTerminal.cliTypeId} - {selectedTerminal.modelConfigId}
+                  </p>
+                </div>
+                <div>
+                  <div onClick={() => setIsQualityPanelOpen(true)}>
+                    <QualityGateStatusBadge terminalId={selectedTerminal.id} className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />
+                  </div>
+                  <Dialog open={isQualityPanelOpen} onOpenChange={setIsQualityPanelOpen}>
+                    <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col border-slate-200 dark:border-slate-800">
+                      <QualityReportPanel terminalId={selectedTerminal.id} className="flex-1 overflow-y-auto pr-2 mt-2" />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={handleClear}>

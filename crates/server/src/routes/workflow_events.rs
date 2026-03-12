@@ -30,6 +30,10 @@ pub enum WsEventType {
     #[serde(rename = "terminal.status_changed")]
     TerminalStatusChanged,
 
+    /// Terminal quality gate result
+    #[serde(rename = "terminal.quality_gate_result")]
+    TerminalQualityGateResult,
+
     /// Task status changed (pending -> running -> completed/failed)
     #[serde(rename = "task.status_changed")]
     TaskStatusChanged,
@@ -113,6 +117,7 @@ fn terminal_completion_status_to_wire(status: TerminalCompletionStatus) -> &'sta
         TerminalCompletionStatus::ReviewPass => "review_pass",
         TerminalCompletionStatus::ReviewReject => "review_reject",
         TerminalCompletionStatus::Failed => "failed",
+        TerminalCompletionStatus::Checkpoint => "checkpoint",
     }
 }
 
@@ -284,6 +289,22 @@ impl WsEvent {
                 Some((
                     workflow_id,
                     Self::new(WsEventType::TerminalCompleted, payload),
+                ))
+            }
+
+            BusMessage::TerminalQualityGateResult(event) => {
+                let workflow_id = event.original_event.workflow_id;
+                let payload = json!({
+                    "workflowId": workflow_id,
+                    "taskId": event.original_event.task_id,
+                    "terminalId": event.original_event.terminal_id,
+                    "isPassed": event.is_passed,
+                    "mode": format!("{:?}", event.mode).to_lowercase(),
+                    "fixInstructions": event.fix_instructions,
+                });
+                Some((
+                    workflow_id,
+                    Self::new(WsEventType::TerminalQualityGateResult, payload),
                 ))
             }
 

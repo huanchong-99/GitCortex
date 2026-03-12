@@ -27,6 +27,7 @@ pub mod organizations;
 pub mod planning_drafts;
 pub mod projects;
 pub mod provider_health;
+pub mod quality;
 pub mod repo;
 pub mod scratch;
 pub mod sessions;
@@ -74,6 +75,7 @@ pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub) -> IntoMak
         .nest("/workflows", workflows::workflows_routes())
         .nest("/workflows", slash_commands::slash_commands_routes())
         .nest("/workflows", provider_health::provider_health_routes())
+        .merge(quality::quality_routes())
         .nest("/terminal", terminal_ws::terminal_ws_routes())
         .nest("/terminals", terminals::terminal_routes())
         // WebSocket routes for workflow events (requires Extension layer for hub)
