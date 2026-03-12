@@ -48,14 +48,14 @@ impl ErrorHandler {
         // 1. Update workflow status to failed
         db::models::Workflow::update_status(&self.db.pool, workflow_id, WORKFLOW_STATUS_FAILED)
             .await
-            .map_err(|e| anyhow!("Failed to update workflow status: {}", e))?;
+            .map_err(|e| anyhow!("Failed to update workflow status: {e}"))?;
 
         info!("Workflow {} marked as failed", workflow_id);
 
         // 2. Get workflow to check if error terminal is enabled
         let workflow = db::models::Workflow::find_by_id(&self.db.pool, workflow_id)
             .await?
-            .ok_or_else(|| anyhow!("Workflow {} not found", workflow_id))?;
+            .ok_or_else(|| anyhow!("Workflow {workflow_id} not found"))?;
 
         // 3. Activate error terminal if configured
         if workflow.error_terminal_enabled {
@@ -70,7 +70,7 @@ impl ErrorHandler {
         };
 
         self.message_bus
-            .publish(&format!("workflow:{}", workflow_id), event)
+            .publish(&format!("workflow:{workflow_id}"), event)
             .await?;
 
         error!("Error handling complete for workflow {}", workflow_id);
@@ -115,8 +115,7 @@ impl ErrorHandler {
                 .ok_or_else(|| anyhow!("Error terminal has no PTY session"))?;
 
             let message = format!(
-                "[ERROR] Task {} failed: {}\nPlease investigate and fix the error.",
-                task_id, error_message
+                "[ERROR] Task {task_id} failed: {error_message}\nPlease investigate and fix the error."
             );
 
             self.message_bus

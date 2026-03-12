@@ -79,17 +79,17 @@ fn get_extended_path() -> String {
 
     // Add common npm global paths
     if let Ok(appdata) = std::env::var("APPDATA") {
-        paths.push(format!("{}\\npm", appdata));
+        paths.push(format!("{appdata}\\npm"));
     }
 
     // Add user local bin (for tools like claude)
     if let Ok(userprofile) = std::env::var("USERPROFILE") {
-        paths.push(format!("{}\\.local\\bin", userprofile));
+        paths.push(format!("{userprofile}\\.local\\bin"));
     }
 
     // Add common program files paths
     if let Ok(programfiles) = std::env::var("ProgramFiles") {
-        paths.push(format!("{}\\nodejs", programfiles));
+        paths.push(format!("{programfiles}\\nodejs"));
     }
 
     paths.join(";")
@@ -218,8 +218,7 @@ pub async fn start_terminal(
     // Find the absolute path of the CLI executable
     let shell = find_executable(cmd_name).await.ok_or_else(|| {
         ApiError::BadRequest(format!(
-            "CLI '{}' not found in PATH. Please ensure it is installed and accessible.",
-            cmd_name
+            "CLI '{cmd_name}' not found in PATH. Please ensure it is installed and accessible."
         ))
     })?;
 
@@ -486,7 +485,7 @@ async fn get_terminal_working_dir(
             .flatten();
 
     let workflow_id = workflow_id
-        .ok_or_else(|| anyhow::anyhow!("Workflow task {} not found", workflow_task_id))?;
+        .ok_or_else(|| anyhow::anyhow!("Workflow task {workflow_task_id} not found"))?;
 
     // Get project_id from workflow
     let project_id: Option<Vec<u8>> =
@@ -497,11 +496,11 @@ async fn get_terminal_working_dir(
             .flatten();
 
     let project_id =
-        project_id.ok_or_else(|| anyhow::anyhow!("Workflow {} not found", workflow_id))?;
+        project_id.ok_or_else(|| anyhow::anyhow!("Workflow {workflow_id} not found"))?;
 
     // Convert project_id bytes to UUID string
     let project_uuid = uuid::Uuid::from_slice(&project_id)
-        .map_err(|e| anyhow::anyhow!("Invalid project_id format: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Invalid project_id format: {e}"))?;
 
     // 1) Prefer project.default_agent_working_dir
     let working_dir: Option<String> =
@@ -517,14 +516,14 @@ async fn get_terminal_working_dir(
 
     // 2) Fallback to first repo path in project
     let repo_working_dir: Option<String> = sqlx::query_scalar(
-        r#"
+        r"
         SELECT r.path
         FROM repos r
         INNER JOIN project_repos pr ON pr.repo_id = r.id
         WHERE pr.project_id = ?
         ORDER BY r.display_name ASC
         LIMIT 1
-        "#,
+        ",
     )
     .bind(project_uuid)
     .fetch_optional(&deployment.db().pool)
@@ -536,8 +535,7 @@ async fn get_terminal_working_dir(
     }
 
     Err(anyhow::anyhow!(
-        "Could not determine working directory: project {} has no default_agent_working_dir and no repositories",
-        project_uuid
+        "Could not determine working directory: project {project_uuid} has no default_agent_working_dir and no repositories"
     ))
 }
 
@@ -575,8 +573,7 @@ pub async fn stop_terminal(
     tracing::info!("Terminal {} stopped and reset successfully", id);
 
     Ok(ResponseJson(ApiResponse::success(format!(
-        "Terminal {} stopped successfully",
-        id
+        "Terminal {id} stopped successfully"
     ))))
 }
 

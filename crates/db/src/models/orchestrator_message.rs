@@ -41,11 +41,11 @@ impl WorkflowOrchestratorMessage {
 
     pub async fn insert(pool: &SqlitePool, message: &Self) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow_orchestrator_message (
                 id, workflow_id, command_id, role, content, source, external_message_id, created_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#,
+            ",
         )
         .bind(&message.id)
         .bind(&message.workflow_id)
@@ -60,6 +60,7 @@ impl WorkflowOrchestratorMessage {
         Ok(())
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     pub async fn list_by_workflow_paginated(
         pool: &SqlitePool,
         workflow_id: &str,
@@ -67,13 +68,13 @@ impl WorkflowOrchestratorMessage {
         limit: usize,
     ) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, WorkflowOrchestratorMessage>(
-            r#"
+            r"
             SELECT *
             FROM workflow_orchestrator_message
             WHERE workflow_id = ?1
             ORDER BY created_at ASC, id ASC
             LIMIT ?2 OFFSET ?3
-            "#,
+            ",
         )
         .bind(workflow_id)
         .bind(limit as i64)
@@ -127,12 +128,12 @@ impl WorkflowOrchestratorCommand {
 
     pub async fn insert(pool: &SqlitePool, command: &Self) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO workflow_orchestrator_command (
                 id, workflow_id, source, external_message_id, request_message, status,
                 error, retryable, started_at, completed_at, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-            "#,
+            ",
         )
         .bind(&command.id)
         .bind(&command.workflow_id)
@@ -158,7 +159,7 @@ impl WorkflowOrchestratorCommand {
         external_message_id: &str,
     ) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, WorkflowOrchestratorCommand>(
-            r#"
+            r"
             SELECT *
             FROM workflow_orchestrator_command
             WHERE workflow_id = ?1
@@ -166,7 +167,7 @@ impl WorkflowOrchestratorCommand {
               AND external_message_id = ?3
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(workflow_id)
         .bind(source)
@@ -177,12 +178,12 @@ impl WorkflowOrchestratorCommand {
 
     pub async fn find_by_id(pool: &SqlitePool, command_id: &str) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, WorkflowOrchestratorCommand>(
-            r#"
+            r"
             SELECT *
             FROM workflow_orchestrator_command
             WHERE id = ?1
             LIMIT 1
-            "#,
+            ",
         )
         .bind(command_id)
         .fetch_optional(pool)
@@ -200,7 +201,7 @@ impl WorkflowOrchestratorCommand {
         completed_at: Option<DateTime<Utc>>,
     ) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE workflow_orchestrator_command
             SET status = ?1,
                 error = ?2,
@@ -209,7 +210,7 @@ impl WorkflowOrchestratorCommand {
                 completed_at = ?5,
                 updated_at = ?6
             WHERE id = ?7
-            "#,
+            ",
         )
         .bind(status)
         .bind(error)
@@ -225,7 +226,7 @@ impl WorkflowOrchestratorCommand {
 
     pub async fn recover_incomplete_commands(pool: &SqlitePool) -> sqlx::Result<u64> {
         let rows = sqlx::query(
-            r#"
+            r"
             UPDATE workflow_orchestrator_command
             SET status = 'failed',
                 error = COALESCE(
@@ -236,7 +237,7 @@ impl WorkflowOrchestratorCommand {
                 completed_at = datetime('now'),
                 updated_at = datetime('now')
             WHERE status IN ('queued', 'running')
-            "#,
+            ",
         )
         .execute(pool)
         .await?;
@@ -267,7 +268,7 @@ impl ExternalConversationBinding {
     ) -> sqlx::Result<()> {
         let id = Uuid::new_v4().to_string();
         sqlx::query(
-            r#"
+            r"
             INSERT INTO external_conversation_binding (
                 id, provider, conversation_id, workflow_id, created_by, is_active, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, 1, datetime('now'), datetime('now'))
@@ -277,7 +278,7 @@ impl ExternalConversationBinding {
                 created_by = excluded.created_by,
                 is_active = 1,
                 updated_at = datetime('now')
-            "#,
+            ",
         )
         .bind(id)
         .bind(provider)
@@ -295,14 +296,14 @@ impl ExternalConversationBinding {
         conversation_id: &str,
     ) -> sqlx::Result<Option<Self>> {
         sqlx::query_as::<_, ExternalConversationBinding>(
-            r#"
+            r"
             SELECT *
             FROM external_conversation_binding
             WHERE provider = ?1
               AND conversation_id = ?2
               AND is_active = 1
             LIMIT 1
-            "#,
+            ",
         )
         .bind(provider)
         .bind(conversation_id)
@@ -316,13 +317,13 @@ impl ExternalConversationBinding {
         conversation_id: &str,
     ) -> sqlx::Result<u64> {
         let rows = sqlx::query(
-            r#"
+            r"
             UPDATE external_conversation_binding
             SET is_active = 0,
                 updated_at = datetime('now')
             WHERE provider = ?1
               AND conversation_id = ?2
-            "#,
+            ",
         )
         .bind(provider)
         .bind(conversation_id)

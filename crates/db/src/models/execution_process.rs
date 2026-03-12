@@ -517,9 +517,9 @@ impl ExecutionProcess {
         };
 
         sqlx::query(
-            r#"UPDATE execution_processes
+            r"UPDATE execution_processes
                SET status = ?, exit_code = ?, completed_at = ?, updated_at = datetime('now')
-               WHERE id = ?"#,
+               WHERE id = ?",
         )
         .bind(status)
         .bind(exit_code)

@@ -33,23 +33,18 @@ pub struct QualityGateConfig {
 /// 质量门运行模式
 ///
 /// 参考 TODO.md D8: feature flag `QUALITY_GATE_MODE`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum QualityGateMode {
     /// 关闭 — 走旧流程，质量门完全不参与
     Off,
     /// 影子模式 — 运行分析、记录结果，但不阻断任何流程
+    #[default]
     Shadow,
     /// 警告模式 — 分析并回流问题到终端，但不硬性阻断合并
     Warn,
     /// 强制模式 — 硬性门禁，不通过则阻断
     Enforce,
-}
-
-impl Default for QualityGateMode {
-    fn default() -> Self {
-        Self::Shadow
-    }
 }
 
 /// 单个质量门定义

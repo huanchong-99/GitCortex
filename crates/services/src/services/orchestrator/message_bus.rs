@@ -282,7 +282,7 @@ impl MessageBus {
         // Publish to terminal-specific topic first (preferred path for PTY routing).
         // If no terminal-input subscriber is present, fall back to legacy session topic.
         // This avoids silent drop while preventing duplicate PTY delivery.
-        let topic = format!("{}{}", TERMINAL_INPUT_TOPIC_PREFIX, terminal_id);
+        let topic = format!("{TERMINAL_INPUT_TOPIC_PREFIX}{terminal_id}");
         let topic_subscriber_count = self.subscriber_count(&topic).await;
         let fallback_topic = session_id.to_string();
         let delivered = if topic_subscriber_count > 0 {
@@ -365,7 +365,7 @@ impl MessageBus {
             );
 
             return match self.publish(fallback_topic, message.clone()).await {
-                Ok(_) => true,
+                Ok(()) => true,
                 Err(err) => {
                     tracing::error!(
                         ?err,
@@ -377,17 +377,16 @@ impl MessageBus {
                     false
                 }
             };
-        } else {
-            tracing::error!(
-                terminal_id = %terminal_id,
-                session_id = %session_id,
-                primary_topic = %primary_topic,
-                fallback_topic = %fallback_topic,
-                reason = %reason,
-                "Dropping terminal input: no primary or fallback subscribers"
-            );
-            false
         }
+        tracing::error!(
+            terminal_id = %terminal_id,
+            session_id = %session_id,
+            primary_topic = %primary_topic,
+            fallback_topic = %fallback_topic,
+            reason = %reason,
+            "Dropping terminal input: no primary or fallback subscribers"
+        );
+        false
     }
 
     /// Publishes a terminal prompt decision for UI updates.

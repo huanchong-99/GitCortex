@@ -411,26 +411,22 @@ impl ProcessManager {
             return;
         };
 
-        match tokio::time::timeout(Duration::from_secs(READER_SHUTDOWN_TIMEOUT_SECS), &mut task)
-            .await
-        {
-            Ok(join_result) => {
-                if let Err(e) = join_result {
-                    tracing::warn!(
-                        terminal_id = %terminal_id,
-                        error = %e,
-                        "PTY reader task finished with join error"
-                    );
-                }
-            }
-            Err(_) => {
-                task.abort();
+        if let Ok(join_result) = tokio::time::timeout(Duration::from_secs(READER_SHUTDOWN_TIMEOUT_SECS), &mut task)
+            .await {
+            if let Err(e) = join_result {
                 tracing::warn!(
                     terminal_id = %terminal_id,
-                    timeout_secs = READER_SHUTDOWN_TIMEOUT_SECS,
-                    "PTY reader task graceful shutdown timed out, aborted"
+                    error = %e,
+                    "PTY reader task finished with join error"
                 );
             }
+        } else {
+            task.abort();
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                timeout_secs = READER_SHUTDOWN_TIMEOUT_SECS,
+                "PTY reader task graceful shutdown timed out, aborted"
+            );
         }
     }
 
@@ -447,29 +443,25 @@ impl ProcessManager {
             return;
         };
 
-        match tokio::time::timeout(
+        if let Ok(join_result) = tokio::time::timeout(
             Duration::from_secs(LOGGER_TASK_SHUTDOWN_TIMEOUT_SECS),
             &mut task,
         )
-        .await
-        {
-            Ok(join_result) => {
-                if let Err(e) = join_result {
-                    tracing::warn!(
-                        terminal_id = %terminal_id,
-                        error = %e,
-                        "Terminal logger task finished with join error"
-                    );
-                }
-            }
-            Err(_) => {
-                task.abort();
+        .await {
+            if let Err(e) = join_result {
                 tracing::warn!(
                     terminal_id = %terminal_id,
-                    timeout_secs = LOGGER_TASK_SHUTDOWN_TIMEOUT_SECS,
-                    "Terminal logger task graceful shutdown timed out, aborted"
+                    error = %e,
+                    "Terminal logger task finished with join error"
                 );
             }
+        } else {
+            task.abort();
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                timeout_secs = LOGGER_TASK_SHUTDOWN_TIMEOUT_SECS,
+                "Terminal logger task graceful shutdown timed out, aborted"
+            );
         }
     }
 
@@ -671,8 +663,7 @@ impl ProcessManager {
         match child.try_wait() {
             Ok(Some(status)) => {
                 return Err(anyhow::anyhow!(
-                    "Terminal process exited immediately with status: {:?}. The CLI may not be installed correctly.",
-                    status
+                    "Terminal process exited immediately with status: {status:?}. The CLI may not be installed correctly."
                 ));
             }
             Ok(None) => {
@@ -823,8 +814,7 @@ impl ProcessManager {
         match child.try_wait() {
             Ok(Some(status)) => {
                 return Err(anyhow::anyhow!(
-                    "Terminal process exited immediately with status: {:?}. The CLI may not be installed correctly.",
-                    status
+                    "Terminal process exited immediately with status: {status:?}. The CLI may not be installed correctly."
                 ));
             }
             Ok(None) => {
@@ -1185,8 +1175,7 @@ impl ProcessManager {
 
                                 logger
                                     .append(&format!(
-                                        "[{}] output stream lagged: skipped={} replay_from_seq={}",
-                                        log_type_owned, skipped, resume_from
+                                        "[{log_type_owned}] output stream lagged: skipped={skipped} replay_from_seq={resume_from}"
                                     ))
                                     .await;
 
@@ -1197,22 +1186,19 @@ impl ProcessManager {
                                         .map(|process| process.output_fanout.subscribe(Some(resume_from)))
                                 };
 
-                                match recovered_subscription {
-                                    Some(new_subscription) => {
-                                        subscription = new_subscription;
-                                        tracing::info!(
-                                            terminal_id = %terminal_id_owned,
-                                            resume_from_seq = resume_from,
-                                            "Terminal logger subscription recovered after lag"
-                                        );
-                                    }
-                                    None => {
-                                        tracing::warn!(
-                                            terminal_id = %terminal_id_owned,
-                                            "Terminal logger lag recovery aborted: terminal not found"
-                                        );
-                                        break;
-                                    }
+                                if let Some(new_subscription) = recovered_subscription {
+                                    subscription = new_subscription;
+                                    tracing::info!(
+                                        terminal_id = %terminal_id_owned,
+                                        resume_from_seq = resume_from,
+                                        "Terminal logger subscription recovered after lag"
+                                    );
+                                } else {
+                                    tracing::warn!(
+                                        terminal_id = %terminal_id_owned,
+                                        "Terminal logger lag recovery aborted: terminal not found"
+                                    );
+                                    break;
                                 }
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -1239,18 +1225,15 @@ impl ProcessManager {
 
         let (existing_shutdown, existing_task) = {
             let mut processes = self.processes.write().await;
-            let tracked = match processes.get_mut(terminal_id) {
-                Some(tracked) => tracked,
-                None => {
-                    drop(processes);
-                    Self::stop_logger_task_gracefully(
-                        terminal_id,
-                        Some(shutdown_tx),
-                        Some(logger_task),
-                    )
-                    .await;
-                    return Err(anyhow::anyhow!("Terminal not found: {terminal_id}"));
-                }
+            let tracked = if let Some(tracked) = processes.get_mut(terminal_id) { tracked } else {
+                drop(processes);
+                Self::stop_logger_task_gracefully(
+                    terminal_id,
+                    Some(shutdown_tx),
+                    Some(logger_task),
+                )
+                .await;
+                return Err(anyhow::anyhow!("Terminal not found: {terminal_id}"));
             };
             let existing_shutdown = tracked.logger_shutdown_tx.take();
             let existing_task = tracked.logger_task.take();
@@ -1384,10 +1367,10 @@ impl TerminalLogger {
         let mut tx = db.pool.begin().await?;
         for line in entries {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO terminal_log (id, terminal_id, log_type, content, created_at)
                 VALUES (?1, ?2, ?3, ?4, ?5)
-                "#,
+                ",
             )
             .bind(Uuid::new_v4().to_string())
             .bind(terminal_id)
@@ -1571,28 +1554,24 @@ impl TerminalLogger {
             return;
         };
 
-        match tokio::time::timeout(Duration::from_secs(LOGGER_SHUTDOWN_TIMEOUT_SECS), &mut task)
-            .await
-        {
-            Ok(join_result) => {
-                if let Err(e) = join_result {
-                    tracing::warn!(
-                        terminal_id = %self.terminal_id,
-                        log_type = %self.log_type,
-                        error = %e,
-                        "Terminal logger flush task finished with join error"
-                    );
-                }
-            }
-            Err(_) => {
-                task.abort();
+        if let Ok(join_result) = tokio::time::timeout(Duration::from_secs(LOGGER_SHUTDOWN_TIMEOUT_SECS), &mut task)
+            .await {
+            if let Err(e) = join_result {
                 tracing::warn!(
                     terminal_id = %self.terminal_id,
                     log_type = %self.log_type,
-                    timeout_secs = LOGGER_SHUTDOWN_TIMEOUT_SECS,
-                    "Terminal logger flush task graceful shutdown timed out, aborted"
+                    error = %e,
+                    "Terminal logger flush task finished with join error"
                 );
             }
+        } else {
+            task.abort();
+            tracing::warn!(
+                terminal_id = %self.terminal_id,
+                log_type = %self.log_type,
+                timeout_secs = LOGGER_SHUTDOWN_TIMEOUT_SECS,
+                "Terminal logger flush task graceful shutdown timed out, aborted"
+            );
         }
     }
 

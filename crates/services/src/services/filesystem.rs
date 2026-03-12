@@ -534,7 +534,7 @@ impl FilesystemService {
         let self_clone = self.clone();
         tokio::task::spawn_blocking(move || self_clone.list_directory(path))
             .await
-            .map_err(|e| FilesystemError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+            .map_err(|e| FilesystemError::Io(std::io::Error::other(e)))?
     }
 
     pub fn list_directory(

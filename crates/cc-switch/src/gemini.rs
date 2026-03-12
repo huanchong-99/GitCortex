@@ -18,10 +18,8 @@ pub fn parse_env_file(content: &str) -> HashMap<String, String> {
         let line = line.trim();
         // 跳过空行和注释
         if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        // 解析 KEY=VALUE
-        if let Some(pos) = line.find('=') {
+        } else if let Some(pos) = line.find('=') {
+            // 解析 KEY=VALUE
             let key = line[..pos].trim().to_string();
             let value = line[pos + 1..].trim();
             // 移除引号

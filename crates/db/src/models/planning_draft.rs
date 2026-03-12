@@ -52,7 +52,7 @@ impl PlanningDraft {
 
     pub async fn insert(pool: &SqlitePool, draft: &Self) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO planning_draft (
                 id, project_id, name, status,
                 requirement_summary, technical_spec, workflow_seed,
@@ -60,7 +60,7 @@ impl PlanningDraft {
                 confirmed_at, materialized_workflow_id,
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
-            "#,
+            ",
         )
         .bind(&draft.id)
         .bind(draft.project_id)
@@ -117,14 +117,14 @@ impl PlanningDraft {
         workflow_seed: Option<&str>,
     ) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE planning_draft SET
                 requirement_summary = ?2,
                 technical_spec = ?3,
                 workflow_seed = ?4,
                 updated_at = datetime('now')
             WHERE id = ?1
-            "#,
+            ",
         )
         .bind(id)
         .bind(requirement_summary)
@@ -137,13 +137,13 @@ impl PlanningDraft {
 
     pub async fn set_confirmed(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE planning_draft SET
                 status = 'confirmed',
                 confirmed_at = datetime('now'),
                 updated_at = datetime('now')
             WHERE id = ?1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -157,13 +157,13 @@ impl PlanningDraft {
         workflow_id: &str,
     ) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE planning_draft SET
                 status = 'materialized',
                 materialized_workflow_id = ?2,
                 updated_at = datetime('now')
             WHERE id = ?1
-            "#,
+            ",
         )
         .bind(id)
         .bind(workflow_id)
@@ -196,10 +196,10 @@ impl PlanningDraftMessage {
 
     pub async fn insert(pool: &SqlitePool, message: &Self) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO planning_draft_message (id, draft_id, role, content, created_at)
             VALUES (?1, ?2, ?3, ?4, ?5)
-            "#,
+            ",
         )
         .bind(&message.id)
         .bind(&message.draft_id)

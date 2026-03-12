@@ -101,7 +101,7 @@ impl FeishuService {
                     tracing::error!(error = %e, "Feishu WebSocket connection ended with error");
                 }
             }
-            _ = Self::process_events_inner(event_rx, pool, bus, messenger) => {
+            () = Self::process_events_inner(event_rx, pool, bus, messenger) => {
                 tracing::info!("Feishu event processing loop ended");
             }
         }

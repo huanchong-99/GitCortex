@@ -263,6 +263,7 @@ impl EditorConfig {
         ))
     }
 
+    #[allow(dead_code)]
     fn remote_url(&self, path: &Path) -> Option<String> {
         self.remote_url_with_hint(path, None)
     }

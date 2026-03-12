@@ -325,7 +325,7 @@ impl Workspace {
         pool: &SqlitePool,
     ) -> Result<Vec<Workspace>, sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             SELECT
                 w.id,
                 w.task_id,
@@ -370,7 +370,7 @@ impl Workspace {
                     ELSE w.updated_at
                 END
             ) ASC
-            "#,
+            ",
         )
         .try_map(|row: sqlx::sqlite::SqliteRow| {
             use sqlx::Row;

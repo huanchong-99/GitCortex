@@ -37,7 +37,7 @@ pub fn generate_task_branch_name(
     let mut counter = 2;
 
     while existing_branches.contains(&candidate) {
-        candidate = format!("{}-{}", base, counter);
+        candidate = format!("{base}-{counter}");
         counter += 1;
     }
 

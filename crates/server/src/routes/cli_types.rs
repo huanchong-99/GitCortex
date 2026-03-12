@@ -42,7 +42,7 @@ async fn detect_cli_types(
     let results = detector
         .detect_all()
         .await
-        .map_err(|e| ApiError::Internal(format!("Failed to detect CLIs: {}", e)))?;
+        .map_err(|e| ApiError::Internal(format!("Failed to detect CLIs: {e}")))?;
 
     Ok(ResponseJson(results))
 }

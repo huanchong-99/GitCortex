@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use handlebars::{Handlebars, RenderError};
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
@@ -58,7 +58,7 @@ impl TemplateRenderer {
         if let Some(params_str) = custom_params {
             if !params_str.trim().is_empty() {
                 let params: JsonValue = serde_json::from_str(params_str)
-                    .map_err(|e| anyhow::anyhow!("Invalid custom_params JSON: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Invalid custom_params JSON: {e}"))?;
 
                 // Merge custom params into data
                 if let Some(obj) = params.as_object() {
@@ -77,7 +77,7 @@ impl TemplateRenderer {
         // Render the template
         self.handlebars
             .render_template(template, &data)
-            .map_err(|e| anyhow::anyhow!("Template rendering failed: {}", e))
+            .map_err(|e| anyhow::anyhow!("Template rendering failed: {e}"))
     }
 }
 

@@ -165,8 +165,7 @@ pub struct IssueSummary {
 impl IssueSummary {
     /// 从问题列表生成摘要
     pub fn from_issues(issues: &[QualityIssue]) -> Self {
-        let mut summary = Self::default();
-        summary.total = issues.len();
+        let mut summary = Self { total: issues.len(), ..Self::default() };
         for issue in issues {
             match issue.severity {
                 Severity::Blocker => summary.blocker += 1,

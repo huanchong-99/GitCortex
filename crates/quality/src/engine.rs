@@ -11,9 +11,9 @@ use tracing::{info, warn};
 use crate::config::{QualityGateConfig, QualityGateMode};
 use crate::gate::evaluator::ConditionEvaluator;
 use crate::gate::result::MeasureValue;
-use crate::gate::{QualityGateDecision, QualityGateLevel};
+use crate::gate::QualityGateLevel;
 use crate::metrics::MetricKey;
-use crate::provider::{ProviderReport, QualityProvider};
+use crate::provider::QualityProvider;
 use crate::report::QualityReport;
 
 /// 质量门执行引擎

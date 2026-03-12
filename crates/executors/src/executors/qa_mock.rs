@@ -123,14 +123,14 @@ fn escape_cmd_double_quoted(path: &Path) -> String {
 
 /// Perform random file operations in the worktree
 async fn perform_file_operations(dir: &Path) {
-    info!("QA Mock: performing file operations in {:?}", dir);
+    info!("QA Mock: performing file operations in {dir:?}");
 
     // Create: qa_created_{uuid}.txt
     let uuid = uuid::Uuid::new_v4();
-    let new_file = dir.join(format!("qa_created_{}.txt", uuid));
+    let new_file = dir.join(format!("qa_created_{uuid}.txt"));
     match tokio::fs::write(&new_file, "QA mode created this file\n").await {
-        Ok(_) => info!("QA Mock: created file {:?}", new_file),
-        Err(e) => warn!("QA Mock: failed to create file: {}", e),
+        Ok(_) => info!("QA Mock: created file {new_file:?}"),
+        Err(e) => warn!("QA Mock: failed to create file: {e}"),
     }
 
     // Find files (excluding .git and binary files)
@@ -163,8 +163,8 @@ async fn perform_file_operations(dir: &Path) {
             // Don't remove the file we just created
             if file_to_remove != new_file {
                 match tokio::fs::remove_file(&file_to_remove).await {
-                    Ok(_) => info!("QA Mock: removed file {:?}", file_to_remove),
-                    Err(e) => warn!("QA Mock: failed to remove file: {}", e),
+                    Ok(_) => info!("QA Mock: removed file {file_to_remove:?}"),
+                    Err(e) => warn!("QA Mock: failed to remove file: {e}"),
                 }
             }
         }
@@ -177,16 +177,15 @@ async fn perform_file_operations(dir: &Path) {
                 match tokio::fs::read_to_string(&file_to_modify).await {
                     Ok(content) => {
                         let modified = format!(
-                            "{}\n// QA modification at {}\n",
-                            content,
+                            "{content}\n// QA modification at {}\n",
                             chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
                         );
                         match tokio::fs::write(&file_to_modify, modified).await {
-                            Ok(_) => info!("QA Mock: modified file {:?}", file_to_modify),
-                            Err(e) => warn!("QA Mock: failed to write modified file: {}", e),
+                            Ok(_) => info!("QA Mock: modified file {file_to_modify:?}"),
+                            Err(e) => warn!("QA Mock: failed to write modified file: {e}"),
                         }
                     }
-                    Err(e) => warn!("QA Mock: failed to read file for modification: {}", e),
+                    Err(e) => warn!("QA Mock: failed to read file for modification: {e}"),
                 }
             }
         }
@@ -338,8 +337,7 @@ fn generate_mock_logs(prompt: &str) -> Vec<String> {
                 model: Some("qa-mock".to_string()),
                 content: vec![ClaudeContentItem::Text {
                     text: format!(
-                        "QA mode execution completed successfully.\\n\\nI performed the following operations:\\n1. Read README.md\\n2. Created qa_output.txt\\n3. Ran a test command\\nOriginal prompt: {}",
-                        prompt
+                        "QA mode execution completed successfully.\\n\\nI performed the following operations:\\n1. Read README.md\\n2. Created qa_output.txt\\n3. Ran a test command\\nOriginal prompt: {prompt}"
                     ),
                 }],
                 stop_reason: Some("end_turn".to_string()),
@@ -381,9 +379,7 @@ mod tests {
             let parsed: Result<serde_json::Value, _> = serde_json::from_str(log);
             assert!(
                 parsed.is_ok(),
-                "Log entry {} should be valid JSON: {}",
-                i,
-                log
+                "Log entry {i} should be valid JSON: {log}"
             );
         }
     }
@@ -395,9 +391,7 @@ mod tests {
             let parsed: Result<ClaudeJson, _> = serde_json::from_str(log);
             assert!(
                 parsed.is_ok(),
-                "Log entry {} should deserialize to ClaudeJson: {} - error: {:?}",
-                i,
-                log,
+                "Log entry {i} should deserialize to ClaudeJson: {log} - error: {:?}",
                 parsed.err()
             );
         }

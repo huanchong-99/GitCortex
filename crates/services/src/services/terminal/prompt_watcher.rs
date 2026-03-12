@@ -224,10 +224,8 @@ fn is_unexpected_changes_followup_prompt(text: &str) -> bool {
 
 fn normalize_handoff_marker_text(text: &str) -> String {
     text.to_ascii_lowercase()
-        .replace('\u{2019}', "'")
-        .replace('\u{2018}', "'")
-        .replace('\u{2013}', " ")
-        .replace('\u{2014}', " ")
+        .replace(['\u{2019}', '\u{2018}'], "'")
+        .replace(['\u{2013}', '\u{2014}'], " ")
 }
 
 fn has_handoff_stall_clean_marker(lower: &str) -> bool {
@@ -689,6 +687,7 @@ impl TerminalWatchState {
         self.handoff_stall_context.clear();
     }
 
+    #[allow(dead_code)]
     fn mark_pending_handoff_submit(&mut self) {
         self.pending_handoff_submit_at = Some(Instant::now());
     }
@@ -1123,15 +1122,12 @@ next_action: handoff\n"
     pub async fn process_output(&self, terminal_id: &str, output: &str) {
         let mut terminals = self.terminals.write().await;
 
-        let state = match terminals.get_mut(terminal_id) {
-            Some(s) => s,
-            None => {
-                tracing::trace!(
-                    terminal_id = %terminal_id,
-                    "Terminal not registered for prompt watching, ignoring output"
-                );
-                return;
-            }
+        let state = if let Some(s) = terminals.get_mut(terminal_id) { s } else {
+            tracing::trace!(
+                terminal_id = %terminal_id,
+                "Terminal not registered for prompt watching, ignoring output"
+            );
+            return;
         };
 
         // Check and reset stale state
@@ -1256,12 +1252,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::ArrowSelect, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level Claude bypass accept fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1291,6 +1282,10 @@ next_action: handoff\n"
                 .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level Claude bypass accept fallback injection"
+            );
         }
 
         if state.auto_confirm && !state.should_debounce() && has_claude_custom_api_key_context {
@@ -1303,12 +1298,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::ArrowSelect, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level custom API key fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1334,6 +1324,10 @@ next_action: handoff\n"
                     .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level custom API key fallback injection"
+            );
         }
 
         // Chunk-level fallback: Claude can report the configured model as
@@ -1353,12 +1347,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::Input, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level Claude model-unavailable fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1412,6 +1401,10 @@ next_action: handoff\n"
                 .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level Claude model-unavailable fallback injection"
+            );
         }
 
         // Chunk-level fallback for bypass-permissions toggle prompt.
@@ -1426,12 +1419,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::EnterConfirm, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level bypass-permissions fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1457,6 +1445,10 @@ next_action: handoff\n"
                     .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level bypass-permissions fallback injection"
+            );
         }
 
         // Chunk-level fallback: decline Notepad prompts to avoid blocking
@@ -1469,12 +1461,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::YesNo, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level Notepad fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1500,6 +1487,10 @@ next_action: handoff\n"
                     .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level Notepad fallback injection"
+            );
         }
 
         // Chunk-level fallback: Codex can ask whether it should continue after
@@ -1516,12 +1507,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::Input, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level unexpected-changes fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1563,6 +1549,10 @@ next_action: handoff\n"
                 }
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level unexpected-changes fallback injection"
+            );
         }
 
         // Chunk-level fallback: some agents finish their checks and then ask for
@@ -1584,12 +1574,7 @@ next_action: handoff\n"
             let detected_prompt =
                 DetectedPrompt::new(PromptKind::Input, normalized_output.clone(), 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level handoff-stall fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1647,6 +1632,10 @@ next_action: handoff\n"
                 .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level handoff-stall fallback injection"
+            );
         }
 
         // Chunk-level fallback: Codex confirmation prompt can appear inside
@@ -1662,12 +1651,7 @@ next_action: handoff\n"
             );
             let detected_prompt = DetectedPrompt::new(PromptKind::YesNo, normalized_output, 0.95);
 
-            if !state.state_machine.should_process(&detected_prompt) {
-                tracing::debug!(
-                    terminal_id = %state.terminal_id,
-                    "Skipping duplicate chunk-level Codex confirmation fallback injection"
-                );
-            } else {
+            if state.state_machine.should_process(&detected_prompt) {
                 state.last_detection = Some(Instant::now());
                 state.state_machine.on_prompt_detected(detected_prompt);
                 state.state_machine.on_response_sent(decision.clone());
@@ -1693,6 +1677,10 @@ next_action: handoff\n"
                     .await;
                 return;
             }
+            tracing::debug!(
+                terminal_id = %state.terminal_id,
+                "Skipping duplicate chunk-level Codex confirmation fallback injection"
+            );
         }
 
         // Process each line

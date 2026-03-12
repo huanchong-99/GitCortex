@@ -149,7 +149,7 @@ impl SubscriptionHub {
         let mut senders = self.senders.write().await;
         let should_remove = senders
             .get(workflow_id)
-            .map_or(false, |sender| sender.receiver_count() == 0);
+            .is_some_and(|sender| sender.receiver_count() == 0);
 
         if should_remove {
             senders.remove(workflow_id);
@@ -200,6 +200,7 @@ impl SubscriptionHub {
         );
     }
 
+    #[allow(dead_code)]
     /// Get or create a broadcast sender for a workflow.
     async fn get_or_create_sender(&self, workflow_id: &str) -> broadcast::Sender<WsEvent> {
         // Fast path: check if sender already exists

@@ -62,12 +62,12 @@ impl FeishuAppConfig {
     /// Insert a new feishu app config record
     pub async fn insert(pool: &SqlitePool, config: &Self) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO feishu_app_config (
                 id, app_id, app_secret_encrypted, tenant_key,
                 base_url, enabled, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#,
+            ",
         )
         .bind(&config.id)
         .bind(&config.app_id)
@@ -133,14 +133,14 @@ impl FeishuAppConfig {
         base_url: &str,
     ) -> sqlx::Result<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE feishu_app_config SET
                 app_id = ?2,
                 app_secret_encrypted = ?3,
                 base_url = ?4,
                 updated_at = datetime('now')
             WHERE id = ?1
-            "#,
+            ",
         )
         .bind(id)
         .bind(app_id)

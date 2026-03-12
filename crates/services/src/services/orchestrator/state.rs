@@ -242,16 +242,14 @@ impl OrchestratorState {
     pub fn is_task_completed(&self, task_id: &str) -> bool {
         self.task_states
             .get(task_id)
-            .map(|s| s.is_completed)
-            .unwrap_or(false)
+            .is_some_and(|s| s.is_completed)
     }
 
     /// Returns true if a specific task has any failed terminals.
     pub fn task_has_failures(&self, task_id: &str) -> bool {
         self.task_states
             .get(task_id)
-            .map(|s| !s.failed_terminals.is_empty())
-            .unwrap_or(false)
+            .is_some_and(|s| !s.failed_terminals.is_empty())
     }
 
     /// Appends a message and trims history based on config.

@@ -138,7 +138,7 @@ impl TerminalBridge {
         }
 
         // Subscribe to both the new terminal-input topic and legacy PTY-session topic
-        let terminal_input_topic = format!("terminal.input.{}", terminal_id);
+        let terminal_input_topic = format!("terminal.input.{terminal_id}");
         let mut rx_terminal_input = self.message_bus.subscribe(&terminal_input_topic).await;
         let mut rx_legacy = self.message_bus.subscribe(session_id).await;
 
@@ -338,7 +338,7 @@ impl TerminalBridge {
         let handle = process_manager
             .get_handle(&terminal_id)
             .await
-            .ok_or_else(|| anyhow::anyhow!("Terminal not running: {}", terminal_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Terminal not running: {terminal_id}"))?;
 
         if handle.session_id != pty_session_id {
             return Err(anyhow::anyhow!(
@@ -350,7 +350,7 @@ impl TerminalBridge {
         }
 
         let writer = handle.writer.ok_or_else(|| {
-            anyhow::anyhow!("PTY writer unavailable for terminal {}", terminal_id)
+            anyhow::anyhow!("PTY writer unavailable for terminal {terminal_id}")
         })?;
 
         // Create channel for writer task

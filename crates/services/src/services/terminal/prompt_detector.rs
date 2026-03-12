@@ -562,6 +562,7 @@ pub const ARROW_DOWN: &str = "\x1b[B";
 /// # Returns
 ///
 /// A string containing the arrow key escape sequences
+#[allow(clippy::comparison_chain)]
 pub fn build_arrow_sequence(current: usize, target: usize) -> String {
     if target > current {
         // Move down

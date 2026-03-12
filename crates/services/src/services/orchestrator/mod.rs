@@ -32,6 +32,7 @@ pub use state::{OrchestratorRunState, OrchestratorState, SharedOrchestratorState
 pub use terminal_coordinator::TerminalCoordinator;
 pub use types::*;
 
+#[cfg(test)]
 mod terminal_coordinator_test;
 #[cfg(test)]
 mod tests;

@@ -8,7 +8,7 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use db::DBService;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use super::{
     constants::WORKFLOW_STATUS_RUNNING,
@@ -150,17 +150,17 @@ impl StatePersistence {
         let workflow_id = &state.workflow_id;
         let persisted: PersistedState = state.to_owned().into();
         let state_json = serde_json::to_string(&persisted)
-            .map_err(|e| anyhow!("Failed to serialize state: {}", e))?;
+            .map_err(|e| anyhow!("Failed to serialize state: {e}"))?;
 
         debug!("Saving state for workflow {}", workflow_id);
 
         // Store state in workflow metadata or a dedicated table
         // For now, we'll use a simple approach: update workflow with state JSON
-        let query = r#"
+        let query = r"
             UPDATE workflow
             SET orchestrator_state = ?1, updated_at = ?2
             WHERE id = ?3
-        "#;
+        ";
 
         let now = Utc::now();
         sqlx::query(query)
@@ -169,7 +169,7 @@ impl StatePersistence {
             .bind(workflow_id)
             .execute(&self.db.pool)
             .await
-            .map_err(|e| anyhow!("Failed to save state to database: {}", e))?;
+            .map_err(|e| anyhow!("Failed to save state to database: {e}"))?;
 
         debug!("State saved successfully for workflow {}", workflow_id);
 
@@ -182,21 +182,21 @@ impl StatePersistence {
     pub async fn load_state(&self, workflow_id: &str) -> Result<Option<OrchestratorState>> {
         debug!("Loading state for workflow {}", workflow_id);
 
-        let query = r#"
+        let query = r"
             SELECT orchestrator_state
             FROM workflow
             WHERE id = ?1
-        "#;
+        ";
 
         let row: Option<(Option<String>,)> = sqlx::query_as(query)
             .bind(workflow_id)
             .fetch_optional(&self.db.pool)
             .await
-            .map_err(|e| anyhow!("Failed to load state from database: {}", e))?;
+            .map_err(|e| anyhow!("Failed to load state from database: {e}"))?;
 
         if let Some((Some(state_json),)) = row {
             let persisted: PersistedState = serde_json::from_str(&state_json)
-                .map_err(|e| anyhow!("Failed to deserialize state: {}", e))?;
+                .map_err(|e| anyhow!("Failed to deserialize state: {e}"))?;
 
             let mut state = OrchestratorState::new(workflow_id.to_string());
             state.task_states = persisted
@@ -228,7 +228,7 @@ impl StatePersistence {
         // Load workflow to check status
         let workflow = db::models::Workflow::find_by_id(&self.db.pool, workflow_id)
             .await?
-            .ok_or_else(|| anyhow!("Workflow {} not found", workflow_id))?;
+            .ok_or_else(|| anyhow!("Workflow {workflow_id} not found"))?;
 
         // Only recover if workflow is in "running" state
         if workflow.status != WORKFLOW_STATUS_RUNNING {
@@ -260,11 +260,11 @@ impl StatePersistence {
     pub async fn clear_state(&self, workflow_id: &str) -> Result<()> {
         debug!("Clearing state for workflow {}", workflow_id);
 
-        let query = r#"
+        let query = r"
             UPDATE workflow
             SET orchestrator_state = NULL, updated_at = ?1
             WHERE id = ?2
-        "#;
+        ";
 
         let now = Utc::now();
         sqlx::query(query)
@@ -272,7 +272,7 @@ impl StatePersistence {
             .bind(workflow_id)
             .execute(&self.db.pool)
             .await
-            .map_err(|e| anyhow!("Failed to clear state from database: {}", e))?;
+            .map_err(|e| anyhow!("Failed to clear state from database: {e}"))?;
 
         debug!("State cleared successfully for workflow {}", workflow_id);
 
@@ -286,8 +286,8 @@ impl StatePersistence {
         &self,
         workflow_id: &str,
         task_id: &str,
-        completed_terminals: &[String],
-        failed_terminals: &[String],
+        _completed_terminals: &[String],
+        _failed_terminals: &[String],
     ) -> Result<()> {
         debug!(
             "Saving task progress for workflow {} task {}",

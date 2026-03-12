@@ -41,7 +41,7 @@ fn create_codex_auth(codex_home: &Path, api_key: &str) -> anyhow::Result<()> {
 
     let auth_str = serde_json::to_string_pretty(&auth_content)?;
     std::fs::write(&auth_path, auth_str)
-        .map_err(|e| anyhow::anyhow!("Failed to write Codex auth.json: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write Codex auth.json: {e}"))?;
 
     // Set restrictive permissions on Unix
     #[cfg(unix)]
@@ -100,23 +100,22 @@ fn create_codex_config(
     let wire_api = resolve_codex_wire_api();
 
     let mut config_content = format!(
-        r#"model_provider = "{}"
-model = "{}"
+        r#"model_provider = "{provider_key}"
+model = "{model}"
 
-[model_providers.{}]
-name = "{}"
-base_url = "{}"
-api_key = "{}"
-"#,
-        provider_key, model, provider_key, provider_key, base_url_str, api_key
+[model_providers.{provider_key}]
+name = "{provider_key}"
+base_url = "{base_url_str}"
+api_key = "{api_key}"
+"#
     );
 
     // Default to OpenAI Responses API for compatibility with most custom gateways.
     // Set GITCORTEX_CODEX_WIRE_API=codex when provider explicitly requires /codex.
-    config_content.push_str(&format!("wire_api = \"{}\"\n", wire_api));
+    config_content.push_str(&format!("wire_api = \"{wire_api}\"\n"));
 
     std::fs::write(&config_path, config_content)
-        .map_err(|e| anyhow::anyhow!("Failed to write Codex config.toml: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write Codex config.toml: {e}"))?;
 
     tracing::info!(
         codex_home = %codex_home.display(),
@@ -160,7 +159,7 @@ fn create_claude_config(claude_home: &Path, api_key: &str) -> anyhow::Result<()>
     };
 
     std::fs::write(&config_path, config_content)
-        .map_err(|e| anyhow::anyhow!("Failed to write Claude config.json: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write Claude config.json: {e}"))?;
 
     tracing::debug!(
         claude_home = %claude_home.display(),
@@ -219,7 +218,7 @@ fn create_claude_settings(
 
     let content = serde_json::to_string_pretty(&settings)?;
     std::fs::write(&settings_path, content)
-        .map_err(|e| anyhow::anyhow!("Failed to write Claude settings.json: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write Claude settings.json: {e}"))?;
 
     tracing::debug!(
         settings_path = %settings_path.display(),
@@ -238,14 +237,14 @@ fn create_gemini_env(
 ) -> anyhow::Result<()> {
     let env_path = gemini_home.join(".env");
 
-    let mut env_content = format!("GEMINI_API_KEY={}\nGEMINI_MODEL={}\n", api_key, model);
+    let mut env_content = format!("GEMINI_API_KEY={api_key}\nGEMINI_MODEL={model}\n");
 
     if let Some(url) = base_url {
-        env_content.push_str(&format!("GOOGLE_GEMINI_BASE_URL={}\n", url));
+        env_content.push_str(&format!("GOOGLE_GEMINI_BASE_URL={url}\n"));
     }
 
     std::fs::write(&env_path, env_content)
-        .map_err(|e| anyhow::anyhow!("Failed to write Gemini .env: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write Gemini .env: {e}"))?;
 
     // Set restrictive permissions on Unix
     #[cfg(unix)]
@@ -270,6 +269,7 @@ fn create_gemini_env(
 }
 
 /// Creates OpenCode config in isolated directory
+#[allow(dead_code)]
 fn create_opencode_config(
     opencode_home: &Path,
     base_url: Option<&str>,
@@ -294,7 +294,7 @@ fn create_opencode_config(
 
     let config_content = serde_json::to_string_pretty(&config)?;
     std::fs::write(&config_path, config_content)
-        .map_err(|e| anyhow::anyhow!("Failed to write OpenCode config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write OpenCode config: {e}"))?;
 
     tracing::debug!(
         opencode_home = %opencode_home.display(),
@@ -430,16 +430,13 @@ impl CCSwitchService {
             return Ok((None, None));
         };
 
-        let workflow = match Workflow::find_by_id(&self.db.pool, &workflow_id).await? {
-            Some(workflow) => workflow,
-            None => {
-                tracing::warn!(
-                    workflow_id = %workflow_id,
-                    workflow_task_id = %workflow_task_id,
-                    "Workflow not found while resolving Codex API fallback"
-                );
-                return Ok((None, None));
-            }
+        let workflow = if let Some(workflow) = Workflow::find_by_id(&self.db.pool, &workflow_id).await? { workflow } else {
+            tracing::warn!(
+                workflow_id = %workflow_id,
+                workflow_task_id = %workflow_task_id,
+                "Workflow not found while resolving Codex API fallback"
+            );
+            return Ok((None, None));
         };
 
         let api_key = match workflow.get_api_key() {
@@ -592,16 +589,13 @@ impl CCSwitchService {
         };
 
         // Parse CLI type
-        let cli = match CcCliType::parse(&cli_type.name) {
-            Some(cli) => cli,
-            None => {
-                tracing::warn!(
-                    cli_name = %cli_type.name,
-                    terminal_id = %terminal.id,
-                    "CLI does not support config switching, using empty config"
-                );
-                return Ok(empty_config());
-            }
+        let cli = if let Some(cli) = CcCliType::parse(&cli_type.name) { cli } else {
+            tracing::warn!(
+                cli_name = %cli_type.name,
+                terminal_id = %terminal.id,
+                "CLI does not support config switching, using empty config"
+            );
+            return Ok(empty_config());
         };
 
         // Only Claude Code, Codex, and Gemini support environment-based configuration
@@ -649,7 +643,7 @@ impl CCSwitchService {
                         base_dir.display()
                     )
                 })?;
-                let claude_home = base_dir.join(format!("claude-{}", safe_id));
+                let claude_home = base_dir.join(format!("claude-{safe_id}"));
                 std::fs::create_dir_all(&claude_home).map_err(|e| {
                     anyhow::anyhow!(
                         "Failed to create Claude home directory {}: {e}",
@@ -754,7 +748,7 @@ impl CCSwitchService {
                                 orchestrator_base_url = ?orchestrator_base_url,
                                 "Cannot use workflow orchestrator API key fallback: base URLs are incompatible"
                             );
-                        };
+                        }
                     }
                 }
 
@@ -899,7 +893,7 @@ impl CCSwitchService {
                         base_dir.display()
                     )
                 })?;
-                let codex_home = base_dir.join(format!("codex-{}", safe_id));
+                let codex_home = base_dir.join(format!("codex-{safe_id}"));
                 std::fs::create_dir_all(&codex_home).map_err(|e| {
                     anyhow::anyhow!(
                         "Failed to create CODEX_HOME directory {}: {e}",
@@ -983,7 +977,7 @@ impl CCSwitchService {
                         base_dir.display()
                     )
                 })?;
-                let gemini_home = base_dir.join(format!("gemini-{}", safe_id));
+                let gemini_home = base_dir.join(format!("gemini-{safe_id}"));
                 std::fs::create_dir_all(&gemini_home).map_err(|e| {
                     anyhow::anyhow!(
                         "Failed to create Gemini home directory {}: {e}",

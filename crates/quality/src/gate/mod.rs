@@ -134,7 +134,6 @@ mod tests {
     use super::*;
     use crate::gate::condition::{Condition, Operator};
     use crate::gate::result::EvaluationResult;
-    use crate::gate::status::Level;
     use crate::metrics::MetricKey;
 
     #[test]

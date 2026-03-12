@@ -4,7 +4,7 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     response::Json as ResponseJson,
-    routing::{delete, get, post, put},
+    routing::get,
 };
 use chrono::Utc;
 use db::models::SlashCommandPreset;
@@ -52,7 +52,7 @@ pub async fn list_command_presets(
     let presets = SlashCommandPreset::find_all(&deployment.db().pool)
         .await
         .map_err(|e| {
-            ApiError::Internal(format!("Failed to fetch command presets: {}", e).into())
+            ApiError::Internal(format!("Failed to fetch command presets: {e}"))
         })?;
 
     Ok(Json(ApiResponse::success(presets)))
@@ -71,9 +71,9 @@ pub async fn get_command_preset(
             .fetch_optional(&deployment.db().pool)
             .await
             .map_err(|e| {
-                ApiError::Internal(format!("Failed to fetch command preset: {}", e).into())
+                ApiError::Internal(format!("Failed to fetch command preset: {e}"))
             })?
-            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {id}")))?;
 
     Ok(Json(ApiResponse::success(preset)))
 }
@@ -131,7 +131,7 @@ pub async fn create_command_preset(
         if e.to_string().contains("UNIQUE constraint failed") {
             ApiError::Conflict(format!("Command '{}' already exists", preset.command))
         } else {
-            ApiError::Internal(format!("Failed to create command preset: {}", e).into())
+            ApiError::Internal(format!("Failed to create command preset: {e}"))
         }
     })?;
 
@@ -153,9 +153,9 @@ pub async fn update_command_preset(
             .fetch_optional(&deployment.db().pool)
             .await
             .map_err(|e| {
-                ApiError::Internal(format!("Failed to fetch command preset: {}", e).into())
+                ApiError::Internal(format!("Failed to fetch command preset: {e}"))
             })?
-            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {id}")))?;
 
     // Don't allow modifying system presets
     if existing.is_system {
@@ -187,7 +187,7 @@ pub async fn update_command_preset(
     .bind(&id)
     .execute(&deployment.db().pool)
     .await
-    .map_err(|e| ApiError::Internal(format!("Failed to update command preset: {}", e).into()))?;
+    .map_err(|e| ApiError::Internal(format!("Failed to update command preset: {e}")))?;
 
     // Fetch and return the updated preset
     let updated =
@@ -196,7 +196,7 @@ pub async fn update_command_preset(
             .fetch_one(&deployment.db().pool)
             .await
             .map_err(|e| {
-                ApiError::Internal(format!("Failed to fetch updated command preset: {}", e).into())
+                ApiError::Internal(format!("Failed to fetch updated command preset: {e}"))
             })?;
 
     Ok(Json(ApiResponse::success(updated)))
@@ -216,9 +216,9 @@ pub async fn delete_command_preset(
             .fetch_optional(&deployment.db().pool)
             .await
             .map_err(|e| {
-                ApiError::Internal(format!("Failed to fetch command preset: {}", e).into())
+                ApiError::Internal(format!("Failed to fetch command preset: {e}"))
             })?
-            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {}", id)))?;
+            .ok_or_else(|| ApiError::NotFound(format!("Command preset not found: {id}")))?;
 
     // Don't allow deleting system presets
     if existing.is_system {
@@ -233,13 +233,12 @@ pub async fn delete_command_preset(
         .execute(&deployment.db().pool)
         .await
         .map_err(|e| {
-            ApiError::Internal(format!("Failed to delete command preset: {}", e).into())
+            ApiError::Internal(format!("Failed to delete command preset: {e}"))
         })?;
 
     if result.rows_affected() == 0 {
         return Err(ApiError::NotFound(format!(
-            "Command preset not found: {}",
-            id
+            "Command preset not found: {id}"
         )));
     }
 

@@ -93,8 +93,7 @@ fn ensure_supported_provider(provider: &str) -> Result<(), ApiError> {
 fn is_chat_connector_feature_enabled() -> bool {
     std::env::var("GITCORTEX_CHAT_CONNECTOR_ENABLED")
         .ok()
-        .map(|value| value.trim().eq_ignore_ascii_case("true"))
-        .unwrap_or(true)
+        .map_or(true, |value| value.trim().eq_ignore_ascii_case("true"))
 }
 
 fn read_chat_webhook_secret() -> Result<String, ApiError> {

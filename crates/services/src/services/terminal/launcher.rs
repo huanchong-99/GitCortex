@@ -589,7 +589,7 @@ impl TerminalLauncher {
             terminal_id: terminal_id.to_string(),
             status: status.to_string(),
         };
-        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
+        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
 
         if let Err(e) = message_bus.publish(&topic, message.clone()).await {
             tracing::warn!(
@@ -650,13 +650,13 @@ impl TerminalLauncher {
         terminal_id: &str,
     ) -> anyhow::Result<Option<String>> {
         let workflow_id: Option<String> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT wt.workflow_id
             FROM workflow_task wt
             INNER JOIN terminal t ON t.workflow_task_id = wt.id
             WHERE t.id = ?
             LIMIT 1
-            "#,
+            ",
         )
         .bind(terminal_id)
         .fetch_optional(&self.db.pool)

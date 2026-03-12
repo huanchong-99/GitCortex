@@ -140,7 +140,7 @@ impl WorkflowDetailDto {
         let tasks_dto = tasks
             .iter()
             .map(|task| {
-                WorkflowTaskDto::from_workflow_task(task, &vec![]) // terminals will be loaded separately
+                WorkflowTaskDto::from_workflow_task(task, &[]) // terminals will be loaded separately
             })
             .collect();
 
@@ -278,7 +278,7 @@ impl WorkflowCommandDto {
         Self {
             id: command.id.clone(),
             workflow_id: command.workflow_id.clone(),
-            preset_id: command.preset_id.to_string(),
+            preset_id: command.preset_id.clone(),
             order_index: command.order_index,
             custom_params: command.custom_params.clone(),
             created_at: command.created_at.to_rfc3339(),
@@ -290,7 +290,7 @@ impl WorkflowCommandDto {
 impl SlashCommandPresetDto {
     pub fn from_model(preset: &db::models::SlashCommandPreset) -> Self {
         Self {
-            id: preset.id.to_string(),
+            id: preset.id.clone(),
             command: preset.command.clone(),
             description: preset.description.clone(),
             prompt_template: preset.prompt_template.clone().unwrap_or_default(),

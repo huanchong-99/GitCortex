@@ -412,8 +412,7 @@ impl OrchestratorAgent {
         state
             .task_states
             .get(task_id)
-            .map(|task_state| task_state.planning_complete)
-            .unwrap_or(false)
+            .is_some_and(|task_state| task_state.planning_complete)
     }
 
     async fn sync_task_state_from_db(
@@ -428,16 +427,12 @@ impl OrchestratorAgent {
             .into_iter()
             .map(|terminal| terminal.id)
             .collect();
-        let planning_complete = match planning_complete {
-            Some(value) => value,
-            None => {
-                let state = self.state.read().await;
-                state
-                    .task_states
-                    .get(task_id)
-                    .map(|task_state| task_state.planning_complete)
-                    .unwrap_or(true)
-            }
+        let planning_complete = if let Some(value) = planning_complete { value } else {
+            let state = self.state.read().await;
+            state
+                .task_states
+                .get(task_id)
+                .map_or(true, |task_state| task_state.planning_complete)
         };
 
         let mut state = self.state.write().await;
@@ -452,8 +447,7 @@ impl OrchestratorAgent {
                 state
                     .task_states
                     .get(task_id)
-                    .map(|task_state| task_state.planning_complete)
-                    .unwrap_or(false),
+                    .is_some_and(|task_state| task_state.planning_complete),
                 state.is_task_completed(task_id),
                 state.task_has_failures(task_id),
                 state.workflow_id.clone(),
@@ -467,7 +461,7 @@ impl OrchestratorAgent {
         let status = if task_failed { "failed" } else { "completed" };
         db::models::WorkflowTask::update_status(&self.db.pool, task_id, status)
             .await
-            .map_err(|e| anyhow!("Failed to update task {} status to {}: {e}", task_id, status))?;
+            .map_err(|e| anyhow!("Failed to update task {task_id} status to {status}: {e}"))?;
         self.message_bus
             .publish_workflow_event(
                 &workflow_id,
@@ -1095,22 +1089,19 @@ impl OrchestratorAgent {
         let mut completion_response: Option<String> = None;
         if should_run_completion_llm {
             let prompt = self.build_completion_prompt(&event).await?;
-            match self.call_llm_safe(&prompt).await {
-                Some(response) => {
-                    completion_response = Some(response);
-                }
-                None => {
-                    let wf_id = {
-                        let state = self.state.read().await;
-                        state.workflow_id.clone()
-                    };
-                    tracing::warn!(
-                        workflow_id = %wf_id,
-                        task_id = %event.task_id,
-                        terminal_id = %event.terminal_id,
-                        "LLM unavailable, falling back to auto-dispatch only"
-                    );
-                }
+            if let Some(response) = self.call_llm_safe(&prompt).await {
+                completion_response = Some(response);
+            } else {
+                let wf_id = {
+                    let state = self.state.read().await;
+                    state.workflow_id.clone()
+                };
+                tracing::warn!(
+                    workflow_id = %wf_id,
+                    task_id = %event.task_id,
+                    terminal_id = %event.terminal_id,
+                    "LLM unavailable, falling back to auto-dispatch only"
+                );
             }
         }
 
@@ -1332,8 +1323,7 @@ impl OrchestratorAgent {
             }
 
             let summary = format!(
-                "Quality gate {}: {} total issues, {} blocking",
-                gate_status, total_issues, blocking_issues
+                "Quality gate {gate_status}: {total_issues} total issues, {blocking_issues} blocking"
             );
 
             let result = QualityGateResultEvent {
@@ -1603,11 +1593,11 @@ impl OrchestratorAgent {
         }
 
         let latest_output_at: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT MAX(created_at)
             FROM terminal_log
             WHERE terminal_id = ?
-            "#,
+            ",
         )
         .bind(terminal_id)
         .fetch_one(pool)
@@ -1617,11 +1607,11 @@ impl OrchestratorAgent {
             Some(last_output_at)
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COALESCE(started_at, updated_at, created_at)
                 FROM terminal
                 WHERE id = ?
-                "#,
+                ",
             )
             .bind(terminal_id)
             .fetch_optional(pool)
@@ -1758,24 +1748,21 @@ impl OrchestratorAgent {
         }
 
         // 1. Try to parse commit metadata
-        let metadata = match crate::services::git_watcher::parse_commit_metadata(message) {
-            Ok(m) => m,
-            Err(_) => {
-                // No METADATA - wake up orchestrator for decision
-                tracing::info!(
-                    "Commit {} has no METADATA, waking orchestrator for decision",
-                    commit_hash
-                );
-                self.handle_git_event_no_metadata(
-                    workflow_id,
-                    commit_hash,
-                    branch,
-                    message,
-                    &event_id,
-                )
-                .await?;
-                return Ok(());
-            }
+        let metadata = if let Ok(m) = crate::services::git_watcher::parse_commit_metadata(message) { m } else {
+            // No METADATA - wake up orchestrator for decision
+            tracing::info!(
+                "Commit {} has no METADATA, waking orchestrator for decision",
+                commit_hash
+            );
+            self.handle_git_event_no_metadata(
+                workflow_id,
+                commit_hash,
+                branch,
+                message,
+                &event_id,
+            )
+            .await?;
+            return Ok(());
         };
 
         // 2. Validate workflow_id matches
@@ -2428,31 +2415,26 @@ impl OrchestratorAgent {
         let failed_terminal =
             db::models::Terminal::find_by_id(&self.db.pool, failed_terminal_id)
                 .await?
-                .ok_or_else(|| anyhow!("Terminal not found: {}", failed_terminal_id))?;
+                .ok_or_else(|| anyhow!("Terminal not found: {failed_terminal_id}"))?;
 
         // 2. Find an alternative CLI config
-        let alt_config = match self
+        let alt_config = if let Some(config) = self
             .find_alternative_cli_config(&failed_terminal.cli_type_id)
-            .await?
-        {
-            Some(config) => config,
-            None => {
-                let workflow_id = self.state.read().await.workflow_id.clone();
-                let _ = self
-                    .message_bus
-                    .publish_workflow_event(
-                        &workflow_id,
-                        BusMessage::Error {
-                            workflow_id: workflow_id.clone(),
-                            error: format!(
-                                "Provider failover: no alternative CLI config available for terminal {}",
-                                failed_terminal_id
-                            ),
-                        },
-                    )
-                    .await;
-                return Ok(false);
-            }
+            .await? { config } else {
+            let workflow_id = self.state.read().await.workflow_id.clone();
+            let _ = self
+                .message_bus
+                .publish_workflow_event(
+                    &workflow_id,
+                    BusMessage::Error {
+                        workflow_id: workflow_id.clone(),
+                        error: format!(
+                            "Provider failover: no alternative CLI config available for terminal {failed_terminal_id}"
+                        ),
+                    },
+                )
+                .await;
+            return Ok(false);
         };
 
         tracing::info!(
@@ -2513,7 +2495,7 @@ impl OrchestratorAgent {
         // 7. Build dispatch instruction with context from the failed terminal
         let task = db::models::WorkflowTask::find_by_id(&self.db.pool, task_id)
             .await?
-            .ok_or_else(|| anyhow!("Task not found: {}", task_id))?;
+            .ok_or_else(|| anyhow!("Task not found: {task_id}"))?;
 
         let terminals = db::models::Terminal::find_by_task(&self.db.pool, task_id).await?;
 
@@ -2748,8 +2730,7 @@ impl OrchestratorAgent {
                 .trim_start_matches("```");
             return without_opening
                 .strip_suffix("```")
-                .map(str::trim)
-                .unwrap_or(without_opening.trim());
+                .map_or(without_opening.trim(), str::trim);
         }
         trimmed
     }
@@ -2872,8 +2853,7 @@ impl OrchestratorAgent {
                         BusMessage::Error {
                             workflow_id: workflow_id.clone(),
                             error: format!(
-                                "LLM call failed ({} consecutive): {}",
-                                count, e
+                                "LLM call failed ({count} consecutive): {e}"
                             ),
                         },
                     )
@@ -3084,16 +3064,13 @@ impl OrchestratorAgent {
 
                 // 2. Get PTY session ID. Missing PTY can happen after process teardown;
                 // skip this advisory message instead of crashing the orchestrator runtime.
-                let pty_session_id = match terminal.pty_session_id.clone() {
-                    Some(session_id) => session_id,
-                    None => {
-                        tracing::warn!(
-                            terminal_id = %terminal.id,
-                            status = %terminal.status,
-                            "Skipping SendToTerminal instruction because terminal has no PTY session"
-                        );
-                        return Ok(());
-                    }
+                let pty_session_id = if let Some(session_id) = terminal.pty_session_id.clone() { session_id } else {
+                    tracing::warn!(
+                        terminal_id = %terminal.id,
+                        status = %terminal.status,
+                        "Skipping SendToTerminal instruction because terminal has no PTY session"
+                    );
+                    return Ok(());
                 };
 
                 // 3. Send message via message bus
@@ -3221,16 +3198,16 @@ impl OrchestratorAgent {
                 // 3. Initialize task state if not already done
                 {
                     let mut state = self.state.write().await;
-                    if !state.task_states.contains_key(&task_id) {
-                        state.init_task(
-                            task_id.clone(),
-                            terminals.iter().map(|terminal| terminal.id.clone()).collect(),
-                        );
-                    } else {
+                    if state.task_states.contains_key(&task_id) {
                         state.sync_task_terminals(
                             task_id.clone(),
                             terminals.iter().map(|terminal| terminal.id.clone()).collect(),
                             true,
+                        );
+                    } else {
+                        state.init_task(
+                            task_id.clone(),
+                            terminals.iter().map(|terminal| terminal.id.clone()).collect(),
                         );
                     }
                 }
@@ -3297,8 +3274,7 @@ impl OrchestratorAgent {
                             custom_api_key: None,
                             role: Some("reviewer".to_string()),
                             role_description: Some(format!(
-                                "Code reviewer for terminal {}",
-                                terminal_id
+                                "Code reviewer for terminal {terminal_id}"
                             )),
                             order_index: None,
                             auto_confirm: Some(true),
@@ -3374,8 +3350,7 @@ impl OrchestratorAgent {
                             custom_api_key: None,
                             role: Some("fixer".to_string()),
                             role_description: Some(format!(
-                                "Issue fixer for terminal {}",
-                                terminal_id
+                                "Issue fixer for terminal {terminal_id}"
                             )),
                             order_index: None,
                             auto_confirm: Some(true),
@@ -3507,70 +3482,67 @@ impl OrchestratorAgent {
         }
 
         // 3. Get PTY session ID, fail if not available.
-        let pty_session_id = match active_terminal.pty_session_id.as_deref() {
-            Some(id) => id.to_string(),
-            None => {
-                let error_msg = format!(
-                    "Terminal {} has no PTY session, marking as failed",
-                    active_terminal.id
-                );
-                tracing::error!("{}", error_msg);
+        let pty_session_id = if let Some(id) = active_terminal.pty_session_id.as_deref() { id.to_string() } else {
+            let error_msg = format!(
+                "Terminal {} has no PTY session, marking as failed",
+                active_terminal.id
+            );
+            tracing::error!("{}", error_msg);
 
-                // Mark terminal as failed
-                let _ = db::models::Terminal::update_status(
-                    &self.db.pool,
-                    &active_terminal.id,
-                    TERMINAL_STATUS_FAILED,
+            // Mark terminal as failed
+            let _ = db::models::Terminal::update_status(
+                &self.db.pool,
+                &active_terminal.id,
+                TERMINAL_STATUS_FAILED,
+            )
+            .await;
+
+            // Broadcast terminal status update
+            let _ = self
+                .message_bus
+                .publish_workflow_event(
+                    &workflow_id,
+                    BusMessage::TerminalStatusUpdate {
+                        workflow_id: workflow_id.clone(),
+                        terminal_id: active_terminal.id.clone(),
+                        status: TERMINAL_STATUS_FAILED.to_string(),
+                    },
                 )
                 .await;
 
-                // Broadcast terminal status update
-                let _ = self
-                    .message_bus
-                    .publish_workflow_event(
-                        &workflow_id,
-                        BusMessage::TerminalStatusUpdate {
-                            workflow_id: workflow_id.clone(),
-                            terminal_id: active_terminal.id.clone(),
-                            status: TERMINAL_STATUS_FAILED.to_string(),
-                        },
-                    )
-                    .await;
+            // Mark task as failed
+            let _ =
+                db::models::WorkflowTask::update_status(&self.db.pool, task_id, "failed").await;
 
-                // Mark task as failed
-                let _ =
-                    db::models::WorkflowTask::update_status(&self.db.pool, task_id, "failed").await;
+            // Broadcast task status update
+            let _ = self
+                .message_bus
+                .publish_workflow_event(
+                    &workflow_id,
+                    BusMessage::TaskStatusUpdate {
+                        workflow_id: workflow_id.clone(),
+                        task_id: task_id.to_string(),
+                        status: "failed".to_string(),
+                    },
+                )
+                .await;
 
-                // Broadcast task status update
-                let _ = self
-                    .message_bus
-                    .publish_workflow_event(
-                        &workflow_id,
-                        BusMessage::TaskStatusUpdate {
-                            workflow_id: workflow_id.clone(),
-                            task_id: task_id.to_string(),
-                            status: "failed".to_string(),
-                        },
-                    )
-                    .await;
+            // Broadcast error event for UI notification
+            let _ = self
+                .message_bus
+                .publish_workflow_event(
+                    &workflow_id,
+                    BusMessage::Error {
+                        workflow_id: workflow_id.clone(),
+                        error: error_msg.clone(),
+                    },
+                )
+                .await;
 
-                // Broadcast error event for UI notification
-                let _ = self
-                    .message_bus
-                    .publish_workflow_event(
-                        &workflow_id,
-                        BusMessage::Error {
-                            workflow_id: workflow_id.clone(),
-                            error: error_msg.clone(),
-                        },
-                    )
-                    .await;
-
-                return Err(anyhow::anyhow!(
-                    "Terminal {} has no PTY session",
-                    active_terminal.id
-                ));
-            }
+            return Err(anyhow::anyhow!(
+                "Terminal {} has no PTY session",
+                active_terminal.id
+            ));
         };
 
         // 4. Update task status to running.
@@ -3730,7 +3702,7 @@ impl OrchestratorAgent {
 
     fn force_terminate_terminal_process(&self, pid: i32) -> anyhow::Result<()> {
         if pid <= 0 {
-            return Err(anyhow!("invalid process id: {}", pid));
+            return Err(anyhow!("invalid process id: {pid}"));
         }
 
         #[cfg(unix)]
@@ -3755,7 +3727,7 @@ impl OrchestratorAgent {
             let output = std::process::Command::new("taskkill")
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output()
-                .map_err(|e| anyhow!("failed to execute taskkill: {}", e))?;
+                .map_err(|e| anyhow!("failed to execute taskkill: {e}"))?;
 
             if output.status.success() {
                 return Ok(());
@@ -3770,7 +3742,7 @@ impl OrchestratorAgent {
                 return Ok(());
             }
 
-            return Err(anyhow!("taskkill failed for {}: {}", pid, stderr));
+            return Err(anyhow!("taskkill failed for {pid}: {stderr}"));
         }
 
         #[allow(unreachable_code)]
@@ -3834,9 +3806,9 @@ impl OrchestratorAgent {
             if !normalized.is_empty() {
                 if total_terminals > 1 {
                     let summary = Self::truncate_instruction_text(&normalized, 200);
-                    parts.push(format!("Task objective: {}", summary));
+                    parts.push(format!("Task objective: {summary}"));
                 } else {
-                    parts.push(format!("Task description: {}", normalized));
+                    parts.push(format!("Task description: {normalized}"));
                 }
             }
         }
@@ -3854,7 +3826,7 @@ impl OrchestratorAgent {
                 .collect::<Vec<_>>()
                 .join(" ");
             if !normalized.is_empty() {
-                parts.push(format!("Role description: {}", normalized));
+                parts.push(format!("Role description: {normalized}"));
             }
         }
 
@@ -3969,16 +3941,16 @@ impl OrchestratorAgent {
             // Initialize task state
             {
                 let mut state = self.state.write().await;
-                if !state.task_states.contains_key(&task.id) {
-                    state.init_task(
-                        task.id.clone(),
-                        terminals.iter().map(|terminal| terminal.id.clone()).collect(),
-                    );
-                } else {
+                if state.task_states.contains_key(&task.id) {
                     state.sync_task_terminals(
                         task.id.clone(),
                         terminals.iter().map(|terminal| terminal.id.clone()).collect(),
                         true,
+                    );
+                } else {
+                    state.init_task(
+                        task.id.clone(),
+                        terminals.iter().map(|terminal| terminal.id.clone()).collect(),
                     );
                 }
             }
@@ -4321,7 +4293,7 @@ impl OrchestratorAgent {
             let task_worktree_path = base_repo_path.join("worktrees").join(&task_branch);
 
             // Perform the merge
-            let commit_message = format!("Merge task {} ({})", task_id, task_branch);
+            let commit_message = format!("Merge task {task_id} ({task_branch})");
             match git_service.merge_changes(
                 base_repo_path,
                 &task_worktree_path,
@@ -4375,9 +4347,7 @@ impl OrchestratorAgent {
                             .await?;
 
                         return Err(anyhow::anyhow!(
-                            "Merge conflict detected for task branch {}: {}",
-                            task_branch,
-                            e
+                            "Merge conflict detected for task branch {task_branch}: {e}"
                         ));
                     }
 
@@ -4393,16 +4363,14 @@ impl OrchestratorAgent {
 
                     let message = BusMessage::Error {
                         workflow_id: workflow_id.clone(),
-                        error: format!("Merge failed for task {}: {}", task_id, e),
+                        error: format!("Merge failed for task {task_id}: {e}"),
                     };
                     self.message_bus
                         .publish_workflow_event(&workflow_id, message)
                         .await?;
 
                     return Err(anyhow::anyhow!(
-                        "Merge failed for task branch {}: {}",
-                        task_branch,
-                        e
+                        "Merge failed for task branch {task_branch}: {e}"
                     ));
                 }
             }
@@ -4461,17 +4429,13 @@ impl OrchestratorAgent {
             .map_err(|e| anyhow::anyhow!("Failed to get workflow task: {e}"))?
             .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Workflow task {} not found for terminal {}",
-                    workflow_task_id,
-                    terminal_id
+                    "Workflow task {workflow_task_id} not found for terminal {terminal_id}"
                 )
             })?;
 
         if task.workflow_id != workflow_id {
             return Err(anyhow!(
-                "Terminal {} does not belong to workflow {}",
-                terminal_id,
-                workflow_id
+                "Terminal {terminal_id} does not belong to workflow {workflow_id}"
             ));
         }
 
@@ -4481,8 +4445,7 @@ impl OrchestratorAgent {
             .filter(|id| !id.trim().is_empty())
             .ok_or_else(|| {
                 anyhow!(
-                    "Terminal {} has no session_id for prompt response",
-                    terminal_id
+                    "Terminal {terminal_id} has no session_id for prompt response"
                 )
             })?;
 
@@ -4493,9 +4456,7 @@ impl OrchestratorAgent {
 
         if !handled {
             return Err(anyhow!(
-                "Terminal {} is not waiting for prompt approval in workflow {}",
-                terminal_id,
-                workflow_id
+                "Terminal {terminal_id} is not waiting for prompt approval in workflow {workflow_id}"
             ));
         }
 
@@ -4531,9 +4492,7 @@ impl OrchestratorAgent {
 
         result.map_err(|error| {
             anyhow!(
-                "Failed to process orchestrator chat message for workflow {}: {}",
-                workflow_id,
-                error
+                "Failed to process orchestrator chat message for workflow {workflow_id}: {error}"
             )
         })
     }
@@ -4571,7 +4530,7 @@ impl OrchestratorAgent {
         // Load workflow to check if slash commands are enabled
         let workflow = db::models::Workflow::find_by_id(&self.db.pool, &workflow_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Workflow {} not found", workflow_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Workflow {workflow_id} not found"))?;
 
         if !workflow.use_slash_commands {
             tracing::info!("Slash commands disabled for workflow {}", workflow_id);
@@ -4676,7 +4635,7 @@ impl OrchestratorAgent {
         let output = tokio::process::Command::new("git")
             .args([
                 "diff",
-                &format!("{}~1..{}", commit_hash, commit_hash),
+                &format!("{commit_hash}~1..{commit_hash}"),
                 "--stat",
             ])
             .current_dir(&working_dir)
@@ -4697,7 +4656,7 @@ fn truncate_with_marker(s: &str, max_chars: usize) -> String {
         s.to_string()
     } else {
         let truncated = &s[..s.floor_char_boundary(max_chars.saturating_sub(16))];
-        format!("{}\n[...truncated]", truncated)
+        format!("{truncated}\n[...truncated]")
     }
 }
 

@@ -219,53 +219,33 @@ fn is_valid_workflow_status_transition(current: &str, next: &str) -> bool {
 
     matches!(
         (current, next),
-        ("created", "starting")
-            | ("created", "failed")
-            | ("created", "cancelled")
-            | ("starting", "ready")
-            | ("starting", "failed")
-            | ("starting", "cancelled")
-            | ("ready", "running")
-            | ("ready", "failed")
-            | ("ready", "cancelled")
-            | ("running", "paused")
-            | ("running", "completed")
-            | ("running", "failed")
-            | ("running", "cancelled")
-            | ("paused", "ready")
-            | ("paused", "running")
-            | ("paused", "failed")
-            | ("paused", "cancelled")
-            | ("completed", "merging")
-            | ("completed", "created")
-            | ("merging", "completed")
-            | ("merging", "failed")
-            | ("failed", "starting")
-            | ("failed", "created")
-            | ("failed", "cancelled")
-            | ("cancelled", "created")
+        ("created" | "failed", "starting") |
+("created" | "starting" | "ready" | "running" | "paused" | "merging",
+"failed") |
+("created" | "starting" | "ready" | "running" | "paused" | "failed",
+"cancelled") | ("starting" | "paused", "ready") |
+("ready" | "paused", "running") | ("running", "paused" | "completed") |
+("completed", "merging" | "created") | ("merging", "completed") |
+("failed" | "cancelled", "created")
     )
 }
 
 fn validate_workflow_status_transition(current: &str, next: &str) -> Result<(), ApiError> {
     if !is_known_workflow_status(next) {
         return Err(ApiError::BadRequest(format!(
-            "Invalid workflow status '{}', expected one of: {:?}",
-            next, WORKFLOW_STATUSES
+            "Invalid workflow status '{next}', expected one of: {WORKFLOW_STATUSES:?}"
         )));
     }
 
     if !is_known_workflow_status(current) {
         return Err(ApiError::Conflict(format!(
-            "Cannot transition workflow from unknown status '{}': expected one of: {:?}",
-            current, WORKFLOW_STATUSES
+            "Cannot transition workflow from unknown status '{current}': expected one of: {WORKFLOW_STATUSES:?}"
         )));
     }
 
     if !is_valid_workflow_status_transition(current, next) {
         return Err(ApiError::Conflict(format!(
-            "Invalid workflow status transition: '{}' -> '{}'",
-            current, next
+            "Invalid workflow status transition: '{current}' -> '{next}'"
         )));
     }
 
@@ -285,8 +265,7 @@ fn validate_task_workflow_scope(task: &WorkflowTask, workflow_id: &str) -> Resul
 fn validate_runtime_mutation_workflow_status(status: &str) -> Result<(), ApiError> {
     if !RUNTIME_MUTABLE_WORKFLOW_STATUSES.contains(&status) {
         return Err(ApiError::Conflict(format!(
-            "Workflow status '{}' does not allow runtime task or terminal mutations",
-            status
+            "Workflow status '{status}' does not allow runtime task or terminal mutations"
         )));
     }
 
@@ -303,8 +282,7 @@ fn has_configured_workflow_models(config: &AppConfig) -> bool {
 fn is_orchestrator_chat_feature_enabled() -> bool {
     std::env::var("GITCORTEX_ORCHESTRATOR_CHAT_ENABLED")
         .ok()
-        .map(|value| value.trim().eq_ignore_ascii_case("true"))
-        .unwrap_or(true)
+        .map_or(true, |value| value.trim().eq_ignore_ascii_case("true"))
 }
 
 fn redact_sensitive_content(content: &str) -> String {
@@ -342,7 +320,7 @@ fn extract_role_from_headers(headers: &HeaderMap) -> Option<String> {
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(|value| value.to_ascii_lowercase())
+        .map(str::to_ascii_lowercase)
 }
 
 fn ensure_orchestrator_permission(
@@ -586,15 +564,13 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
     for (task_index, task) in req.tasks.iter().enumerate() {
         if task.name.trim().is_empty() {
             return Err(ApiError::BadRequest(format!(
-                "task[{}].name is required",
-                task_index
+                "task[{task_index}].name is required"
             )));
         }
 
         if task.terminals.is_empty() {
             return Err(ApiError::BadRequest(format!(
-                "task[{}].terminals must not be empty",
-                task_index
+                "task[{task_index}].terminals must not be empty"
             )));
         }
 
@@ -602,15 +578,13 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
         for (terminal_index, terminal) in task.terminals.iter().enumerate() {
             if terminal.cli_type_id.trim().is_empty() {
                 return Err(ApiError::BadRequest(format!(
-                    "task[{}].terminal[{}].cliTypeId is required",
-                    task_index, terminal_index
+                    "task[{task_index}].terminal[{terminal_index}].cliTypeId is required"
                 )));
             }
 
             if terminal.model_config_id.trim().is_empty() {
                 return Err(ApiError::BadRequest(format!(
-                    "task[{}].terminal[{}].modelConfigId is required",
-                    task_index, terminal_index
+                    "task[{task_index}].terminal[{terminal_index}].modelConfigId is required"
                 )));
             }
         }
@@ -621,8 +595,7 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
         for (cmd_index, cmd) in commands.iter().enumerate() {
             if cmd.preset_id.trim().is_empty() {
                 return Err(ApiError::BadRequest(format!(
-                    "commands[{}].presetId is required",
-                    cmd_index
+                    "commands[{cmd_index}].presetId is required"
                 )));
             }
 
@@ -631,8 +604,7 @@ pub fn validate_create_request(req: &CreateWorkflowRequest) -> Result<(), ApiErr
                 if !params.trim().is_empty() {
                     serde_json::from_str::<serde_json::Value>(params).map_err(|_| {
                         ApiError::BadRequest(format!(
-                            "commands[{}].customParams must be valid JSON",
-                            cmd_index
+                            "commands[{cmd_index}].customParams must be valid JSON"
                         ))
                     })?;
                 }
@@ -727,25 +699,22 @@ async fn validate_cli_and_model_configs(
             .await
             .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
 
-        let model_config = match model_config {
-            Some(mc) => mc,
-            None => {
-                // Model config not found - try to create from inline data
-                let inline = inline.ok_or_else(|| ApiError::BadRequest(format!(
-                    "Model config not found: {model_config_id}. Provide inline modelConfig to auto-create."
-                )))?;
+        let model_config = if let Some(mc) = model_config { mc } else {
+            // Model config not found - try to create from inline data
+            let inline = inline.ok_or_else(|| ApiError::BadRequest(format!(
+                "Model config not found: {model_config_id}. Provide inline modelConfig to auto-create."
+            )))?;
 
-                // Create custom model config from inline data
-                ModelConfig::create_custom(
-                    pool,
-                    &model_config_id,
-                    &cli_type_id,
-                    &inline.display_name,
-                    &inline.model_id,
-                )
-                .await
-                .map_err(|e| ApiError::Internal(format!("Failed to create model config: {e}")))?
-            }
+            // Create custom model config from inline data
+            ModelConfig::create_custom(
+                pool,
+                &model_config_id,
+                &cli_type_id,
+                &inline.display_name,
+                &inline.model_id,
+            )
+            .await
+            .map_err(|e| ApiError::Internal(format!("Failed to create model config: {e}")))?
         };
 
         // Validate model config belongs to the CLI type
@@ -875,7 +844,7 @@ async fn create_workflow(
     // Collect existing branch names for conflict detection
     // In a real scenario, we'd query the git repository for existing branches
     // For now, we collect branches that will be created in this batch
-    for (_task_index, task_req) in req.tasks.iter().enumerate() {
+    for task_req in &req.tasks {
         let task_id = Uuid::new_v4().to_string();
 
         // Generate branch name using slugify with conflict detection
@@ -894,7 +863,7 @@ async fn create_workflow(
             let mut counter = 2;
 
             while existing_branches.contains(&candidate) {
-                candidate = format!("{}-{}", base_branch, counter);
+                candidate = format!("{base_branch}-{counter}");
                 counter += 1;
             }
 
@@ -1128,7 +1097,7 @@ async fn rollback_prepare_failure(deployment: &DeploymentImpl, workflow_id: &str
             Vec::new()
         }
     };
-    let workflow_topic = format!("workflow:{}", workflow_id);
+    let workflow_topic = format!("workflow:{workflow_id}");
 
     for terminal in terminals {
         if let Err(e) = deployment
@@ -1233,14 +1202,14 @@ async fn resolve_workflow_working_dir(
     }
 
     let repo_working_dir: Option<String> = sqlx::query_scalar(
-        r#"
+        r"
         SELECT r.path
         FROM repos r
         INNER JOIN project_repos pr ON pr.repo_id = r.id
         WHERE pr.project_id = ?
         ORDER BY r.display_name ASC
         LIMIT 1
-        "#,
+        ",
     )
     .bind(workflow.project_id)
     .fetch_optional(&deployment.db().pool)
@@ -1597,7 +1566,7 @@ async fn start_workflow(
             // Log full error internally
             tracing::error!("Failed to start workflow {}: {:?}", workflow_id, e);
             // Return generic message to client
-            ApiError::Internal(format!("Failed to start workflow"))
+            ApiError::Internal("Failed to start workflow".to_string())
         })?;
 
     refresh_prompt_watcher_registrations(&deployment, &workflow_id).await;
@@ -1775,23 +1744,20 @@ async fn create_runtime_task(
         Some(order_index) => {
             if existing_tasks.iter().any(|task| task.order_index == order_index) {
                 return Err(ApiError::Conflict(format!(
-                    "Task orderIndex {} already exists in workflow {}",
-                    order_index, workflow_id
+                    "Task orderIndex {order_index} already exists in workflow {workflow_id}"
                 )));
             }
             order_index
         }
         None => existing_tasks
             .last()
-            .map(|task| task.order_index + 1)
-            .unwrap_or(0),
+            .map_or(0, |task| task.order_index + 1),
     };
 
     let branch = if let Some(custom_branch) = req.branch {
         if existing_tasks.iter().any(|task| task.branch == custom_branch) {
             return Err(ApiError::Conflict(format!(
-                "Task branch '{}' already exists in workflow {}",
-                custom_branch, workflow_id
+                "Task branch '{custom_branch}' already exists in workflow {workflow_id}"
             )));
         }
         custom_branch
@@ -1803,7 +1769,7 @@ async fn create_runtime_task(
         let mut counter = 2;
 
         while existing_branches.contains(&candidate) {
-            candidate = format!("{}-{}", base_branch, counter);
+            candidate = format!("{base_branch}-{counter}");
             counter += 1;
         }
 
@@ -1875,8 +1841,7 @@ async fn create_runtime_terminal(
         .is_some();
     if !cli_exists {
         return Err(ApiError::BadRequest(format!(
-            "CLI type not found: {}",
-            cli_type_id
+            "CLI type not found: {cli_type_id}"
         )));
     }
 
@@ -1884,12 +1849,11 @@ async fn create_runtime_terminal(
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to validate model config: {e}")))?
         .ok_or_else(|| {
-            ApiError::BadRequest(format!("Model config not found: {}", model_config_id))
+            ApiError::BadRequest(format!("Model config not found: {model_config_id}"))
         })?;
     if model_config.cli_type_id != cli_type_id {
         return Err(ApiError::BadRequest(format!(
-            "Model config {} does not belong to CLI type {}",
-            model_config_id, cli_type_id
+            "Model config {model_config_id} does not belong to CLI type {cli_type_id}"
         )));
     }
 
@@ -1901,16 +1865,14 @@ async fn create_runtime_terminal(
                 .any(|terminal| terminal.order_index == order_index)
             {
                 return Err(ApiError::Conflict(format!(
-                    "Terminal orderIndex {} already exists in task {}",
-                    order_index, task_id
+                    "Terminal orderIndex {order_index} already exists in task {task_id}"
                 )));
             }
             order_index
         }
         None => existing_terminals
             .last()
-            .map(|terminal| terminal.order_index + 1)
-            .unwrap_or(0),
+            .map_or(0, |terminal| terminal.order_index + 1),
     };
 
     let now = chrono::Utc::now();
@@ -2220,8 +2182,7 @@ async fn submit_prompt_response(
     let runtime = deployment.orchestrator_runtime();
     if !runtime.is_running(&workflow_id).await {
         return Err(ApiError::BadRequest(format!(
-            "Cannot submit prompt response: workflow '{}' is not running",
-            workflow_id
+            "Cannot submit prompt response: workflow '{workflow_id}' is not running"
         )));
     }
 
@@ -2331,8 +2292,7 @@ pub(crate) async fn submit_orchestrator_chat(
     let runtime = deployment.orchestrator_runtime();
     if !runtime.is_running(&workflow_id).await {
         return Err(ApiError::Conflict(format!(
-            "Cannot submit orchestrator chat: workflow '{}' is not running",
-            workflow_id
+            "Cannot submit orchestrator chat: workflow '{workflow_id}' is not running"
         )));
     }
 
@@ -2462,8 +2422,8 @@ pub(crate) async fn submit_orchestrator_chat(
     .await
     .map_err(|e| ApiError::Internal(format!("Failed to update command completion: {e}")))?;
 
-    if response.status == "succeeded" {
-        if let Ok(messages) = runtime.get_orchestrator_messages(&workflow_id).await
+    if response.status == "succeeded"
+        && let Ok(messages) = runtime.get_orchestrator_messages(&workflow_id).await
             && let Some(last_assistant) =
                 messages.iter().rev().find(|entry| entry.role == "assistant")
         {
@@ -2478,7 +2438,6 @@ pub(crate) async fn submit_orchestrator_chat(
             let _ =
                 WorkflowOrchestratorMessage::insert(&deployment.db().pool, &assistant_message).await;
         }
-    }
 
     let receipt_message = WorkflowOrchestratorMessage::new(
         &workflow_id,
@@ -2640,8 +2599,7 @@ async fn merge_workflow(
         && !strategy.eq_ignore_ascii_case("squash")
     {
         return Err(ApiError::BadRequest(format!(
-            "Unsupported merge strategy '{}': only 'squash' is supported",
-            strategy
+            "Unsupported merge strategy '{strategy}': only 'squash' is supported"
         )));
     }
 
@@ -2654,8 +2612,7 @@ async fn merge_workflow(
     let current_status = workflow.status.as_str();
     if !can_merge_from_workflow_status(current_status) {
         return Err(ApiError::BadRequest(format!(
-            "Cannot merge workflow with status '{}': expected one of: {:?}",
-            current_status, MERGE_ALLOWED_WORKFLOW_STATUSES
+            "Cannot merge workflow with status '{current_status}': expected one of: {MERGE_ALLOWED_WORKFLOW_STATUSES:?}"
         )));
     }
 
@@ -2711,8 +2668,7 @@ async fn merge_workflow(
         if task_branch.is_empty() {
             let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "failed").await;
             return Err(ApiError::BadRequest(format!(
-                "Cannot merge task {}: branch is empty",
-                task_id
+                "Cannot merge task {task_id}: branch is empty"
             )));
         }
 
@@ -2726,7 +2682,7 @@ async fn merge_workflow(
             )));
         }
 
-        let commit_message = format!("Merge task {} ({})", task_id, task_branch);
+        let commit_message = format!("Merge task {task_id} ({task_branch})");
         match deployment.git().merge_changes(
             &base_repo_path,
             &task_worktree_path,

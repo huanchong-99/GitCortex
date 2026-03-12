@@ -155,20 +155,17 @@ async fn handle_terminal_socket(
     // Get process handle from ProcessManager
     let process_handle = deployment.process_manager().get_handle(&terminal_id).await;
 
-    let process_handle = match process_handle {
-        Some(handle) => handle,
-        None => {
-            let msg = WsMessage::Error {
-                message: "Terminal process not running. Please start the terminal first."
-                    .to_string(),
-            };
-            let _ = ws_sender
-                .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
-                .await;
-            let _ = ws_sender.close().await;
-            tracing::warn!("Terminal {} has no running process", terminal_id);
-            return;
-        }
+    let process_handle = if let Some(handle) = process_handle { handle } else {
+        let msg = WsMessage::Error {
+            message: "Terminal process not running. Please start the terminal first."
+                .to_string(),
+        };
+        let _ = ws_sender
+            .send(Message::Text(serde_json::to_string(&msg).unwrap().into()))
+            .await;
+        let _ = ws_sender.close().await;
+        tracing::warn!("Terminal {} has no running process", terminal_id);
+        return;
     };
 
     sync_prompt_watcher_registration(
@@ -247,7 +244,7 @@ async fn handle_terminal_socket(
         tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = idle_timeout_notifier.notified() => {
+                    () = idle_timeout_notifier.notified() => {
                         if idle_timeout_triggered.load(Ordering::Acquire) {
                             tracing::info!(
                                 terminal_id = %terminal_id_output,
@@ -413,98 +410,95 @@ async fn handle_terminal_socket(
     // Spawn WebSocket receive task (WebSocket input -> PTY)
     let recv_task = tokio::spawn(async move {
         loop {
-            match ws_receiver.next().await {
-                Some(result) => {
-                    // Update last activity time
-                    *last_activity_recv.write().await = Instant::now();
+            if let Some(result) = ws_receiver.next().await {
+                // Update last activity time
+                *last_activity_recv.write().await = Instant::now();
 
-                    match result {
-                        Ok(msg) => match msg {
-                            Message::Text(text) => {
-                                if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
-                                    match ws_msg {
-                                        WsMessage::Input { data } => {
-                                            // Send to PTY writer
-                                            if let Err(e) =
-                                                ws_tx_input.send(data.into_bytes()).await
-                                            {
-                                                tracing::error!("Failed to send to PTY: {}", e);
-                                                break;
-                                            }
-                                        }
-                                        WsMessage::Resize { cols, rows } => {
-                                            // Resize PTY
-                                            if let Err(e) = process_manager
-                                                .resize(&terminal_id_resize, cols, rows)
-                                                .await
-                                            {
-                                                tracing::warn!(
-                                                    "Failed to resize terminal {}: {}",
-                                                    terminal_id_resize,
-                                                    e
-                                                );
-                                            } else {
-                                                tracing::debug!(
-                                                    "Terminal {} resized to {}x{}",
-                                                    terminal_id_resize,
-                                                    cols,
-                                                    rows
-                                                );
-                                            }
-                                        }
-                                        WsMessage::Heartbeat => {
-                                            tracing::trace!("Received client heartbeat");
-                                        }
-                                        WsMessage::Output { .. } => {
-                                            tracing::warn!("Client sent unexpected Output message");
-                                        }
-                                        WsMessage::Error { .. } => {
-                                            tracing::warn!("Client sent unexpected Error message");
+                match result {
+                    Ok(msg) => match msg {
+                        Message::Text(text) => {
+                            if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
+                                match ws_msg {
+                                    WsMessage::Input { data } => {
+                                        // Send to PTY writer
+                                        if let Err(e) =
+                                            ws_tx_input.send(data.into_bytes()).await
+                                        {
+                                            tracing::error!("Failed to send to PTY: {}", e);
+                                            break;
                                         }
                                     }
-                                } else {
-                                    tracing::warn!("Failed to parse WebSocket message: {}", text);
+                                    WsMessage::Resize { cols, rows } => {
+                                        // Resize PTY
+                                        if let Err(e) = process_manager
+                                            .resize(&terminal_id_resize, cols, rows)
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                "Failed to resize terminal {}: {}",
+                                                terminal_id_resize,
+                                                e
+                                            );
+                                        } else {
+                                            tracing::debug!(
+                                                "Terminal {} resized to {}x{}",
+                                                terminal_id_resize,
+                                                cols,
+                                                rows
+                                            );
+                                        }
+                                    }
+                                    WsMessage::Heartbeat => {
+                                        tracing::trace!("Received client heartbeat");
+                                    }
+                                    WsMessage::Output { .. } => {
+                                        tracing::warn!("Client sent unexpected Output message");
+                                    }
+                                    WsMessage::Error { .. } => {
+                                        tracing::warn!("Client sent unexpected Error message");
+                                    }
                                 }
-                            }
-                            Message::Close(_) => {
-                                tracing::info!("Client requested close");
-                                break;
-                            }
-                            Message::Ping(data) => {
-                                tracing::trace!("Received ping: {} bytes", data.len());
-                            }
-                            Message::Pong(data) => {
-                                tracing::trace!("Received pong: {} bytes", data.len());
-                            }
-                            Message::Binary(data) => {
-                                tracing::warn!(
-                                    "Received unexpected binary data: {} bytes",
-                                    data.len()
-                                );
-                            }
-                        },
-                        Err(e) => {
-                            if is_benign_ws_disconnect(&e) {
-                                tracing::debug!(
-                                    terminal_id = %terminal_id_recv,
-                                    error = %e,
-                                    "WebSocket disconnected"
-                                );
                             } else {
-                                tracing::error!(
-                                    terminal_id = %terminal_id_recv,
-                                    error = %e,
-                                    "WebSocket error"
-                                );
+                                tracing::warn!("Failed to parse WebSocket message: {}", text);
                             }
+                        }
+                        Message::Close(_) => {
+                            tracing::info!("Client requested close");
                             break;
                         }
+                        Message::Ping(data) => {
+                            tracing::trace!("Received ping: {} bytes", data.len());
+                        }
+                        Message::Pong(data) => {
+                            tracing::trace!("Received pong: {} bytes", data.len());
+                        }
+                        Message::Binary(data) => {
+                            tracing::warn!(
+                                "Received unexpected binary data: {} bytes",
+                                data.len()
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        if is_benign_ws_disconnect(&e) {
+                            tracing::debug!(
+                                terminal_id = %terminal_id_recv,
+                                error = %e,
+                                "WebSocket disconnected"
+                            );
+                        } else {
+                            tracing::error!(
+                                terminal_id = %terminal_id_recv,
+                                error = %e,
+                                "WebSocket error"
+                            );
+                        }
+                        break;
                     }
                 }
-                None => {
-                    tracing::debug!("WebSocket stream ended");
-                    break;
-                }
+            } else {
+                tracing::debug!("WebSocket stream ended");
+                break;
             }
         }
     });
@@ -546,7 +540,7 @@ async fn handle_terminal_socket(
                 }
             }
         }
-        _ = async {
+        () = async {
             if let Some(task) = &mut writer_task {
                 let _ = task.await;
             }
@@ -642,7 +636,7 @@ async fn sync_prompt_watcher_registration(
     };
 
     let pty_session_id = active_session_id
-        .map(|session_id| session_id.to_string())
+        .map(std::string::ToString::to_string)
         .filter(|session_id| !session_id.trim().is_empty())
         .or_else(|| {
             terminal

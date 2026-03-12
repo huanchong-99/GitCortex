@@ -98,6 +98,7 @@ pub enum WorkflowTaskStatus {
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Workflow {
     /// Primary key ID (UUID as String for compatibility)
     pub id: String,
@@ -525,7 +526,7 @@ impl Workflow {
             "
         )
         .bind(&workflow.id)
-        .bind(&workflow.project_id)
+        .bind(workflow.project_id)
         .bind(&workflow.name)
         .bind(&workflow.description)
         .bind(&workflow.status)
@@ -746,7 +747,7 @@ impl Workflow {
             "
         )
         .bind(&workflow.id)
-        .bind(&workflow.project_id)
+        .bind(workflow.project_id)
         .bind(&workflow.name)
         .bind(&workflow.description)
         .bind(&workflow.status)

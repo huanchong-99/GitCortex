@@ -48,8 +48,7 @@ pub async fn readyz(
 async fn resolve_feishu_health(deployment: &DeploymentImpl) -> Value {
     let feature_enabled = std::env::var("GITCORTEX_FEISHU_ENABLED")
         .ok()
-        .map(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1")
-        .unwrap_or(false);
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1");
 
     if !feature_enabled {
         return json!({ "enabled": false, "connectionStatus": "disabled" });

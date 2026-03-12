@@ -39,6 +39,7 @@ pub fn router() -> Router<DeploymentImpl> {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct HandoffInitPayload {
     provider: String,
     return_to: String,
@@ -60,6 +61,7 @@ async fn handoff_init(
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct HandoffCompleteQuery {
     handoff_id: Uuid,
     #[serde(default)]

@@ -22,7 +22,7 @@ use crate::error::ApiError;
 fn build_bash_command(program_path: &Path, args: &[String]) -> Result<String, ExecutorError> {
     let quote = |value: &str| {
         shlex::try_quote(value)
-            .map(|quoted| quoted.into_owned())
+            .map(std::borrow::Cow::into_owned)
             .map_err(CommandBuildError::QuoteError)
             .map_err(ExecutorError::from)
     };

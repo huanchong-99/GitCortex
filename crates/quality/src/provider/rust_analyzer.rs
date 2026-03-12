@@ -305,6 +305,7 @@ impl QualityProvider for RustProvider {
 struct CommandOutput {
     stdout: String,
     stderr: String,
+    #[allow(dead_code)]
     success: bool,
 }
 

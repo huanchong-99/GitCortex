@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
-use dotenv;
 use server::{
     DeploymentImpl, routes,
     routes::{SharedSubscriptionHub, event_bridge::EventBridge, subscription_hub::SubscriptionHub},
@@ -246,8 +245,7 @@ pub async fn perform_cleanup_actions(deployment: &DeploymentImpl) {
 fn is_feishu_enabled() -> bool {
     std::env::var("GITCORTEX_FEISHU_ENABLED")
         .ok()
-        .map(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1")
-        .unwrap_or(false)
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1")
 }
 
 /// Attempt to start the Feishu connector by loading config from the database.

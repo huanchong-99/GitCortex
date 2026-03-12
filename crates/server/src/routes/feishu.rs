@@ -22,8 +22,7 @@ use crate::{DeploymentImpl, error::ApiError};
 fn is_feishu_enabled() -> bool {
     std::env::var("GITCORTEX_FEISHU_ENABLED")
         .ok()
-        .map(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1")
-        .unwrap_or(false)
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1")
 }
 
 // ---------------------------------------------------------------------------

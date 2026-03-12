@@ -159,13 +159,12 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     async fn trigger_auto_project_setup(&self) {
         let auto_setup_enabled = std::env::var("GITCORTEX_AUTO_SETUP_PROJECTS")
             .ok()
-            .map(|value| {
+            .map_or(true, |value| {
                 !matches!(
                     value.trim().to_ascii_lowercase().as_str(),
                     "0" | "false" | "no" | "off"
                 )
-            })
-            .unwrap_or(true);
+            });
 
         if !auto_setup_enabled {
             tracing::info!("Auto project setup disabled via GITCORTEX_AUTO_SETUP_PROJECTS");

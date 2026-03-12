@@ -177,17 +177,13 @@ impl OrchestratorRuntime {
 
         // Get project to find repo path
         let project =
-            match db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id)
-                .await?
-            {
-                Some(project) => project,
-                None => {
-                    warn!(
-                        "Project {} not found for workflow {}, git watcher disabled",
-                        workflow.project_id, workflow_id
-                    );
-                    return Ok(None);
-                }
+            if let Some(project) = db::models::project::Project::find_by_id(&self.db.pool, workflow.project_id)
+                .await? { project } else {
+                warn!(
+                    "Project {} not found for workflow {}, git watcher disabled",
+                    workflow.project_id, workflow_id
+                );
+                return Ok(None);
             };
 
         // Resolve repo path: prefer project.default_agent_working_dir, then fallback to project repos
@@ -311,7 +307,7 @@ impl OrchestratorRuntime {
         }
 
         if running.contains_key(workflow_id) || starting.contains(workflow_id) {
-            return Err(anyhow!("Workflow {} is already running", workflow_id));
+            return Err(anyhow!("Workflow {workflow_id} is already running"));
         }
 
         starting.insert(workflow_id.to_string());
@@ -329,7 +325,7 @@ impl OrchestratorRuntime {
         // Load workflow from database
         let workflow = db::models::Workflow::find_by_id(&self.db.pool, workflow_id)
             .await?
-            .ok_or_else(|| anyhow!("Workflow {} not found", workflow_id))?;
+            .ok_or_else(|| anyhow!("Workflow {workflow_id} not found"))?;
 
         // Verify workflow is in ready state
         if workflow.status != WORKFLOW_STATUS_READY {
@@ -409,8 +405,7 @@ impl OrchestratorRuntime {
                 let mut running = running_workflows.lock().await;
                 let can_remove = running
                     .get(&workflow_id_owned)
-                    .map(|entry| entry.task_handle.is_finished())
-                    .unwrap_or(false);
+                    .is_some_and(|entry| entry.task_handle.is_finished());
 
                 if can_remove {
                     running.remove(&workflow_id_owned);
@@ -437,12 +432,9 @@ impl OrchestratorRuntime {
                     handle.watcher.stop();
                     let mut watcher_task = handle.task_handle;
                     let shutdown_result = timeout(Duration::from_secs(5), &mut watcher_task).await;
-                    match shutdown_result {
-                        Ok(_) => {}
-                        Err(_) => {
-                            watcher_task.abort();
-                            watcher_task.await.ok();
-                        }
+                    if let Ok(_) = shutdown_result {} else {
+                        watcher_task.abort();
+                        watcher_task.await.ok();
                     }
                 }
             }
@@ -511,7 +503,7 @@ impl OrchestratorRuntime {
             let running = self.running_workflows.lock().await;
             let running_workflow = running
                 .get(workflow_id)
-                .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?;
+                .ok_or_else(|| anyhow!("Workflow {workflow_id} is not running"))?;
 
             Arc::clone(&running_workflow.agent)
         };
@@ -521,10 +513,7 @@ impl OrchestratorRuntime {
             .await
             .map_err(|e| {
                 anyhow!(
-                    "Failed to submit user prompt response for workflow {} and terminal {}: {}",
-                    workflow_id,
-                    terminal_id,
-                    e
+                    "Failed to submit user prompt response for workflow {workflow_id} and terminal {terminal_id}: {e}"
                 )
             })
     }
@@ -587,7 +576,7 @@ impl OrchestratorRuntime {
             let running = self.running_workflows.lock().await;
             let running_workflow = running
                 .get(workflow_id)
-                .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?;
+                .ok_or_else(|| anyhow!("Workflow {workflow_id} is not running"))?;
 
             Arc::clone(&running_workflow.agent)
         };
@@ -601,8 +590,7 @@ impl OrchestratorRuntime {
             Err(error) => {
                 command_result.status = OrchestratorChatCommandStatus::Failed;
                 command_result.error = Some(format!(
-                    "Failed to submit orchestrator chat message for workflow {}: {}",
-                    workflow_id, error
+                    "Failed to submit orchestrator chat message for workflow {workflow_id}: {error}"
                 ));
             }
         }
@@ -625,7 +613,7 @@ impl OrchestratorRuntime {
             let running = self.running_workflows.lock().await;
             let running_workflow = running
                 .get(workflow_id)
-                .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?;
+                .ok_or_else(|| anyhow!("Workflow {workflow_id} is not running"))?;
 
             Arc::clone(&running_workflow.agent)
         };
@@ -651,13 +639,13 @@ impl OrchestratorRuntime {
             let mut running = self.running_workflows.lock().await;
             running
                 .remove(workflow_id)
-                .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?
+                .ok_or_else(|| anyhow!("Workflow {workflow_id} is not running"))?
         };
 
         // Send shutdown signal via message bus
         self.message_bus
             .publish(
-                &format!("workflow:{}", workflow_id),
+                &format!("workflow:{workflow_id}"),
                 super::BusMessage::Shutdown,
             )
             .await?;
@@ -731,7 +719,7 @@ impl OrchestratorRuntime {
             running
                 .get(workflow_id)
                 .map(|rw| Arc::clone(&rw.agent))
-                .ok_or_else(|| anyhow!("Workflow {} is not running", workflow_id))?
+                .ok_or_else(|| anyhow!("Workflow {workflow_id} is not running"))?
         };
 
         Ok(agent.reset_provider(provider_name).await)
@@ -774,11 +762,11 @@ impl OrchestratorRuntime {
         let pool = &self.db.pool;
 
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT id
             FROM workflow
             WHERE status = 'running'
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await?;
@@ -861,7 +849,7 @@ impl OrchestratorRuntime {
         // Load workflow record to build orchestrator config
         let workflow = db::models::Workflow::find_by_id(&self.db.pool, workflow_id)
             .await?
-            .ok_or_else(|| anyhow!("Workflow {} not found during recovery", workflow_id))?;
+            .ok_or_else(|| anyhow!("Workflow {workflow_id} not found during recovery"))?;
 
         // Build orchestrator config (mirrors start_workflow_reserved logic)
         let orchestrator_config = if workflow.orchestrator_enabled {
@@ -919,8 +907,7 @@ impl OrchestratorRuntime {
                 let mut running = running_workflows.lock().await;
                 let can_remove = running
                     .get(&workflow_id_owned)
-                    .map(|entry| entry.task_handle.is_finished())
-                    .unwrap_or(false);
+                    .is_some_and(|entry| entry.task_handle.is_finished());
 
                 if can_remove {
                     running.remove(&workflow_id_owned);
@@ -947,12 +934,9 @@ impl OrchestratorRuntime {
                     handle.watcher.stop();
                     let mut watcher_task = handle.task_handle;
                     let shutdown_result = timeout(Duration::from_secs(5), &mut watcher_task).await;
-                    match shutdown_result {
-                        Ok(_) => {}
-                        Err(_) => {
-                            watcher_task.abort();
-                            watcher_task.await.ok();
-                        }
+                    if let Ok(_) = shutdown_result {} else {
+                        watcher_task.abort();
+                        watcher_task.await.ok();
                     }
                 }
             }

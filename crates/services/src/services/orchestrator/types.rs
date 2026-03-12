@@ -254,7 +254,7 @@ impl PromptDecision {
     pub fn llm_arrow_select(current_index: usize, target_index: usize, reasoning: String) -> Self {
         let arrow_sequence = build_arrow_sequence(current_index, target_index);
         Self::LLMDecision {
-            response: format!("{}\n", arrow_sequence),
+            response: format!("{arrow_sequence}\n"),
             reasoning,
             target_index: Some(target_index),
         }
@@ -263,7 +263,7 @@ impl PromptDecision {
     /// Create an LLM decision for Choice prompts
     pub fn llm_choice(choice: &str, reasoning: String) -> Self {
         Self::LLMDecision {
-            response: format!("{}\n", choice),
+            response: format!("{choice}\n"),
             reasoning,
             target_index: None,
         }
@@ -272,7 +272,7 @@ impl PromptDecision {
     /// Create an LLM decision for Input prompts
     pub fn llm_input(input: &str, reasoning: String) -> Self {
         Self::LLMDecision {
-            response: format!("{}\n", input),
+            response: format!("{input}\n"),
             reasoning,
             target_index: None,
         }
@@ -289,8 +289,10 @@ impl PromptDecision {
 /// Terminal prompt state for tracking prompt handling
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum PromptState {
     /// No prompt detected
+    #[default]
     Idle,
     /// Prompt detected, waiting for decision
     Detected,
@@ -302,11 +304,6 @@ pub enum PromptState {
     WaitingForApproval,
 }
 
-impl Default for PromptState {
-    fn default() -> Self {
-        Self::Idle
-    }
-}
 
 /// Retry window for re-processing an identical prompt while mid-flight.
 ///

@@ -70,7 +70,7 @@ impl ChatConnector for TelegramConnector {
     async fn send_message(&self, conversation_id: &str, content: &str) -> anyhow::Result<String> {
         let resp = self
             .http_client
-            .post(&self.api_url("sendMessage"))
+            .post(self.api_url("sendMessage"))
             .json(&serde_json::json!({
                 "chat_id": conversation_id,
                 "text": content,
@@ -95,7 +95,7 @@ impl ChatConnector for TelegramConnector {
     ) -> anyhow::Result<String> {
         let resp = self
             .http_client
-            .post(&self.api_url("sendMessage"))
+            .post(self.api_url("sendMessage"))
             .json(&serde_json::json!({
                 "chat_id": conversation_id,
                 "text": content,
@@ -113,7 +113,7 @@ impl ChatConnector for TelegramConnector {
         Ok(reply_id)
     }
 
-    fn provider_name(&self) -> &str {
+    fn provider_name(&self) -> &'static str {
         "telegram"
     }
 

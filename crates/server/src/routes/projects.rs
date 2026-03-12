@@ -205,7 +205,7 @@ pub async fn get_project_remote_members(
         "Remote project features are not supported in this version.".to_string(),
     ))
 }
-
+#[allow(dead_code)]
 async fn apply_remote_project_link(
     deployment: &DeploymentImpl,
     project: Project,

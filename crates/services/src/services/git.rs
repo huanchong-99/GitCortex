@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::Path};
 
-use anyhow::Context;
 use chrono::{DateTime, Utc};
 use git2::{
     BranchType, Delta, DiffFindOptions, DiffOptions, Error as GitError, Reference, Remote,
@@ -1330,9 +1329,7 @@ impl GitService {
         )?;
 
         let parse_date = |raw: Option<&str>| -> DateTime<Utc> {
-            raw.and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(Utc::now)
+            raw.and_then(|value| DateTime::parse_from_rfc3339(value).ok()).map_or_else(Utc::now, |dt| dt.with_timezone(&Utc))
         };
 
         let mut branches = Vec::new();

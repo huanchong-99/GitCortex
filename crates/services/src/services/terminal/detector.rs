@@ -50,17 +50,17 @@ impl CliDetector {
 
         // Add common npm global paths
         if let Ok(appdata) = std::env::var("APPDATA") {
-            paths.push(format!("{}\\npm", appdata));
+            paths.push(format!("{appdata}\\npm"));
         }
 
         // Add user local bin (for tools like claude)
         if let Ok(userprofile) = std::env::var("USERPROFILE") {
-            paths.push(format!("{}\\.local\\bin", userprofile));
+            paths.push(format!("{userprofile}\\.local\\bin"));
         }
 
         // Add common program files paths
         if let Ok(programfiles) = std::env::var("ProgramFiles") {
-            paths.push(format!("{}\\nodejs", programfiles));
+            paths.push(format!("{programfiles}\\nodejs"));
         }
 
         paths.join(";")

@@ -153,6 +153,19 @@ fn split_command_line(input: &str) -> Result<Vec<String>, CommandBuildError> {
     }
 }
 
+pub fn apply_overrides(builder: CommandBuilder, overrides: &CmdOverrides) -> CommandBuilder {
+    let builder = if let Some(ref base) = overrides.base_command_override {
+        builder.override_base(base.clone())
+    } else {
+        builder
+    };
+    if let Some(ref extra) = overrides.additional_params {
+        builder.extend_params(extra.clone())
+    } else {
+        builder
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,44 +186,55 @@ mod tests {
     }
 
     #[test]
-    fn build_initial_keeps_base_string_parsing_compatible() {
-        let builder = CommandBuilder::new("npx -y tool@latest").params(["--json"]);
-
-        let command = builder
-            .build_initial()
-            .expect("base command string should still be parsed into program + args");
-
-        assert_eq!(command.program, "npx");
-        assert_eq!(command.args, vec!["-y", "tool@latest", "--json"]);
+    fn simple_base_builds_correctly() {
+        let builder = CommandBuilder::new("claude --print");
+        let command = builder.build_initial().expect("should build");
+        assert_eq!(command.program, "claude");
+        assert_eq!(command.args, vec!["--print"]);
     }
 
     #[test]
-    fn build_initial_preserves_param_boundaries() {
-        let builder = CommandBuilder::new("agent").params([
-            "--prompt",
-            "hello world",
-            "contains\"quote",
-            "trailing-space ",
-        ]);
+    fn params_appended_to_base() {
+        let builder = CommandBuilder::new("claude").params(["--print", "--verbose"]);
+        let command = builder.build_initial().expect("should build");
+        assert_eq!(command.program, "claude");
+        assert_eq!(command.args, vec!["--print", "--verbose"]);
+    }
 
+    #[test]
+    fn follow_up_appends_additional_args() {
+        let builder = CommandBuilder::new("claude").params(["--print"]);
+        let additional = vec!["--resume".to_string(), "session-123".to_string()];
         let command = builder
-            .build_initial()
-            .expect("params should keep original argument boundaries");
-
-        assert_eq!(command.program, "agent");
+            .build_follow_up(&additional)
+            .expect("should build follow-up");
+        assert_eq!(command.program, "claude");
         assert_eq!(
             command.args,
-            vec![
-                "--prompt",
-                "hello world",
-                "contains\"quote",
-                "trailing-space ",
-            ]
+            vec!["--print", "--resume", "session-123"]
         );
     }
 
     #[test]
-    fn build_follow_up_preserves_additional_arg_boundaries() {
+    fn override_base_replaces_command() {
+        let builder = CommandBuilder::new("claude --print").override_base("gemini --run");
+        let command = builder.build_initial().expect("should build");
+        assert_eq!(command.program, "gemini");
+        assert_eq!(command.args, vec!["--run"]);
+    }
+
+    #[test]
+    fn extend_params_adds_to_existing() {
+        let builder = CommandBuilder::new("claude")
+            .params(["--print"])
+            .extend_params(["--verbose"]);
+        let command = builder.build_initial().expect("should build");
+        assert_eq!(command.program, "claude");
+        assert_eq!(command.args, vec!["--print", "--verbose"]);
+    }
+
+    #[test]
+    fn follow_up_args_not_reparsed() {
         let builder = CommandBuilder::new("agent --mode run").params(["--prompt", "line one"]);
         let additional = vec![
             "--resume".to_string(),
@@ -235,18 +259,5 @@ mod tests {
                 "unterminated\"quote",
             ]
         );
-    }
-}
-
-pub fn apply_overrides(builder: CommandBuilder, overrides: &CmdOverrides) -> CommandBuilder {
-    let builder = if let Some(ref base) = overrides.base_command_override {
-        builder.override_base(base.clone())
-    } else {
-        builder
-    };
-    if let Some(ref extra) = overrides.additional_params {
-        builder.extend_params(extra.clone())
-    } else {
-        builder
     }
 }

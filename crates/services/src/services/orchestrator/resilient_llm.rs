@@ -18,6 +18,7 @@ const CIRCUIT_BREAKER_THRESHOLD: u32 = 5;
 const PROBE_INTERVAL_SECS: u64 = 60;
 
 /// Per-provider health tracking state.
+#[derive(Default)]
 struct ProviderState {
     consecutive_failures: u32,
     is_dead: bool,
@@ -27,18 +28,6 @@ struct ProviderState {
     total_failures: u64,
 }
 
-impl Default for ProviderState {
-    fn default() -> Self {
-        Self {
-            consecutive_failures: 0,
-            is_dead: false,
-            last_failure: None,
-            last_probe: None,
-            total_requests: 0,
-            total_failures: 0,
-        }
-    }
-}
 
 /// A single provider entry: client + mutable health state.
 struct ProviderEntry {
@@ -330,8 +319,7 @@ impl LLMClient for ResilientLLMClient {
         }
 
         Err(anyhow::anyhow!(
-            "All LLM providers exhausted ({} providers tried)",
-            provider_count,
+            "All LLM providers exhausted ({provider_count} providers tried)",
         ))
     }
 

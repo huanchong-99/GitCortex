@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use services::services::orchestrator::{
     BusMessage, ProviderEvent,
-    types::{PromptDecision, PromptKind, QualityGateResultEvent, TerminalCompletionStatus},
+    types::{PromptDecision, PromptKind, TerminalCompletionStatus},
 };
 use ts_rs::TS;
 use uuid::Uuid;

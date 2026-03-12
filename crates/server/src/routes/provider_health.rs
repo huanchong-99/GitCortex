@@ -46,7 +46,7 @@ pub async fn get_provider_status(
 ) -> Json<ApiResponse<ProviderHealthResponse>> {
     // Check if the workflow exists
     let workflow = db::models::Workflow::find_by_id(&deployment.db().pool, &workflow_id).await;
-    if workflow.as_ref().is_ok_and(|w| w.is_none()) {
+    if workflow.as_ref().is_ok_and(std::option::Option::is_none) {
         return Json(ApiResponse::success(ProviderHealthResponse {
             providers: vec![],
             active_provider: "none".to_string(),
@@ -58,9 +58,7 @@ pub async fn get_provider_status(
     if let Some(reports) = runtime.get_provider_status(&workflow_id).await {
         let active_provider = reports
             .iter()
-            .find(|r| r.is_active)
-            .map(|r| r.name.clone())
-            .unwrap_or_else(|| "none".to_string());
+            .find(|r| r.is_active).map_or_else(|| "none".to_string(), |r| r.name.clone());
 
         let providers: Vec<ProviderStatus> = reports
             .into_iter()
@@ -99,9 +97,7 @@ pub async fn get_provider_status(
         .collect();
 
     let active_provider = providers
-        .first()
-        .map(|p| p.name.clone())
-        .unwrap_or_else(|| "none".to_string());
+        .first().map_or_else(|| "none".to_string(), |p| p.name.clone());
 
     Json(ApiResponse::success(ProviderHealthResponse {
         providers,

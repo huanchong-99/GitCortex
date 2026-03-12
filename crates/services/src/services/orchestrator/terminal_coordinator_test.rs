@@ -4,21 +4,18 @@
 //! Note: Model configuration is now handled at spawn time via environment variables,
 //! not by the coordinator.
 
-use std::sync::Arc;
 
+use std::sync::Arc;
+use db::models::Terminal;
+use crate::services::orchestrator::TerminalCoordinator;
 use chrono::Utc;
 use db::{
     DBService,
-    models::{
-        cli_type::{CliType, ModelConfig},
-        terminal::Terminal,
-    },
+    models::cli_type::{CliType, ModelConfig},
 };
 use sqlx::sqlite::SqlitePoolOptions;
 use uuid::Uuid;
-
-use crate::services::orchestrator::TerminalCoordinator;
-
+#[allow(dead_code)]
 // Helper function to create test database with real migrations
 async fn setup_test_db() -> DBService {
     // Create in-memory SQLite pool
@@ -42,6 +39,7 @@ async fn setup_test_db() -> DBService {
 }
 
 // Helper function to create CLI type and model config
+#[allow(dead_code)]
 async fn create_cli_and_model(
     db: &DBService,
     cli_name: &str,
@@ -55,7 +53,7 @@ async fn create_cli_and_model(
         id: cli_id.clone(),
         name: cli_name.to_string(),
         display_name: format!("{} CLI", cli_name.to_uppercase()),
-        detect_command: format!("which {}", cli_name),
+        detect_command: format!("which {cli_name}"),
         install_command: None,
         install_guide_url: None,
         config_file_path: None,
@@ -76,7 +74,7 @@ async fn create_cli_and_model(
     .bind(&cli.install_command)
     .bind(&cli.install_guide_url)
     .bind(&cli.config_file_path)
-    .bind(&cli.is_system)
+    .bind(cli.is_system)
     .bind(cli.created_at)
     .execute(&db.pool)
     .await
@@ -86,8 +84,8 @@ async fn create_cli_and_model(
         id: model_id.clone(),
         cli_type_id: cli_id,
         name: model_name.to_string(),
-        display_name: format!("{} Model", model_name),
-        api_model_id: Some(format!("{}-api-id", model_name)),
+        display_name: format!("{model_name} Model"),
+        api_model_id: Some(format!("{model_name}-api-id")),
         is_default: true,
         is_official: true,
         created_at: now,
@@ -116,6 +114,7 @@ async fn create_cli_and_model(
     (cli, model)
 }
 
+#[allow(dead_code)]
 // Helper function to create workflow with tasks and terminals
 async fn create_workflow_with_terminals(
     db: &DBService,
@@ -195,9 +194,9 @@ async fn create_workflow_with_terminals(
         .bind(&task_id)
         .bind(&workflow_id)
         .bind::<Option<String>>(None)
-        .bind(format!("Task {}", task_idx))
-        .bind(format!("Description for task {}", task_idx))
-        .bind(format!("task-{}", task_idx))
+        .bind(format!("Task {task_idx}"))
+        .bind(format!("Description for task {task_idx}"))
+        .bind(format!("task-{task_idx}"))
         .bind("pending")
         .bind(task_idx as i32)
         .bind(now)
@@ -228,8 +227,8 @@ async fn create_workflow_with_terminals(
             .bind(model_config_id)
             .bind("https://api.test.com")
             .bind("test-api-key")
-            .bind(format!("role-{}", term_idx))
-            .bind(format!("Role description {}", term_idx))
+            .bind(format!("role-{term_idx}"))
+            .bind(format!("Role description {term_idx}"))
             .bind(term_idx as i32)
             .bind("not_started")
             .bind(now)

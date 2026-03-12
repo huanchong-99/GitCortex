@@ -247,7 +247,7 @@ impl RuntimeActionService {
 
         let terminal = Terminal::find_by_id(&self.db.pool, terminal_id)
             .await?
-            .ok_or_else(|| anyhow!("Terminal {} not found after launch", terminal_id))?;
+            .ok_or_else(|| anyhow!("Terminal {terminal_id} not found after launch"))?;
         self.publish_terminal_status(&workflow_id, &terminal.id, &terminal.status)
             .await?;
         Ok(terminal)
@@ -293,7 +293,7 @@ impl RuntimeActionService {
 
         let terminal = Terminal::find_by_id(&self.db.pool, terminal_id)
             .await?
-            .ok_or_else(|| anyhow!("Terminal {} not found after close", terminal_id))?;
+            .ok_or_else(|| anyhow!("Terminal {terminal_id} not found after close"))?;
         self.publish_terminal_status(&workflow_id, &terminal.id, &terminal.status)
             .await?;
         Ok(terminal)

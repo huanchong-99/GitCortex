@@ -151,7 +151,7 @@ fn api_key_from_headers(headers: &HeaderMap) -> Result<String, ApiError> {
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(|value| value.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| ApiError::BadRequest("X-API-Key header is required".to_string()))
 }
 
@@ -423,7 +423,7 @@ fn extract_google_model_ids(json: &Value) -> Vec<String> {
         for item in items {
             if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
                 // Extract model ID from "models/gemini-pro" -> "gemini-pro"
-                let id = name.split('/').last().unwrap_or(name).to_string();
+                let id = name.split('/').next_back().unwrap_or(name).to_string();
                 models.push(id);
             }
         }

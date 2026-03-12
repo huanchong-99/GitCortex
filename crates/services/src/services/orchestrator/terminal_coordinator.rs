@@ -88,7 +88,7 @@ impl TerminalCoordinator {
         // Step 3: Transition terminals to "starting" status
         // Note: Model switching is now done at spawn time via environment variables
         let mut prepared_terminals = Vec::new();
-        let topic = format!("{}{}", WORKFLOW_TOPIC_PREFIX, workflow_id);
+        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
         for terminal in &all_terminals {
             info!(
                 terminal_id = %terminal.id,

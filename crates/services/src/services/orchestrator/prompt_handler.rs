@@ -398,7 +398,7 @@ impl PromptHandler {
         workflow_id: &str,
         user_response: &str,
     ) -> bool {
-        let response = format!("{}\n", user_response);
+        let response = format!("{user_response}\n");
 
         let (decision, should_publish_input, handled) = {
             let mut state_machines = self.state_machines.write().await;
@@ -492,29 +492,29 @@ impl PromptHandler {
 /// Build LLM prompt for making a decision about a terminal prompt
 pub fn build_llm_decision_prompt(request: &LLMPromptDecisionRequest) -> String {
     let mut prompt = format!(
-        r#"You are an AI assistant helping to respond to an interactive terminal prompt.
+        r"You are an AI assistant helping to respond to an interactive terminal prompt.
 
 ## Prompt Information
 - Type: {}
 - Text: {}
 - Has dangerous keywords: {}
-"#,
+",
         request.prompt_kind, request.prompt_text, request.has_dangerous_keywords
     );
 
     if let Some(ref options) = request.options {
         prompt.push_str("\n## Available Options\n");
         for (i, opt) in options.iter().enumerate() {
-            prompt.push_str(&format!("{}. {}\n", i, opt));
+            prompt.push_str(&format!("{i}. {opt}\n"));
         }
     }
 
     if let Some(idx) = request.current_index {
-        prompt.push_str(&format!("\nCurrently selected: option {}\n", idx));
+        prompt.push_str(&format!("\nCurrently selected: option {idx}\n"));
     }
 
     if let Some(ref context) = request.task_context {
-        prompt.push_str(&format!("\n## Task Context\n{}\n", context));
+        prompt.push_str(&format!("\n## Task Context\n{context}\n"));
     }
 
     prompt.push_str(

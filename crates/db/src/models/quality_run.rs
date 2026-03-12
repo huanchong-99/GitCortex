@@ -56,9 +56,9 @@ impl QualityRun {
         Self {
             id: Uuid::new_v4().to_string(),
             workflow_id: workflow_id.to_string(),
-            task_id: task_id.map(|s| s.to_string()),
-            terminal_id: terminal_id.map(|s| s.to_string()),
-            commit_hash: commit_hash.map(|s| s.to_string()),
+            task_id: task_id.map(std::string::ToString::to_string),
+            terminal_id: terminal_id.map(std::string::ToString::to_string),
+            commit_hash: commit_hash.map(std::string::ToString::to_string),
             gate_level: gate_level.to_string(),
             gate_status: "pending".to_string(),
             mode: mode.to_string(),
@@ -119,6 +119,7 @@ impl QualityRun {
     }
 
     /// Complete a quality run with results
+    #[allow(clippy::too_many_arguments)]
     pub async fn complete(
         pool: &SqlitePool,
         id: &str,

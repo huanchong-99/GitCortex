@@ -106,21 +106,21 @@ impl CommitMetadata {
                 let value = &line[pos + 1..].trim();
 
                 match *key {
-                    "workflow_id" => metadata.workflow_id = value.to_string(),
-                    "task_id" => metadata.task_id = value.to_string(),
-                    "terminal_id" => metadata.terminal_id = value.to_string(),
+                    "workflow_id" => metadata.workflow_id = (*value).to_string(),
+                    "task_id" => metadata.task_id = (*value).to_string(),
+                    "terminal_id" => metadata.terminal_id = (*value).to_string(),
                     "terminal_order" => {
                         metadata.terminal_order = value.parse().unwrap_or(0);
                     }
-                    "cli" => metadata.cli = value.to_string(),
-                    "model" => metadata.model = value.to_string(),
-                    "status" => metadata.status = value.to_string(),
-                    "severity" => metadata.severity = Some(value.to_string()),
-                    "reviewed_terminal" => metadata.reviewed_terminal = Some(value.to_string()),
+                    "cli" => metadata.cli = (*value).to_string(),
+                    "model" => metadata.model = (*value).to_string(),
+                    "status" => metadata.status = (*value).to_string(),
+                    "severity" => metadata.severity = Some((*value).to_string()),
+                    "reviewed_terminal" => metadata.reviewed_terminal = Some((*value).to_string()),
                     "issues" => {
                         metadata.issues = serde_json::from_str(value).ok();
                     }
-                    "next_action" => metadata.next_action = value.to_string(),
+                    "next_action" => metadata.next_action = (*value).to_string(),
                     _ => {}
                 }
             }
@@ -275,7 +275,7 @@ impl GitWatcher {
                 tracing::info!("New commit detected: {}", commit.hash);
 
                 match self.handle_new_commit(commit.clone()).await {
-                    Ok(_) => {
+                    Ok(()) => {
                         let mut last_hash = self.last_commit_hash.lock().await;
                         *last_hash = Some(commit.hash.clone());
                     }
@@ -439,30 +439,27 @@ impl GitWatcher {
     /// Handle a new commit by parsing its metadata and publishing events
     async fn handle_new_commit(&self, commit: ParsedCommit) -> Result<()> {
         // Check if commit has metadata
-        let metadata = match commit.metadata {
-            Some(m) => m,
-            None => {
-                // No metadata - publish GitEvent to wake up orchestrator
-                let Some(workflow_id) = self.workflow_id.as_deref() else {
-                    tracing::debug!(
-                        "Commit {} has no workflow metadata and watcher is not bound to a workflow, skipping",
-                        commit.hash
-                    );
-                    return Ok(());
-                };
-
-                // Publish GitEvent for commits without METADATA
-                self.message_bus
-                    .publish_git_event(workflow_id, &commit.hash, &commit.branch, &commit.message)
-                    .await;
-
-                tracing::info!(
-                    "Published GitEvent for commit {} (no metadata) on workflow {}",
-                    commit.hash,
-                    workflow_id
+        let metadata = if let Some(m) = commit.metadata { m } else {
+            // No metadata - publish GitEvent to wake up orchestrator
+            let Some(workflow_id) = self.workflow_id.as_deref() else {
+                tracing::debug!(
+                    "Commit {} has no workflow metadata and watcher is not bound to a workflow, skipping",
+                    commit.hash
                 );
                 return Ok(());
-            }
+            };
+
+            // Publish GitEvent for commits without METADATA
+            self.message_bus
+                .publish_git_event(workflow_id, &commit.hash, &commit.branch, &commit.message)
+                .await;
+
+            tracing::info!(
+                "Published GitEvent for commit {} (no metadata) on workflow {}",
+                commit.hash,
+                workflow_id
+            );
+            return Ok(());
         };
 
         if let Some(bound_workflow_id) = self.workflow_id.as_deref()
