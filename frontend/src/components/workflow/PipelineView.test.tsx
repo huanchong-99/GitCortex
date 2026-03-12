@@ -5,6 +5,17 @@ import type { Terminal } from './TerminalCard';
 import type { WorkflowTaskDto, TerminalDto } from '@/shared/types';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
+vi.mock('@/hooks/useQualityGate', () => ({
+  useTerminalLatestQuality: () => ({ data: null, isLoading: false }),
+  qualityKeys: {
+    all: ['quality'],
+    runsForWorkflow: (id: string) => ['quality', 'runs', 'workflow', id],
+    runDetail: (id: string) => ['quality', 'run', id],
+    issuesForRun: (id: string) => ['quality', 'issues', id],
+    latestForTerminal: (id: string) => ['quality', 'latest', 'terminal', id],
+  },
+}));
+
 describe('PipelineView', () => {
   // Create realistic DTO-based mock data
   const mockTerminalDto1: TerminalDto = {

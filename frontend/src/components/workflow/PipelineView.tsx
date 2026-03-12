@@ -2,6 +2,8 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { TerminalCard, type Terminal } from './TerminalCard';
+import { QualityBadge } from './QualityBadge';
+import { useTerminalLatestQuality } from '@/hooks/useQualityGate';
 import { useTranslation } from 'react-i18next';
 
 /** Workflow runtime status */
@@ -62,6 +64,20 @@ const STATUS_LABEL_KEYS: Record<WorkflowStatus, string> = {
   completed: 'pipeline.status.completed',
   failed: 'pipeline.status.failed',
 };
+
+function TerminalQualityIndicator({ terminalId }: Readonly<{ terminalId: string }>) {
+  const { data } = useTerminalLatestQuality(terminalId);
+  if (!data) return null;
+  return (
+    <div className="mt-1">
+      <QualityBadge
+        gateStatus={data.gateStatus}
+        totalIssues={data.totalIssues}
+        blockingIssues={data.blockingIssues}
+      />
+    </div>
+  );
+}
 
 /**
  * Renders the workflow pipeline view with task terminals and status.
@@ -135,16 +151,19 @@ export function PipelineView({
                 </div>
 
                 {/* Terminals Row */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   {task.terminals.map((terminal, terminalIndex) => (
                     <React.Fragment key={terminal.id}>
-                      <TerminalCard
-                        terminal={terminal}
-                        onClick={() => onTerminalClick?.(task.id, terminal.id)}
-                      />
+                      <div className="flex flex-col items-center">
+                        <TerminalCard
+                          terminal={terminal}
+                          onClick={() => onTerminalClick?.(task.id, terminal.id)}
+                        />
+                        <TerminalQualityIndicator terminalId={terminal.id} />
+                      </div>
 
                       {terminalIndex < task.terminals.length - 1 && (
-                        <div className="w-8 h-0.5 bg-muted/30 flex-shrink-0" />
+                        <div className="w-8 h-0.5 bg-muted/30 flex-shrink-0 mt-14" />
                       )}
                     </React.Fragment>
                   ))}

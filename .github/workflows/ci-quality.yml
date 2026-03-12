@@ -25,3 +25,52 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       continue-on-error: true # Allowed to fail if token not set during initial phases
+
+  quality-gate:
+    name: Quality Gate Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CARGO_TERM_COLOR: always
+      SQLX_OFFLINE: true
+      AWS_LC_SYS_STATIC: "1"
+      AWS_LC_SYS_NO_PREGENERATED_SRC: "1"
+      LIBGIT2_SYS_USE_PKG_CONFIG: "1"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          pkg-config \
+          libsqlite3-dev \
+          libgit2-dev \
+          zlib1g-dev \
+          cmake \
+          ninja-build \
+          clang \
+          libclang-dev \
+          perl \
+          nasm \
+          libssl-dev
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly-2025-12-04
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-quality-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run quality gate (shadow mode)
+      run: bash scripts/quality/run-quality-gate.sh repo shadow
+      continue-on-error: true

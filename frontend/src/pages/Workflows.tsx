@@ -39,6 +39,7 @@ import {
   type OrchestratorChatMessage,
 } from '@/hooks/useWorkflows';
 import { useProjects } from '@/hooks/useProjects';
+import { qualityKeys } from '@/hooks/useQualityGate';
 import type {
   WorkflowDetailDto,
   WorkflowListItemDto,
@@ -1149,6 +1150,20 @@ export function Workflows() {
     }
   }, [queryClient, selectedWorkflowId, validProjectId]);
 
+  const handleQualityGateResult = useCallback((payload: unknown) => {
+    const data = payload as { workflowId?: string; terminalId?: string };
+    if (data.terminalId) {
+      queryClient.invalidateQueries({
+        queryKey: qualityKeys.latestForTerminal(data.terminalId),
+      });
+    }
+    if (data.workflowId) {
+      queryClient.invalidateQueries({
+        queryKey: qualityKeys.runsForWorkflow(data.workflowId),
+      });
+    }
+  }, [queryClient]);
+
   const workflowEventHandlers = useMemo(
     () => ({
       onTerminalPromptDetected: handleTerminalPromptDetected,
@@ -1157,11 +1172,13 @@ export function Workflows() {
       onTaskStatusChanged: handleRealtimeWorkflowSignal,
       onTerminalStatusChanged: handleRealtimeWorkflowSignal,
       onTerminalCompleted: handleRealtimeWorkflowSignal,
+      onQualityGateResult: handleQualityGateResult,
     }),
     [
       handleTerminalPromptDetected,
       handleTerminalPromptDecision,
       handleRealtimeWorkflowSignal,
+      handleQualityGateResult,
     ]
   );
 

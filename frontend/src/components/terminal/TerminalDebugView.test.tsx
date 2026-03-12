@@ -52,6 +52,18 @@ vi.mock('@/components/quality/QualityGateStatusBadge', () => ({
   QualityGateStatusBadge: () => null,
 }));
 
+vi.mock('@/hooks/useQualityGate', () => ({
+  useTerminalLatestQuality: () => ({ data: null, isLoading: false }),
+  useQualityIssues: () => ({ data: [], isLoading: false }),
+  qualityKeys: {
+    all: ['quality'],
+    runsForWorkflow: (id: string) => ['quality', 'runs', 'workflow', id],
+    runDetail: (id: string) => ['quality', 'run', id],
+    issuesForRun: (id: string) => ['quality', 'issues', id],
+    latestForTerminal: (id: string) => ['quality', 'latest', 'terminal', id],
+  },
+}));
+
 class MockWebSocket {
   url = '';
   readyState = 0;

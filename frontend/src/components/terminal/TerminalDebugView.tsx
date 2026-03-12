@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { TerminalEmulator, type TerminalEmulatorRef } from './TerminalEmulator';
-import { QualityGateStatusBadge } from '@/components/quality/QualityGateStatusBadge';
+import { QualityBadge } from '@/components/workflow/QualityBadge';
 import { QualityReportPanel } from '@/components/quality/QualityReportPanel';
+import { useTerminalLatestQuality } from '@/hooks/useQualityGate';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -436,7 +437,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
                         <span className="text-xs">{statusLabel}</span>
                       </div>
                       <div className="mt-0.5">
-                        <QualityGateStatusBadge terminalId={terminal.id} />
+                        <TerminalQualityBadgeInline terminalId={terminal.id} />
                       </div>
                     </div>
                   </button>
@@ -462,7 +463,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
                 </div>
                 <div>
                   <div onClick={() => setIsQualityPanelOpen(true)}>
-                    <QualityGateStatusBadge terminalId={selectedTerminal.id} className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />
+                    <TerminalQualityBadgeInline terminalId={selectedTerminal.id} className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" />
                   </div>
                   <Dialog open={isQualityPanelOpen} onOpenChange={setIsQualityPanelOpen}>
                     <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col border-slate-200 dark:border-slate-800">
@@ -571,6 +572,19 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
         )}
       </div>
     </div>
+  );
+}
+
+function TerminalQualityBadgeInline({ terminalId, className }: Readonly<{ terminalId: string; className?: string }>) {
+  const { data } = useTerminalLatestQuality(terminalId);
+  if (!data) return null;
+  return (
+    <QualityBadge
+      gateStatus={data.gateStatus}
+      totalIssues={data.totalIssues}
+      blockingIssues={data.blockingIssues}
+      className={className}
+    />
   );
 }
 

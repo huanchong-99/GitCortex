@@ -56,6 +56,9 @@ jobs:
     - name: Run cargo check
       run: cargo check --workspace --lib --bins
 
+    - name: Run cargo clippy
+      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
     - name: Run cargo test
       run: cargo test --workspace --lib -- --test-threads=1
 
@@ -85,3 +88,11 @@ jobs:
     - name: Run tests
       working-directory: frontend
       run: pnpm test:run
+
+    - name: Run lint
+      working-directory: frontend
+      run: pnpm run lint
+
+    - name: Run type check
+      working-directory: frontend
+      run: pnpm run check

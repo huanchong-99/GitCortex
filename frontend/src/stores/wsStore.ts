@@ -1400,6 +1400,20 @@ export interface SystemErrorPayload {
   message?: string;
 }
 
+export interface QualityGateResultPayload {
+  workflowId: string;
+  taskId: string;
+  terminalId: string;
+  qualityRunId: string;
+  gateStatus: string;
+  mode: string;
+  totalIssues: number;
+  blockingIssues: number;
+  newIssues: number;
+  passed: boolean;
+  summary: string;
+}
+
 export type TerminalPromptKind =
   | 'enter_confirm'
   | 'yes_no'
@@ -1471,6 +1485,7 @@ export type WorkflowEventHandlers = {
   onTerminalPromptDetected?: (payload: TerminalPromptDetectedPayload) => void;
   onTerminalPromptDecision?: (payload: TerminalPromptDecisionPayload) => void;
   onGitCommitDetected?: (payload: GitCommitPayload) => void;
+  onQualityGateResult?: (payload: QualityGateResultPayload) => void;
   onSystemError?: (payload: SystemErrorPayload) => void;
 } & Record<string, unknown>;
 
@@ -1576,6 +1591,16 @@ export function useWorkflowEvents(
           workflowId,
           'git.commit_detected',
           handlers.onGitCommitDetected as MessageHandler
+        )
+      );
+    }
+
+    if (handlers?.onQualityGateResult) {
+      unsubscribers.push(
+        subscribeToWorkflow(
+          workflowId,
+          'quality.gate_result',
+          handlers.onQualityGateResult as MessageHandler
         )
       );
     }

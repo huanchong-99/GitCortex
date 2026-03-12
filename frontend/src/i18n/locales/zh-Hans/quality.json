@@ -1,0 +1,33 @@
+{
+  "panel": {
+    "title": "质量门禁报告",
+    "runId": "运行 ID",
+    "refresh": "刷新",
+    "loading": "正在加载质量报告...",
+    "error": "加载质量报告失败。",
+    "empty": "该终端暂无质量报告。",
+    "detectedIssues": "检测到的问题"
+  },
+  "metrics": {
+    "totalIssues": "问题总数",
+    "blockers": "阻断",
+    "criticalMajor": "严重/主要",
+    "minorInfo": "次要/提示"
+  },
+  "status": {
+    "ok": "通过",
+    "warn": "警告",
+    "warnCount": "{{count}} 个警告",
+    "error": "失败",
+    "errorCount": "{{count}} 个阻断",
+    "running": "扫描中...",
+    "pending": "等待中",
+    "skipped": "已跳过"
+  },
+  "mode": {
+    "off": "关闭",
+    "shadow": "影子模式",
+    "warn": "警告模式",
+    "enforce": "强制模式"
+  }
+}

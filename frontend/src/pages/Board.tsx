@@ -8,6 +8,7 @@ import { ViewHeader } from '@/components/ui-new/primitives/ViewHeader';
 import { useWorkflowEvents } from '@/stores/wsStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { workflowKeys } from '@/hooks/useWorkflows';
+import { qualityKeys } from '@/hooks/useQualityGate';
 import { useSearchParams } from 'react-router-dom';
 import { useProjects } from '@/hooks/useProjects';
 
@@ -74,6 +75,20 @@ export function Board() {
     });
   }, [queryClient, selectedWorkflowId]);
 
+  const handleQualityGateResult = useCallback((payload: unknown) => {
+    const data = payload as { workflowId?: string; terminalId?: string };
+    if (data.terminalId) {
+      queryClient.invalidateQueries({
+        queryKey: qualityKeys.latestForTerminal(data.terminalId),
+      });
+    }
+    if (data.workflowId) {
+      queryClient.invalidateQueries({
+        queryKey: qualityKeys.runsForWorkflow(data.workflowId),
+      });
+    }
+  }, [queryClient]);
+
   const workflowEventHandlers = useMemo(
     () => ({
       onWorkflowStatusChanged: handleRealtimeWorkflowSignal,
@@ -81,8 +96,9 @@ export function Board() {
       onTerminalStatusChanged: handleRealtimeWorkflowSignal,
       onTerminalCompleted: handleRealtimeWorkflowSignal,
       onGitCommitDetected: handleRealtimeWorkflowSignal,
+      onQualityGateResult: handleQualityGateResult,
     }),
-    [handleRealtimeWorkflowSignal]
+    [handleRealtimeWorkflowSignal, handleQualityGateResult]
   );
 
   useWorkflowEvents(selectedWorkflowId, workflowEventHandlers);

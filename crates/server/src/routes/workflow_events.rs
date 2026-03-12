@@ -30,10 +30,6 @@ pub enum WsEventType {
     #[serde(rename = "terminal.status_changed")]
     TerminalStatusChanged,
 
-    /// Terminal quality gate result
-    #[serde(rename = "terminal.quality_gate_result")]
-    TerminalQualityGateResult,
-
     /// Task status changed (pending -> running -> completed/failed)
     #[serde(rename = "task.status_changed")]
     TaskStatusChanged,
@@ -296,28 +292,6 @@ impl WsEvent {
                 ))
             }
 
-            BusMessage::TerminalQualityGateResult(event) => {
-                let workflow_id = event.workflow_id.clone();
-                let payload = json!({
-                    "workflowId": &event.workflow_id,
-                    "taskId": &event.task_id,
-                    "terminalId": &event.terminal_id,
-                    "qualityRunId": &event.quality_run_id,
-                    "gateStatus": &event.gate_status,
-                    "isPassed": event.passed,
-                    "mode": &event.mode,
-                    "totalIssues": event.total_issues,
-                    "blockingIssues": event.blocking_issues,
-                    "newIssues": event.new_issues,
-                    "summary": &event.summary,
-                    "fixInstructions": &event.fix_instructions,
-                });
-                Some((
-                    workflow_id,
-                    Self::new(WsEventType::TerminalQualityGateResult, payload),
-                ))
-            }
-
             BusMessage::GitEvent {
                 workflow_id,
                 commit_hash,
@@ -437,31 +411,32 @@ impl WsEvent {
 
             // Quality gate result event
             BusMessage::TerminalQualityGateResult(event) => {
+                let workflow_id = event.workflow_id.clone();
                 let payload = json!({
-                    "workflowId": event.workflow_id,
-                    "taskId": event.task_id,
-                    "terminalId": event.terminal_id,
-                    "qualityRunId": event.quality_run_id,
-                    "commitHash": event.commit_hash,
-                    "gateStatus": event.gate_status,
-                    "mode": event.mode,
+                    "workflowId": &event.workflow_id,
+                    "taskId": &event.task_id,
+                    "terminalId": &event.terminal_id,
+                    "qualityRunId": &event.quality_run_id,
+                    "commitHash": &event.commit_hash,
+                    "gateStatus": &event.gate_status,
+                    "mode": &event.mode,
                     "totalIssues": event.total_issues,
                     "blockingIssues": event.blocking_issues,
                     "newIssues": event.new_issues,
                     "passed": event.passed,
-                    "summary": event.summary,
+                    "summary": &event.summary,
                     // snake_case duplicates for legacy compat
-                    "workflow_id": event.workflow_id,
-                    "task_id": event.task_id,
-                    "terminal_id": event.terminal_id,
-                    "quality_run_id": event.quality_run_id,
-                    "commit_hash": event.commit_hash,
-                    "gate_status": event.gate_status,
+                    "workflow_id": &event.workflow_id,
+                    "task_id": &event.task_id,
+                    "terminal_id": &event.terminal_id,
+                    "quality_run_id": &event.quality_run_id,
+                    "commit_hash": &event.commit_hash,
+                    "gate_status": &event.gate_status,
                     "total_issues": event.total_issues,
                     "blocking_issues": event.blocking_issues,
                     "new_issues": event.new_issues
                 });
-                Some((event.workflow_id, Self::new(WsEventType::QualityGateResult, payload)))
+                Some((workflow_id, Self::new(WsEventType::QualityGateResult, payload)))
             }
 
             // Provider state change events

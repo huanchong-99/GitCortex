@@ -1,8 +1,9 @@
-import { useTerminalQuality, useQualityIssues } from '@/hooks/useQualityReports';
-import { QualityGateStatusBadge } from './QualityGateStatusBadge';
+import { useTerminalLatestQuality, useQualityIssues } from '@/hooks/useQualityGate';
+import { QualityBadge } from '@/components/workflow/QualityBadge';
 import { QualityIssueList } from './QualityIssueList';
 import { AlertTriangle, StopCircle, Bug, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 export interface QualityReportPanelProps {
   terminalId: string;
@@ -11,34 +12,32 @@ export interface QualityReportPanelProps {
 }
 
 export function QualityReportPanel({ terminalId, className, onRefresh }: QualityReportPanelProps) {
-  const { data: runs, isLoading, error, refetch } = useTerminalQuality(terminalId);
-  const latestRun = runs?.[0];
+  const { t } = useTranslation('quality');
+  const { data: latestRun, isLoading, error, refetch } = useTerminalLatestQuality(terminalId);
   const runId = latestRun?.id;
-  const { data: issuesData, isLoading: issuesLoading } = useQualityIssues(runId, {
-    enabled: !!runId
-  });
+  const { data: issuesData, isLoading: issuesLoading } = useQualityIssues(runId);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8 text-slate-500">
         <Loader2 className="w-6 h-6 animate-spin mr-2" />
-        <span className="text-sm">Loading quality report...</span>
+        <span className="text-sm">{t('panel.loading')}</span>
       </div>
     );
   }
 
-  if (error || !runs) {
+  if (error) {
     return (
       <div className="p-4 bg-red-50 text-red-600 rounded-md text-sm border border-red-100">
-        Failed to load quality report.
+        {t('panel.error')}
       </div>
     );
   }
 
-  if (runs.length === 0) {
+  if (!isLoading && !latestRun) {
     return (
       <div className="text-center p-8 text-slate-500 text-sm border border-dashed rounded-md">
-        No quality report available for this terminal yet.
+        {t('panel.empty')}
       </div>
     );
   }
@@ -67,48 +66,48 @@ export function QualityReportPanel({ terminalId, className, onRefresh }: Quality
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Quality Gate Report
+            {t('panel.title')}
           </h3>
           <div className="text-xs text-slate-500 mt-1">
-            Run ID: <span className="font-mono">{latestRun?.id.substring(0, 8)}</span>
+            {t('panel.runId')}: <span className="font-mono">{latestRun?.id.substring(0, 8)}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => { refetch(); onRefresh?.(); }}>
-            Refresh
+            {t('panel.refresh')}
           </Button>
-          <QualityGateStatusBadge status={latestRun?.gateStatus === 'running' ? 'running' : (latestRun?.gateStatus?.toLowerCase() as any)} terminalId={terminalId} />
+          <QualityBadge gateStatus={latestRun?.gateStatus ?? 'pending'} />
         </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center">
           <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{metrics?.total || 0}</div>
-          <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">Total Issues</div>
+          <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">{t('metrics.totalIssues')}</div>
         </div>
         
         <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-100 dark:border-red-900/30 flex flex-col items-center justify-center">
           <StopCircle className="w-5 h-5 text-red-500 mb-1" />
           <div className="text-xl font-bold text-red-700 dark:text-red-400">{metrics?.blocker || 0}</div>
-          <div className="text-[10px] text-red-600 dark:text-red-500 uppercase tracking-wider font-semibold mt-0.5">Blockers</div>
+          <div className="text-[10px] text-red-600 dark:text-red-500 uppercase tracking-wider font-semibold mt-0.5">{t('metrics.blockers')}</div>
         </div>
 
         <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-100 dark:border-amber-900/30 flex flex-col items-center justify-center">
           <AlertTriangle className="w-5 h-5 text-amber-500 mb-1" />
-          <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{metrics?.critical || 0 + (metrics?.major || 0)}</div>
-          <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider font-semibold mt-0.5">Critical/Major</div>
+          <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{(metrics?.critical ?? 0) + (metrics?.major ?? 0)}</div>
+          <div className="text-[10px] text-amber-600 dark:text-amber-500 uppercase tracking-wider font-semibold mt-0.5">{t('metrics.criticalMajor')}</div>
         </div>
 
         <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-100 dark:border-yellow-900/30 flex flex-col items-center justify-center">
           <Bug className="w-5 h-5 text-yellow-500 mb-1" />
-          <div className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{metrics?.minor || 0 + (metrics?.info || 0)}</div>
-          <div className="text-[10px] text-yellow-600 dark:text-yellow-500 uppercase tracking-wider font-semibold mt-0.5">Minor/Info</div>
+          <div className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{(metrics?.minor ?? 0) + (metrics?.info ?? 0)}</div>
+          <div className="text-[10px] text-yellow-600 dark:text-yellow-500 uppercase tracking-wider font-semibold mt-0.5">{t('metrics.minorInfo')}</div>
         </div>
       </div>
 
       <div>
         <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center">
-          Detected Issues
+          {t('panel.detectedIssues')}
           {issuesLoading && <Loader2 className="w-3 h-3 animate-spin ml-2 text-slate-400" />}
         </h4>
         <QualityIssueList issues={issues} maxHeight="500px" />

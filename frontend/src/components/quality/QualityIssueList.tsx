@@ -49,7 +49,7 @@ const IssueItem = ({ issue }: { issue: QualityIssueRecord }) => {
             </div>
           </div>
           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-            <span className="truncate max-w-[200px] md:maxw-xs">{issue.filePath || 'Unknown file'}</span>
+            <span className="truncate max-w-[200px] md:max-w-xs">{issue.filePath || 'Unknown file'}</span>
             {issue.line !== null && issue.line !== undefined && (
               <span>Line {issue.line.toString()}</span>
             )}

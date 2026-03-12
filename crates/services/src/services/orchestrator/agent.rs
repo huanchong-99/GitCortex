@@ -1229,15 +1229,84 @@ impl OrchestratorAgent {
         tokio::spawn(async move {
             let start = Instant::now();
 
-            // For now, the quality gate evaluation is a no-op pass-through
-            // that always produces an "ok" result. The actual provider-based
-            // scanning will be wired in Phase 29D when the quality engine
-            // gets a workspace path and provider configuration.
-            let gate_status = "ok";
-            let total_issues: i32 = 0;
-            let blocking_issues: i32 = 0;
-            let new_issues: i32 = 0;
-            let passed = true;
+            // Resolve the project working directory for quality analysis
+            let working_dir = match db::models::Workflow::find_by_id(&db.pool, &workflow_id).await {
+                Ok(Some(wf)) => {
+                    match db::models::project::Project::find_by_id(&db.pool, wf.project_id).await {
+                        Ok(Some(proj)) => {
+                            match &proj.default_agent_working_dir {
+                                Some(path) if !path.trim().is_empty() => Some(PathBuf::from(path)),
+                                _ => {
+                                    // Fall back to first project repo
+                                    db::models::project_repo::ProjectRepo::find_repos_for_project(
+                                        &db.pool,
+                                        proj.id,
+                                    )
+                                    .await
+                                    .ok()
+                                    .and_then(|repos| {
+                                        repos.into_iter()
+                                            .map(|r| r.path.to_string_lossy().into_owned())
+                                            .find(|p| !p.trim().is_empty())
+                                            .map(PathBuf::from)
+                                    })
+                                }
+                            }
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+
+            let (gate_status, total_issues, blocking_issues, new_issues, passed, fix_instructions, report_json) =
+                if let Some(ref wd) = working_dir {
+                    match quality::engine::QualityEngine::from_project(wd) {
+                        Ok(engine) => {
+                            match engine.run(wd, quality::gate::QualityGateLevel::Terminal, None).await {
+                                Ok(report) => {
+                                    let status = report.overall_status();
+                                    let gate_str = match status {
+                                        quality::gate::status::QualityGateStatus::Ok => "ok",
+                                        quality::gate::status::QualityGateStatus::Warn => "warn",
+                                        quality::gate::status::QualityGateStatus::Error => "error",
+                                    };
+                                    let total = report.summary.total as i32;
+                                    let blocking = report.summary.blocking_issues as i32;
+                                    let new_i = report.summary.new_issues as i32;
+                                    let is_passed = report.is_passed();
+                                    let fix = if is_passed { None } else { Some(report.to_fix_instructions()) };
+                                    let rjson = serde_json::to_string(&report).ok();
+
+                                    (gate_str, total, blocking, new_i, is_passed, fix, rjson)
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        quality_run_id = %run_id,
+                                        error = %e,
+                                        "Quality engine run failed, falling back to ok"
+                                    );
+                                    ("ok", 0i32, 0i32, 0i32, true, None, None)
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                quality_run_id = %run_id,
+                                error = %e,
+                                "Failed to create QualityEngine from project, falling back to ok"
+                            );
+                            ("ok", 0i32, 0i32, 0i32, true, None, None)
+                        }
+                    }
+                } else {
+                    tracing::warn!(
+                        quality_run_id = %run_id,
+                        "Could not resolve project working directory, falling back to ok"
+                    );
+                    ("ok", 0i32, 0i32, 0i32, true, None, None)
+                };
+
             let duration_ms = start.elapsed().as_millis() as i32;
 
             // Complete the quality_run record
@@ -1250,7 +1319,7 @@ impl OrchestratorAgent {
                 new_issues,
                 duration_ms,
                 None, // providers_run
-                None, // report_json
+                report_json.as_deref(),
                 None, // decision_json
             )
             .await
@@ -1280,7 +1349,7 @@ impl OrchestratorAgent {
                 new_issues,
                 passed,
                 summary,
-                fix_instructions: None,
+                fix_instructions,
             };
 
             message_bus.publish_quality_gate_result(result).await;

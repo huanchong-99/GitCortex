@@ -1,5 +1,6 @@
 import { Shield, ShieldCheck, ShieldAlert, ShieldX, Loader2 } from 'lucide-react';
 import { StatusPill } from '@/components/ui-new/primitives/StatusPill';
+import { useTranslation } from 'react-i18next';
 
 type GateStatus = 'pending' | 'running' | 'ok' | 'warn' | 'error' | 'skipped';
 
@@ -44,30 +45,32 @@ function statusToIcon(status: string) {
   }
 }
 
-function statusToLabel(status: string, blockingIssues?: number) {
-  switch (status) {
-    case 'ok':
-      return 'Passed';
-    case 'warn':
-      return blockingIssues ? `${blockingIssues} warnings` : 'Warning';
-    case 'error':
-      return blockingIssues ? `${blockingIssues} blocking` : 'Failed';
-    case 'running':
-      return 'Scanning...';
-    case 'pending':
-      return 'Pending';
-    case 'skipped':
-      return 'Skipped';
-    default:
-      return status;
-  }
-}
-
 export function QualityBadge({
   gateStatus,
   blockingIssues,
   className,
 }: Readonly<QualityBadgeProps>) {
+  const { t } = useTranslation('quality');
+
+  function statusToLabel(status: string, blocking?: number) {
+    switch (status) {
+      case 'ok':
+        return t('status.ok');
+      case 'warn':
+        return blocking ? t('status.warnCount', { count: blocking }) : t('status.warn');
+      case 'error':
+        return blocking ? t('status.errorCount', { count: blocking }) : t('status.error');
+      case 'running':
+        return t('status.running');
+      case 'pending':
+        return t('status.pending');
+      case 'skipped':
+        return t('status.skipped');
+      default:
+        return status;
+    }
+  }
+
   return (
     <StatusPill
       tone={statusToTone(gateStatus)}
