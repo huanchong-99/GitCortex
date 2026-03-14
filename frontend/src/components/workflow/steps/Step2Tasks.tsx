@@ -82,32 +82,36 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
   }, [currentTaskIndex, taskCount]);
 
   // Incrementally adjust tasks array when taskCount changes, preserving existing data
+  const configRef = useRef(config);
+  configRef.current = config;
+
   useEffect(() => {
-    if (config.length === taskCount) {
+    const current = configRef.current;
+    if (current.length === taskCount) {
       return;
     }
 
     let adjusted: TaskConfig[];
-    if (taskCount > config.length) {
+    if (taskCount > current.length) {
       // Append new empty tasks while keeping existing ones intact
       const additional: TaskConfig[] = Array.from(
-        { length: taskCount - config.length },
+        { length: taskCount - current.length },
         (_, i) => ({
-          id: `task-${Date.now()}-${config.length + i}`,
+          id: `task-${Date.now()}-${current.length + i}`,
           name: '',
           description: '',
           branch: '',
           terminalCount: 1,
         })
       );
-      adjusted = [...config, ...additional];
+      adjusted = [...current, ...additional];
     } else {
       // Truncate to new count, preserving earlier tasks
-      adjusted = config.slice(0, taskCount);
+      adjusted = current.slice(0, taskCount);
     }
 
     onChangeRef.current(adjusted);
-  }, [config.length, taskCount]);
+  }, [taskCount]);
 
   const updateTask = (index: number, updates: Partial<TaskConfig>) => {
     const newTasks = [...config];
