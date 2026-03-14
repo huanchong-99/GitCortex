@@ -4149,6 +4149,7 @@ impl OrchestratorAgent {
     ///   1. SQLite single-writer means DB writes are serialized anyway.
     ///   2. Concurrent PTY input could cause race conditions in the message bus.
     ///   3. Error handling becomes more complex with parallel futures.
+    ///
     /// Sequential dispatch is safe and the startup delay is bounded by the number
     /// of tasks (typically < 10).
     async fn auto_dispatch_initial_tasks(&self) -> anyhow::Result<()> {
