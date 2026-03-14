@@ -234,7 +234,7 @@ function normalizeTerminalCompletedStatus(
       return 'failed';
     case 'cancelled':
     case 'canceled':
-      return 'cancelled';
+      return 'unknown';
     case 'review_pass':
     case 'review_passed':
       return 'review_pass';
@@ -1384,7 +1384,7 @@ export interface GitCommitPayload {
 export type TerminalCompletedStatus =
   | 'completed'
   | 'failed'
-  | 'cancelled'
+  | 'checkpoint'
   | 'review_pass'
   | 'review_reject'
   | 'unknown';

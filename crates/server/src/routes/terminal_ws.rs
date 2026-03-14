@@ -196,6 +196,11 @@ async fn handle_terminal_socket(
     }
 
     // Subscribe to terminal output stream with replay
+    // [G09-003] Design limitation: on WS reconnect, the client receives a full replay
+    // from the fanout buffer but any output emitted between disconnect and reconnect
+    // that has already been evicted from the replay window is permanently lost.
+    // Future improvement: persist a per-terminal high-water-mark so reconnecting
+    // clients can request replay from their last-seen sequence via query parameter.
     let mut output_subscription = match process_manager.subscribe_output(&terminal_id, None).await {
         Ok(sub) => sub,
         Err(e) => {
@@ -225,10 +230,20 @@ async fn handle_terminal_socket(
     let terminal_id_recv = terminal_id.clone();
     let terminal_id_output = terminal_id.clone();
 
-    // Track last activity time for idle timeout
+    // Track last activity time for idle timeout.
+    // [G09-010] RwLock<Instant> is used instead of AtomicU64 because `Instant` is an
+    // opaque type with no guaranteed conversion to/from integer on all platforms.
+    // The contention is negligible (one write per WS message, one read per heartbeat).
     let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
     let last_activity_recv = last_activity.clone();
     let last_activity_heartbeat = last_activity.clone();
+
+    // [G08-010] Track last client message time to detect half-open connections.
+    // If the server receives no client messages for 90s, the heartbeat task will
+    // close the connection (the client should send Heartbeat every 30s).
+    let last_client_message = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
+    let last_client_message_recv = last_client_message.clone();
+    let last_client_message_heartbeat = last_client_message.clone();
 
     let terminal_id_resize = terminal_id.clone();
     let idle_timeout_notifier = std::sync::Arc::new(tokio::sync::Notify::new());
@@ -241,6 +256,7 @@ async fn handle_terminal_socket(
         let last_activity_clone = last_activity.clone();
         let idle_timeout_notifier = idle_timeout_notifier.clone();
         let idle_timeout_triggered = idle_timeout_triggered.clone();
+        let process_manager_output = process_manager.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -316,13 +332,34 @@ async fn handle_terminal_socket(
                                 use tokio::sync::broadcast::error::RecvError;
                                 match e {
                                     RecvError::Lagged(skipped) => {
-                                        // Recoverable: output burst exceeded channel capacity
-                                        // Log and continue receiving from current position
+                                        // [G09-001] Recoverable: output burst exceeded channel capacity.
+                                        // Log warning and attempt to re-subscribe from last known seq
+                                        // to recover any chunks still in the replay buffer.
+                                        let resume_from = output_subscription.last_seq();
                                         tracing::warn!(
                                             terminal_id = %terminal_id_output,
                                             skipped_messages = skipped,
-                                            "Output subscription lagged, skipped messages"
+                                            resume_from_seq = resume_from,
+                                            "Output subscription lagged, attempting replay recovery"
                                         );
+
+                                        match process_manager_output.subscribe_output(&terminal_id_output, Some(resume_from)).await {
+                                            Ok(new_sub) => {
+                                                output_subscription = new_sub;
+                                                tracing::info!(
+                                                    terminal_id = %terminal_id_output,
+                                                    resume_from_seq = resume_from,
+                                                    "WS output subscription recovered after lag"
+                                                );
+                                            }
+                                            Err(re_err) => {
+                                                tracing::warn!(
+                                                    terminal_id = %terminal_id_output,
+                                                    error = %re_err,
+                                                    "Failed to re-subscribe after lag, continuing with current subscription"
+                                                );
+                                            }
+                                        }
                                         continue;
                                     }
                                     RecvError::Closed => {
@@ -398,6 +435,22 @@ async fn handle_terminal_socket(
                     return true;
                 }
 
+                // [G08-010] Detect half-open connections: if no client message
+                // (input, resize, heartbeat) received for 90s, assume the client
+                // is gone and close the connection server-side.
+                let last_client = *last_client_message_heartbeat.read().await;
+                let client_silent_duration = last_client.elapsed();
+                if client_silent_duration > Duration::from_secs(90) {
+                    tracing::warn!(
+                        terminal_id = %terminal_id_heartbeat,
+                        silent_secs = client_silent_duration.as_secs(),
+                        "Half-open connection detected: no client message for 90s, closing"
+                    );
+                    idle_timeout_triggered.store(true, Ordering::Release);
+                    idle_timeout_notifier.notify_one();
+                    return true;
+                }
+
                 tracing::trace!(
                     "Terminal {} heartbeat check, idle for {}s",
                     terminal_id_heartbeat,
@@ -413,6 +466,8 @@ async fn handle_terminal_socket(
             if let Some(result) = ws_receiver.next().await {
                 // Update last activity time
                 *last_activity_recv.write().await = Instant::now();
+                // [G08-010] Update last client message time for half-open detection
+                *last_client_message_recv.write().await = Instant::now();
 
                 match result {
                     Ok(msg) => match msg {

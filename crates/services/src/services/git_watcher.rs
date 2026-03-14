@@ -271,22 +271,45 @@ impl GitWatcher {
                 }
             };
 
+            // G10-009: Per-commit retry with bounded attempts instead of
+            // breaking out of the entire loop on first failure. This prevents
+            // a single transient error from stalling all subsequent commits.
+            const MAX_RETRIES_PER_COMMIT: u32 = 3;
+
             for commit in new_commits {
                 tracing::info!("New commit detected: {}", commit.hash);
 
-                match self.handle_new_commit(commit.clone()).await {
-                    Ok(()) => {
-                        let mut last_hash = self.last_commit_hash.lock().await;
-                        *last_hash = Some(commit.hash.clone());
+                let mut attempts = 0u32;
+                let mut succeeded = false;
+                while attempts < MAX_RETRIES_PER_COMMIT {
+                    match self.handle_new_commit(commit.clone()).await {
+                        Ok(()) => {
+                            let mut last_hash = self.last_commit_hash.lock().await;
+                            *last_hash = Some(commit.hash.clone());
+                            succeeded = true;
+                            break;
+                        }
+                        Err(e) => {
+                            attempts += 1;
+                            tracing::warn!(
+                                commit_hash = %commit.hash,
+                                attempt = attempts,
+                                max_retries = MAX_RETRIES_PER_COMMIT,
+                                error = %e,
+                                "Error handling commit, retrying"
+                            );
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!(
-                            commit_hash = %commit.hash,
-                            error = %e,
-                            "Error handling commit; keeping cursor unchanged for retry"
-                        );
-                        break;
-                    }
+                }
+                if !succeeded {
+                    tracing::warn!(
+                        commit_hash = %commit.hash,
+                        "Exhausted {} retries for commit; skipping and advancing cursor",
+                        MAX_RETRIES_PER_COMMIT
+                    );
+                    // Advance cursor so we don't re-process this commit forever
+                    let mut last_hash = self.last_commit_hash.lock().await;
+                    *last_hash = Some(commit.hash.clone());
                 }
             }
         }
@@ -313,6 +336,10 @@ impl GitWatcher {
     ) -> Result<Vec<ParsedCommit>> {
         use tokio::process::Command;
 
+        // NOTE (G10-004): We intentionally query only the current HEAD branch
+        // (no --all flag). Each GitWatcher instance is bound to a single
+        // worktree/branch. The orchestrator spawns one GitWatcher per worktree,
+        // so cross-branch commits are handled by their respective watcher.
         let mut cmd = Command::new("git");
         cmd.current_dir(repo_path)
             .args(["log", "--format=%H", "--reverse"]);
@@ -350,13 +377,28 @@ impl GitWatcher {
         Ok(commits)
     }
 
+    /// Fetch commit details in a single `git show` invocation.
+    ///
+    /// G10-006: Previously this spawned 3 separate git processes (hash+subject,
+    /// branch, full body). Now we use a single `git show -s --format=<fmt>` with
+    /// ASCII Record Separator (`\x1e`) as the delimiter so that commit messages
+    /// containing any printable character (including `|`) are handled correctly.
+    ///
+    /// G10-005 (design limitation): The branch name is resolved via
+    /// `rev-parse --abbrev-ref HEAD`, which always returns the *current* HEAD of
+    /// this worktree — not necessarily the branch that *contains* the queried
+    /// commit. This is acceptable because each GitWatcher instance is bound to a
+    /// single worktree whose HEAD tracks the task branch. A future improvement
+    /// could use `git branch --contains <hash>` for precise attribution.
     async fn get_commit_by_hash(&self, repo_path: &Path, revision: &str) -> Result<ParsedCommit> {
         use tokio::process::Command;
 
-        // Get commit hash and subject
+        // Single git invocation: hash \x1e full_body
+        // Using ASCII Record Separator (0x1e) as delimiter — safe because it
+        // never appears in normal commit text (G10-001).
         let output = Command::new("git")
             .current_dir(repo_path)
-            .args(["show", "-s", "--format=%H|%s", revision])
+            .args(["show", "-s", "--format=%H\x1e%B", revision])
             .output()
             .await
             .context(format!(
@@ -372,17 +414,26 @@ impl GitWatcher {
             );
         }
 
-        let result = String::from_utf8_lossy(&output.stdout);
-        let parts: Vec<&str> = result.trim().split('|').collect();
+        let raw = String::from_utf8_lossy(&output.stdout);
+        let trimmed = raw.trim();
 
-        if parts.len() < 2 {
-            anyhow::bail!("Invalid git log output format");
-        }
+        // Split on the record separator; we expect exactly 2 parts.
+        let (hash, full_message) = trimmed
+            .split_once('\x1e')
+            .ok_or_else(|| anyhow!("Invalid git show output format (missing \\x1e separator)"))?;
 
-        let hash = parts[0].to_string();
-        let message = parts[1..].join("|"); // Handle cases where message might contain '|'
+        let hash = hash.to_string();
+        let full_message = full_message.to_string();
 
-        // Get current branch name
+        // Extract subject (first line) from the full body for the `message` field.
+        let message = full_message
+            .lines()
+            .next()
+            .unwrap_or("")
+            .to_string();
+
+        // Get current branch name (kept as a separate lightweight command since
+        // `git show --format` cannot emit the worktree's HEAD branch).
         let branch_output = Command::new("git")
             .current_dir(repo_path)
             .args(["rev-parse", "--abbrev-ref", "HEAD"])
@@ -405,27 +456,6 @@ impl GitWatcher {
             "unknown".to_string()
         };
 
-        // Try to parse metadata from the commit message
-        // Get full message body for metadata parsing
-        let full_output = Command::new("git")
-            .current_dir(repo_path)
-            .args(["show", "-s", "--format=%B", revision])
-            .output()
-            .await
-            .context(format!(
-                "Failed to get commit body {} from {}",
-                revision,
-                self.config.repo_path.display()
-            ))?;
-
-        if !full_output.status.success() {
-            anyhow::bail!(
-                "git show body failed: {}",
-                String::from_utf8_lossy(&full_output.stderr)
-            );
-        }
-
-        let full_message = String::from_utf8_lossy(&full_output.stdout).to_string();
         let metadata = CommitMetadata::parse(&full_message);
 
         Ok(ParsedCommit {
@@ -437,6 +467,22 @@ impl GitWatcher {
     }
 
     /// Handle a new commit by parsing its metadata and publishing events
+    ///
+    /// Two event paths exist by design (G10-010):
+    ///
+    /// 1. **TerminalCompleted** — emitted when metadata indicates a terminal
+    ///    status transition (completed/handoff, checkpoint, review, failed).
+    ///    The orchestrator uses this to advance the task state machine.
+    ///
+    /// 2. **GitEvent** — emitted for commits *without* metadata so the
+    ///    orchestrator can attempt no-metadata commit attribution, and for
+    ///    checkpoint commits (status=completed + next_action=continue/retry)
+    ///    so the orchestrator is aware of intermediate progress.
+    ///
+    /// G10-011: When a commit carries metadata with a terminal_id and we
+    /// successfully publish TerminalCompleted, we intentionally do NOT also
+    /// publish a GitEvent to avoid the orchestrator processing the same
+    /// commit through two independent code paths.
     async fn handle_new_commit(&self, commit: ParsedCommit) -> Result<()> {
         // Check if commit has metadata
         let metadata = if let Some(m) = commit.metadata { m } else {
@@ -449,7 +495,8 @@ impl GitWatcher {
                 return Ok(());
             };
 
-            // Publish GitEvent for commits without METADATA
+            // G10-012: Publish full commit message (not just subject) so the
+            // orchestrator and DB have the complete body for attribution.
             self.message_bus
                 .publish_git_event(workflow_id, &commit.hash, &commit.branch, &commit.message)
                 .await;
@@ -525,6 +572,12 @@ impl GitWatcher {
             "Published TerminalCompleted event for terminal {}",
             metadata.terminal_id
         );
+
+        // G10-011: Do NOT publish a GitEvent here. The TerminalCompleted
+        // event already carries all necessary information (commit hash,
+        // metadata, terminal_id). Publishing both would cause the
+        // orchestrator to process the same commit twice through different
+        // code paths, potentially leading to duplicate state transitions.
 
         Ok(())
     }

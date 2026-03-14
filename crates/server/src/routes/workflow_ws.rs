@@ -179,7 +179,11 @@ async fn handle_workflow_socket(
         }
     });
 
-    // Wait for either task to complete
+    // Wait for either task to complete.
+    // NOTE(G12-007): tokio::select! automatically drops the losing future when one
+    // branch completes. Since send_task and recv_task are JoinHandles, dropping them
+    // does NOT abort the spawned task — but the spawned tasks will naturally terminate
+    // once the WebSocket half they own is dropped/closed. No explicit abort is needed.
     tokio::select! {
         _ = send_task => {
             debug!("Send task completed for workflow {}", workflow_id_cleanup);

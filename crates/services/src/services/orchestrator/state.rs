@@ -1,6 +1,6 @@
 //! Orchestrator state tracking and transitions.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use tokio::sync::RwLock;
 
@@ -62,7 +62,13 @@ pub struct OrchestratorState {
     pub error_count: u32,
 
     /// Set of processed commit hashes for idempotency.
+    ///
+    /// Bounded to `MAX_PROCESSED_COMMITS` entries. When the limit is reached,
+    /// the oldest half is evicted via `record_processed_commit()`.
     pub processed_commits: HashSet<String>,
+
+    /// Insertion-order tracking for `processed_commits` eviction.
+    processed_commits_order: VecDeque<String>,
 
     /// Terminals currently waiting for quiet-window completion checks.
     pub pending_quiet_completion_checks: HashSet<String>,
@@ -86,6 +92,7 @@ impl OrchestratorState {
             total_tokens_used: 0,
             error_count: 0,
             processed_commits: HashSet::new(),
+            processed_commits_order: VecDeque::new(),
             pending_quiet_completion_checks: HashSet::new(),
             pending_quality_checks: HashSet::new(),
             processed_checkpoints: HashSet::new(),
@@ -297,6 +304,38 @@ impl OrchestratorState {
         self.task_states
             .values()
             .any(|s| !s.failed_terminals.is_empty())
+    }
+
+    /// Maximum number of processed commit hashes to retain in memory.
+    const MAX_PROCESSED_COMMITS: usize = 10_000;
+
+    /// Record a commit hash as processed, with bounded capacity.
+    ///
+    /// Returns `true` if the commit was newly inserted, `false` if already seen.
+    /// When the set exceeds `MAX_PROCESSED_COMMITS`, the oldest half is evicted.
+    pub fn record_processed_commit(&mut self, commit_hash: String) -> bool {
+        if self.processed_commits.contains(&commit_hash) {
+            return false;
+        }
+
+        // Evict oldest half when capacity is exceeded
+        if self.processed_commits.len() >= Self::MAX_PROCESSED_COMMITS {
+            let evict_count = Self::MAX_PROCESSED_COMMITS / 2;
+            for _ in 0..evict_count {
+                if let Some(old) = self.processed_commits_order.pop_front() {
+                    self.processed_commits.remove(&old);
+                }
+            }
+            tracing::info!(
+                remaining = self.processed_commits.len(),
+                evicted = evict_count,
+                "Evicted oldest processed commits to stay within capacity"
+            );
+        }
+
+        self.processed_commits.insert(commit_hash.clone());
+        self.processed_commits_order.push_back(commit_hash);
+        true
     }
 
     /// Validates and performs a run-state transition.

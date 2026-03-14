@@ -158,7 +158,9 @@ pub async fn get_terminal_logs(
     Query(query): Query<TerminalLogsQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<TerminalLog>>>, ApiError> {
     // Fetch logs from database (already in DESC order by created_at)
-    let mut logs = TerminalLog::find_by_terminal(&deployment.db().pool, &id, query.limit).await?;
+    // G16-011: Clamp limit to [0, 10000] to reject negative values and cap upper bound.
+    let clamped_limit = query.limit.map(|l| l.clamp(0, 10000));
+    let mut logs = TerminalLog::find_by_terminal(&deployment.db().pool, &id, clamped_limit).await?;
 
     // Reverse to get chronological order (oldest first)
     logs.reverse();
@@ -182,6 +184,9 @@ pub async fn start_terminal(
         .ok_or_else(|| ApiError::NotFound(format!("Terminal {id} not found")))?;
 
     // Validate terminal status before starting
+    // NOTE(G16-015): Per-terminal concurrency is protected by the CAS-style status
+    // transition below (only one caller can move from a startable status to "starting").
+    // The is_running() check provides an additional safety net but is not the primary guard.
     if !STARTABLE_TERMINAL_STATUSES.contains(&terminal.status.as_str()) {
         return Err(ApiError::Conflict(format!(
             "Terminal {id} cannot be started from status '{}'",
@@ -551,7 +556,7 @@ pub async fn stop_terminal(
     // Ensure terminal exists first to avoid false success on nonexistent id
     let terminal = Terminal::find_by_id(&deployment.db().pool, &id)
         .await?
-        .ok_or_else(|| ApiError::NotFound("not_found".to_string()))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Terminal {id} not found")))?;
     // Best-effort kill in case the process is still running
     if let Err(e) = deployment.process_manager().kill_terminal(&id).await {
         tracing::warn!("Failed to kill terminal {}: {}", id, e);

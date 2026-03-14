@@ -42,11 +42,17 @@ pub enum WsEventType {
     #[serde(rename = "git.commit_detected")]
     GitCommitDetected,
 
-    /// Orchestrator awakened and processing
+    /// Orchestrator awakened and processing.
+    /// NOTE: Reserved for future use — not currently emitted by the backend.
+    /// Kept to maintain a stable WebSocket event contract for frontend consumers.
+    #[allow(dead_code)]
     #[serde(rename = "orchestrator.awakened")]
     OrchestratorAwakened,
 
-    /// Orchestrator made a decision
+    /// Orchestrator made a decision.
+    /// NOTE: Reserved for future use — not currently emitted by the backend.
+    /// Kept to maintain a stable WebSocket event contract for frontend consumers.
+    #[allow(dead_code)]
     #[serde(rename = "orchestrator.decision")]
     OrchestratorDecision,
 
@@ -272,6 +278,8 @@ impl WsEvent {
                 let commit_message = event.commit_message;
                 let metadata = event.metadata;
 
+                // TODO(G08-005): Long-term, unify payload to camelCase only and remove
+                // snake_case duplicates once all frontend consumers have migrated.
                 let payload = json!({
                     "workflowId": workflow_id,
                     "taskId": task_id,

@@ -20,7 +20,7 @@ use axum::{
     extract::Request,
     http::{StatusCode, header},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 
 /// Middleware that requires API token authentication.
@@ -48,8 +48,10 @@ use axum::{
 /// // GITCORTEX_API_TOKEN="my-secret-token"
 /// // Request: Authorization: Bearer my-secret-token
 /// ```
-pub async fn require_api_token(req: Request, next: Next) -> Result<Response, StatusCode> {
-    // Check if API token is configured
+pub async fn require_api_token(req: Request, next: Next) -> Result<Response, Response> {
+    // Check if API token is configured.
+    // NOTE(G35-002): std::env::var() is called per-request intentionally. The cost is
+    // negligible (< 1µs on all platforms) and allows runtime token rotation without restart.
     let token = match std::env::var("GITCORTEX_API_TOKEN") {
         Ok(value) if !value.trim().is_empty() => value,
         Err(_) => {
@@ -83,14 +85,20 @@ pub async fn require_api_token(req: Request, next: Next) -> Result<Response, Sta
         tracing::trace!("API request authenticated successfully");
         Ok(next.run(req).await)
     } else {
-        // Authentication failed
+        // Authentication failed — return a JSON error body (G16-002)
         tracing::warn!(
             method = %req.method(),
             uri = %req.uri(),
             has_auth_header = auth_header.is_some(),
             "Unauthorized API request: invalid or missing authentication token"
         );
-        Err(StatusCode::UNAUTHORIZED)
+        Err((
+            StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "success": false,
+                "error": "Unauthorized: invalid or missing authentication token"
+            })),
+        ).into_response())
     }
 }
 

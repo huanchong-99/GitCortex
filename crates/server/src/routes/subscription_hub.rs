@@ -153,7 +153,12 @@ impl SubscriptionHub {
 
         if should_remove {
             senders.remove(workflow_id);
-            tracing::debug!("Cleaned up idle channel for workflow: {}", workflow_id);
+
+            // Also clean up any pending events cached for this workflow (G08-009)
+            let mut pending = self.pending_events.write().await;
+            pending.remove(workflow_id);
+
+            tracing::debug!("Cleaned up idle channel and pending events for workflow: {}", workflow_id);
         }
     }
 

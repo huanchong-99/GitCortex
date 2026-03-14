@@ -121,21 +121,6 @@ const TERMINAL_STATUS_CONFIG: Record<string, StatusConfig> = {
     tone: 'brand',
     icon: PlayIcon,
   },
-  running: {
-    key: 'workflow:terminalDebug.status.running',
-    tone: 'brand',
-    icon: PlayIcon,
-  },
-  active: {
-    key: 'workflow:terminalDebug.status.active',
-    tone: 'brand',
-    icon: PlayIcon,
-  },
-  paused: {
-    key: 'workflow:terminalDebug.status.paused',
-    tone: 'warning',
-    icon: PauseIcon,
-  },
   completed: {
     key: 'workflow:terminalDebug.status.completed',
     tone: 'success',
@@ -146,10 +131,40 @@ const TERMINAL_STATUS_CONFIG: Record<string, StatusConfig> = {
     tone: 'danger',
     icon: XCircleIcon,
   },
+  cancelled: {
+    key: 'workflow:terminalDebug.status.cancelled',
+    tone: 'neutral',
+    icon: XCircleIcon,
+  },
   killed: {
     key: 'workflow:terminalDebug.status.killed',
     tone: 'danger',
     icon: WarningIcon,
+  },
+  review_passed: {
+    key: 'workflow:terminalDebug.status.review_passed',
+    tone: 'success',
+    icon: CheckCircleIcon,
+  },
+  review_rejected: {
+    key: 'workflow:terminalDebug.status.review_rejected',
+    tone: 'danger',
+    icon: XCircleIcon,
+  },
+  quality_pending: {
+    key: 'workflow:terminalDebug.status.quality_pending',
+    tone: 'warning',
+    icon: ClockIcon,
+  },
+  checkpoint: {
+    key: 'workflow:terminalDebug.status.checkpoint',
+    tone: 'info',
+    icon: PauseIcon,
+  },
+  paused: {
+    key: 'workflow:terminalDebug.status.paused',
+    tone: 'warning',
+    icon: PauseIcon,
   },
   idle: {
     key: 'workflow:terminalDebug.status.idle',

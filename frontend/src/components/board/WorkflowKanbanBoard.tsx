@@ -81,6 +81,9 @@ export function WorkflowKanbanBoard({ workflowId }: Readonly<WorkflowKanbanBoard
     const task = tasks.find((item) => item.id === taskId);
     if (!task || task.status === nextStatus) return;
 
+    // Note: State transition legality is validated server-side.
+    // The backend will reject invalid transitions and return an error,
+    // which the mutation's onError handler will process.
     // Trigger the mutation (optimistic update handled in the hook)
     updateTaskStatus.mutate({
       workflowId,

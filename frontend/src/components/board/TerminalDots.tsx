@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-type TerminalStatus = 'not_started' | 'starting' | 'waiting' | 'working' | 'completed' | 'failed' | 'running' | 'cancelled' | 'pending';
+type TerminalStatus = 'not_started' | 'starting' | 'waiting' | 'working' | 'completed' | 'failed' | 'cancelled' | 'review_passed' | 'review_rejected' | 'quality_pending';
 
 interface TerminalInfo {
   id: string;
@@ -20,19 +20,21 @@ interface TerminalDotsProps {
 function getStatusColor(status: TerminalStatus): string {
   switch (status) {
     case 'working':
-    case 'running':
       return 'bg-green-500 animate-pulse';
     case 'waiting':
       return 'bg-blue-500';
     case 'starting':
       return 'bg-yellow-500';
     case 'completed':
+    case 'review_passed':
       return 'bg-green-500';
     case 'failed':
     case 'cancelled':
+    case 'review_rejected':
       return 'bg-red-500';
+    case 'quality_pending':
+      return 'bg-yellow-500 animate-pulse';
     case 'not_started':
-    case 'pending':
     default:
       return 'bg-gray-400';
   }

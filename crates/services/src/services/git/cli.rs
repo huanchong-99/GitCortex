@@ -37,6 +37,8 @@ pub enum GitCliError {
     AuthFailed(String),
     #[error("push rejected: {0}")]
     PushRejected(String),
+    #[error("merge conflicts detected: {0}")]
+    MergeConflicts(String),
     #[error("rebase in progress in this worktree")]
     RebaseInProgress,
 }
@@ -590,6 +592,10 @@ impl GitCli {
     }
 
     /// Checkout base branch, squash-merge from_branch, and commit with message. Returns new HEAD sha.
+    ///
+    /// G06-009: If the squash-merge step encounters conflicts, the error is
+    /// classified as `MergeConflicts` so callers can distinguish merge failures
+    /// from other git errors and take appropriate action (e.g. abort + report).
     pub fn merge_squash_commit(
         &self,
         repo_path: &Path,
@@ -598,8 +604,15 @@ impl GitCli {
         message: &str,
     ) -> Result<String, GitCliError> {
         self.git(repo_path, ["checkout", base_branch]).map(|_| ())?;
-        self.git(repo_path, ["merge", "--squash", "--no-commit", from_branch])
-            .map(|_| ())?;
+        if let Err(GitCliError::CommandFailed(msg)) =
+            self.git(repo_path, ["merge", "--squash", "--no-commit", from_branch])
+        {
+            // Check stderr/stdout for conflict indicators
+            if msg.to_ascii_uppercase().contains("CONFLICT") {
+                return Err(GitCliError::MergeConflicts(msg));
+            }
+            return Err(GitCliError::CommandFailed(msg));
+        }
         self.git(repo_path, ["commit", "-m", message]).map(|_| ())?;
         let sha = self
             .git(repo_path, ["rev-parse", "HEAD"])?

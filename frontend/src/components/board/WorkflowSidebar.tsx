@@ -21,6 +21,14 @@ interface WorkflowSidebarProps {
   readonly onSelectWorkflow: (id: string) => void;
 }
 
+/**
+ * Sidebar listing workflows for the active project.
+ *
+ * This component does NOT subscribe to WebSocket events directly.
+ * Freshness is guaranteed by React Query's staleTime (5 min) combined with
+ * cache invalidations triggered by the parent Board component's WS handlers
+ * (which invalidate both `workflowKeys.byId` and `workflowKeys.forProject`).
+ */
 export function WorkflowSidebar({
   projects,
   activeProjectId,

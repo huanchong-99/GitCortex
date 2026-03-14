@@ -41,6 +41,9 @@ pub const DEFAULT_ROWS: u16 = 24;
 pub const PROCESS_PTY_READ_BUFFER_SIZE: usize = 4096;
 
 /// Default replay chunk retention per terminal stream
+/// [G09-004] These values can be overridden via `OutputFanoutConfig` when constructing
+/// `ProcessManager::default_output_fanout()`. For production tuning, consider making
+/// them configurable via environment variables or server configuration.
 pub const PROCESS_REPLAY_MAX_CHUNKS: usize = 512;
 
 /// Default replay byte retention per terminal stream
@@ -270,6 +273,11 @@ impl Drop for CodexHomeGuard {
 // ============================================================================
 
 /// Process manager for terminal lifecycle with PTY support
+///
+/// [G21-006] No `Drop` implementation: process cleanup is handled by the runtime
+/// shutdown sequence which calls `kill_terminal` / `finalize_terminated_process`
+/// for each tracked process. Implementing `Drop` would require blocking I/O
+/// (task joins, CODEX_HOME cleanup) which is not safe in a synchronous destructor.
 pub struct ProcessManager {
     processes: Arc<RwLock<HashMap<String, TrackedProcess>>>,
 }
@@ -977,6 +985,11 @@ impl ProcessManager {
     }
 
     /// Check if a terminal process is running
+    ///
+    /// [G21-002] This checks HashMap presence only, which is correct because entries
+    /// are removed from the map in `kill_terminal` and `cleanup` when a process exits.
+    /// The `cleanup` method periodically reaps dead processes via `try_wait`, so
+    /// `is_running` reflects actual liveness within the cleanup polling interval.
     pub async fn is_running(&self, terminal_id: &str) -> bool {
         let processes = self.processes.read().await;
         processes.contains_key(terminal_id)

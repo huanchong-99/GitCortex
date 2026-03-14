@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { WorkflowSidebar } from '@/components/board/WorkflowSidebar';
 import { WorkflowKanbanBoard } from '@/components/board/WorkflowKanbanBoard';
@@ -68,15 +68,39 @@ export function Board() {
     workflowIdFromUrl,
   ]);
 
+  // G29-008: Debounced WS invalidation to avoid rapid-fire cache busting
+  const invalidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleRealtimeWorkflowSignal = useCallback(() => {
     if (!selectedWorkflowId) return;
-    queryClient.invalidateQueries({
-      queryKey: workflowKeys.byId(selectedWorkflowId),
-    });
-  }, [queryClient, selectedWorkflowId]);
+
+    if (invalidationTimerRef.current) {
+      clearTimeout(invalidationTimerRef.current);
+    }
+
+    invalidationTimerRef.current = setTimeout(() => {
+      // G11-002 / G29-003: Invalidate both byId AND forProject list
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.byId(selectedWorkflowId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.forProject(validProjectId),
+      });
+      invalidationTimerRef.current = null;
+    }, 300);
+  }, [queryClient, selectedWorkflowId, validProjectId]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (invalidationTimerRef.current) {
+        clearTimeout(invalidationTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleQualityGateResult = useCallback((payload: unknown) => {
-    const data = payload as { workflowId?: string; terminalId?: string };
+    const data = payload as { workflowId?: string; terminalId?: string; runId?: string };
     if (data.terminalId) {
       queryClient.invalidateQueries({
         queryKey: qualityKeys.latestForTerminal(data.terminalId),
@@ -87,7 +111,21 @@ export function Board() {
         queryKey: qualityKeys.runsForWorkflow(data.workflowId),
       });
     }
+    // G31-007: Also invalidate runDetail and issuesForRun when runId is available
+    if (data.runId) {
+      queryClient.invalidateQueries({
+        queryKey: qualityKeys.runDetail(data.runId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: qualityKeys.issuesForRun(data.runId),
+      });
+    }
   }, [queryClient]);
+
+  // G29-004: Prompt events trigger invalidation so UI reflects prompt state
+  const handlePromptEvent = useCallback(() => {
+    handleRealtimeWorkflowSignal();
+  }, [handleRealtimeWorkflowSignal]);
 
   const workflowEventHandlers = useMemo(
     () => ({
@@ -96,9 +134,11 @@ export function Board() {
       onTerminalStatusChanged: handleRealtimeWorkflowSignal,
       onTerminalCompleted: handleRealtimeWorkflowSignal,
       onGitCommitDetected: handleRealtimeWorkflowSignal,
+      onTerminalPromptDetected: handlePromptEvent,
+      onTerminalPromptDecision: handlePromptEvent,
       onQualityGateResult: handleQualityGateResult,
     }),
-    [handleRealtimeWorkflowSignal, handleQualityGateResult]
+    [handleRealtimeWorkflowSignal, handlePromptEvent, handleQualityGateResult]
   );
 
   useWorkflowEvents(selectedWorkflowId, workflowEventHandlers);

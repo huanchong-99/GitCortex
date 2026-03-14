@@ -536,11 +536,29 @@ impl TerminalLauncher {
     }
 
     async fn rollback_launch_after_spawn(&self, terminal_id: &str, reason: String) -> LaunchResult {
-        let workflow_id = self
+        // [G02-002] Log warning when workflow_id resolution fails instead of silently swallowing
+        let workflow_id = match self
             .get_workflow_id_for_terminal_by_terminal_id(terminal_id)
             .await
-            .ok()
-            .flatten();
+        {
+            Ok(wf_id) => {
+                if wf_id.is_none() {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        "Could not resolve workflow_id for terminal during rollback (no matching workflow_task)"
+                    );
+                }
+                wf_id
+            }
+            Err(e) => {
+                tracing::warn!(
+                    terminal_id = %terminal_id,
+                    error = %e,
+                    "Failed to resolve workflow_id for terminal during rollback"
+                );
+                None
+            }
+        };
         tracing::error!(
             terminal_id = %terminal_id,
             error = %reason,
@@ -581,6 +599,13 @@ impl TerminalLauncher {
             return;
         };
         let Some(workflow_id) = workflow_id else {
+            // [G11-005] Log warning when workflow_id is None so status broadcasts
+            // are not silently skipped — aids debugging of orphaned terminals.
+            tracing::warn!(
+                terminal_id = %terminal_id,
+                status = %status,
+                "Skipping terminal status broadcast: workflow_id is None"
+            );
             return;
         };
 

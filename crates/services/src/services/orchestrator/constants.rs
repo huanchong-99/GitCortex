@@ -28,16 +28,29 @@ pub const TERMINAL_STATUS_WORKING: &str = "working";
 pub const TERMINAL_STATUS_COMPLETED: &str = "completed";
 pub const TERMINAL_STATUS_FAILED: &str = "failed";
 pub const TERMINAL_STATUS_CANCELLED: &str = "cancelled";
+/// Used by agent.rs for code-review terminal outcomes.
 pub const TERMINAL_STATUS_REVIEW_PASSED: &str = "review_passed";
+/// Used by agent.rs for code-review terminal outcomes.
 pub const TERMINAL_STATUS_REVIEW_REJECTED: &str = "review_rejected";
 
-/// Workflow status values
-pub const WORKFLOW_STATUS_PENDING: &str = "pending";
+/// Workflow status values — mirrors `WorkflowStatus` enum in `db::models::workflow`.
+pub const WORKFLOW_STATUS_CREATED: &str = "created";
+pub const WORKFLOW_STATUS_STARTING: &str = "starting";
 pub const WORKFLOW_STATUS_READY: &str = "ready";
 pub const WORKFLOW_STATUS_RUNNING: &str = "running";
+pub const WORKFLOW_STATUS_PAUSED: &str = "paused";
+pub const WORKFLOW_STATUS_MERGING: &str = "merging";
 pub const WORKFLOW_STATUS_COMPLETED: &str = "completed";
 pub const WORKFLOW_STATUS_FAILED: &str = "failed";
-pub const WORKFLOW_STATUS_MERGING: &str = "merging";
+pub const WORKFLOW_STATUS_CANCELLED: &str = "cancelled";
+
+/// Task status values — mirrors `WorkflowTaskStatus` enum in `db::models::workflow`.
+pub const TASK_STATUS_PENDING: &str = "pending";
+pub const TASK_STATUS_RUNNING: &str = "running";
+pub const TASK_STATUS_REVIEW_PENDING: &str = "reviewpending";
+pub const TASK_STATUS_COMPLETED: &str = "completed";
+pub const TASK_STATUS_FAILED: &str = "failed";
+pub const TASK_STATUS_CANCELLED: &str = "cancelled";
 
 // Phase 28A: Terminal completion context limits
 pub const COMPLETION_CONTEXT_LOG_LINES: usize = 50;
@@ -68,16 +81,34 @@ mod tests {
 
     #[test]
     fn test_all_workflow_status_constants_exist() {
-        let _ = WORKFLOW_STATUS_PENDING;
-        let _ = WORKFLOW_STATUS_READY; // This is missing
+        let _ = WORKFLOW_STATUS_CREATED;
+        let _ = WORKFLOW_STATUS_STARTING;
+        let _ = WORKFLOW_STATUS_READY;
         let _ = WORKFLOW_STATUS_RUNNING;
+        let _ = WORKFLOW_STATUS_PAUSED;
+        let _ = WORKFLOW_STATUS_MERGING;
         let _ = WORKFLOW_STATUS_COMPLETED;
         let _ = WORKFLOW_STATUS_FAILED;
-        let _ = WORKFLOW_STATUS_MERGING;
+        let _ = WORKFLOW_STATUS_CANCELLED;
+    }
+
+    #[test]
+    fn test_all_task_status_constants_exist() {
+        let _ = TASK_STATUS_PENDING;
+        let _ = TASK_STATUS_RUNNING;
+        let _ = TASK_STATUS_REVIEW_PENDING;
+        let _ = TASK_STATUS_COMPLETED;
+        let _ = TASK_STATUS_FAILED;
+        let _ = TASK_STATUS_CANCELLED;
     }
 
     #[test]
     fn test_workflow_status_ready_value() {
         assert_eq!(WORKFLOW_STATUS_READY, "ready");
+    }
+
+    #[test]
+    fn test_workflow_status_created_value() {
+        assert_eq!(WORKFLOW_STATUS_CREATED, "created");
     }
 }

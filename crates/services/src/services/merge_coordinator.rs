@@ -96,8 +96,9 @@ impl MergeCoordinator {
                     sha
                 );
 
-                // Broadcast merge success event
-                self.broadcast_merge_success(workflow_id, task_id, &sha)
+                // Broadcast merge success event (don't set workflow completed per-task;
+                // the caller should set it after all tasks are merged — G06-007)
+                self.broadcast_merge_success(workflow_id, task_id, &sha, false)
                     .await?;
 
                 Ok(sha)
@@ -196,7 +197,7 @@ impl MergeCoordinator {
         );
 
         // Broadcast merge completion
-        self.broadcast_merge_success(workflow_id, task_id, commit_sha)
+        self.broadcast_merge_success(workflow_id, task_id, commit_sha, true)
             .await?;
 
         tracing::info!("Successfully completed resolved merge for task {}", task_id);
@@ -210,11 +211,15 @@ impl MergeCoordinator {
     /// * `workflow_id` - The ID of the workflow
     /// * `task_id` - The ID of the task
     /// * `commit_sha` - The commit SHA of the merge
+    /// * `set_workflow_completed` - Whether to set the workflow status to "completed".
+    ///   Callers should pass `false` when merging individual tasks and only pass `true`
+    ///   after all tasks have been merged successfully.
     async fn broadcast_merge_success(
         &self,
         workflow_id: &str,
         task_id: &str,
         _commit_sha: &str,
+        set_workflow_completed: bool,
     ) -> Result<()> {
         tracing::debug!(
             "Broadcasting merge success for workflow {} task {}",
@@ -222,16 +227,18 @@ impl MergeCoordinator {
             task_id
         );
 
-        // Update workflow status to "completed"
-        db::models::Workflow::update_status(&self.db.pool, workflow_id, "completed").await?;
+        if set_workflow_completed {
+            // Update workflow status to "completed"
+            db::models::Workflow::update_status(&self.db.pool, workflow_id, "completed").await?;
 
-        // Publish success event
-        let message = BusMessage::StatusUpdate {
-            workflow_id: workflow_id.to_string(),
-            status: "completed".to_string(),
-        };
-        let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
-        self.message_bus.publish(&topic, message).await?;
+            // Publish success event
+            let message = BusMessage::StatusUpdate {
+                workflow_id: workflow_id.to_string(),
+                status: "completed".to_string(),
+            };
+            let topic = format!("{WORKFLOW_TOPIC_PREFIX}{workflow_id}");
+            self.message_bus.publish(&topic, message).await?;
+        }
 
         Ok(())
     }

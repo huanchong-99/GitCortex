@@ -92,7 +92,14 @@ pub struct Terminal {
     /// Execution order within task
     pub order_index: i32,
 
-    /// Status
+    /// Status (stored as TEXT in SQLite).
+    ///
+    /// # Database Constraint Note
+    /// The `terminal` table currently has no CHECK constraint on this column.
+    /// Adding `CHECK(status IN ('not_started','starting','waiting','working',
+    /// 'completed','failed','cancelled','review_passed','review_rejected',
+    /// 'quality_pending'))` requires a new migration. Application-layer
+    /// validation is enforced via `TerminalStatus` enum and CAS methods.
     pub status: String,
 
     /// OS process ID
@@ -338,20 +345,41 @@ impl Terminal {
     }
 
     /// Update terminal status
+    ///
+    /// When the new status is a terminal state (`failed` or `cancelled`),
+    /// `completed_at` is set automatically to prevent dangling incomplete
+    /// records.
     pub async fn update_status(pool: &SqlitePool, id: &str, status: &str) -> sqlx::Result<()> {
         let now = Utc::now();
-        sqlx::query(
-            r"
-            UPDATE terminal
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-            ",
-        )
-        .bind(status)
-        .bind(now)
-        .bind(id)
-        .execute(pool)
-        .await?;
+        let is_terminal_state = status == "failed" || status == "cancelled";
+        if is_terminal_state {
+            sqlx::query(
+                r"
+                UPDATE terminal
+                SET status = ?, completed_at = COALESCE(completed_at, ?), updated_at = ?
+                WHERE id = ?
+                ",
+            )
+            .bind(status)
+            .bind(now)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        } else {
+            sqlx::query(
+                r"
+                UPDATE terminal
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                ",
+            )
+            .bind(status)
+            .bind(now)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        }
         Ok(())
     }
 
@@ -481,15 +509,18 @@ impl Terminal {
         Ok(())
     }
 
-    /// Set terminal to starting status (process is preparing to spawn)
-    pub async fn set_starting(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+    /// Set terminal to starting status (CAS: only from `not_started`).
+    ///
+    /// Returns `true` when the transition succeeds, `false` when the terminal
+    /// is not in `not_started` state (e.g. already starting or further along).
+    pub async fn set_starting(pool: &SqlitePool, id: &str) -> sqlx::Result<bool> {
         let now = Utc::now();
         let status = TerminalStatus::Starting.to_string();
-        sqlx::query(
+        let result = sqlx::query(
             r"
             UPDATE terminal
             SET status = ?, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND status = 'not_started'
             ",
         )
         .bind(status)
@@ -497,18 +528,21 @@ impl Terminal {
         .bind(id)
         .execute(pool)
         .await?;
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
-    /// Set terminal to waiting status (process started, waiting for instructions)
-    pub async fn set_waiting(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+    /// Set terminal to waiting status (CAS: only from `starting`).
+    ///
+    /// Returns `true` when the transition succeeds, `false` when the terminal
+    /// is not in `starting` state.
+    pub async fn set_waiting(pool: &SqlitePool, id: &str) -> sqlx::Result<bool> {
         let now = Utc::now();
         let status = TerminalStatus::Waiting.to_string();
-        sqlx::query(
+        let result = sqlx::query(
             r"
             UPDATE terminal
             SET status = ?, started_at = ?, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND status = 'starting'
             ",
         )
         .bind(status)
@@ -517,11 +551,11 @@ impl Terminal {
         .bind(id)
         .execute(pool)
         .await?;
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
     /// Backward-compatible alias for set_waiting.
-    pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<()> {
+    pub async fn set_started(pool: &SqlitePool, id: &str) -> sqlx::Result<bool> {
         Self::set_waiting(pool, id).await
     }
 

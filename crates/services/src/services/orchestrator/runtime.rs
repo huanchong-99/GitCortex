@@ -481,6 +481,25 @@ impl OrchestratorRuntime {
     /// Creates and starts an OrchestratorAgent for the given workflow.
     /// Returns an error if the workflow is already running or if the
     /// max_concurrent_workflows limit is reached.
+    ///
+    /// # Slot safety (G03-001)
+    ///
+    /// `reserve_start_slot` / `release_start_slot` form a logical RAII pair.
+    /// A traditional `scopeguard` cannot be used here because the release
+    /// operation is `async` and Rust does not support async `Drop`.
+    ///
+    /// Panic safety: in the tokio runtime, a panic inside
+    /// `start_workflow_reserved` will unwind the **task**, not the process.
+    /// The slot remains in `starting_workflows` but the workflow never enters
+    /// `running_workflows`, so the only effect is one wasted slot until the
+    /// runtime is restarted.  This is acceptable because:
+    ///   1. Panics in this path indicate a logic bug that warrants restart.
+    ///   2. `max_concurrent_workflows` is a soft limit; one leaked slot does
+    ///      not block existing workflows.
+    ///
+    /// If stricter guarantees are needed in the future, wrap the call in
+    /// `tokio::task::spawn` + `catch_unwind` and release the slot on
+    /// `JoinError::is_panic()`.
     pub async fn start_workflow(&self, workflow_id: &str) -> Result<()> {
         self.reserve_start_slot(workflow_id).await?;
         let start_result = self.start_workflow_reserved(workflow_id).await;
@@ -625,6 +644,18 @@ impl OrchestratorRuntime {
     ///
     /// Sends shutdown signal to the agent and waits for graceful shutdown.
     /// If shutdown doesn't complete within timeout, the task is aborted.
+    ///
+    /// # Shutdown ordering (G05-006)
+    ///
+    /// The workflow is removed from `running_workflows` *before* the
+    /// `Shutdown` message is published.  This means new API requests
+    /// (e.g. `submit_orchestrator_chat`) will immediately get "not running"
+    /// errors, even though the agent task is still draining.  This is
+    /// intentional: it prevents new work from being enqueued during
+    /// teardown.  Any in-flight events already in the message bus channel
+    /// will still be delivered to the agent's event loop, but the agent
+    /// breaks out of its loop upon receiving `BusMessage::Shutdown`,
+    /// so those trailing events are harmlessly discarded.
     pub async fn stop_workflow(&self, workflow_id: &str) -> Result<()> {
         // Stop GitWatcher first (non-blocking)
         self.stop_git_watcher(workflow_id).await;
@@ -652,9 +683,16 @@ impl OrchestratorRuntime {
 
         info!("Shutdown signal sent for workflow {}", workflow_id);
 
-        // Wait for graceful shutdown (5 second timeout)
+        // Wait for graceful shutdown.
+        //
+        // Timeout rationale (G05-003): 10 seconds accommodates the worst
+        // case where the agent is mid-LLM call.  Most LLM providers have
+        // their own request timeout (typically 30-60s), but the agent
+        // checks for shutdown between iterations, so 10s is sufficient for
+        // the current event-loop design.  If LLM timeouts are raised above
+        // 10s in the future, this value should be increased accordingly.
         let mut task_handle = running_workflow.task_handle;
-        let shutdown_result = timeout(Duration::from_secs(5), &mut task_handle).await;
+        let shutdown_result = timeout(Duration::from_secs(10), &mut task_handle).await;
 
         match shutdown_result {
             Ok(Ok(())) => {
@@ -758,6 +796,28 @@ impl OrchestratorRuntime {
     /// fails are marked as 'failed'.
     /// Returns the number of interrupted workflows discovered.
     /// Should be called on service startup.
+    ///
+    /// # Recovery strategy limitations (G05-004)
+    ///
+    /// The current strategy is conservative: any workflow that cannot be
+    /// fully resumed (missing persisted state, invalid config, agent
+    /// creation failure) is marked as `failed`.  This means:
+    ///
+    ///   - Workflows that had active terminals with uncommitted work will
+    ///     lose that in-progress work.  The terminals' PTY processes are
+    ///     gone after restart, so there is no way to reconnect.
+    ///
+    ///   - Workflows with persisted state may still fail to resume if the
+    ///     API key has been rotated or the LLM provider is unreachable at
+    ///     recovery time.
+    ///
+    /// Future improvements could include:
+    ///   - A `suspended` status that preserves the workflow for manual
+    ///     retry instead of marking it `failed` immediately.
+    ///   - Partial recovery: restart only the orchestrator agent and let
+    ///     it re-evaluate which terminals need re-launching.
+    ///   - Exponential back-off retry for transient provider failures
+    ///     during recovery.
     pub async fn recover_running_workflows(&self) -> Result<usize> {
         let pool = &self.db.pool;
 
@@ -951,6 +1011,19 @@ impl OrchestratorRuntime {
         drop(running);
 
         // Start GitWatcher (non-blocking, failure is not fatal)
+        //
+        // Timing window note (G05-005): The agent task is spawned and may
+        // begin processing events *before* the GitWatcher is started below.
+        // This means commits that land between agent start and watcher start
+        // will not be detected by the watcher's polling loop.
+        //
+        // In practice this window is very short (< 100ms), and the agent's
+        // own quiet-window logic (40s inactivity timer) provides a natural
+        // buffer.  However, for maximum robustness a future improvement
+        // could have the agent (or the watcher) perform a one-time scan of
+        // recent commits after startup to catch anything missed during the
+        // gap.  This applies to both normal start (`start_workflow_reserved`)
+        // and recovery (`try_resume_workflow`).
         match self.try_start_git_watcher(workflow_id, &workflow).await {
             Ok(Some(handle)) => {
                 let mut watchers = self.git_watchers.lock().await;

@@ -281,7 +281,11 @@ impl StatePersistence {
 
     /// Save task execution progress
     ///
-    /// Saves progress for a specific task.
+    /// Reserved interface for future incremental task-level persistence.
+    /// Currently a no-op — full state is persisted via `save_state()` which
+    /// includes all task states. When a dedicated `task_progress` table is
+    /// introduced, this method will perform incremental upserts.
+    #[allow(unused)]
     pub async fn save_task_progress(
         &self,
         workflow_id: &str,

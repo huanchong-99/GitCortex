@@ -13,7 +13,11 @@ use utils::{path::normalize_macos_private_alias, shell::resolve_executable_path}
 
 use super::git::{GitService, GitServiceError};
 
-// Global synchronization for worktree creation to prevent race conditions
+// Global synchronization for worktree creation to prevent race conditions.
+// NOTE(G23-010): std::sync::Mutex is used intentionally here. The lock is held only
+// briefly to clone an Arc, so poison risk is negligible. If a thread panics while
+// holding this lock, unwrap() will propagate the panic — which is the desired behavior
+// since the HashMap state would be inconsistent.
 static WORKTREE_CREATION_LOCKS: Lazy<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -106,6 +110,14 @@ impl WorktreeManager {
 
         // Acquire the lock for this specific worktree path
         let _guard = lock.lock().await;
+
+        // Eagerly prune completed entries from the global lock map (G23-001).
+        // An entry is "idle" when no other task holds or is waiting on its async Mutex
+        // (strong_count == 1 means only the HashMap itself references it).
+        {
+            let mut locks = WORKTREE_CREATION_LOCKS.lock().unwrap();
+            locks.retain(|_k, v| Arc::strong_count(v) > 1);
+        }
 
         // Check if worktree already exists and is properly set up
         if Self::is_worktree_properly_set_up(repo_path, worktree_path).await? {
@@ -260,7 +272,15 @@ impl WorktreeManager {
                 "Removing existing worktree directory: {}",
                 worktree_path.display()
             );
-            std::fs::remove_dir_all(worktree_path).map_err(WorktreeError::Io)?;
+            // G23-008: Downgrade remove_dir_all failure to a warning so that one
+            // stubborn directory does not abort the entire cleanup sequence.
+            if let Err(e) = std::fs::remove_dir_all(worktree_path) {
+                tracing::warn!(
+                    "Failed to remove worktree directory {} (continuing cleanup): {}",
+                    worktree_path.display(),
+                    e
+                );
+            }
         }
 
         // Step 4: Good-practice to clean up any other stale admin entries

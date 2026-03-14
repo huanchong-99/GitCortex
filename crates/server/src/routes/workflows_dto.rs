@@ -27,7 +27,10 @@ pub struct WorkflowDetailDto {
     pub error_terminal_enabled: bool,
     pub error_terminal_cli_id: Option<String>,
     pub error_terminal_model_id: Option<String>,
+    /// Wrapped in Option for backward compatibility with older API clients that
+    /// may not send these fields. The underlying DB column is NOT NULL with a default.
     pub merge_terminal_cli_id: Option<String>,
+    /// See `merge_terminal_cli_id` — same backward-compat rationale.
     pub merge_terminal_model_id: Option<String>,
     pub target_branch: String,
     pub git_watcher_enabled: bool,

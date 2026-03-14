@@ -112,7 +112,17 @@ pub struct Workflow {
     /// Workflow description
     pub description: Option<String>,
 
-    /// Status
+    /// Status (stored as TEXT in SQLite for backward compatibility).
+    ///
+    /// # Design Decision
+    /// This field is a `String` rather than `WorkflowStatus` enum because SQLite
+    /// stores it as TEXT. Migrating to a typed enum field would require:
+    /// 1. A database migration to add CHECK constraints
+    /// 2. Updating all raw SQL queries that compare/set status strings
+    /// 3. Changing the `FromRow` derivation to handle enum deserialization
+    /// This is tracked as a future improvement. In the meantime, use the
+    /// `WorkflowStatus` enum and constants in `orchestrator::constants` for
+    /// compile-time safety at the application layer.
     pub status: String,
 
     /// Execution mode: diy | agent_planned
@@ -286,7 +296,12 @@ pub struct WorkflowTask {
     /// Git branch name
     pub branch: String,
 
-    /// Status
+    /// Status (stored as TEXT in SQLite for backward compatibility).
+    ///
+    /// # Design Decision
+    /// Same rationale as `Workflow.status` — kept as `String` to avoid a
+    /// large-scale migration. Use `WorkflowTaskStatus` enum and
+    /// `orchestrator::constants::TASK_STATUS_*` for application-layer safety.
     pub status: String,
 
     /// Task order
@@ -951,6 +966,37 @@ impl WorkflowTask {
         .execute(pool)
         .await?;
         Ok(())
+    }
+
+    /// Compare-and-set task status for critical transitions.
+    ///
+    /// Returns `Ok(true)` when the transition succeeds (row matched
+    /// `expected_status`), `Ok(false)` when the current status did not match.
+    /// Use this for transitions where concurrent updates could cause state
+    /// regression (e.g. running → completed while another thread tries
+    /// running → failed).
+    pub async fn update_status_cas(
+        pool: &SqlitePool,
+        id: &str,
+        expected_status: &str,
+        next_status: &str,
+    ) -> sqlx::Result<bool> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            r"
+            UPDATE workflow_task
+            SET status = ?, updated_at = ?
+            WHERE id = ? AND status = ?
+            ",
+        )
+        .bind(next_status)
+        .bind(now)
+        .bind(id)
+        .bind(expected_status)
+        .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 }
 

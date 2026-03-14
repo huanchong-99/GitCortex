@@ -54,7 +54,13 @@ export function TaskCard({ task, workflowId }: Readonly<TaskCardProps>) {
         <div className="text-sm font-semibold">{task.name}</div>
         <div className="text-xs text-low">{task.branch}</div>
         <div className="mt-2">
-          <TerminalDots terminalCount={task.terminals.length} />
+          <TerminalDots
+            terminalCount={task.terminals.length}
+            terminals={task.terminals.map((term) => ({
+              id: term.id,
+              status: term.status as 'not_started' | 'starting' | 'waiting' | 'working' | 'completed' | 'failed' | 'cancelled' | 'review_passed' | 'review_rejected' | 'quality_pending',
+            }))}
+          />
         </div>
       </div>
     </div>

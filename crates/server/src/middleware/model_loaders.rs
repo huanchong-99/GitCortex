@@ -1,6 +1,5 @@
 use axum::{
     extract::{Path, Request, State},
-    http::StatusCode,
     middleware::Next,
     response::Response,
 };
@@ -11,24 +10,24 @@ use db::models::{
 use deployment::Deployment;
 use uuid::Uuid;
 
-use crate::DeploymentImpl;
+use crate::{DeploymentImpl, error::ApiError};
 
 pub async fn load_project_middleware(
     State(deployment): State<DeploymentImpl>,
     Path(project_id): Path<Uuid>,
     request: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, ApiError> {
     // Load the project from the database
     let project = match Project::find_by_id(&deployment.db().pool, project_id).await {
         Ok(Some(project)) => project,
         Ok(None) => {
             tracing::warn!("Project {} not found", project_id);
-            return Err(StatusCode::NOT_FOUND);
+            return Err(ApiError::NotFound(format!("Project {project_id} not found")));
         }
         Err(e) => {
             tracing::error!("Failed to fetch project {}: {}", project_id, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            return Err(ApiError::Internal(format!("Failed to fetch project: {e}")));
         }
     };
 
@@ -45,17 +44,17 @@ pub async fn load_task_middleware(
     Path(task_id): Path<Uuid>,
     request: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, ApiError> {
     // Load the task and validate it belongs to the project
     let task = match Task::find_by_id(&deployment.db().pool, task_id).await {
         Ok(Some(task)) => task,
         Ok(None) => {
             tracing::warn!("Task {} not found", task_id);
-            return Err(StatusCode::NOT_FOUND);
+            return Err(ApiError::NotFound(format!("Task {task_id} not found")));
         }
         Err(e) => {
             tracing::error!("Failed to fetch task {}: {}", task_id, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            return Err(ApiError::Internal(format!("Failed to fetch task: {e}")));
         }
     };
 
@@ -72,17 +71,17 @@ pub async fn load_workspace_middleware(
     Path(workspace_id): Path<Uuid>,
     mut request: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, ApiError> {
     // Load the Workspace from the database
     let workspace = match Workspace::find_by_id(&deployment.db().pool, workspace_id).await {
         Ok(Some(w)) => w,
         Ok(None) => {
             tracing::warn!("Workspace {} not found", workspace_id);
-            return Err(StatusCode::NOT_FOUND);
+            return Err(ApiError::NotFound(format!("Workspace {workspace_id} not found")));
         }
         Err(e) => {
             tracing::error!("Failed to fetch Workspace {}: {}", workspace_id, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            return Err(ApiError::Internal(format!("Failed to fetch workspace: {e}")));
         }
     };
 
@@ -98,18 +97,18 @@ pub async fn load_execution_process_middleware(
     Path(process_id): Path<Uuid>,
     mut request: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, ApiError> {
     // Load the execution process from the database
     let execution_process =
         match ExecutionProcess::find_by_id(&deployment.db().pool, process_id).await {
             Ok(Some(process)) => process,
             Ok(None) => {
                 tracing::warn!("ExecutionProcess {} not found", process_id);
-                return Err(StatusCode::NOT_FOUND);
+                return Err(ApiError::NotFound(format!("ExecutionProcess {process_id} not found")));
             }
             Err(e) => {
                 tracing::error!("Failed to fetch execution process {}: {}", process_id, e);
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                return Err(ApiError::Internal(format!("Failed to fetch execution process: {e}")));
             }
         };
 
@@ -126,17 +125,17 @@ pub async fn load_tag_middleware(
     Path(tag_id): Path<Uuid>,
     request: axum::extract::Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, ApiError> {
     // Load the tag from the database
     let tag = match Tag::find_by_id(&deployment.db().pool, tag_id).await {
         Ok(Some(tag)) => tag,
         Ok(None) => {
             tracing::warn!("Tag {} not found", tag_id);
-            return Err(StatusCode::NOT_FOUND);
+            return Err(ApiError::NotFound(format!("Tag {tag_id} not found")));
         }
         Err(e) => {
             tracing::error!("Failed to fetch tag {}: {}", tag_id, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            return Err(ApiError::Internal(format!("Failed to fetch tag: {e}")));
         }
     };
 
@@ -153,16 +152,16 @@ pub async fn load_session_middleware(
     Path(session_id): Path<Uuid>,
     mut request: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, ApiError> {
     let session = match Session::find_by_id(&deployment.db().pool, session_id).await {
         Ok(Some(session)) => session,
         Ok(None) => {
             tracing::warn!("Session {} not found", session_id);
-            return Err(StatusCode::NOT_FOUND);
+            return Err(ApiError::NotFound(format!("Session {session_id} not found")));
         }
         Err(e) => {
             tracing::error!("Failed to fetch session {}: {}", session_id, e);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            return Err(ApiError::Internal(format!("Failed to fetch session: {e}")));
         }
     };
 

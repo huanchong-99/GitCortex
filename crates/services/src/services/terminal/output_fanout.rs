@@ -42,7 +42,9 @@ impl Default for OutputFanoutConfig {
     fn default() -> Self {
         Self {
             broadcast_capacity: 512,
-            replay_max_chunks: 512,
+            // [G09-005] replay capacity is 2x broadcast capacity to absorb bursts
+            // without losing chunks that are still in the broadcast channel.
+            replay_max_chunks: 1024,
             replay_max_bytes: 1024 * 1024, // 1 MiB
         }
     }
