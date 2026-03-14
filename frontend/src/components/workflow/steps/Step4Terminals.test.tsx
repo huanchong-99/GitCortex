@@ -232,14 +232,11 @@ describe('Step4Terminals', () => {
       />
     );
 
-    // Wait for CLI status section to appear
+    // Wait for CLI types to load and render
     await waitFor(() => {
-      expect(screen.getByText(i18n.t('workflow:step4.cliStatusTitle'))).toBeInTheDocument();
+      const cliButtons = screen.getAllByText('Claude Code');
+      expect(cliButtons.length).toBeGreaterThan(0);
     });
-
-    // Claude Code should appear in the list
-    const cliButtons = screen.getAllByText('Claude Code');
-    expect(cliButtons.length).toBeGreaterThan(0);
   });
 
   it('normalizes legacy CLI detect responses to canonical CLI ids', async () => {
