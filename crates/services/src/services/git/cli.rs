@@ -84,6 +84,16 @@ impl GitCli {
         Self {}
     }
     /// Run `git -C <repo> worktree add <path> <branch>` (optionally creating the branch with -b)
+    ///
+    /// G23-007: When `create_branch=true`, we use `-b <branch> <path>` (without a
+    /// trailing start-point argument). Previously the branch name was appended twice:
+    /// once as the `-b` label and once as the final positional argument, which caused
+    /// git to interpret the duplicate as a "commit-ish" start point and fail when a
+    /// branch of that name already existed, or silently check out from an unexpected ref.
+    ///
+    /// Correct command forms:
+    ///   create_branch=false: `git worktree add <path> <branch>`    (check out existing branch)
+    ///   create_branch=true:  `git worktree add -b <branch> <path>` (create new branch at HEAD)
     pub fn worktree_add(
         &self,
         repo_path: &Path,
@@ -95,11 +105,17 @@ impl GitCli {
 
         let mut args: Vec<OsString> = vec!["worktree".into(), "add".into()];
         if create_branch {
+            // G23-007: `-b <new-branch> <path>` — branch name must NOT be repeated
+            // as a trailing start-point; that would make git try to check out from an
+            // existing ref named `branch`, which is likely absent (we're creating it).
             args.push("-b".into());
             args.push(OsString::from(branch));
+            args.push(worktree_path.as_os_str().into());
+        } else {
+            // Check out the existing branch at the given path.
+            args.push(worktree_path.as_os_str().into());
+            args.push(OsString::from(branch));
         }
-        args.push(worktree_path.as_os_str().into());
-        args.push(OsString::from(branch));
         self.git(repo_path, args)?;
 
         // Good practice: reapply sparse-checkout in the new worktree to ensure materialization matches

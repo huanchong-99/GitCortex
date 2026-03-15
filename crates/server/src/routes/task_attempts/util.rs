@@ -64,9 +64,10 @@ pub async fn restore_worktrees_to_process(
         // Calculate this repo's worktree path
         let worktree_path = workspace_dir.join(&repo.name);
 
-        // Reset this repo's worktree
+        // G34-007: Capture return value from reconcile_worktree_to_commit and
+        // log a warning if the reconcile was needed but not applied (non-OK result).
         if let Some(oid) = target_oid {
-            deployment.git().reconcile_worktree_to_commit(
+            let outcome = deployment.git().reconcile_worktree_to_commit(
                 &worktree_path,
                 &oid,
                 WorktreeResetOptions::new(
@@ -76,6 +77,15 @@ pub async fn restore_worktrees_to_process(
                     perform_git_reset,
                 ),
             );
+            if outcome.needed && !outcome.applied {
+                tracing::warn!(
+                    workspace_id = %workspace.id,
+                    repo_id = %repo.id,
+                    target_oid = %oid,
+                    "reconcile_worktree_to_commit: reset was needed but not applied \
+                     (worktree may be dirty or force_when_dirty is false)"
+                );
+            }
         }
     }
 

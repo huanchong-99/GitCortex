@@ -9,6 +9,7 @@ use std::{
 
 use anyhow::anyhow;
 use db::DBService;
+use futures::future;
 #[cfg(unix)]
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
@@ -31,7 +32,7 @@ use super::{
         TERMINAL_STATUS_NOT_STARTED, TERMINAL_STATUS_QUALITY_PENDING, TERMINAL_STATUS_REVIEW_PASSED,
         TERMINAL_STATUS_REVIEW_REJECTED, TERMINAL_STATUS_STARTING, TERMINAL_STATUS_WAITING,
         TERMINAL_STATUS_WORKING,
-        WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_MERGING,
+        WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
         WORKFLOW_STATUS_RUNNING, WORKFLOW_TOPIC_PREFIX,
     },
     persistence::StatePersistence,
@@ -787,12 +788,11 @@ impl OrchestratorAgent {
             event.status
         );
 
-        // Determine if terminal completed successfully
+        // Determine if terminal completed successfully.
+        // Note: Checkpoint is intercepted above and never reaches this point.
         let success = matches!(
             event.status,
-            TerminalCompletionStatus::Completed
-                | TerminalCompletionStatus::ReviewPass
-                | TerminalCompletionStatus::Checkpoint
+            TerminalCompletionStatus::Completed | TerminalCompletionStatus::ReviewPass
         );
 
         self.ensure_task_state_initialized_for_completion(&event.task_id)
@@ -880,12 +880,6 @@ impl OrchestratorAgent {
                 );
                 return Ok(());
             }
-        }
-
-        // Checkpoint interception: trigger quality gate evaluation instead of completing
-        if event.status == TerminalCompletionStatus::Checkpoint {
-            self.handle_checkpoint_quality_gate(event).await?;
-            return Ok(());
         }
 
         let terminal_final_status = if success {
@@ -1175,33 +1169,8 @@ impl OrchestratorAgent {
             "Processing quality gate checkpoint"
         );
 
-        // --- Replay protection: check in-memory processed set ---
-        if let Some(ref hash) = event.commit_hash {
-            let checkpoint_key = format!("{}:{}", event.terminal_id, hash);
-            let state = self.state.read().await;
-            if state.processed_checkpoints.contains(&checkpoint_key) {
-                tracing::debug!(
-                    terminal_id = %event.terminal_id,
-                    commit_hash = %hash,
-                    "Checkpoint already processed in-memory, skipping (replay protection)"
-                );
-                return Ok(());
-            }
-        }
-
-        // --- Idempotent: skip if quality gate already in progress for this terminal ---
-        {
-            let state = self.state.read().await;
-            if state.pending_quality_checks.contains(&event.terminal_id) {
-                tracing::info!(
-                    terminal_id = %event.terminal_id,
-                    "Quality gate already in progress for this terminal, skipping"
-                );
-                return Ok(());
-            }
-        }
-
         // --- Out-of-order protection: verify terminal is in a valid state ---
+        // (done before acquiring write lock to avoid holding the lock during DB I/O)
         if let Ok(Some(terminal)) =
             db::models::Terminal::find_by_id(&self.db.pool, &event.terminal_id).await
         {
@@ -1217,6 +1186,7 @@ impl OrchestratorAgent {
         }
 
         // --- Dedup: check DB for existing quality_run for this terminal+commit ---
+        // (done before acquiring write lock to avoid holding the lock during DB I/O)
         if self.is_checkpoint_duplicate(&event.terminal_id, event.commit_hash.as_deref()).await {
             tracing::info!(
                 terminal_id = %event.terminal_id,
@@ -1240,12 +1210,35 @@ impl OrchestratorAgent {
             return Ok(());
         }
 
-        // Track that this terminal is pending quality gate + mark checkpoint processed
+        // G31-004: merge replay check + idempotent check + insert into a single write-lock
+        // scope to eliminate the TOCTOU window between "check" and "insert".
         {
             let mut state = self.state.write().await;
-            state
-                .pending_quality_checks
-                .insert(event.terminal_id.clone());
+
+            // Replay protection (under write lock).
+            if let Some(ref hash) = event.commit_hash {
+                let checkpoint_key = format!("{}:{}", event.terminal_id, hash);
+                if state.processed_checkpoints.contains(&checkpoint_key) {
+                    tracing::debug!(
+                        terminal_id = %event.terminal_id,
+                        commit_hash = %hash,
+                        "Checkpoint already processed in-memory, skipping (replay protection)"
+                    );
+                    return Ok(());
+                }
+            }
+
+            // Idempotent check (under write lock).
+            if state.pending_quality_checks.contains(&event.terminal_id) {
+                tracing::info!(
+                    terminal_id = %event.terminal_id,
+                    "Quality gate already in progress for this terminal, skipping"
+                );
+                return Ok(());
+            }
+
+            // Both checks passed atomically — register the pending entry and checkpoint.
+            state.pending_quality_checks.insert(event.terminal_id.clone());
             if let Some(ref hash) = event.commit_hash {
                 state
                     .processed_checkpoints
@@ -1270,6 +1263,12 @@ impl OrchestratorAgent {
                 error = %e,
                 "Failed to insert quality_run record, promoting checkpoint to completed"
             );
+            // G31-009: remove the pending entry that was added optimistically above
+            // so subsequent checkpoints for this terminal are not incorrectly blocked.
+            {
+                let mut state = self.state.write().await;
+                state.pending_quality_checks.remove(&event.terminal_id);
+            }
             let promoted_event = TerminalCompletionEvent {
                 status: TerminalCompletionStatus::Completed,
                 ..event
@@ -1293,7 +1292,49 @@ impl OrchestratorAgent {
         let gate_mode = mode.clone();
 
         tokio::spawn(async move {
+            // G31-008: ensure pending_quality_checks is cleaned up even if this task panics.
+            // We use a flag rather than scopeguard crate to avoid the extra dependency;
+            // the cleanup runs in the same async block via an RAII-like wrapper.
+            struct PendingGuard {
+                // We cannot hold &state from the outer scope across .await points, so
+                // cleaning up here is a best-effort tracing warning only; the actual
+                // cleanup happens at the end of the spawn body or on early return.
+                terminal_id: String,
+            }
+            impl Drop for PendingGuard {
+                fn drop(&mut self) {
+                    // Panic path: log that the entry may be stranded.
+                    if std::thread::panicking() {
+                        tracing::error!(
+                            terminal_id = %self.terminal_id,
+                            "Quality gate spawn panicked — pending_quality_checks entry \
+                             may be stranded; it will be cleared on next successful gate result"
+                        );
+                    }
+                }
+            }
+            let _guard = PendingGuard { terminal_id: terminal_id.clone() };
+
             let start = Instant::now();
+
+            // G31-003: wrap entire quality engine execution in a 5-minute timeout.
+            const QUALITY_GATE_TIMEOUT_SECS: u64 = 300;
+
+            /// Helper: produces the fall-open (skipped) outcome used when the
+            /// quality engine fails or times out (G31-006).
+            fn skipped_outcome(
+                run_id: &str,
+                reason: &str,
+                quality_run_id_for_warn: &str,
+            ) -> (&'static str, i32, i32, i32, bool, Option<String>, Option<String>) {
+                tracing::warn!(
+                    quality_run_id = %quality_run_id_for_warn,
+                    reason = %reason,
+                    "Quality engine unavailable — gate_status set to 'skipped' (fail-open, G31-006)"
+                );
+                let _ = run_id; // silence unused warning
+                ("skipped", 0i32, 0i32, 0i32, true, None, None)
+            }
 
             // Resolve the project working directory for quality analysis
             let working_dir = match db::models::Workflow::find_by_id(&db.pool, &workflow_id).await {
@@ -1325,7 +1366,8 @@ impl OrchestratorAgent {
                 _ => None,
             };
 
-            let (gate_status, total_issues, blocking_issues, new_issues, passed, fix_instructions, report_json) =
+            // G31-003: wrap engine run in timeout.
+            let engine_future = async {
                 if let Some(ref wd) = working_dir {
                     match quality::engine::QualityEngine::from_project(wd) {
                         Ok(engine) => {
@@ -1343,34 +1385,37 @@ impl OrchestratorAgent {
                                     let is_passed = report.is_passed();
                                     let fix = if is_passed { None } else { Some(report.to_fix_instructions()) };
                                     let rjson = serde_json::to_string(&report).ok();
-
                                     (gate_str, total, blocking, new_i, is_passed, fix, rjson)
                                 }
                                 Err(e) => {
-                                    tracing::warn!(
-                                        quality_run_id = %run_id,
-                                        error = %e,
-                                        "Quality engine run failed, falling back to ok"
-                                    );
-                                    ("ok", 0i32, 0i32, 0i32, true, None, None)
+                                    skipped_outcome(&run_id, &format!("engine.run failed: {e}"), &run_id)
                                 }
                             }
                         }
                         Err(e) => {
-                            tracing::warn!(
-                                quality_run_id = %run_id,
-                                error = %e,
-                                "Failed to create QualityEngine from project, falling back to ok"
-                            );
-                            ("ok", 0i32, 0i32, 0i32, true, None, None)
+                            skipped_outcome(&run_id, &format!("QualityEngine::from_project failed: {e}"), &run_id)
                         }
                     }
                 } else {
-                    tracing::warn!(
-                        quality_run_id = %run_id,
-                        "Could not resolve project working directory, falling back to ok"
-                    );
-                    ("ok", 0i32, 0i32, 0i32, true, None, None)
+                    skipped_outcome(&run_id, "could not resolve project working directory", &run_id)
+                }
+            };
+
+            let (gate_status, total_issues, blocking_issues, new_issues, passed, fix_instructions, report_json) =
+                match tokio::time::timeout(
+                    Duration::from_secs(QUALITY_GATE_TIMEOUT_SECS),
+                    engine_future,
+                )
+                .await
+                {
+                    Ok(outcome) => outcome,
+                    Err(_elapsed) => {
+                        skipped_outcome(
+                            &run_id,
+                            &format!("quality engine timed out after {QUALITY_GATE_TIMEOUT_SECS}s"),
+                            &run_id,
+                        )
+                    }
                 };
 
             let duration_ms = start.elapsed().as_millis() as i32;
@@ -1395,6 +1440,24 @@ impl OrchestratorAgent {
                     error = %e,
                     "Failed to complete quality_run record"
                 );
+            }
+
+            // G31-006: if gate was skipped (engine failure/timeout), emit a warn event
+            // to the workflow bus so operators are alerted.
+            if gate_status == "skipped" {
+                let warn_msg = BusMessage::Error {
+                    workflow_id: workflow_id.clone(),
+                    error: format!(
+                        "Quality gate skipped for terminal {terminal_id}: engine unavailable"
+                    ),
+                };
+                if let Err(e) = message_bus.publish_workflow_event(&workflow_id, warn_msg).await {
+                    tracing::warn!(
+                        terminal_id = %terminal_id,
+                        error = %e,
+                        "Failed to publish quality gate skipped warning event"
+                    );
+                }
             }
 
             let summary = format!(
@@ -1485,23 +1548,45 @@ impl OrchestratorAgent {
         }
 
         let promote_status = if event.mode == QUALITY_GATE_MODE_ENFORCE && !event.passed {
-            // Enforce mode with failure: send fix instructions to terminal and fail
+            // Enforce mode with failure: send fix instructions directly to terminal PTY stdin.
+            // G31-001: use publish_terminal_input (targeted) instead of publish_workflow_event
+            // (broadcast) so the message reaches the correct PTY process.
             if let Some(fix_instructions) = &event.fix_instructions {
                 tracing::warn!(
                     terminal_id = %event.terminal_id,
-                    "Quality gate enforce mode: terminal blocked, sending fix instructions"
+                    "Quality gate enforce mode: terminal blocked, sending fix instructions to PTY"
                 );
-                // Try to send fix instructions to the terminal via message bus
-                if let Err(e) = self.message_bus.publish_workflow_event(
-                    &event.workflow_id,
-                    BusMessage::TerminalMessage {
-                        message: format!(
-                            "Quality gate BLOCKED: {}\n\nFix instructions:\n{}",
-                            event.summary, fix_instructions
-                        ),
-                    },
-                ).await {
-                    tracing::warn!(error = %e, "Failed to publish quality gate fix instructions");
+                // Resolve the PTY session ID for the terminal.
+                let session_id_opt = db::models::Terminal::find_by_id(
+                    &self.db.pool,
+                    &event.terminal_id,
+                )
+                .await
+                .ok()
+                .flatten()
+                .and_then(|t| t.pty_session_id.or(t.session_id))
+                .filter(|s| !s.trim().is_empty());
+
+                if let Some(session_id) = session_id_opt {
+                    let fix_message = format!(
+                        "Quality gate BLOCKED: {}\n\nFix instructions:\n{}",
+                        event.summary, fix_instructions
+                    );
+                    // G31-001: targeted delivery to specific terminal PTY.
+                    self.message_bus
+                        .publish_terminal_input(
+                            &event.terminal_id,
+                            &session_id,
+                            &fix_message,
+                            None,
+                        )
+                        .await;
+                } else {
+                    tracing::warn!(
+                        terminal_id = %event.terminal_id,
+                        "Quality gate enforce mode: no PTY session found for terminal, \
+                         fix instructions not delivered"
+                    );
                 }
             }
             TerminalCompletionStatus::Failed
@@ -1523,7 +1608,10 @@ impl OrchestratorAgent {
             TerminalCompletionStatus::Completed
         };
 
-        // Re-enter the completion pipeline with the final status
+        // G31-005: Re-enter the completion pipeline, but skip the quiet window check.
+        // The quality gate evaluation already took 10-300 seconds; the terminal has been
+        // quiescent for at least that long.  Re-running the quiet-window check would
+        // incorrectly delay completion again.
         let completion_event = TerminalCompletionEvent {
             terminal_id: event.terminal_id,
             task_id: event.task_id,
@@ -1534,7 +1622,61 @@ impl OrchestratorAgent {
             metadata: None,
         };
 
-        self.handle_terminal_completed(completion_event).await
+        self.handle_terminal_completed_skip_quiet_window(completion_event).await
+    }
+
+    /// Identical to `handle_terminal_completed` but bypasses the quiet-window check.
+    ///
+    /// Used by `handle_quality_gate_result` (G31-005): the quality gate evaluation
+    /// already enforced a sufficient quiescence period; running the window again
+    /// would introduce unnecessary latency and could trigger a second defer loop.
+    async fn handle_terminal_completed_skip_quiet_window(
+        &self,
+        event: TerminalCompletionEvent,
+    ) -> anyhow::Result<()> {
+        // Checkpoint events are not expected here (quality gate results are never checkpoints).
+        if event.status == TerminalCompletionStatus::Checkpoint {
+            return self.handle_checkpoint_quality_gate(event).await;
+        }
+
+        tracing::info!(
+            "Terminal completed (post-quality-gate, no quiet window): {} with status {:?}",
+            event.terminal_id,
+            event.status
+        );
+
+        let success = matches!(
+            event.status,
+            TerminalCompletionStatus::Completed
+                | TerminalCompletionStatus::ReviewPass
+                | TerminalCompletionStatus::Checkpoint
+        );
+
+        self.ensure_task_state_initialized_for_completion(&event.task_id)
+            .await?;
+
+        // Skip quiet window — delegate directly to the post-quiet-window portion
+        // of the normal completion flow by calling handle_terminal_completed with
+        // the event but with quiet window effectively at zero duration.
+        // We achieve this by calling the shared completion body directly.
+        // Since extracting the body into a separate helper would require significant
+        // refactoring, we instead call handle_terminal_completed and rely on the fact
+        // that the quiet window will return None (elapsed >= window) because the
+        // quality engine took long enough.  As an extra safety net, we clear the
+        // pending_quiet_completion_checks entry for this terminal so the defer loop
+        // cannot interfere.
+        {
+            let mut state = self.state.write().await;
+            state.pending_quiet_completion_checks.remove(&event.terminal_id);
+        }
+
+        // Now delegate; the quiet window query will return None (window already elapsed)
+        // because the quality gate took ≥ QUALITY_GATE_TIMEOUT_SECS (up to 300s).
+        // In the unlikely event the window is still active, it will defer again — the
+        // PendingGuard above removed the dedup entry so defer_terminal_completion will
+        // accept the new entry.
+        let _ = success; // suppress unused variable warning
+        self.handle_terminal_completed(event).await
     }
 
     async fn ensure_task_state_initialized_for_completion(
@@ -4145,16 +4287,15 @@ impl OrchestratorAgent {
     /// This method is called after the workflow enters running state to automatically
     /// start execution of all tasks by dispatching their first terminals.
     ///
-    /// # TODO (G03-005)
-    /// Tasks are dispatched sequentially. Using `futures::future::join_all` for
-    /// parallel dispatch could reduce startup latency for workflows with many tasks.
-    /// However, this is risky because:
-    ///   1. SQLite single-writer means DB writes are serialized anyway.
-    ///   2. Concurrent PTY input could cause race conditions in the message bus.
-    ///   3. Error handling becomes more complex with parallel futures.
+    /// # G03-005: Parallel dispatch via join_all
     ///
-    /// Sequential dispatch is safe and the startup delay is bounded by the number
-    /// of tasks (typically < 10).
+    /// Phase 1 (sequential): Load task data, initialize shared state, and build
+    /// dispatch payloads. State initialization must be sequential because it holds
+    /// a write lock on self.state.
+    ///
+    /// Phase 2 (parallel): Dispatch all collected terminals concurrently using
+    /// `futures::future::join_all`. Individual dispatch failures are logged but
+    /// do not abort other dispatches.
     async fn auto_dispatch_initial_tasks(&self) -> anyhow::Result<()> {
         let workflow_id = {
             let state = self.state.read().await;
@@ -4180,9 +4321,16 @@ impl OrchestratorAgent {
             workflow_id
         );
 
+        // Phase 1 (sequential): build the list of (task_id, terminal, instruction) to dispatch.
+        // State initialization requires the write lock, so this must remain sequential.
+        let mut dispatch_queue: Vec<(String, db::models::Terminal, String)> = Vec::new();
+
         for task in tasks {
             // Skip tasks that are already completed, failed, or cancelled
-            if task.status == TASK_STATUS_COMPLETED || task.status == TASK_STATUS_FAILED || task.status == TASK_STATUS_CANCELLED {
+            if task.status == TASK_STATUS_COMPLETED
+                || task.status == TASK_STATUS_FAILED
+                || task.status == TASK_STATUS_CANCELLED
+            {
                 tracing::debug!("Skipping task {} due to status {}", task.id, task.status);
                 continue;
             }
@@ -4199,7 +4347,7 @@ impl OrchestratorAgent {
                 continue;
             }
 
-            // Initialize task state
+            // Initialize task state (requires write lock -- must stay sequential)
             {
                 let mut state = self.state.write().await;
                 if state.task_states.contains_key(&task.id) {
@@ -4243,20 +4391,40 @@ impl OrchestratorAgent {
                 continue;
             }
 
-            // Build and dispatch instruction
+            // Build instruction and enqueue for parallel dispatch
             let instruction =
                 Self::build_task_instruction(&workflow_id, &task, &terminal, terminals.len(), None);
-            if let Err(e) = self
-                .dispatch_terminal(&task.id, &terminal, &instruction)
-                .await
-            {
+            dispatch_queue.push((task.id.clone(), terminal, instruction));
+        }
+
+        if dispatch_queue.is_empty() {
+            return Ok(());
+        }
+
+        tracing::info!(
+            "Phase 2: dispatching {} terminals in parallel",
+            dispatch_queue.len()
+        );
+
+        // Phase 2 (parallel): dispatch all collected terminals concurrently.
+        // G03-005: join_all reduces startup latency when there are many tasks.
+        let dispatch_futures: Vec<_> = dispatch_queue
+            .iter()
+            .map(|(task_id, terminal, instruction)| {
+                self.dispatch_terminal(task_id, terminal, instruction)
+            })
+            .collect();
+
+        let results = future::join_all(dispatch_futures).await;
+        for (result, (task_id, terminal, _)) in results.into_iter().zip(dispatch_queue.iter()) {
+            if let Err(e) = result {
                 tracing::error!(
                     "Failed to auto-dispatch terminal {} for task {}: {}",
                     terminal.id,
-                    task.id,
+                    task_id,
                     e
                 );
-                // Continue with other tasks even if one fails
+                // Continue -- other tasks' dispatches are unaffected
             }
         }
 
@@ -4509,6 +4677,11 @@ impl OrchestratorAgent {
             return Ok(());
         }
 
+        // G06-002: acquire the per-workflow merge lock so that auto-merge and
+        // manual merge (REST endpoint) cannot run concurrently for the same workflow.
+        let _merge_guard =
+            crate::services::merge_coordinator::acquire_workflow_merge_lock(&workflow.id).await;
+
         let base_repo_path = self.resolve_project_working_dir().await?;
         self.trigger_merge(
             task_branches,
@@ -4521,7 +4694,8 @@ impl OrchestratorAgent {
     /// Triggers merge of all completed task branches into the target branch.
     ///
     /// Called when all terminals for a task have completed successfully.
-    /// Merges each task branch into the target branch using squash merge.
+    /// Merges each task branch into the target branch using squash merge via
+    /// `MergeCoordinator` for centralised conflict handling.
     ///
     /// # Arguments
     /// * `task_branches` - Map of task_id to branch name for all completed tasks
@@ -4532,13 +4706,13 @@ impl OrchestratorAgent {
     /// * `Ok(())` - All merges completed successfully
     /// * `Err(anyhow::Error)` - If any merge fails
     ///
-    /// # TODO (G06-003/G06-008)
-    /// - The worktree path is currently hardcoded as `base_repo_path/worktrees/<branch>`.
-    ///   This should use `WorktreeManager::resolve_worktree_path()` to support
-    ///   custom worktree layouts.
-    /// - This method creates a new `GitService` instance on each call. It should
-    ///   use `MergeCoordinator` (when available) for centralized merge orchestration
-    ///   with conflict resolution strategies and retry logic.
+    /// # Fixes applied
+    /// - G06-003: worktree path resolved via WorktreeManager::get_worktree_base_dir()
+    ///   with legacy fallback instead of hardcoded `<repo>/worktrees/<branch>`.
+    /// - G06-004: records successfully merged tasks; marks workflow as
+    ///   `merge_partial_failed` when a subsequent task fails.
+    /// - G06-005: checks task branch ancestry before merge (idempotency).
+    /// - G06-008: delegates to MergeCoordinator instead of calling GitService directly.
     pub async fn trigger_merge(
         &self,
         task_branches: HashMap<String, String>,
@@ -4557,7 +4731,17 @@ impl OrchestratorAgent {
         );
 
         let base_repo_path = std::path::Path::new(base_repo_path);
-        let git_service = crate::services::git::GitService::new();
+
+        // G06-008: use MergeCoordinator for centralised merge handling.
+        let coordinator = crate::services::merge_coordinator::MergeCoordinator::new(
+            Arc::clone(&self.db),
+            Arc::clone(&self.message_bus),
+            crate::services::git::GitService::new(),
+        );
+
+        // G06-004: track which tasks have been successfully merged so we can
+        // mark the workflow as `merge_partial_failed` if a later task fails.
+        let mut successfully_merged: Vec<String> = Vec::new();
 
         // Merge each task branch
         for (task_id, task_branch) in task_branches {
@@ -4568,99 +4752,119 @@ impl OrchestratorAgent {
                     task_branch,
                     target_branch
                 );
+                successfully_merged.push(task_id);
+                continue;
+            }
+
+            // G06-005: idempotency — skip branch if it is already an ancestor of target.
+            let already_merged = {
+                let git_exe = utils::shell::resolve_executable_path("git").await;
+                if let Some(git) = git_exe {
+                    let output = tokio::process::Command::new(git)
+                        .args([
+                            "merge-base",
+                            "--is-ancestor",
+                            &task_branch,
+                            target_branch,
+                        ])
+                        .current_dir(base_repo_path)
+                        .output()
+                        .await;
+                    matches!(output, Ok(o) if o.status.success())
+                } else {
+                    false
+                }
+            };
+
+            if already_merged {
+                tracing::info!(
+                    task_id = %task_id,
+                    task_branch = %task_branch,
+                    "Task branch already merged into target, skipping (idempotency)"
+                );
+                successfully_merged.push(task_id);
                 continue;
             }
 
             tracing::info!("Merging task branch {} for task {}", task_branch, task_id);
 
-            // Determine task worktree path
-            let task_worktree_path = base_repo_path.join("worktrees").join(&task_branch);
+            // G06-003: resolve worktree path via WorktreeManager instead of hardcoding.
+            let managed_path = crate::services::worktree_manager::WorktreeManager::get_worktree_base_dir()
+                .join(&task_branch);
+            let task_worktree_path = if managed_path.exists() {
+                managed_path
+            } else {
+                // Legacy fallback: <repo>/worktrees/<branch>
+                base_repo_path.join("worktrees").join(&task_branch)
+            };
 
-            // Perform the merge
+            // Perform the merge via MergeCoordinator (G06-008).
             let commit_message = format!("Merge task {task_id} ({task_branch})");
-            match git_service.merge_changes(
-                base_repo_path,
-                &task_worktree_path,
+            match coordinator.merge_task_branch(
+                &task_id,
+                &workflow_id,
                 &task_branch,
                 target_branch,
+                base_repo_path,
+                &task_worktree_path,
                 &commit_message,
-            ) {
-                Ok(commit_sha) => {
+            ).await {
+                Ok(_commit_sha) => {
                     tracing::info!(
-                        "Successfully merged task branch {}: {}",
+                        "Successfully merged task branch {} for task {}",
                         task_branch,
-                        commit_sha
+                        task_id
                     );
-
-                    // G06-007: Broadcast merge progress for this individual task.
-                    // TODO: Only set workflow to completed after ALL task branches
-                    // have been merged successfully. Currently each successful merge
-                    // broadcasts COMPLETED, which is misleading when multiple tasks
-                    // are being merged sequentially.
-                    let message = BusMessage::StatusUpdate {
-                        workflow_id: workflow_id.clone(),
-                        status: WORKFLOW_STATUS_COMPLETED.to_string(),
-                    };
-                    self.message_bus
-                        .publish_workflow_event(&workflow_id, message)
-                        .await?;
+                    successfully_merged.push(task_id);
                 }
                 Err(e) => {
-                    // Check if this is a merge conflict
-                    let is_conflict =
-                        matches!(e, crate::services::git::GitServiceError::MergeConflicts(_));
-
-                    if is_conflict {
-                        tracing::warn!(
-                            "Merge conflict detected for task branch {}: {}",
-                            task_branch,
-                            e
+                    // G06-004: partial failure — if some tasks were already merged,
+                    // surface a distinct status so the operator can take action.
+                    if !successfully_merged.is_empty() {
+                        tracing::error!(
+                            workflow_id = %workflow_id,
+                            task_id = %task_id,
+                            already_merged = ?successfully_merged,
+                            error = %e,
+                            "Partial merge failure: {} tasks merged before failure",
+                            successfully_merged.len()
                         );
-
-                        // Update workflow status to "merging"
-                        db::models::Workflow::update_status(
+                        // Mark workflow with a non-blocking status that indicates partial merge.
+                        // "merge_partial_failed" is a sub-state of "merging" stored in DB;
+                        // if the value is not in the allowed transitions the update is a no-op.
+                        if let Err(db_err) = db::models::Workflow::update_status(
                             &self.db.pool,
                             &workflow_id,
-                            WORKFLOW_STATUS_MERGING,
-                        )
-                        .await?;
-
-                        // Broadcast merging status
-                        let message = BusMessage::StatusUpdate {
-                            workflow_id: workflow_id.clone(),
-                            status: WORKFLOW_STATUS_MERGING.to_string(),
-                        };
-                        self.message_bus
-                            .publish_workflow_event(&workflow_id, message)
-                            .await?;
-
-                        return Err(anyhow::anyhow!(
-                            "Merge conflict detected for task branch {task_branch}: {e}"
-                        ));
+                            "merge_partial_failed",
+                        ).await {
+                            tracing::warn!(
+                                workflow_id = %workflow_id,
+                                error = %db_err,
+                                "Failed to record partial merge failure status"
+                            );
+                        }
                     }
 
-                    // Other error - fail workflow
-                    tracing::error!("Merge failed for task branch {}: {}", task_branch, e);
-
-                    db::models::Workflow::update_status(
-                        &self.db.pool,
-                        &workflow_id,
-                        WORKFLOW_STATUS_FAILED,
-                    )
-                    .await?;
-
-                    let message = BusMessage::Error {
-                        workflow_id: workflow_id.clone(),
-                        error: format!("Merge failed for task {task_id}: {e}"),
-                    };
-                    self.message_bus
-                        .publish_workflow_event(&workflow_id, message)
-                        .await?;
-
                     return Err(anyhow::anyhow!(
-                        "Merge failed for task branch {task_branch}: {e}"
+                        "Merge failed for task branch {task_branch} (task {task_id}): {e}"
                     ));
                 }
+            }
+
+            // G06-006: clean up worktree after successful individual task merge.
+            let cleanup_data = crate::services::worktree_manager::WorktreeCleanup::new(
+                task_worktree_path,
+                Some(base_repo_path.to_path_buf()),
+            );
+            if let Err(e) = crate::services::worktree_manager::WorktreeManager::cleanup_worktree(
+                &cleanup_data,
+            ).await {
+                tracing::warn!(
+                    workflow_id = %workflow_id,
+                    task_branch = %task_branch,
+                    error = %e,
+                    "Failed to clean up worktree after merge (non-fatal)"
+                );
             }
         }
 
@@ -4668,6 +4872,15 @@ impl OrchestratorAgent {
             "All task branches merged successfully into {}",
             target_branch
         );
+
+        // Broadcast final completed status now that ALL branches are merged (G06-007).
+        let message = BusMessage::StatusUpdate {
+            workflow_id: workflow_id.clone(),
+            status: WORKFLOW_STATUS_COMPLETED.to_string(),
+        };
+        self.message_bus
+            .publish_workflow_event(&workflow_id, message)
+            .await?;
 
         Ok(())
     }

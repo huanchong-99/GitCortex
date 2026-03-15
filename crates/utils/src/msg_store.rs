@@ -10,8 +10,11 @@ use tokio_stream::wrappers::BroadcastStream;
 
 use crate::{log_msg::LogMsg, stream_lines::LinesStreamExt};
 
-// 100 MB Limit
-const HISTORY_BYTES: usize = 100_000 * 1_024;
+// G33-005: Reduced history cap from 100 MB to 50 MB
+const HISTORY_BYTES: usize = 50_000 * 1_024;
+
+/// Warn threshold: emit a tracing::warn! when usage exceeds 80% of the cap.
+const HISTORY_WARN_THRESHOLD: usize = (HISTORY_BYTES as f64 * 0.8) as usize;
 
 #[derive(Clone)]
 struct StoredMsg {
@@ -61,6 +64,15 @@ impl MsgStore {
         }
         inner.history.push_back(StoredMsg { msg, bytes });
         inner.total_bytes = inner.total_bytes.saturating_add(bytes);
+
+        // G33-005: warn when history usage exceeds 80% of the cap
+        if inner.total_bytes >= HISTORY_WARN_THRESHOLD {
+            tracing::warn!(
+                used_bytes = inner.total_bytes,
+                cap_bytes = HISTORY_BYTES,
+                "MsgStore history usage exceeds 80% of cap; consider increasing throughput or reducing history"
+            );
+        }
     }
 
     // Convenience
@@ -98,10 +110,29 @@ impl MsgStore {
     }
 
     /// History then live, as `LogMsg`.
+    ///
+    /// G33-006: to close the race window between taking the history snapshot and
+    /// subscribing to the live broadcast channel, we subscribe to the channel
+    /// *first* and then snapshot history while we are already a subscriber.
+    /// Any message pushed concurrently will either already be in the history
+    /// snapshot (pushed before subscribe) or will appear in the live channel
+    /// (pushed after subscribe).  Neither case produces a gap.
     pub fn history_plus_stream(
         &self,
     ) -> futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>> {
-        let (history, rx) = (self.get_history(), self.get_receiver());
+        // 1. Subscribe to the broadcast channel first so we don't miss anything.
+        let rx = self.sender.subscribe();
+        // 2. Only then take the history snapshot.  Messages pushed between these
+        //    two steps will appear in both the history and the live stream (a
+        //    harmless duplicate), but no message will be silently lost.
+        let history: Vec<LogMsg> = self
+            .inner
+            .read()
+            .unwrap()
+            .history
+            .iter()
+            .map(|s| s.msg.clone())
+            .collect();
 
         let hist = futures::stream::iter(history.into_iter().map(Ok::<_, std::io::Error>));
         let live = BroadcastStream::new(rx)

@@ -24,17 +24,21 @@ use crate::{
     services::{
         cc_switch::CCSwitchService,
         orchestrator::{BusMessage, SharedMessageBus},
-        terminal::{PromptWatcher, launcher::TerminalLauncher, process::ProcessManager},
+        terminal::{
+            PromptWatcher,
+            bridge::TerminalBridge,
+            launcher::TerminalLauncher,
+            process::ProcessManager,
+        },
     },
     utils::generate_task_branch_name,
 };
 
-// G15-007: "working" is intentionally included so that provider-failover and
-// stall-recovery paths can restart a terminal that is nominally "working" but
-// whose PTY process has died or become unresponsive. Without it, the orchestrator
-// would be unable to re-launch such terminals and the task would stall.
-const STARTABLE_TERMINAL_STATUSES: [&str; 5] =
-    ["not_started", "failed", "cancelled", "waiting", "working"];
+// [G15-007] "working" removed: a terminal in "working" status has a live PTY process.
+// Re-launching it would spawn a duplicate process and corrupt orchestrator state.
+// Stall-recovery must call close_terminal first (→ "cancelled") before re-launching.
+const STARTABLE_TERMINAL_STATUSES: [&str; 4] =
+    ["not_started", "failed", "cancelled", "waiting"];
 
 #[derive(Debug, Clone)]
 pub struct RuntimeTaskSpec {
@@ -270,14 +274,29 @@ impl RuntimeActionService {
             .ok_or_else(|| anyhow!("Task {} not found", terminal.workflow_task_id))?;
         let workflow_id = task.workflow_id.clone();
 
+        // [G21-011] Publish Shutdown to both the legacy PTY-session topic AND the
+        // terminal-input topic so all bridge subscribers receive the signal.
         if let Some(pty_session_id) = terminal.pty_session_id.as_deref() {
+            let terminal_input_topic = format!("terminal.input.{}", terminal.id);
             let _ = self
                 .message_bus
                 .publish(pty_session_id, BusMessage::Shutdown)
                 .await;
+            let _ = self
+                .message_bus
+                .publish(&terminal_input_topic, BusMessage::Shutdown)
+                .await;
         }
         if self.process_manager.is_running(&terminal.id).await {
             self.process_manager.kill_terminal(&terminal.id).await?;
+        }
+        // [G21-003] Unregister bridge to stop MessageBus -> PTY stdin forwarding.
+        if let Some(pty_session_id) = terminal.pty_session_id.as_deref() {
+            let bridge = TerminalBridge::new(
+                self.message_bus.clone(),
+                Arc::clone(&self.process_manager),
+            );
+            bridge.unregister(pty_session_id).await;
         }
         self.prompt_watcher.unregister(&terminal.id).await;
 

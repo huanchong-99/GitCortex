@@ -232,6 +232,13 @@ fn generate_types_content() -> String {
         server::routes::quality::QualityRunDetail::decl(),
         server::routes::workflow_events::WsEvent::decl(),
         server::routes::workflow_events::WsEventType::decl(),
+        // [G36-003] GitCortex-specific DB model types with #[derive(TS)] but previously unexported
+        db::models::workflow::WorkflowStatus::decl(),
+        db::models::workflow::WorkflowTaskStatus::decl(),
+        db::models::terminal::TerminalStatus::decl(),
+        db::models::cli_type::CliType::decl(),
+        db::models::cli_type::ModelConfig::decl(),
+        db::models::cli_type::CliDetectionStatus::decl(),
     ];
 
     let body = decls

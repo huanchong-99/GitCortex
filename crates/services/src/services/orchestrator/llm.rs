@@ -292,37 +292,11 @@ impl OpenAICompatibleClient {
 #[async_trait]
 impl LLMClient for OpenAICompatibleClient {
     async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
-        // Clone messages for each retry attempt
-        let messages_clone = messages.clone();
-
-        // Create retry attempts
-        let mut attempt: u32 = 0;
-        let max_retries: u32 = 3;
-
-        loop {
-            match self.chat_once(messages_clone.clone()).await {
-                Ok(result) => {
-                    if attempt > 0 {
-                        tracing::info!("LLM request succeeded on attempt {}", attempt + 1);
-                    }
-                    return Ok(result);
-                }
-                Err(e) if attempt < max_retries - 1 => {
-                    tracing::warn!(
-                        "LLM request attempt {} failed, retrying in {}ms: {}",
-                        attempt + 1,
-                        1000 * (attempt + 1),
-                        e
-                    );
-                    sleep(Duration::from_millis(1000 * u64::from(attempt + 1))).await;
-                    attempt += 1;
-                }
-                Err(e) => {
-                    tracing::error!("All {} LLM request attempts failed", max_retries);
-                    return Err(e);
-                }
-            }
-        }
+        // G24-006: keep internal retry at 1 attempt (no internal retry) so that
+        // ResilientLLMClient's cross-provider retry loop is the sole retry layer.
+        // Stacking 3 inner retries × N providers leads to excessive backoff delays
+        // and confusing failure counts in the circuit breaker.
+        self.chat_once(messages).await
     }
 }
 

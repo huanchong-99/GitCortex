@@ -1,12 +1,13 @@
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use git2::{Error as GitError, Repository};
+use lru::LruCache;
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use thiserror::Error;
 use tracing::{debug, info, trace};
 use utils::{path::normalize_macos_private_alias, shell::resolve_executable_path};
@@ -14,12 +15,15 @@ use utils::{path::normalize_macos_private_alias, shell::resolve_executable_path}
 use super::git::{GitService, GitServiceError};
 
 // Global synchronization for worktree creation to prevent race conditions.
-// NOTE(G23-010): std::sync::Mutex is used intentionally here. The lock is held only
-// briefly to clone an Arc, so poison risk is negligible. If a thread panics while
-// holding this lock, unwrap() will propagate the panic — which is the desired behavior
-// since the HashMap state would be inconsistent.
-static WORKTREE_CREATION_LOCKS: Lazy<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+// G23-001 + G23-010: Use parking_lot::Mutex (no poison) with an LruCache (capacity 1000)
+// so that stale entries are automatically evicted when the map grows beyond 1000 entries,
+// bounding memory usage for long-running services.
+static WORKTREE_CREATION_LOCKS: Lazy<Mutex<LruCache<String, Arc<tokio::sync::Mutex<()>>>>> =
+    Lazy::new(|| {
+        Mutex::new(LruCache::new(
+            std::num::NonZeroUsize::new(1000).expect("capacity is non-zero"),
+        ))
+    });
 
 #[derive(Debug, Clone)]
 pub struct WorktreeCleanup {
@@ -99,25 +103,18 @@ impl WorktreeManager {
     ) -> Result<(), WorktreeError> {
         let path_str = worktree_path.to_string_lossy().to_string();
 
-        // Get or create a lock for this specific worktree path
+        // Get or create a lock for this specific worktree path.
+        // G23-001: LruCache bounds memory; G23-010: parking_lot::Mutex never poisons.
         let lock = {
-            let mut locks = WORKTREE_CREATION_LOCKS.lock().unwrap();
-            locks
-                .entry(path_str.clone())
-                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
-                .clone()
+            let mut locks = WORKTREE_CREATION_LOCKS.lock();
+            if locks.get(&path_str).is_none() {
+                locks.put(path_str.clone(), Arc::new(tokio::sync::Mutex::new(())));
+            }
+            locks.get(&path_str).expect("just inserted").clone()
         };
 
         // Acquire the lock for this specific worktree path
         let _guard = lock.lock().await;
-
-        // Eagerly prune completed entries from the global lock map (G23-001).
-        // An entry is "idle" when no other task holds or is waiting on its async Mutex
-        // (strong_count == 1 means only the HashMap itself references it).
-        {
-            let mut locks = WORKTREE_CREATION_LOCKS.lock().unwrap();
-            locks.retain(|_k, v| Arc::strong_count(v) > 1);
-        }
 
         // Check if worktree already exists and is properly set up
         if Self::is_worktree_properly_set_up(repo_path, worktree_path).await? {
@@ -449,13 +446,14 @@ impl WorktreeManager {
     pub async fn cleanup_worktree(worktree: &WorktreeCleanup) -> Result<(), WorktreeError> {
         let path_str = worktree.worktree_path.to_string_lossy().to_string();
 
-        // Get the same lock to ensure we don't interfere with creation
+        // Get the same lock to ensure we don't interfere with creation.
+        // G23-001: LruCache bounds memory; G23-010: parking_lot::Mutex never poisons.
         let lock = {
-            let mut locks = WORKTREE_CREATION_LOCKS.lock().unwrap();
-            locks
-                .entry(path_str.clone())
-                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
-                .clone()
+            let mut locks = WORKTREE_CREATION_LOCKS.lock();
+            if locks.get(&path_str).is_none() {
+                locks.put(path_str.clone(), Arc::new(tokio::sync::Mutex::new(())));
+            }
+            locks.get(&path_str).expect("just inserted").clone()
         };
 
         let _guard = lock.lock().await;

@@ -175,6 +175,7 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/{workflow_id}/prepare", post(prepare_workflow))
         .route("/{workflow_id}/start", post(start_workflow))
         .route("/{workflow_id}/pause", post(pause_workflow))
+        .route("/{workflow_id}/resume", post(resume_workflow))
         .route("/{workflow_id}/stop", post(stop_workflow))
         .route(
             "/{workflow_id}/prompts/respond",
@@ -856,12 +857,28 @@ async fn create_workflow(
     let mut task_rows: Vec<(WorkflowTask, Vec<Terminal>)> = Vec::new();
     let mut existing_branches: Vec<String> = Vec::new();
 
-    // Collect existing branch names for conflict detection
-    // TODO(G23-003): Query the actual git repository for existing branch names
-    // (e.g. via `git branch --list`) to detect conflicts with remote/local branches,
-    // not just within the current batch.
-    // In a real scenario, we'd query the git repository for existing branches
-    // For now, we collect branches that will be created in this batch
+    // G23-003: Fetch the project's primary repo path so we can query git for
+    // existing branches (both local and remote) and avoid naming conflicts that
+    // span across workflows or pre-existing branches.
+    let project_repo_path_for_branch_check: Option<std::path::PathBuf> = {
+        let repo_path_str: Option<String> = sqlx::query_scalar(
+            r"
+            SELECT r.path
+            FROM repos r
+            INNER JOIN project_repos pr ON pr.repo_id = r.id
+            WHERE pr.project_id = ?
+            ORDER BY r.display_name ASC
+            LIMIT 1
+            ",
+        )
+        .bind(project_id)
+        .fetch_optional(&deployment.db().pool)
+        .await
+        .unwrap_or(None)
+        .flatten();
+        repo_path_str.map(std::path::PathBuf::from)
+    };
+
     for task_req in &req.tasks {
         let task_id = Uuid::new_v4().to_string();
 
@@ -871,7 +888,7 @@ async fn create_workflow(
             custom_branch.clone()
         } else {
             // Auto-generate branch name: workflow/{workflow_id}/{slugified-task-name}
-            // Check against already-generated branches in this batch
+            // G23-003: Check both the current batch AND the git repository for conflicts.
             let base_branch = format!(
                 "workflow/{}/{}",
                 workflow_id,
@@ -880,7 +897,31 @@ async fn create_workflow(
             let mut candidate = base_branch.clone();
             let mut counter = 2;
 
-            while existing_branches.contains(&candidate) {
+            loop {
+                let in_batch = existing_branches.contains(&candidate);
+                // Only do the git check when we have a repo path and the batch check passes.
+                let in_git = if !in_batch {
+                    if let Some(repo_path) = &project_repo_path_for_branch_check {
+                        let git_service = services::services::git::GitService::new();
+                        let branch_candidate = candidate.clone();
+                        let repo_path_owned = repo_path.clone();
+                        tokio::task::spawn_blocking(move || {
+                            git_service.check_branch_exists(&repo_path_owned, &branch_candidate)
+                        })
+                        .await
+                        .ok()
+                        .and_then(|r| r.ok())
+                        .unwrap_or(false)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !in_batch && !in_git {
+                    break;
+                }
                 candidate = format!("{base_branch}-{counter}");
                 counter += 1;
             }
@@ -1248,9 +1289,9 @@ async fn rollback_prepare_failure(deployment: &DeploymentImpl, workflow_id: &str
     }
 }
 
-// TODO(G23-006): When worktrees are active, this should resolve to the task-specific
-// worktree path (via WorktreeManager) instead of the project root. Currently all
-// terminals share the same base repo path, which may cause conflicts.
+// G23-006: When the workflow has a task with an active worktree, resolve the
+// working directory to the task's worktree path rather than the project root.
+// This prevents multiple terminals from sharing the same working directory.
 async fn resolve_workflow_working_dir(
     deployment: &DeploymentImpl,
     workflow: &Workflow,
@@ -1266,6 +1307,24 @@ async fn resolve_workflow_working_dir(
         .filter(|dir| !dir.is_empty())
     {
         return Ok(PathBuf::from(dir));
+    }
+
+    // G23-006: Check if there is a task worktree for this workflow. If so, use
+    // the first task's worktree path as the working directory so that each
+    // terminal operates in its own isolated checkout instead of the repo root.
+    let first_task =
+        WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow.id)
+            .await
+            .ok()
+            .and_then(|tasks| tasks.into_iter().next());
+
+    if let Some(task) = first_task {
+        let worktree_path =
+            services::services::worktree_manager::WorktreeManager::get_worktree_base_dir()
+                .join(&task.branch);
+        if worktree_path.exists() {
+            return Ok(worktree_path);
+        }
     }
 
     let repo_working_dir: Option<String> = sqlx::query_scalar(
@@ -1766,6 +1825,52 @@ async fn pause_workflow(
         workflow_id = %workflow_id,
         "Workflow paused with terminal cleanup and cascaded status updates"
     );
+
+    Ok(ResponseJson(ApiResponse::success(())))
+}
+
+/// POST /api/workflows/:workflow_id/resume
+/// Resume a paused workflow (G05-002)
+///
+/// Transitions the workflow from paused to ready via CAS and then starts
+/// the orchestrator runtime. This endpoint provides a dedicated resume path
+/// rather than reusing the start endpoint, giving clearer semantics and
+/// enabling the frontend to show a distinct Resume button.
+async fn resume_workflow(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<Uuid>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let workflow_id = workflow_id.to_string();
+
+    // Verify workflow exists and is in paused state
+    let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
+
+    if workflow.status != "paused" {
+        return Err(ApiError::BadRequest(format!(
+            "Cannot resume workflow: current status is '{}', expected 'paused'",
+            workflow.status
+        )));
+    }
+
+    // Delegate to the runtime which performs paused -> ready CAS and agent creation
+    deployment
+        .orchestrator_runtime()
+        .resume_workflow(&workflow_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                workflow_id = %workflow_id,
+                error = ?e,
+                "Failed to resume workflow"
+            );
+            ApiError::Internal("Failed to resume workflow".to_string())
+        })?;
+
+    refresh_prompt_watcher_registrations(&deployment, &workflow_id).await;
+
+    tracing::info!(workflow_id = %workflow_id, "Workflow resumed successfully");
 
     Ok(ResponseJson(ApiResponse::success(())))
 }
@@ -2784,7 +2889,17 @@ async fn merge_workflow(
         )));
     }
 
-    // CAS: atomically transition completed → merging to prevent concurrent merges
+    // G06-002: acquire the per-workflow merge lock BEFORE the CAS so that
+    // auto-merge (orchestrator) and manual merge (this endpoint) cannot both
+    // pass the CAS check concurrently.
+    let _merge_guard = services::services::merge_coordinator::acquire_workflow_merge_lock(
+        &workflow_id,
+    )
+    .await;
+
+    // G06-001: CAS — atomically transition completed → merging to prevent concurrent merges.
+    // Works in tandem with the mutex above: the mutex prevents races between code paths
+    // that both read status before updating; the CAS ensures only one succeeds at the DB level.
     let cas_ok = Workflow::set_merging(&deployment.db().pool, &workflow_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;

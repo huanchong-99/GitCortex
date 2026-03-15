@@ -198,9 +198,15 @@ pub async fn create_pr(
     State(deployment): State<DeploymentImpl>,
     Json(request): Json<CreatePrApiRequest>,
 ) -> Result<ResponseJson<ApiResponse<String, PrError>>, ApiError> {
-    // G34-002: Validate title is non-empty
-    if request.title.trim().is_empty() {
+    // G34-002: Validate title is non-empty and within length limits
+    let title_trimmed = request.title.trim();
+    if title_trimmed.is_empty() {
         return Err(ApiError::BadRequest("PR title must not be empty".to_string()));
+    }
+    if title_trimmed.len() > 256 {
+        return Err(ApiError::BadRequest(
+            "PR title must not exceed 256 characters".to_string(),
+        ));
     }
 
     let pool = &deployment.db().pool;
@@ -463,8 +469,19 @@ pub async fn attach_existing_pr(
         Err(e) => return Err(ApiError::GitHost(e)),
     };
 
-    // Take the first PR (prefer open, but also accept merged/closed)
-    if let Some(pr_info) = prs.into_iter().next() {
+    // G34-008: Sort PRs by status preference: Open > Merged > Closed > Unknown
+    // then take the first one to ensure we pick the most relevant PR.
+    let status_priority = |s: &MergeStatus| -> u8 {
+        match s {
+            MergeStatus::Open => 0,
+            MergeStatus::Merged => 1,
+            MergeStatus::Closed => 2,
+            MergeStatus::Unknown => 3,
+        }
+    };
+    let mut sorted_prs = prs;
+    sorted_prs.sort_by_key(|pr| status_priority(&pr.status));
+    if let Some(pr_info) = sorted_prs.into_iter().next() {
         // Save PR info to database
         let merge = Merge::create_pr(
             pool,

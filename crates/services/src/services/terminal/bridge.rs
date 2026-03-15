@@ -406,8 +406,9 @@ impl TerminalBridge {
                     }
                 }
                 _ = health_interval.tick() => {
-                    // Cleanup dead processes
-                    process_manager.cleanup().await;
+                    // [G21-010] Removed process_manager.cleanup() here: global dead-process
+                    // scanning belongs to ProcessManager's own periodic task, not to each
+                    // individual bridge instance (which would cause N redundant full scans).
 
                     // Check if terminal is still running
                     if !process_manager.is_running(&terminal_id).await {

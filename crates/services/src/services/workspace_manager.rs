@@ -301,7 +301,9 @@ impl WorkspaceManager {
             return;
         }
 
-        let entries = match std::fs::read_dir(&workspace_base_dir) {
+        // G23-009: Use tokio::fs::read_dir instead of std::fs::read_dir to avoid
+        // blocking the async runtime during directory enumeration.
+        let mut entries = match tokio::fs::read_dir(&workspace_base_dir).await {
             Ok(entries) => entries,
             Err(e) => {
                 error!(
@@ -313,9 +315,10 @@ impl WorkspaceManager {
             }
         };
 
-        for entry in entries {
-            let entry = match entry {
-                Ok(entry) => entry,
+        loop {
+            let entry = match entries.next_entry().await {
+                Ok(Some(entry)) => entry,
+                Ok(None) => break,
                 Err(e) => {
                     warn!("Failed to read directory entry: {}", e);
                     continue;
@@ -351,7 +354,8 @@ impl WorkspaceManager {
             workspace_dir.display()
         );
 
-        let entries = match std::fs::read_dir(workspace_dir) {
+        // G23-009: Use tokio::fs::read_dir to avoid blocking the async runtime.
+        let mut entries = match tokio::fs::read_dir(workspace_dir).await {
             Ok(entries) => entries,
             Err(e) => {
                 debug!(
@@ -365,7 +369,15 @@ impl WorkspaceManager {
             }
         };
 
-        for entry in entries.filter_map(Result::ok) {
+        loop {
+            let entry = match entries.next_entry().await {
+                Ok(Some(entry)) => entry,
+                Ok(None) => break,
+                Err(e) => {
+                    warn!("Failed to read directory entry: {}", e);
+                    continue;
+                }
+            };
             let path = entry.path();
             if path.is_dir()
                 && let Err(e) = WorktreeManager::cleanup_suspected_worktree(&path).await

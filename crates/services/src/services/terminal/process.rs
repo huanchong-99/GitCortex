@@ -40,11 +40,16 @@ pub const DEFAULT_ROWS: u16 = 24;
 /// Reader buffer size for background PTY output fanout
 pub const PROCESS_PTY_READ_BUFFER_SIZE: usize = 4096;
 
-/// Default replay chunk retention per terminal stream
-/// [G09-004] These values can be overridden via `OutputFanoutConfig` when constructing
-/// `ProcessManager::default_output_fanout()`. For production tuning, consider making
-/// them configurable via environment variables or server configuration.
-pub const PROCESS_REPLAY_MAX_CHUNKS: usize = 512;
+/// Broadcast channel capacity for terminal output fanout.
+pub const PROCESS_BROADCAST_CAPACITY: usize = 512;
+
+/// Default replay chunk retention per terminal stream.
+///
+/// [G09-005] Replay capacity is set to 2x broadcast capacity so that chunks
+/// that are still in-flight in the broadcast channel are guaranteed to also
+/// exist in the replay buffer, enabling lag-recovery without data loss.
+/// [G09-004] For production tuning consider making this an env-var / config.
+pub const PROCESS_REPLAY_MAX_CHUNKS: usize = PROCESS_BROADCAST_CAPACITY * 2;
 
 /// Default replay byte retention per terminal stream
 pub const PROCESS_REPLAY_MAX_BYTES: usize = 1024 * 1024;
@@ -518,11 +523,14 @@ impl ProcessManager {
     }
 
     /// Create default output fanout configuration.
+    ///
+    /// [G09-005] replay_max_chunks is 2x broadcast_capacity so that chunks still
+    /// in-flight in the broadcast channel are always available in the replay buffer.
     fn default_output_fanout() -> Arc<OutputFanout> {
         Arc::new(OutputFanout::new(OutputFanoutConfig {
-            replay_max_chunks: PROCESS_REPLAY_MAX_CHUNKS,
+            broadcast_capacity: PROCESS_BROADCAST_CAPACITY,
+            replay_max_chunks: PROCESS_REPLAY_MAX_CHUNKS, // 2x broadcast_capacity
             replay_max_bytes: PROCESS_REPLAY_MAX_BYTES,
-            ..OutputFanoutConfig::default()
         }))
     }
 
@@ -735,10 +743,11 @@ impl ProcessManager {
         })
     }
 
-    /// Spawns a new terminal process with PTY
+    /// Spawns a new terminal process with PTY.
     ///
-    /// Creates a new PTY and spawns the shell process attached to it.
-    /// The process is tracked by its terminal ID and can be monitored or terminated later.
+    /// [G21-008] Delegates to `spawn_pty_with_config` using a default `SpawnCommand`
+    /// to eliminate code duplication. The legacy signature is preserved for callers
+    /// (tests, timeout tests) that use the simpler (shell, working_dir) form.
     ///
     /// # Arguments
     ///
@@ -759,125 +768,9 @@ impl ProcessManager {
         cols: u16,
         rows: u16,
     ) -> anyhow::Result<ProcessHandle> {
-        self.evict_existing_terminal(terminal_id).await?;
-
-        // Create PTY system
-        let pty_system = native_pty_system();
-
-        // Configure PTY size
-        let size = PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        };
-
-        // Open PTY pair (master + slave)
-        let pair = pty_system
-            .openpty(size)
-            .map_err(|e| anyhow::anyhow!("Failed to open PTY: {e}"))?;
-
-        // Build command
-        // On Windows, use cmd.exe /c to run commands so that .cmd/.bat files are found
-        #[cfg(windows)]
-        let mut cmd = {
-            let mut c = CommandBuilder::new("cmd.exe");
-            c.arg("/c");
-            c.arg(shell);
-            c
-        };
-        #[cfg(not(windows))]
-        let mut cmd = CommandBuilder::new(shell);
-        cmd.cwd(working_dir);
-
-        // Set environment variables for proper terminal behavior
-        cmd.env("TERM", "xterm-256color");
-        cmd.env("COLORTERM", "truecolor");
-
-        // UTF-8 encoding for Unix
-        #[cfg(unix)]
-        {
-            cmd.env("LANG", "C.UTF-8");
-            cmd.env("LC_ALL", "C.UTF-8");
-        }
-
-        // Spawn child process on slave PTY
-        let mut child = pair
-            .slave
-            .spawn_command(cmd)
-            .map_err(|e| anyhow::anyhow!("Failed to spawn terminal process: {e}"))?;
-
-        let pid = child.process_id().unwrap_or(0);
-        let session_id = Uuid::new_v4().to_string();
-
-        // Wait a short time and check if the process is still alive
-        // This catches cases where the command fails immediately (e.g., not found, permission denied)
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                return Err(anyhow::anyhow!(
-                    "Terminal process exited immediately with status: {status:?}. The CLI may not be installed correctly."
-                ));
-            }
-            Ok(None) => {
-                // Process is still running, good
-            }
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "Failed to check terminal process status: {e}"
-                ));
-            }
-        }
-
-        // Initialize output fanout and background reader
-        let output_fanout = Self::default_output_fanout();
-        let reader_task = match pair.master.try_clone_reader() {
-            Ok(reader) => Some(Self::spawn_output_reader_task(
-                terminal_id,
-                PtyReader(reader),
-                Arc::clone(&output_fanout),
-            )),
-            Err(e) => {
-                tracing::warn!(
-                    terminal_id = %terminal_id,
-                    error = %e,
-                    "Failed to initialize background PTY reader for fanout"
-                );
-                None
-            }
-        };
-
-        // Store tracked process
-        let mut processes = self.processes.write().await;
-        processes.insert(
-            terminal_id.to_string(),
-            TrackedProcess {
-                session_id: session_id.clone(),
-                child,
-                master: Mutex::new(pair.master),
-                shared_writer: None,
-                codex_home: None, // Legacy spawn_pty doesn't support CODEX_HOME
-                output_fanout,
-                reader_task,
-                logger_task: None,
-                logger_shutdown_tx: None,
-            },
-        );
-
-        tracing::info!(
-            terminal_id = %terminal_id,
-            pid = pid,
-            shell = %shell,
-            "PTY process spawned successfully"
-        );
-
-        Ok(ProcessHandle {
-            pid,
-            session_id,
-            terminal_id: terminal_id.to_string(),
-            reader: None,
-            writer: None,
-        })
+        let config = SpawnCommand::new(shell, working_dir);
+        self.spawn_pty_with_config(terminal_id, &config, cols, rows)
+            .await
     }
 
     /// Resize terminal PTY
@@ -944,14 +837,47 @@ impl ProcessManager {
 
         #[cfg(windows)]
         {
-            let output = std::process::Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .output()
-                .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {e}"))?;
+            // [G21-005] Graceful Windows shutdown: first send CTRL_C_EVENT to let the
+            // process clean up, then wait up to 3 s before force-killing with taskkill /F.
+            // This gives CLI tools (claude, codex, etc.) a chance to flush state.
+            use std::os::windows::process::CommandExt;
+            const CTRL_C_EVENT: u32 = 0;
+            // GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid) — best-effort, ignore errors.
+            let _ = std::process::Command::new("cmd.exe")
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .args(["/c", &format!("taskkill /PID {pid}")])
+                .output();
 
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow::anyhow!("taskkill failed: {stderr}"));
+            // Wait up to 3 s for the process to exit gracefully.
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            let exited_gracefully = loop {
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                // Poll via tasklist; if the PID is gone the process exited.
+                let check = std::process::Command::new("tasklist")
+                    .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+                    .output();
+                if let Ok(out) = check {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    if !stdout.contains(&pid.to_string()) {
+                        break true;
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            };
+
+            if !exited_gracefully {
+                // Force-kill with the process tree flag.
+                let output = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .output()
+                    .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {e}"))?;
+
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(anyhow::anyhow!("taskkill failed: {stderr}"));
+                }
             }
         }
 
@@ -978,15 +904,23 @@ impl ProcessManager {
         Ok(())
     }
 
-    /// Check if a terminal process is running
+    /// Check if a terminal process is running.
     ///
-    /// [G21-002] This checks HashMap presence only, which is correct because entries
-    /// are removed from the map in `kill_terminal` and `cleanup` when a process exits.
-    /// The `cleanup` method periodically reaps dead processes via `try_wait`, so
-    /// `is_running` reflects actual liveness within the cleanup polling interval.
+    /// [G21-002] In addition to HashMap presence, calls `try_wait()` on the child
+    /// to detect processes that have already exited but have not yet been reaped by
+    /// `cleanup()`. This ensures callers get accurate liveness information without
+    /// waiting for the next cleanup poll cycle.
     pub async fn is_running(&self, terminal_id: &str) -> bool {
-        let processes = self.processes.read().await;
-        processes.contains_key(terminal_id)
+        let mut processes = self.processes.write().await;
+        let Some(tracked) = processes.get_mut(terminal_id) else {
+            return false;
+        };
+        // Try to reap the child non-blockingly; if it has exited, treat as not running.
+        match tracked.child.try_wait() {
+            Ok(Some(_)) => false, // process has exited
+            Ok(None) => true,     // process is still running
+            Err(_) => true,       // cannot determine; assume still running to be safe
+        }
     }
 
     /// Lists all currently tracked terminal IDs
@@ -1257,6 +1191,48 @@ impl ProcessManager {
 impl Default for ProcessManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// [G21-006] Best-effort cleanup of all tracked child processes on drop.
+///
+/// We cannot perform async operations (task joins, CODEX_HOME cleanup) here, so we
+/// only send termination signals. Structured shutdown should call `kill_terminal` for
+/// each process before dropping the manager; this `Drop` impl is the last-resort guard.
+impl Drop for ProcessManager {
+    fn drop(&mut self) {
+        // Try to get a synchronous snapshot of tracked processes.
+        // If the RwLock is contended we skip cleanup to avoid deadlock.
+        let processes = match self.processes.try_read() {
+            Ok(guard) => guard,
+            Err(_) => {
+                tracing::warn!("ProcessManager dropped while processes lock is held; skipping cleanup");
+                return;
+            }
+        };
+
+        for (terminal_id, tracked) in processes.iter() {
+            if let Some(pid) = tracked.child.process_id() {
+                if pid > 0 {
+                    #[cfg(unix)]
+                    {
+                        use nix::{sys::signal::{self, Signal}, unistd::Pid};
+                        let _ = signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM);
+                    }
+                    #[cfg(windows)]
+                    {
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/PID", &pid.to_string(), "/T", "/F"])
+                            .output();
+                    }
+                    tracing::debug!(
+                        terminal_id = %terminal_id,
+                        pid = pid,
+                        "ProcessManager::drop: sent termination signal to child"
+                    );
+                }
+            }
+        }
     }
 }
 

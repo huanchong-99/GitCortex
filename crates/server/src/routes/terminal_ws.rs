@@ -5,14 +5,14 @@
 use std::{
     error::Error as StdError,
     io::ErrorKind,
-    sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use axum::{
     Router,
     extract::{
-        Path, State, WebSocketUpgrade,
+        Path, Query, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
     response::IntoResponse,
@@ -24,11 +24,24 @@ use futures_util::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::mpsc,
-    time::Instant,
-};
+use tokio::sync::mpsc;
 use ts_rs::TS;
+
+/// Returns current time as milliseconds since the Unix epoch (wraps to 0 on overflow).
+#[inline]
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Elapsed milliseconds since `start_millis` (monotonic approximation via SystemTime).
+#[inline]
+fn elapsed_since_millis(start_millis: u64) -> Duration {
+    let now = now_millis();
+    Duration::from_millis(now.saturating_sub(start_millis))
+}
 
 use crate::{DeploymentImpl, error::ApiError};
 
@@ -126,10 +139,21 @@ pub fn terminal_ws_routes() -> Router<DeploymentImpl> {
 // Route Handlers
 // ============================================================================
 
+/// Optional query parameters for the terminal WebSocket endpoint.
+///
+/// `last_seq`: The last output sequence number the client received before disconnecting.
+/// When provided, the server replays only the chunks with `seq > last_seq`, enabling
+/// efficient reconnection without re-sending the full history. [G09-003]
+#[derive(Debug, serde::Deserialize, Default)]
+struct ResumeParams {
+    last_seq: Option<u64>,
+}
+
 /// WebSocket handler for terminal connection
 async fn terminal_ws_handler(
     ws: WebSocketUpgrade,
     Path(terminal_id): Path<String>,
+    Query(params): Query<ResumeParams>,
     State(deployment): State<DeploymentImpl>,
 ) -> impl IntoResponse {
     // Validate terminal_id format before proceeding
@@ -138,16 +162,30 @@ async fn terminal_ws_handler(
         return ApiError::BadRequest(format!("Invalid terminal_id format: {e}")).into_response();
     }
 
-    ws.on_upgrade(move |socket| handle_terminal_socket(socket, terminal_id, deployment))
+    ws.on_upgrade(move |socket| {
+        handle_terminal_socket(socket, terminal_id, deployment, params.last_seq)
+    })
 }
 
-/// Handle terminal WebSocket connection with PTY
+/// Handle terminal WebSocket connection with PTY.
+///
+/// `resume_from_seq`: when `Some(n)`, replay starts from `seq > n` (G09-003 resume).
+/// When `None`, full replay from the earliest retained chunk is provided.
 async fn handle_terminal_socket(
     socket: WebSocket,
     terminal_id: String,
     deployment: DeploymentImpl,
+    resume_from_seq: Option<u64>,
 ) {
-    tracing::info!("Terminal WebSocket connected: {}", terminal_id);
+    if let Some(seq) = resume_from_seq {
+        tracing::info!(
+            terminal_id = %terminal_id,
+            resume_from_seq = seq,
+            "Terminal WebSocket connected (resume mode)"
+        );
+    } else {
+        tracing::info!("Terminal WebSocket connected: {}", terminal_id);
+    }
 
     // Split the WebSocket into sender and receiver
     let (mut ws_sender, mut ws_receiver) = socket.split();
@@ -195,13 +233,11 @@ async fn handle_terminal_socket(
         return;
     }
 
-    // Subscribe to terminal output stream with replay
-    // [G09-003] Design limitation: on WS reconnect, the client receives a full replay
-    // from the fanout buffer but any output emitted between disconnect and reconnect
-    // that has already been evicted from the replay window is permanently lost.
-    // Future improvement: persist a per-terminal high-water-mark so reconnecting
-    // clients can request replay from their last-seen sequence via query parameter.
-    let mut output_subscription = match process_manager.subscribe_output(&terminal_id, None).await {
+    // Subscribe to terminal output stream with seq-based resume (G09-003).
+    // On reconnect, the client passes `last_seq` as a query parameter so only
+    // chunks with seq > last_seq are replayed. When last_seq is None, the full
+    // retained replay window is provided (first connect or forced full replay).
+    let mut output_subscription = match process_manager.subscribe_output(&terminal_id, resume_from_seq).await {
         Ok(sub) => sub,
         Err(e) => {
             tracing::error!(
@@ -230,18 +266,16 @@ async fn handle_terminal_socket(
     let terminal_id_recv = terminal_id.clone();
     let terminal_id_output = terminal_id.clone();
 
-    // Track last activity time for idle timeout.
-    // [G09-010] RwLock<Instant> is used instead of AtomicU64 because `Instant` is an
-    // opaque type with no guaranteed conversion to/from integer on all platforms.
-    // The contention is negligible (one write per WS message, one read per heartbeat).
-    let last_activity = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
+    // [G09-010] Track last activity time for idle timeout using AtomicU64 (Unix ms timestamp).
+    // AtomicU64 is lock-free and avoids the overhead of RwLock for single-value timestamps.
+    let last_activity = std::sync::Arc::new(AtomicU64::new(now_millis()));
     let last_activity_recv = last_activity.clone();
     let last_activity_heartbeat = last_activity.clone();
 
     // [G08-010] Track last client message time to detect half-open connections.
     // If the server receives no client messages for 90s, the heartbeat task will
     // close the connection (the client should send Heartbeat every 30s).
-    let last_client_message = std::sync::Arc::new(tokio::sync::RwLock::new(Instant::now()));
+    let last_client_message = std::sync::Arc::new(AtomicU64::new(now_millis()));
     let last_client_message_recv = last_client_message.clone();
     let last_client_message_heartbeat = last_client_message.clone();
 
@@ -291,7 +325,7 @@ async fn handle_terminal_socket(
                         match recv_result {
                             Ok(chunk) => {
                                 // Update last activity
-                                *last_activity_clone.write().await = Instant::now();
+                                last_activity_clone.store(now_millis(), Ordering::Relaxed);
 
                                 if !chunk.text.is_empty() {
                                     let msg = WsMessage::Output { data: chunk.text };
@@ -421,8 +455,8 @@ async fn handle_terminal_socket(
             loop {
                 interval.tick().await;
 
-                let last = *last_activity_heartbeat.read().await;
-                let idle_duration = last.elapsed();
+                let last_ts = last_activity_heartbeat.load(Ordering::Relaxed);
+                let idle_duration = elapsed_since_millis(last_ts);
 
                 if idle_duration > Duration::from_secs(WS_IDLE_TIMEOUT_SECS) {
                     tracing::warn!(
@@ -438,8 +472,8 @@ async fn handle_terminal_socket(
                 // [G08-010] Detect half-open connections: if no client message
                 // (input, resize, heartbeat) received for 90s, assume the client
                 // is gone and close the connection server-side.
-                let last_client = *last_client_message_heartbeat.read().await;
-                let client_silent_duration = last_client.elapsed();
+                let last_client_ts = last_client_message_heartbeat.load(Ordering::Relaxed);
+                let client_silent_duration = elapsed_since_millis(last_client_ts);
                 if client_silent_duration > Duration::from_secs(90) {
                     tracing::warn!(
                         terminal_id = %terminal_id_heartbeat,
@@ -465,9 +499,9 @@ async fn handle_terminal_socket(
         loop {
             if let Some(result) = ws_receiver.next().await {
                 // Update last activity time
-                *last_activity_recv.write().await = Instant::now();
+                last_activity_recv.store(now_millis(), Ordering::Relaxed);
                 // [G08-010] Update last client message time for half-open detection
-                *last_client_message_recv.write().await = Instant::now();
+                last_client_message_recv.store(now_millis(), Ordering::Relaxed);
 
                 match result {
                     Ok(msg) => match msg {

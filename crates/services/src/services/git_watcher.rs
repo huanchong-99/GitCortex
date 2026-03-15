@@ -161,6 +161,14 @@ impl CommitMetadata {
 pub struct ParsedCommit {
     pub hash: String,
     pub branch: String,
+    /// Full commit body (subject + blank line + body paragraphs), as returned by
+    /// `git show --format=%B`. Stored in full so GitEvent and TerminalCompleted
+    /// events carry the complete message for orchestrator attribution.
+    ///
+    /// G10-012: Previously only the subject line (first line) was stored here,
+    /// which meant the no-metadata GitEvent path published an incomplete message,
+    /// preventing the orchestrator from matching commits that embed task hints in
+    /// the body rather than the subject.
     pub message: String,
     pub metadata: Option<CommitMetadata>,
 }
@@ -336,18 +344,33 @@ impl GitWatcher {
     ) -> Result<Vec<ParsedCommit>> {
         use tokio::process::Command;
 
-        // NOTE (G10-004): We intentionally query only the current HEAD branch
-        // (no --all flag). Each GitWatcher instance is bound to a single
-        // worktree/branch. The orchestrator spawns one GitWatcher per worktree,
-        // so cross-branch commits are handled by their respective watcher.
+        // G10-004: Use `--all` so that commits on non-HEAD branches (e.g. during a
+        // fast-forward push or after a detached-HEAD checkout) are not missed.
+        // We pair `--all` with a branch-name filter derived from the worktree's
+        // current HEAD so that only commits reachable from the task branch are
+        // returned, avoiding cross-workflow contamination from unrelated branches.
+        //
+        // Revision range logic:
+        //   - With a known last commit: `<last>..<head_branch>` limits results to
+        //     commits that are on head_branch but not already seen.
+        //   - Without a known last commit: retrieve only the single latest commit
+        //     on the current HEAD to seed the cursor without replaying history.
+        //   - If head_branch cannot be determined, fall back to "HEAD" so git log
+        //     still works (the --all flag ensures reachability from HEAD as well).
+        let head_branch = self.get_head_branch(repo_path).await;
+        let branch_ref = if head_branch == "unknown" { "HEAD" } else { &head_branch };
+
         let mut cmd = Command::new("git");
         cmd.current_dir(repo_path)
-            .args(["log", "--format=%H", "--reverse"]);
+            .args(["log", "--all", "--format=%H", "--reverse"]);
 
         if let Some(last_hash) = last_seen {
-            cmd.arg(format!("{last_hash}..HEAD"));
+            // Limit to commits on head_branch that are not ancestors of last_hash.
+            cmd.arg(format!("{last_hash}..{branch_ref}"));
         } else {
-            cmd.args(["-1"]);
+            // No cursor yet: just grab the most recent commit on the current branch
+            // to initialize the cursor without replaying entire history.
+            cmd.args(["-1", branch_ref]);
         }
 
         let output = cmd.output().await.context(format!(
@@ -384,12 +407,16 @@ impl GitWatcher {
     /// ASCII Record Separator (`\x1e`) as the delimiter so that commit messages
     /// containing any printable character (including `|`) are handled correctly.
     ///
-    /// G10-005 (design limitation): The branch name is resolved via
-    /// `rev-parse --abbrev-ref HEAD`, which always returns the *current* HEAD of
-    /// this worktree — not necessarily the branch that *contains* the queried
-    /// commit. This is acceptable because each GitWatcher instance is bound to a
-    /// single worktree whose HEAD tracks the task branch. A future improvement
-    /// could use `git branch --contains <hash>` for precise attribution.
+    /// G10-005: The branch name is resolved via `git branch --contains <hash>`,
+    /// which returns the actual branch(es) that contain the commit, rather than
+    /// always returning HEAD. When a commit is on multiple branches, the first
+    /// matching branch is used. Falls back to `rev-parse --abbrev-ref HEAD` if
+    /// the `branch --contains` command fails or returns no results.
+    ///
+    /// G10-012: `ParsedCommit.message` now stores the full commit body (not just
+    /// the subject line). This ensures that GitEvent and TerminalCompleted events
+    /// carry the complete message so orchestrator attribution succeeds even when
+    /// task hints are embedded in the body rather than the subject.
     async fn get_commit_by_hash(&self, repo_path: &Path, revision: &str) -> Result<ParsedCommit> {
         use tokio::process::Command;
 
@@ -423,40 +450,62 @@ impl GitWatcher {
             .ok_or_else(|| anyhow!("Invalid git show output format (missing \\x1e separator)"))?;
 
         let hash = hash.to_string();
-        let full_message = full_message.to_string();
+        // G10-012: Store the full commit body (not just the subject line) so that
+        // downstream consumers (orchestrator GitEvent handler, attribution logic)
+        // have access to the complete message including any task-hint body text.
+        let message = full_message.to_string();
 
-        // Extract subject (first line) from the full body for the `message` field.
-        let message = full_message
-            .lines()
-            .next()
-            .unwrap_or("")
-            .to_string();
-
-        // Get current branch name (kept as a separate lightweight command since
-        // `git show --format` cannot emit the worktree's HEAD branch).
-        let branch_output = Command::new("git")
+        // G10-005: Resolve the branch that contains this commit using
+        // `git branch --contains <hash>`. This is more accurate than
+        // `rev-parse --abbrev-ref HEAD` which always returns the current HEAD
+        // branch regardless of which branch the queried commit actually belongs to.
+        let branch_contains_output = Command::new("git")
             .current_dir(repo_path)
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .args(["branch", "--contains", hash.as_str()])
             .output()
-            .await
-            .context(format!(
-                "Failed to get current branch from {}",
-                self.config.repo_path.display()
-            ))?;
+            .await;
 
-        let branch = if branch_output.status.success() {
-            String::from_utf8_lossy(&branch_output.stdout)
-                .trim()
-                .to_string()
-        } else {
-            tracing::warn!(
-                "Failed to get branch name: {}",
-                String::from_utf8_lossy(&branch_output.stderr)
-            );
-            "unknown".to_string()
+        let branch = match branch_contains_output {
+            Ok(out) if out.status.success() => {
+                let raw_branches = String::from_utf8_lossy(&out.stdout);
+                // `git branch --contains` prefixes the current branch with "* ".
+                // Parse the first branch name, stripping the "* " prefix if present.
+                raw_branches
+                    .lines()
+                    .find_map(|line| {
+                        let stripped = line.trim().strip_prefix("* ").unwrap_or(line.trim());
+                        if stripped.is_empty() { None } else { Some(stripped.to_string()) }
+                    })
+                    .unwrap_or_else(|| {
+                        // Commit not yet reachable from any local branch (e.g. detached HEAD);
+                        // fall back to HEAD.
+                        tracing::debug!(
+                            commit = %hash,
+                            "git branch --contains returned no branches; falling back to HEAD"
+                        );
+                        "unknown".to_string()
+                    })
+            }
+            Ok(out) => {
+                // Command ran but failed (non-zero exit); fall back to HEAD.
+                tracing::warn!(
+                    commit = %hash,
+                    stderr = %String::from_utf8_lossy(&out.stderr),
+                    "git branch --contains failed; falling back to rev-parse HEAD"
+                );
+                self.get_head_branch(repo_path).await
+            }
+            Err(e) => {
+                tracing::warn!(
+                    commit = %hash,
+                    error = %e,
+                    "Failed to spawn git branch --contains; falling back to rev-parse HEAD"
+                );
+                self.get_head_branch(repo_path).await
+            }
         };
 
-        let metadata = CommitMetadata::parse(&full_message);
+        let metadata = CommitMetadata::parse(&message);
 
         Ok(ParsedCommit {
             hash,
@@ -464,6 +513,29 @@ impl GitWatcher {
             message,
             metadata,
         })
+    }
+
+    /// Resolve the current HEAD branch via `rev-parse --abbrev-ref HEAD`.
+    /// Used as a fallback when `git branch --contains` is unavailable or fails.
+    async fn get_head_branch(&self, repo_path: &Path) -> String {
+        use tokio::process::Command;
+        let out = Command::new("git")
+            .current_dir(repo_path)
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .output()
+            .await;
+        match out {
+            Ok(o) if o.status.success() => {
+                String::from_utf8_lossy(&o.stdout).trim().to_string()
+            }
+            _ => {
+                tracing::warn!(
+                    "Failed to determine HEAD branch from {}",
+                    self.config.repo_path.display()
+                );
+                "unknown".to_string()
+            }
+        }
     }
 
     /// Handle a new commit by parsing its metadata and publishing events

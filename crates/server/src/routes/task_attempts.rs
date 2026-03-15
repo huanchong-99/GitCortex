@@ -206,6 +206,24 @@ pub async fn create_task_attempt(
         .git_branch_from_workspace(&attempt_id, &task.title)
         .await;
 
+    // G34-004: Check for existing running attempt to prevent concurrent duplicates.
+    // If a workspace already has a running execution process for this task, return 409.
+    let existing_workspaces = Workspace::fetch_all(pool, Some(payload.task_id)).await?;
+    for existing_ws in &existing_workspaces {
+        if !existing_ws.archived {
+            let has_running = ExecutionProcess::has_running_non_dev_server_processes_for_workspace(
+                pool,
+                existing_ws.id,
+            )
+            .await?;
+            if has_running {
+                return Err(ApiError::Conflict(
+                    "A running attempt already exists for this task".to_string(),
+                ));
+            }
+        }
+    }
+
     let workspace = Workspace::create(
         pool,
         &CreateWorkspace {
@@ -227,10 +245,29 @@ pub async fn create_task_attempt(
         .collect();
 
     WorkspaceRepo::create_many(pool, workspace.id, &workspace_repos).await?;
-    deployment
+
+    // G34-005: Roll back the created DB records if start_workspace fails,
+    // to avoid leaving orphaned workspace rows in the database.
+    if let Err(start_err) = deployment
         .container()
         .start_workspace(&workspace, executor_profile_id.clone())
-        .await?;
+        .await
+    {
+        tracing::error!(
+            workspace_id = %workspace.id,
+            task_id = %payload.task_id,
+            "start_workspace failed; rolling back created workspace DB record: {}",
+            start_err
+        );
+        if let Err(del_err) = Workspace::delete(pool, workspace.id).await {
+            tracing::error!(
+                workspace_id = %workspace.id,
+                "Failed to roll back workspace record after start_workspace failure: {}",
+                del_err
+            );
+        }
+        return Err(ApiError::from(start_err));
+    }
 
     deployment
         .track_if_analytics_allowed(
@@ -521,9 +558,31 @@ async fn finalize_workspace_if_all_repos_merged(
         .all(|workspace_repo| merged_repo_ids.contains(&workspace_repo.repo_id));
 
     if all_repos_merged {
+        // G34-012: Wrap Task status update and Workspace archival in a logical sequence
+        // with rollback: if set_archived fails, revert Task status to avoid inconsistency.
         Task::update_status(pool, task_id, TaskStatus::Done).await?;
         if !workspace.pinned {
-            Workspace::set_archived(pool, workspace.id, true).await?;
+            if let Err(archive_err) = Workspace::set_archived(pool, workspace.id, true).await {
+                tracing::error!(
+                    workspace_id = %workspace.id,
+                    task_id = %task_id,
+                    error = %archive_err,
+                    "set_archived failed after marking task Done; \
+                     rolling back Task status to avoid inconsistency"
+                );
+                // Best-effort rollback: revert task status back to In Progress
+                if let Err(rollback_err) =
+                    Task::update_status(pool, task_id, TaskStatus::InProgress).await
+                {
+                    tracing::error!(
+                        task_id = %task_id,
+                        error = %rollback_err,
+                        "Failed to roll back task status after archive failure; \
+                         task may be in inconsistent state"
+                    );
+                }
+                return Err(ApiError::Database(archive_err));
+            }
         }
     }
 
@@ -579,14 +638,30 @@ pub async fn merge_task_attempt(
         &commit_message,
     )?;
 
-    Merge::create_direct(
+    // G34-006: Git merge succeeded but DB write may fail — git merge cannot be rolled back.
+    // Log to dead-letter style error log so the operator can reconcile manually if needed.
+    if let Err(db_err) = Merge::create_direct(
         pool,
         workspace.id,
         workspace_repo.repo_id,
         &workspace_repo.target_branch,
         &merge_commit_id,
     )
-    .await?;
+    .await
+    {
+        tracing::error!(
+            workspace_id = %workspace.id,
+            repo_id = %workspace_repo.repo_id,
+            merge_commit = %merge_commit_id,
+            target_branch = %workspace_repo.target_branch,
+            error = %db_err,
+            "[DEAD-LETTER] Git merge succeeded but DB record creation failed. \
+             The merge commit '{}' is in git history but not recorded in the database. \
+             Manual reconciliation may be required.",
+            merge_commit_id
+        );
+        return Err(ApiError::Database(db_err));
+    }
     let all_repos_merged =
         finalize_workspace_if_all_repos_merged(pool, &workspace, task.id).await?;
     if !all_repos_merged {

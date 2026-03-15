@@ -6,6 +6,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use tokio::sync::{RwLock, broadcast};
@@ -23,6 +24,9 @@ const DEFAULT_CHANNEL_CAPACITY: usize = 256;
 // Subscription Hub
 // ============================================================================
 
+/// TTL for cached pending events (G33-009).
+const PENDING_EVENT_TTL: Duration = Duration::from_secs(300); // 5 minutes
+
 /// Per-workflow broadcast hub for WebSocket events.
 ///
 /// Each workflow has its own broadcast channel. When a WebSocket client
@@ -35,7 +39,8 @@ pub struct SubscriptionHub {
     /// Map of workflow_id -> broadcast sender.
     senders: Arc<RwLock<HashMap<String, broadcast::Sender<WsEvent>>>>,
     /// Per-workflow event cache used when no subscribers are connected.
-    pending_events: Arc<RwLock<HashMap<String, VecDeque<WsEvent>>>>,
+    /// Each entry carries the insertion `Instant` for TTL enforcement (G33-009).
+    pending_events: Arc<RwLock<HashMap<String, VecDeque<(WsEvent, Instant)>>>>,
     /// Maximum number of cached events retained per workflow.
     pending_limit: usize,
 }
@@ -158,7 +163,29 @@ impl SubscriptionHub {
             let mut pending = self.pending_events.write().await;
             pending.remove(workflow_id);
 
-            tracing::debug!("Cleaned up idle channel and pending events for workflow: {}", workflow_id);
+            tracing::debug!(
+                "Cleaned up idle channel and pending events for workflow: {}",
+                workflow_id
+            );
+        } else {
+            // G33-009: even if the channel is still active, evict expired pending_events
+            // entries for this workflow so stale events don't accumulate.
+            let mut pending = self.pending_events.write().await;
+            if let Some(queue) = pending.get_mut(workflow_id) {
+                let now = Instant::now();
+                let before = queue.len();
+                queue.retain(|(_, inserted_at)| {
+                    now.duration_since(*inserted_at) < PENDING_EVENT_TTL
+                });
+                let evicted = before.saturating_sub(queue.len());
+                if evicted > 0 {
+                    tracing::debug!(
+                        workflow_id,
+                        evicted,
+                        "Evicted expired pending_events entries (TTL)"
+                    );
+                }
+            }
         }
     }
 
@@ -174,7 +201,7 @@ impl SubscriptionHub {
     async fn cache_pending_event(&self, workflow_id: &str, event: WsEvent) {
         let mut pending_events = self.pending_events.write().await;
         let queue = pending_events.entry(workflow_id.to_string()).or_default();
-        queue.push_back(event);
+        queue.push_back((event, Instant::now()));
 
         while queue.len() > self.pending_limit {
             queue.pop_front();
@@ -191,11 +218,28 @@ impl SubscriptionHub {
             return;
         }
 
-        let replay_count = pending_events.len();
-        for event in pending_events {
+        let now = Instant::now();
+        let mut replay_count = 0usize;
+        let mut expired_count = 0usize;
+
+        for (event, inserted_at) in pending_events {
+            // G33-009: skip events older than PENDING_EVENT_TTL
+            if now.duration_since(inserted_at) >= PENDING_EVENT_TTL {
+                expired_count += 1;
+                continue;
+            }
             if sender.send(event).is_err() {
                 break;
             }
+            replay_count += 1;
+        }
+
+        if expired_count > 0 {
+            tracing::debug!(
+                workflow_id,
+                expired_count,
+                "Discarded expired pending workflow events (TTL exceeded)"
+            );
         }
 
         tracing::debug!(

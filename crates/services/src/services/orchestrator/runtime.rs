@@ -22,7 +22,7 @@ use uuid::Uuid;
 
 use super::{
     OrchestratorAgent, OrchestratorConfig, SharedMessageBus,
-    constants::{WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_READY},
+    constants::{WORKFLOW_STATUS_FAILED, WORKFLOW_STATUS_PAUSED, WORKFLOW_STATUS_READY},
     persistence::StatePersistence,
     runtime_actions::RuntimeActionService,
     types::LLMMessage,
@@ -645,17 +645,20 @@ impl OrchestratorRuntime {
     /// Sends shutdown signal to the agent and waits for graceful shutdown.
     /// If shutdown doesn't complete within timeout, the task is aborted.
     ///
-    /// # Shutdown ordering (G05-006)
+    /// # Shutdown ordering (G05-003 / G05-006)
     ///
-    /// The workflow is removed from `running_workflows` *before* the
-    /// `Shutdown` message is published.  This means new API requests
-    /// (e.g. `submit_orchestrator_chat`) will immediately get "not running"
-    /// errors, even though the agent task is still draining.  This is
-    /// intentional: it prevents new work from being enqueued during
-    /// teardown.  Any in-flight events already in the message bus channel
-    /// will still be delivered to the agent's event loop, but the agent
-    /// breaks out of its loop upon receiving `BusMessage::Shutdown`,
-    /// so those trailing events are harmlessly discarded.
+    /// The `Shutdown` message is published to the message bus *before* the
+    /// workflow is removed from `running_workflows`.  This ensures the agent
+    /// task receives the shutdown signal and can begin draining its event
+    /// loop before the runtime discards its handle.
+    ///
+    /// After publishing, the workflow is removed so that new API requests
+    /// (e.g. `submit_orchestrator_chat`) immediately get "not running"
+    /// errors, preventing new work from being enqueued during teardown.
+    /// Any in-flight events already in the message bus channel will still
+    /// be delivered to the agent's event loop, but the agent breaks out of
+    /// its loop upon receiving `BusMessage::Shutdown`, so those trailing
+    /// events are harmlessly discarded.
     pub async fn stop_workflow(&self, workflow_id: &str) -> Result<()> {
         // Stop GitWatcher first (non-blocking)
         self.stop_git_watcher(workflow_id).await;
@@ -665,7 +668,21 @@ impl OrchestratorRuntime {
             idempotency.remove(workflow_id);
         }
 
-        // Remove from running workflows
+        // G05-003: Publish Shutdown BEFORE removing from running_workflows so
+        // the agent task is guaranteed to receive the signal before we
+        // discard the task handle.  The workflow topic is derived from the
+        // workflow_id, so the agent's bus subscription will pick it up.
+        if self.running_workflows.lock().await.contains_key(workflow_id) {
+            self.message_bus
+                .publish(
+                    &format!("workflow:{workflow_id}"),
+                    super::BusMessage::Shutdown,
+                )
+                .await?;
+            info!("Shutdown signal sent for workflow {}", workflow_id);
+        }
+
+        // Remove from running workflows AFTER the shutdown signal has been published
         let running_workflow = {
             let mut running = self.running_workflows.lock().await;
             running
@@ -673,26 +690,16 @@ impl OrchestratorRuntime {
                 .ok_or_else(|| anyhow!("Workflow {workflow_id} is not running"))?
         };
 
-        // Send shutdown signal via message bus
-        self.message_bus
-            .publish(
-                &format!("workflow:{workflow_id}"),
-                super::BusMessage::Shutdown,
-            )
-            .await?;
-
-        info!("Shutdown signal sent for workflow {}", workflow_id);
-
         // Wait for graceful shutdown.
         //
-        // Timeout rationale (G05-003): 10 seconds accommodates the worst
+        // Timeout rationale (G05-003): 15 seconds accommodates the worst
         // case where the agent is mid-LLM call.  Most LLM providers have
         // their own request timeout (typically 30-60s), but the agent
-        // checks for shutdown between iterations, so 10s is sufficient for
-        // the current event-loop design.  If LLM timeouts are raised above
-        // 10s in the future, this value should be increased accordingly.
+        // checks for shutdown between iterations, so 15s is sufficient for
+        // the current event-loop design while giving more headroom than the
+        // previous 10s value.
         let mut task_handle = running_workflow.task_handle;
-        let shutdown_result = timeout(Duration::from_secs(10), &mut task_handle).await;
+        let shutdown_result = timeout(Duration::from_secs(15), &mut task_handle).await;
 
         match shutdown_result {
             Ok(Ok(())) => {
@@ -714,6 +721,59 @@ impl OrchestratorRuntime {
         debug!("Total running workflows: {}", running.len());
 
         Ok(())
+    }
+
+    /// Resume a paused workflow (G05-002)
+    ///
+    /// Atomically transitions the workflow from `paused` to `ready` via CAS,
+    /// then delegates to `start_workflow` to create a fresh orchestrator agent.
+    ///
+    /// Returns `Err` if the workflow is not found, is not in `paused` state,
+    /// or if the CAS update races with a concurrent status change.
+    pub async fn resume_workflow(&self, workflow_id: &str) -> Result<()> {
+        let pool = &self.db.pool;
+
+        // Load workflow and verify it is paused
+        let workflow = db::models::Workflow::find_by_id(pool, workflow_id)
+            .await?
+            .ok_or_else(|| anyhow!("Workflow {workflow_id} not found"))?;
+
+        if workflow.status != WORKFLOW_STATUS_PAUSED {
+            return Err(anyhow!(
+                "Cannot resume workflow {workflow_id}: expected status '{}', got '{}'",
+                WORKFLOW_STATUS_PAUSED,
+                workflow.status
+            ));
+        }
+
+        // CAS: paused → ready
+        let now = chrono::Utc::now();
+        let result = sqlx::query(
+            r"
+            UPDATE workflow
+            SET status = 'ready', updated_at = ?
+            WHERE id = ? AND status = 'paused'
+            ",
+        )
+        .bind(now)
+        .bind(workflow_id)
+        .execute(pool)
+        .await
+        .map_err(|e| anyhow!("Failed to update workflow status during resume: {e}"))?;
+
+        if result.rows_affected() == 0 {
+            return Err(anyhow!(
+                "Cannot resume workflow {workflow_id}: status changed concurrently"
+            ));
+        }
+
+        info!(
+            workflow_id = %workflow_id,
+            "Workflow transitioned paused → ready for resume"
+        );
+
+        // Delegate to start_workflow which handles slot reservation and agent creation
+        self.start_workflow(workflow_id).await
     }
 
     /// Check if a workflow is currently running
@@ -851,17 +911,44 @@ impl OrchestratorRuntime {
                     );
                 }
                 Ok(false) => {
-                    warn!(
-                        workflow_id = %workflow_id,
-                        "No persisted state found, marking as failed"
-                    );
+                    // G05-004: Check task progress before giving up. If the workflow
+                    // has completed tasks, it made meaningful progress before the
+                    // restart. In that case, mark it as `paused` so the user can
+                    // inspect results and optionally resume, rather than destroying
+                    // all recorded progress by marking it `failed`.
+                    let has_completed_tasks = match db::models::WorkflowTask::find_by_workflow(pool, &workflow_id).await {
+                        Ok(tasks) => tasks.iter().any(|t| t.status == "completed"),
+                        Err(e) => {
+                            warn!(
+                                workflow_id = %workflow_id,
+                                error = %e,
+                                "Failed to check task progress during recovery; defaulting to failed"
+                            );
+                            false
+                        }
+                    };
+
+                    let recovery_status = if has_completed_tasks {
+                        warn!(
+                            workflow_id = %workflow_id,
+                            "No persisted state found but workflow has completed tasks; marking as paused for manual resume"
+                        );
+                        WORKFLOW_STATUS_PAUSED
+                    } else {
+                        warn!(
+                            workflow_id = %workflow_id,
+                            "No persisted state found and no completed tasks, marking as failed"
+                        );
+                        WORKFLOW_STATUS_FAILED
+                    };
+
                     if let Err(e) =
-                        db::models::Workflow::update_status(pool, &workflow_id, WORKFLOW_STATUS_FAILED)
+                        db::models::Workflow::update_status(pool, &workflow_id, recovery_status)
                             .await
                     {
                         error!(
-                            "Failed to mark workflow {} as failed during recovery: {}",
-                            workflow_id, e
+                            "Failed to mark workflow {} as {} during recovery: {}",
+                            workflow_id, recovery_status, e
                         );
                     }
                 }
@@ -947,6 +1034,29 @@ impl OrchestratorRuntime {
         // Inject the recovered state into the agent
         agent.restore_state(recovered_state).await;
 
+        // G05-005: Start GitWatcher BEFORE spawning the agent task so the
+        // watcher is already polling when the agent begins its event loop.
+        // This eliminates the timing window where commits landing between
+        // agent start and watcher start would be silently missed.
+        match self.try_start_git_watcher(workflow_id, &workflow).await {
+            Ok(Some(handle)) => {
+                let mut watchers = self.git_watchers.lock().await;
+                watchers.insert(workflow_id.to_string(), handle);
+            }
+            Ok(None) => {
+                debug!(
+                    "GitWatcher not started for recovered workflow {} (no valid repo)",
+                    workflow_id
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to start GitWatcher for recovered workflow {}: {}",
+                    workflow_id, e
+                );
+            }
+        }
+
         // Spawn agent task (same pattern as start_workflow_reserved)
         let agent_clone = agent.clone();
         let running_workflows = self.running_workflows.clone();
@@ -1009,39 +1119,6 @@ impl OrchestratorRuntime {
             RunningWorkflow { agent, task_handle },
         );
         drop(running);
-
-        // Start GitWatcher (non-blocking, failure is not fatal)
-        //
-        // Timing window note (G05-005): The agent task is spawned and may
-        // begin processing events *before* the GitWatcher is started below.
-        // This means commits that land between agent start and watcher start
-        // will not be detected by the watcher's polling loop.
-        //
-        // In practice this window is very short (< 100ms), and the agent's
-        // own quiet-window logic (40s inactivity timer) provides a natural
-        // buffer.  However, for maximum robustness a future improvement
-        // could have the agent (or the watcher) perform a one-time scan of
-        // recent commits after startup to catch anything missed during the
-        // gap.  This applies to both normal start (`start_workflow_reserved`)
-        // and recovery (`try_resume_workflow`).
-        match self.try_start_git_watcher(workflow_id, &workflow).await {
-            Ok(Some(handle)) => {
-                let mut watchers = self.git_watchers.lock().await;
-                watchers.insert(workflow_id.to_string(), handle);
-            }
-            Ok(None) => {
-                debug!(
-                    "GitWatcher not started for recovered workflow {} (no valid repo)",
-                    workflow_id
-                );
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to start GitWatcher for recovered workflow {}: {}",
-                    workflow_id, e
-                );
-            }
-        }
 
         Ok(true)
     }

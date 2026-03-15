@@ -308,10 +308,13 @@ impl LLMClient for ResilientLLMClient {
                         e,
                     );
                     let just_died = self.record_failure(idx).await;
-                    if just_died && offset + 1 < provider_count {
+                    if offset + 1 < provider_count {
                         let next_idx = (idx + 1) % provider_count;
-                        self.switch_to_next(idx);
-                        // Record switch event
+                        if just_died {
+                            self.switch_to_next(idx);
+                        }
+                        // G24-003: emit Switched event on every actual provider switch,
+                        // not only when the provider transitions to "dead".
                         let mut events = self.last_events.write().await;
                         events.push(ProviderEvent::Switched {
                             from_provider: self.providers[idx].name.clone(),

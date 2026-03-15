@@ -2,10 +2,14 @@
 //!
 //! Coordinates merging of task branches into the base branch with conflict detection.
 
-use std::{path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::Arc,
+};
 
 use anyhow::Result;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, OwnedMutexGuard, RwLock};
 
 use crate::services::{
     git::GitService,
@@ -14,6 +18,44 @@ use crate::services::{
         message_bus::{BusMessage, SharedMessageBus},
     },
 };
+
+/// Per-workflow merge lock registry.
+///
+/// Ensures that auto-merge (triggered by the orchestrator) and manual merge
+/// (triggered via the REST API) cannot run concurrently for the same workflow.
+/// G06-002: `Arc<Mutex<()>>` is used per workflow_id; the outer Mutex protects
+/// the HashMap itself (held only briefly to clone the Arc).
+type WorkflowMergeLocks = Arc<std::sync::Mutex<HashMap<String, Arc<Mutex<()>>>>>;
+
+/// Returns the global per-workflow merge lock registry.
+fn merge_locks() -> &'static WorkflowMergeLocks {
+    use once_cell::sync::Lazy;
+    static LOCKS: Lazy<WorkflowMergeLocks> =
+        Lazy::new(|| Arc::new(std::sync::Mutex::new(HashMap::new())));
+    &LOCKS
+}
+
+/// Acquires the per-workflow merge lock.
+///
+/// Returns an `OwnedMutexGuard` that releases the lock when dropped.
+/// Use `let _guard = acquire_workflow_merge_lock(workflow_id).await` to hold the
+/// lock for the duration of the merge operation.
+///
+/// G06-002: ensures auto-merge and manual merge cannot run concurrently for the
+/// same workflow.
+pub async fn acquire_workflow_merge_lock(workflow_id: &str) -> OwnedMutexGuard<()> {
+    // Retrieve or create the per-workflow Mutex.
+    let lock_arc: Arc<Mutex<()>> = {
+        let mut map = merge_locks().lock().expect("merge lock map poisoned");
+        map.entry(workflow_id.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone()
+    };
+
+    // `lock_owned()` returns an OwnedMutexGuard<()> which holds an Arc<Mutex<()>>
+    // internally — no lifetime issues.
+    lock_arc.lock_owned().await
+}
 
 /// Coordinates merging of completed task branches into the base branch.
 ///
