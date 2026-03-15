@@ -40,6 +40,7 @@ pub struct SubscriptionHub {
     senders: Arc<RwLock<HashMap<String, broadcast::Sender<WsEvent>>>>,
     /// Per-workflow event cache used when no subscribers are connected.
     /// Each entry carries the insertion `Instant` for TTL enforcement (G33-009).
+    #[allow(clippy::type_complexity)]
     pending_events: Arc<RwLock<HashMap<String, VecDeque<(WsEvent, Instant)>>>>,
     /// Maximum number of cached events retained per workflow.
     pending_limit: usize,

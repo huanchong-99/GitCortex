@@ -254,10 +254,10 @@ async fn reconnect(
             // progress) from other send failures so the caller gets an
             // actionable status code instead of a misleading 200 OK.
             return match e {
-                tokio::sync::mpsc::error::TrySendError::Full(_) => Err(ApiError::Conflict(
+                tokio::sync::mpsc::error::TrySendError::Full(()) => Err(ApiError::Conflict(
                     "A reconnect is already in progress. Please wait and try again.".to_string(),
                 )),
-                tokio::sync::mpsc::error::TrySendError::Closed(_) => Err(ApiError::Internal(
+                tokio::sync::mpsc::error::TrySendError::Closed(()) => Err(ApiError::Internal(
                     "Feishu reconnect channel is closed. The connector may have shut down.".to_string(),
                 )),
             };

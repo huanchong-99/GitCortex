@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
     time::{Duration, Instant},
 };
 
@@ -42,7 +42,7 @@ struct TaskProjectCache {
 
 impl TaskProjectCache {
     fn get(&self, task_id: Uuid) -> Option<Uuid> {
-        let mut map = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(entry) = map.get(&task_id) {
             if entry.inserted_at.elapsed() < TASK_CACHE_TTL {
                 return Some(entry.project_id);
@@ -54,7 +54,7 @@ impl TaskProjectCache {
     }
 
     fn insert(&self, task_id: Uuid, project_id: Uuid) {
-        let mut map = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut map = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
         map.insert(task_id, CacheEntry { project_id, inserted_at: Instant::now() });
     }
 }
@@ -468,7 +468,7 @@ impl EventService {
                                                 // Populate ownership cache
                                                 {
                                                     let mut map = ownership.lock()
-                                                        .unwrap_or_else(|e| e.into_inner());
+                                                        .unwrap_or_else(PoisonError::into_inner);
                                                     map.insert(process.id, process.session_id);
                                                 }
                                                 if !show_soft_deleted && process.dropped {
@@ -491,7 +491,7 @@ impl EventService {
                                             {
                                                 {
                                                     let mut map = ownership.lock()
-                                                        .unwrap_or_else(|e| e.into_inner());
+                                                        .unwrap_or_else(PoisonError::into_inner);
                                                     map.insert(process.id, process.session_id);
                                                 }
                                                 if !show_soft_deleted && process.dropped {
@@ -514,7 +514,7 @@ impl EventService {
                                                 // Check in-memory ownership cache first
                                                 let cached_sid = {
                                                     let map = ownership.lock()
-                                                        .unwrap_or_else(|e| e.into_inner());
+                                                        .unwrap_or_else(PoisonError::into_inner);
                                                     map.get(&proc_id).copied()
                                                 };
                                                 match cached_sid {
@@ -536,7 +536,7 @@ impl EventService {
                                                         {
                                                             if proc.session_id == session_id {
                                                                 let mut map = ownership.lock()
-                                                                    .unwrap_or_else(|e| e.into_inner());
+                                                                    .unwrap_or_else(PoisonError::into_inner);
                                                                 map.insert(proc_id, proc.session_id);
                                                                 return Some(Ok(LogMsg::JsonPatch(
                                                                     patch,
@@ -658,7 +658,7 @@ impl EventService {
         );
 
         let type_str = scratch_type.to_string();
-        let scratch_type_resync = scratch_type.clone();
+        let scratch_type_resync = *scratch_type;
         let db_pool_scratch = self.db.pool.clone();
 
         // Filter to only this scratch's events by matching id and payload.type in the patch value
@@ -667,7 +667,7 @@ impl EventService {
                 let id_str = scratch_id.to_string();
                 let type_str = type_str.clone();
                 let db_pool_scratch = db_pool_scratch.clone();
-                let scratch_type_resync = scratch_type_resync.clone();
+                let scratch_type_resync = scratch_type_resync;
                 async move {
                     match msg_result {
                         Ok(LogMsg::JsonPatch(patch)) => {

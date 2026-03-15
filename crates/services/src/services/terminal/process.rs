@@ -840,10 +840,9 @@ impl ProcessManager {
         {
             tokio::task::spawn_blocking(move || {
                 use std::os::windows::process::CommandExt;
-                const CTRL_C_EVENT: u32 = 0;
-                // GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid) — best-effort, ignore errors.
+                // CREATE_NO_WINDOW
                 let _ = std::process::Command::new("cmd.exe")
-                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .creation_flags(0x0800_0000)
                     .args(["/c", &format!("taskkill /PID {pid}")])
                     .output();
 
