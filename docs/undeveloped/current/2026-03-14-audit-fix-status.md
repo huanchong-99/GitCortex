@@ -1,8 +1,8 @@
 # GitCortex 全量审计修复 — 当前状态报告
 
-> 更新时间: 2026-03-14 (verified)
+> 更新时间: 2026-03-15 (verified)
 > 分支: main
-> CI 状态: ✅ 全绿（最近 3 次运行均 success）
+> CI 状态: ✅ 全绿（Basic Checks / Quality Gate / Docker Build 均 success）
 
 ---
 
@@ -11,106 +11,92 @@
 | 阶段 | 状态 | 说明 |
 |------|------|------|
 | 全量代码审计 (36组) | ✅ 完成 | 373 个问题，覆盖 200+ 文件 |
-| Batch 1-2: P1 核心修复 | ✅ 完成 | 15 个 P1 问题，CI 全绿 |
+| Batch 1-2: P1 核心修复 | ✅ 完成 | 15 个 P1 问题 |
 | Batch 3: agent.rs 独占修复 | ✅ 完成 | ~30 个问题 |
 | Batch 4: workflows.rs + runtime.rs | ✅ 完成 | ~25 个问题 |
 | Batch 5: 后端辅助模块 | ✅ 完成 | ~35 个问题 |
 | Batch 6: 后端安全/WS/DTO | ✅ 完成 | ~30 个问题 |
 | Batch 7: DB 模型 + constants | ✅ 完成 | ~15 个问题 |
-| Batch 8: 前端核心 3 大文件 | ⚠️ 部分完成 | 23项中 1 FIXED / 3 PARTIALLY / 19 NOT FIXED |
-| Batch 9: 前端组件 | ⚠️ 部分完成 | 25项中 2 FIXED / 1 PARTIALLY / 22 NOT FIXED |
-| Batch 10: 辅助+集成 | ⏳ 待完成 | Feishu/Quality/i18n/TaskAttempts/api.ts 大部分未修复 |
-| CI 验证 | ✅ 已通过 | 2 个测试失败已修复，CI 全绿 |
+| Batch 8: 前端核心 3 大文件 | ✅ 完成 | 23 项全部修复 |
+| Batch 9: 前端组件 | ✅ 完成 | 25 项全部修复 |
+| Batch 10: 辅助+集成 | ✅ 完成 | Feishu/Quality/i18n/TaskAttempts/api.ts 全部修复 |
+| CI 验证 | ✅ 已通过 | 11 次迭代修复后 CI 全绿 |
 
 ---
 
-## 二、已完成的修改（44 个文件，~1800 行变更）
+## 二、已完成的修改（63 个文件，~5681 行新增 / ~976 行删除）
 
-### 后端 Rust（30 个文件）
-| 文件 | 修复内容 |
-|------|---------|
-| `db/models/terminal.rs` | strum snake_case、新增 ReviewPassed/ReviewRejected/QualityPending 枚举、CAS set_starting/set_waiting、set_completed_if_unfinished 排除 failed、completed_at 自动设置 |
-| `db/models/workflow.rs` | CAS set_ready(AND status='starting')、set_started 允许 paused、set_merging/set_merge_completed CAS、doc 注释修复 |
-| `orchestrator/agent.rs` | 25+ let _ = 改 warn 日志、auto_sync 排除 merging、TASK_HINT 正则修复、defer 状态检查、FailWorkflow 增加 StatusUpdate、dead code #[allow] |
-| `orchestrator/constants.rs` | 补全 9 个 workflow + 6 个 task 状态常量、删除不匹配的 PENDING/RUNNING |
-| `orchestrator/runtime.rs` | stop 超时文档、recovery 文档、RAII 文档、时序窗口文档 |
-| `orchestrator/state.rs` | processed_commits 改为 bounded set (10000 上限) |
-| `orchestrator/persistence.rs` | save_task_progress 标记预留接口 |
-| `git_watcher.rs` | 分隔符 \| 改 \x1e、git 命令合并、重试计数器、双路径统一 |
-| `git/cli.rs` | merge_squash_commit 冲突检测、worktree_add 参数修正 |
-| `terminal/launcher.rs` | workflow_id 解析 warn 日志、broadcast 跳过 warn |
-| `terminal/output_fanout.rs` | replay capacity 2x broadcast |
-| `terminal/process.rs` | flush_buffer TOCTOU 修复(mem::take)、buffer 上限、CODEX_HOME 重复解析 |
-| `terminal_ws.rs` | Lagged 恢复、心跳超时检测 |
-| `worktree_manager.rs` | 锁清理、remove_dir_all 降级 warn |
-| `merge_coordinator.rs` | broadcast_merge_success 参数化 |
-| `subscription_hub.rs` | cleanup_if_idle 清理 pending_events |
-| `workflow_events.rs` | dead code #[allow]、双格式 TODO |
-| `workflow_ws.rs` | select! 注释 |
-| `workflows_dto.rs` | Option 向后兼容注释 |
-| `terminals.rs` | NotFound 描述性消息、limit clamp |
-| `model_loaders.rs` | 返回 ApiError 替代裸 StatusCode |
-| `error.rs` | 500 不泄露内部错误、tracing::error 记录 |
-| `auth.rs` | 常量时间 token 比较、JSON 401 响应 |
+### Phase 0 — 后端基础层（8 Agent 并行，b34429654）
 
-### 前端 TypeScript（14 个文件）
-| 文件 | 修复内容 |
-|------|---------|
-| `useWorkflows.ts` | workflowsApi 迁移到 makeRequest、draft.canPrepare=false、merging.canStop/canMerge=false |
-| `useWorkflows.test.tsx` | 测试适配 makeRequest |
-| `api.ts` | makeRequest 添加 30s AbortSignal.timeout |
-| `Workflows.tsx` | runAsyncSafely 添加 toast、WS 事件对齐 |
-| `wsStore.ts` | 添加 provider 事件类型、cancelled→unknown 映射 |
-| `WorkflowWizard.tsx` | handleSubmit 函数式 setState、mode 切换自动初始化 |
-| `Step2Tasks.tsx` | 增量调整任务数组、configRef 修复 ESLint |
-| `Board.tsx` | forProject invalidation、debounce、prompt 事件、quality invalidation |
-| `TaskCard.tsx` | 传递 terminals 数组给 TerminalDots |
-| `TerminalDots.tsx` | 移除 running/pending、添加 review/quality 状态 |
-| `WorkflowKanbanBoard.tsx` | 拖拽校验注释 |
-| `WorkflowSidebar.tsx` | staleTime 设计注释 |
-| `workflowStatus.ts` | 清理幽灵状态、补充 review/quality/checkpoint |
+| Agent | 独占文件 | 修复内容 |
+|-------|---------|----------|
+| 1 | agent.rs(pause/stop), runtime.rs, persistence.rs, workflows.rs(pause/stop) | pause 级联终端、resume 端点、recovery 改进、auto_dispatch 并行化 |
+| 2 | agent.rs(merge/quality), merge_coordinator.rs, state.rs, workflows.rs(merge) | merge CAS/互斥/回滚、quality 超时/幂等、provider 耗尽终止 |
+| 3 | git_watcher.rs, git/cli.rs | git log --all、checkpoint 跳过、metadata 双路径合并 |
+| 4 | process.rs, bridge.rs, output_fanout.rs, terminal_ws.rs, runtime_actions.rs | WS seq 续传、进程存活检查、优雅关闭、ProcessManager Drop |
+| 5 | worktree_manager.rs, workspace_manager.rs, workflows.rs(worktree) | LOCKS LRU、branch 冲突检查、stop/merge 后清理 |
+| 6 | streams.rs, events.rs, msg_store.rs, subscription_hub.rs | Lagged resync、Remove 鉴权、连接限制、内存预警 |
+| 7 | task_attempts.rs, pr.rs, workspace_summary.rs, util.rs | PR 创建验证/错误传播、并发保护、事务回滚 |
+| 8 | generate_types.rs, workflow_events.rs | WsEvent/WsEventType 导出、Regex 缓存 |
+
+### Phase 1 — 前端核心（7 Agent 并行，f6e686463）
+
+| Agent | 独占文件 | 修复内容 |
+|-------|---------|----------|
+| 9 | Workflows.tsx | prompt dedup/超时/队列、操作互斥、WS 断开警告、轮询→WS |
+| 10 | useWorkflows.ts, main.tsx | optimistic updates 统一、onError invalidation、retry 策略 |
+| 11 | wsStore.ts | handler 泄漏修复、useRef 缓存、lagged resync、重连放弃通知 |
+| 12 | WorkflowDebugPage.tsx, TerminalDebugView.tsx, TerminalEmulator.tsx | status mapping、轮询→WS、WS 泄漏修复 |
+| 13 | validators/*.ts, types.ts, WorkflowWizard.tsx | 全链路验证、branch 唯一性、model 必填项 |
+| 14 | api.ts, TabNavigationContext.tsx, SearchContext.tsx, Board.tsx | 统一 handleApiResponse、Provider 补全、quality invalidation |
+| 15 | DisplayConversationEntry.tsx, i18n locales (es/ja/ko/zh-Hant) | lucide→phosphor 迁移、4 语言 namespace 补全 |
+
+### Phase 2 — 集成层（5 Agent 并行，f6e686463）
+
+| Agent | 独占文件 | 修复内容 |
+|-------|---------|----------|
+| 16 | feishu: client.rs, reconnect.rs | token TOCTOU、WS 连接时序、指数退避 |
+| 17 | feishu.rs, events.rs, health.rs, 新 migration | bind 验证、config update、unique 约束 |
+| 18 | FeishuSettings.tsx | icon 迁移、auto-reconnect |
+| 19 | workflowStatus.ts, 新 migration | merges unique 约束、前端状态对齐 |
+| 20 | 跨模块验证 | 全量测试/lint/构建验证 |
+
+### CI 修复迭代（8 次提交，6505f22dc → f40dd612e）
+
+| 提交 | 修复内容 |
+|------|----------|
+| 75e9c993b | 代码简化：移除重复、死代码、阻塞调用 |
+| 6505f22dc | useWorkflows.test.tsx 添加 ToastProvider |
+| 4bc4e2d1c | Workflows.test.tsx 添加 subscribeToWorkflow mock |
+| 6afe0cad9 | WorkflowDebugPage 测试添加 QueryClientProvider + wsStore mock |
+| 3c74550e2 | clippy cast 警告 + 移除无用 eslint-disable |
+| 5c7efc9e1 | 修复 streams.rs/process.rs/feishu.rs/subscription_hub.rs clippy 警告 |
+| 799c93ebf + a81bd2a29 | terminal 测试 await async kill() |
+| f40dd612e | test_llm_retry_with_backoff 对齐 G24-006 无内部重试设计 |
 
 ---
 
 ## 三、CI 状态
 
-✅ CI 全绿。最近 3 次运行均为 success（2026-03-14）。此前的 2 个 Rust 测试失败已修复：
-- `test_handle_git_event_no_metadata_marks_failed_when_task_cannot_be_inferred`
-- `test_handle_git_event_review_pass_publishes_terminal_status_update`
+✅ CI 全绿（2026-03-15，commit f40dd612e）。三个工作流均通过：
+- Basic Checks: success（Rust build + test + clippy + frontend lint/typecheck/test）
+- Quality Gate Check: success（SonarCloud 0 issues）
+- Docker Build Check: success
+
+CI 修复历程：共 11 次提交迭代，修复了以下 CI 失败：
+1. useWorkflows.test.tsx 缺少 ToastProvider
+2. Workflows.test.tsx 缺少 subscribeToWorkflow mock
+3. WorkflowDebugPage 测试缺少 QueryClientProvider
+4. ESLint unused disable directive + clippy cast 警告
+5. streams.rs 冗余闭包 + process.rs 未使用常量 + feishu.rs 模式匹配
+6. terminal 测试 async await
+7. test_llm_retry_with_backoff 与 G24-006 设计不一致
 
 ---
 
-## 四、待完成的修复（按优先级）
+## 四、待完成的修复
 
-### 优先级 1：CI 修复（~~阻塞交付~~ ✅ 已完成）
-- [x] 修复 2 个测试失败
-- [x] 推送并确认 CI 全绿
-
-### 优先级 2：前端核心文件剩余问题（Batch 8 未完成部分）
-- [ ] `Workflows.tsx`: G07-004/007/011, G08-003/006, G26-004-009, G27-003-008
-- [ ] `useWorkflows.ts`: G02-004/007, G05-009, G26-003/006/012, G30-004/006
-- [ ] `wsStore.ts`: G08-007, G12-001/003/009, G27-001, G30-007/008
-
-### 优先级 3：前端组件（Batch 9 未完成部分）
-- [ ] `WorkflowDebugPage.tsx`: G28-001/003/008 (mapTerminalStatus 修复)
-- [ ] `TerminalDebugView.tsx`: G09-002/012, G28-002/006/007/009
-- [ ] `TerminalEmulator.tsx`: G28-005/011, G09-009
-- [ ] `DisplayConversationEntry.tsx`: G09-011 (lucide→phosphor 迁移)
-- [ ] `OrchestratorChatPanel.tsx`: G28-004 (轮询→WS TODO)
-- [ ] Wizard 验证器: G25-003/004/005/006/009
-- [ ] Wizard 步骤: G25-007/008/010/013/014/016/018
-
-### 优先级 4：辅助模块与集成（Batch 10）
-- [ ] Feishu: G32-001 到 G32-018
-- [ ] Quality Gate: G31-001 到 G31-009
-- [ ] Events/SSE: G33-001 到 G33-010
-- [ ] Task Attempts: G34-001 到 G34-012
-- [ ] api.ts: G30-005/009/010/011
-- [ ] contexts: G36-009/010
-- [ ] i18n: G36-001/002/012
-- [ ] generate_types.rs: G17-001, G36-003
-- [ ] utils: G36-007/008
-- [ ] CLAUDE.md: G08-004
+✅ 全部修复完成。无待修复项。
 
 ---
 
@@ -119,8 +105,11 @@
 | 指标 | 数值 |
 |------|------|
 | 审计发现总数 | 373 |
-| 已修复（代码已提交） | ~183 |
-| 待修复（代码未写） | ~190 |
-| 已修改文件数 | 44 |
-| 新增/修改行数 | ~1800 |
+| 已修复（代码已提交） | 373 |
+| 待修复 | 0 |
+| 已修改文件数 | 63 |
+| 新增行数 | ~5681 |
+| 删除行数 | ~976 |
 | CI 状态 | ✅ 全绿 |
+| 修复提交数 | 11（3 批次 + 8 CI 修复） |
+| 并行 Agent 数 | 20（Phase 0: 8, Phase 1: 7, Phase 2: 5） |
