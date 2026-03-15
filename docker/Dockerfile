@@ -59,6 +59,7 @@ RUN set -eux; \
     apt-get update && apt-get install -y --no-install-recommends \
         git pkg-config libsqlite3-dev libgit2-dev zlib1g-dev \
         cmake make ninja-build clang libclang-dev perl nasm libssl-dev \
+        protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -102,6 +103,7 @@ WORKDIR /build
 
 COPY Cargo.toml Cargo.lock ./
 COPY .cargo/config.toml .cargo/config.toml
+COPY proto/ proto/
 COPY crates/ crates/
 COPY assets/ assets/
 COPY shared/ shared/
