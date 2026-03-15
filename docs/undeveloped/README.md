@@ -8,8 +8,7 @@ This repository uses two top-level documentation folders:
 ## Current `docs/undeveloped/` structure
 
 - `docs/undeveloped/current/`: active unfinished work
-  - `TODO.md` — single source of truth for all active unfinished tasks
-  - `2026-03-14-audit-fix-status.md` — audit fix progress tracker (partially complete)
+  - `TODO.md` — single source of truth for all active unfinished tasks (only backlog remains)
 - `docs/undeveloped/misc/`: auxiliary data used during development
   - `TEST_DATA.md` — test workflow configuration and API credentials
 
