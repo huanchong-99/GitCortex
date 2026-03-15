@@ -344,13 +344,13 @@ impl ProcessManager {
     /// Attempt to terminate the child process for a tracked terminal.
     ///
     /// Returns `Ok(())` when termination succeeded or the process already exited.
-    fn terminate_tracked_child(
+    async fn terminate_tracked_child(
         &self,
         terminal_id: &str,
         tracked: &mut TrackedProcess,
     ) -> anyhow::Result<()> {
         let kill_result = match tracked.child.process_id() {
-            Some(pid) if pid > 0 => self.kill(pid),
+            Some(pid) if pid > 0 => self.kill(pid).await,
             _ => tracked
                 .child
                 .kill()
@@ -387,6 +387,7 @@ impl ProcessManager {
             };
 
             self.terminate_tracked_child(terminal_id, existing)
+                .await
                 .map_err(|e| {
                     anyhow::anyhow!("Failed to evict existing terminal {terminal_id}: {e}")
                 })?;
@@ -817,7 +818,7 @@ impl ProcessManager {
     ///
     /// Sends a termination signal to the process with the given PID.
     /// On Unix, sends SIGTERM. On Windows, uses taskkill /F.
-    pub fn kill(&self, pid: u32) -> anyhow::Result<()> {
+    pub async fn kill(&self, pid: u32) -> anyhow::Result<()> {
         // Safety check: PID 0 is invalid and could cause unintended behavior
         if pid == 0 {
             return Err(anyhow::anyhow!(
@@ -837,48 +838,49 @@ impl ProcessManager {
 
         #[cfg(windows)]
         {
-            // [G21-005] Graceful Windows shutdown: first send CTRL_C_EVENT to let the
-            // process clean up, then wait up to 3 s before force-killing with taskkill /F.
-            // This gives CLI tools (claude, codex, etc.) a chance to flush state.
-            use std::os::windows::process::CommandExt;
-            const CTRL_C_EVENT: u32 = 0;
-            // GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid) — best-effort, ignore errors.
-            let _ = std::process::Command::new("cmd.exe")
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .args(["/c", &format!("taskkill /PID {pid}")])
-                .output();
-
-            // Wait up to 3 s for the process to exit gracefully.
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
-            let exited_gracefully = loop {
-                if std::time::Instant::now() >= deadline {
-                    break false;
-                }
-                // Poll via tasklist; if the PID is gone the process exited.
-                let check = std::process::Command::new("tasklist")
-                    .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+            tokio::task::spawn_blocking(move || {
+                use std::os::windows::process::CommandExt;
+                const CTRL_C_EVENT: u32 = 0;
+                // GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid) — best-effort, ignore errors.
+                let _ = std::process::Command::new("cmd.exe")
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .args(["/c", &format!("taskkill /PID {pid}")])
                     .output();
-                if let Ok(out) = check {
-                    let stdout = String::from_utf8_lossy(&out.stdout);
-                    if !stdout.contains(&pid.to_string()) {
-                        break true;
+
+                // Wait up to 3 s for the process to exit gracefully.
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+                let exited_gracefully = loop {
+                    if std::time::Instant::now() >= deadline {
+                        break false;
+                    }
+                    // Poll via tasklist; if the PID is gone the process exited.
+                    let check = std::process::Command::new("tasklist")
+                        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+                        .output();
+                    if let Ok(out) = check {
+                        let stdout = String::from_utf8_lossy(&out.stdout);
+                        if !stdout.contains(&pid.to_string()) {
+                            break true;
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                };
+
+                if !exited_gracefully {
+                    // Force-kill with the process tree flag.
+                    let output = std::process::Command::new("taskkill")
+                        .args(["/PID", &pid.to_string(), "/T", "/F"])
+                        .output()
+                        .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {e}"))?;
+
+                    if !output.status.success() {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        return Err(anyhow::anyhow!("taskkill failed: {stderr}"));
                     }
                 }
-                std::thread::sleep(std::time::Duration::from_millis(200));
-            };
 
-            if !exited_gracefully {
-                // Force-kill with the process tree flag.
-                let output = std::process::Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                    .output()
-                    .map_err(|e| anyhow::anyhow!("Failed to execute taskkill: {e}"))?;
-
-                if !output.status.success() {
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(anyhow::anyhow!("taskkill failed: {stderr}"));
-                }
-            }
+                Ok(())
+            }).await.map_err(|e| anyhow::anyhow!("spawn_blocking join error: {e}"))??;
         }
 
         Ok(())
@@ -892,7 +894,7 @@ impl ProcessManager {
                 .get_mut(terminal_id)
                 .ok_or_else(|| anyhow::anyhow!("Terminal not found: {terminal_id}"))?;
 
-            self.terminate_tracked_child(terminal_id, tracked)?;
+            self.terminate_tracked_child(terminal_id, tracked).await?;
             processes
                 .remove(terminal_id)
                 .ok_or_else(|| anyhow::anyhow!("Terminal not found after kill: {terminal_id}"))?

@@ -43,6 +43,7 @@ pub const WORKFLOW_STATUS_MERGING: &str = "merging";
 pub const WORKFLOW_STATUS_COMPLETED: &str = "completed";
 pub const WORKFLOW_STATUS_FAILED: &str = "failed";
 pub const WORKFLOW_STATUS_CANCELLED: &str = "cancelled";
+pub const WORKFLOW_STATUS_MERGE_PARTIAL_FAILED: &str = "merge_partial_failed";
 
 /// Task status values — mirrors `WorkflowTaskStatus` enum in `db::models::workflow`.
 pub const TASK_STATUS_PENDING: &str = "pending";

@@ -5,6 +5,7 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 import { handleApiResponse, logApiError, makeRequest, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/modals';
 import { useToast } from '@/components/ui/toast';
 import type {
   WorkflowDetailDto,
@@ -520,14 +521,6 @@ const workflowsApi = {
 // Helpers
 // ============================================================================
 
-/** Extract a user-facing message from an API or generic error. */
-function errorMessage(error: Error): string {
-  if (error instanceof ApiError && error.message) {
-    return error.message;
-  }
-  return error.message || 'An unexpected error occurred';
-}
-
 // ============================================================================
 // Hooks
 // ============================================================================
@@ -592,7 +585,7 @@ export function useCreateWorkflow() {
     },
     onError: (error: Error, variables) => {
       logApiError('Failed to create workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       // G26-006: Invalidate cache on error to ensure consistency
       queryClient.invalidateQueries({
         queryKey: workflowKeys.forProject(variables.projectId),
@@ -626,7 +619,7 @@ export function usePrepareWorkflow() {
     // G02-004 / G26-005 / G26-006: Rollback + invalidate + toast on error
     onError: (error: Error, workflowId, context) => {
       logApiError('Failed to prepare workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       if (context?.previous) {
         queryClient.setQueryData(workflowKeys.byId(workflowId), context.previous);
       }
@@ -663,7 +656,7 @@ export function useStartWorkflow() {
     // G26-006: Rollback + toast on error
     onError: (error: Error, variables, context) => {
       logApiError('Failed to start workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       if (context?.previous) {
         queryClient.setQueryData(workflowKeys.byId(variables.workflow_id), context.previous);
       }
@@ -700,7 +693,7 @@ export function usePauseWorkflow() {
     // G26-006: Rollback + toast on error
     onError: (error: Error, variables, context) => {
       logApiError('Failed to pause workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       if (context?.previous) {
         queryClient.setQueryData(workflowKeys.byId(variables.workflow_id), context.previous);
       }
@@ -737,7 +730,7 @@ export function useStopWorkflow() {
     // G26-006: Rollback + toast on error
     onError: (error: Error, variables, context) => {
       logApiError('Failed to stop workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       if (context?.previous) {
         queryClient.setQueryData(workflowKeys.byId(variables.workflow_id), context.previous);
       }
@@ -763,7 +756,7 @@ export function useSubmitWorkflowPromptResponse() {
     // G26-006 / G30-004: Invalidate cache + toast on error
     onError: (error: Error, variables) => {
       logApiError('Failed to submit workflow prompt response:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       queryClient.invalidateQueries({
         queryKey: workflowKeys.byId(variables.workflow_id),
       });
@@ -790,7 +783,7 @@ export function useSubmitOrchestratorChat() {
     // G26-006 / G30-004: Invalidate cache + toast on error
     onError: (error: Error, variables) => {
       logApiError('Failed to submit orchestrator chat message:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       queryClient.invalidateQueries({
         queryKey: workflowKeys.byId(variables.workflow_id),
       });
@@ -860,7 +853,7 @@ export function useMergeWorkflow() {
     // G26-006: Rollback + toast on error
     onError: (error: Error, variables, context) => {
       logApiError('Failed to merge workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       if (context?.previous) {
         queryClient.setQueryData(workflowKeys.byId(variables.workflow_id), context.previous);
       }
@@ -891,7 +884,7 @@ export function useDeleteWorkflow() {
     // G26-006 / G30-004: Invalidate cache + toast on error
     onError: (error: Error, workflowId) => {
       logApiError('Failed to delete workflow:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
       queryClient.invalidateQueries({ queryKey: workflowKeys.byId(workflowId) });
     },
     onSettled: () => {
@@ -951,7 +944,7 @@ export function useUpdateTaskStatus() {
         );
       }
       logApiError('Failed to update task status:', error);
-      showToast(errorMessage(error), 'error');
+      showToast(getErrorMessage(error), 'error');
     },
     onSettled: (_, __, { workflowId }) => {
       // Refetch to ensure consistency

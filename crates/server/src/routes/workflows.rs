@@ -28,7 +28,7 @@ use services::services::{
     cc_switch::CCSwitchService,
     config::Config as AppConfig,
     git::GitServiceError,
-    orchestrator::{BusMessage, OrchestratorRuntime, TerminalCoordinator},
+    orchestrator::{BusMessage, OrchestratorRuntime, TerminalCoordinator, constants::WORKFLOW_STATUS_PAUSED},
     terminal::TerminalLauncher,
 };
 use once_cell::sync::Lazy;
@@ -125,7 +125,7 @@ const WORKFLOW_STATUSES: [&str; 9] = [
     "starting",
     "ready",
     "running",
-    "paused",
+    WORKFLOW_STATUS_PAUSED,
     "merging",
     "completed",
     "failed",
@@ -136,7 +136,7 @@ const WORKFLOW_EXECUTION_MODES: [&str; 2] = ["diy", "agent_planned"];
 
 const MERGE_ALLOWED_WORKFLOW_STATUSES: [&str; 2] = ["completed", "merging"];
 const RUNTIME_MUTABLE_WORKFLOW_STATUSES: [&str; 5] =
-    ["created", "starting", "ready", "running", "paused"];
+    ["created", "starting", "ready", "running", WORKFLOW_STATUS_PAUSED];
 const ORCHESTRATOR_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
 const ORCHESTRATOR_RATE_LIMIT_MAX_REQUESTS: usize = 12;
 const ORCHESTRATOR_CIRCUIT_BREAKER_THRESHOLD: usize = 3;
@@ -1160,7 +1160,7 @@ async fn update_workflow_status(
         ("created", "starting", "Use POST /prepare instead"),
         ("failed", "starting", "Use POST /prepare instead"),
         ("ready", "running", "Use POST /start instead"),
-        ("paused", "running", "Use POST /start instead"),
+        (WORKFLOW_STATUS_PAUSED, "running", "Use POST /start instead"),
         ("completed", "merging", "Use POST /merge instead"),
     ];
     for &(from, to, hint) in protected_transitions {
@@ -1665,7 +1665,7 @@ async fn start_workflow(
     // reconciled to `not_started` (missing active PTY/session). Re-prepare before starting.
     // TODO(G16-008): Extract this re-prepare block into a dedicated `re_prepare_if_needed()`
     // function to reduce start_workflow complexity and improve testability.
-    if workflow.status == "ready" || workflow.status == "paused" {
+    if workflow.status == "ready" || workflow.status == WORKFLOW_STATUS_PAUSED {
         let terminals =
             db::models::Terminal::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
 
@@ -1719,7 +1719,7 @@ async fn start_workflow(
     }
 
     // Validate workflow status - allow starting from ready or resuming from paused
-    let valid_start_statuses = ["ready", "paused"];
+    let valid_start_statuses = ["ready", WORKFLOW_STATUS_PAUSED];
     if !valid_start_statuses.contains(&workflow.status.as_str()) {
         return Err(ApiError::BadRequest(format!(
             "Cannot start workflow: current status is '{}', expected 'ready' or 'paused'",
@@ -1728,7 +1728,7 @@ async fn start_workflow(
     }
 
     // If resuming from paused, use CAS to atomically reset to ready state
-    if workflow.status == "paused" {
+    if workflow.status == WORKFLOW_STATUS_PAUSED {
         let now = chrono::Utc::now();
         let result = sqlx::query(
             r"
@@ -1805,7 +1805,7 @@ async fn pause_workflow(
         cleanup_workflow_terminals(&deployment, &workflow_id, "pausing workflow").await?;
 
     // Mark workflow as paused
-    Workflow::update_status(&deployment.db().pool, &workflow_id, "paused").await?;
+    Workflow::update_status(&deployment.db().pool, &workflow_id, WORKFLOW_STATUS_PAUSED).await?;
 
     // Cascade: reset running tasks to pending so they can be re-dispatched on resume
     let tasks = WorkflowTask::find_by_workflow(&deployment.db().pool, &workflow_id).await?;
@@ -1847,7 +1847,7 @@ async fn resume_workflow(
         .await?
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
 
-    if workflow.status != "paused" {
+    if workflow.status != WORKFLOW_STATUS_PAUSED {
         return Err(ApiError::BadRequest(format!(
             "Cannot resume workflow: current status is '{}', expected 'paused'",
             workflow.status
@@ -1891,7 +1891,7 @@ async fn stop_workflow(
         .ok_or_else(|| ApiError::NotFound("Workflow not found".to_string()))?;
 
     // Allow stopping from ready/starting/running/paused (G16-009: added "ready")
-    let valid_statuses = ["ready", "starting", "running", "paused"];
+    let valid_statuses = ["ready", "starting", "running", WORKFLOW_STATUS_PAUSED];
     if !valid_statuses.contains(&workflow.status.as_str()) {
         return Err(ApiError::BadRequest(format!(
             "Cannot stop workflow: current status is '{}', expected one of: {:?}",
@@ -2737,7 +2737,7 @@ pub(crate) async fn submit_orchestrator_chat(
 
     let circuit_opened = update_orchestrator_circuit_breaker(&workflow_id, &response.status).await;
     if circuit_opened && workflow.status == "running" {
-        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, "paused").await;
+        let _ = Workflow::update_status(&deployment.db().pool, &workflow_id, WORKFLOW_STATUS_PAUSED).await;
         tracing::warn!(
             target: "audit.orchestrator_chat",
             workflow_id = %workflow_id,

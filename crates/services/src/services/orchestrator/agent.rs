@@ -33,6 +33,7 @@ use super::{
         TERMINAL_STATUS_REVIEW_REJECTED, TERMINAL_STATUS_STARTING, TERMINAL_STATUS_WAITING,
         TERMINAL_STATUS_WORKING,
         WORKFLOW_STATUS_COMPLETED, WORKFLOW_STATUS_FAILED,
+        WORKFLOW_STATUS_MERGE_PARTIAL_FAILED,
         WORKFLOW_STATUS_RUNNING, WORKFLOW_TOPIC_PREFIX,
     },
     persistence::StatePersistence,
@@ -1645,13 +1646,6 @@ impl OrchestratorAgent {
             event.status
         );
 
-        let success = matches!(
-            event.status,
-            TerminalCompletionStatus::Completed
-                | TerminalCompletionStatus::ReviewPass
-                | TerminalCompletionStatus::Checkpoint
-        );
-
         self.ensure_task_state_initialized_for_completion(&event.task_id)
             .await?;
 
@@ -1675,7 +1669,6 @@ impl OrchestratorAgent {
         // In the unlikely event the window is still active, it will defer again — the
         // PendingGuard above removed the dedup entry so defer_terminal_completion will
         // accept the new entry.
-        let _ = success; // suppress unused variable warning
         self.handle_terminal_completed(event).await
     }
 
@@ -4835,7 +4828,7 @@ impl OrchestratorAgent {
                         if let Err(db_err) = db::models::Workflow::update_status(
                             &self.db.pool,
                             &workflow_id,
-                            "merge_partial_failed",
+                            WORKFLOW_STATUS_MERGE_PARTIAL_FAILED,
                         ).await {
                             tracing::warn!(
                                 workflow_id = %workflow_id,

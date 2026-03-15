@@ -1344,13 +1344,13 @@ export function Workflows() {
   // G26-007: Compute merge progress from workflow tasks when status is 'merging'
   useEffect(() => {
     if (!selectedWorkflowDetail || selectedWorkflowDetail.status !== 'merging') {
-      setMergeProgress(null);
+      setMergeProgress(prev => prev === null ? prev : null);
       return;
     }
     const tasks = selectedWorkflowDetail.tasks ?? [];
     const totalTasks = tasks.length;
     if (totalTasks === 0) {
-      setMergeProgress(null);
+      setMergeProgress(prev => prev === null ? prev : null);
       return;
     }
     const mergedTasks = tasks.filter(
