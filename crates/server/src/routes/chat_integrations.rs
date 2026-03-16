@@ -120,6 +120,18 @@ fn compute_chat_signature(secret: &str, provider: &str, payload: &ChatEventReque
     format!("sha256={digest:x}")
 }
 
+/// Constant-time byte comparison to prevent timing attacks on signature verification.
+fn constant_time_eq_chat(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 fn verify_event_timestamp(timestamp: i64) -> Result<(), ApiError> {
     let now = Utc::now().timestamp();
     let delta = (now - timestamp).abs();
@@ -266,7 +278,7 @@ async fn handle_chat_event(
 
     let secret = read_chat_webhook_secret()?;
     let expected_signature = compute_chat_signature(&secret, &provider, &payload);
-    if !constant_time_eq(payload.signature.as_bytes(), expected_signature.as_bytes()) {
+    if !constant_time_eq_chat(payload.signature.as_bytes(), expected_signature.as_bytes()) {
         return Err(ApiError::Forbidden(
             "Invalid chat event signature".to_string(),
         ));

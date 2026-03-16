@@ -101,6 +101,7 @@ pub mod terminals;
 pub mod workflow_events;
 pub mod workflow_ws;
 pub mod workflows;
+pub mod ws_origin;
 pub mod workflows_dto;
 
 pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub, feishu_handle: SharedFeishuHandle, cli_health_monitor: SharedCliHealthMonitor) -> IntoMakeService<Router> {

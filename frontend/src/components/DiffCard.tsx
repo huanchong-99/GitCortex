@@ -275,7 +275,7 @@ export default function DiffCard({
 
       // If a URL is returned, open it in a new window/tab
       if (response.url) {
-        globalThis.window.open(response.url, '_blank');
+        globalThis.window.open(response.url, '_blank', 'noopener,noreferrer');
       }
     } catch (err) {
       console.error('Failed to open file in IDE:', err);

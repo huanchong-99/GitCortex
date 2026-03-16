@@ -57,7 +57,7 @@ impl SessionManager {
             return Ok(());
         };
 
-        let path = self.session_file_path(session_id);
+        let path = self.session_file_path(session_id)?;
         let mut file = OpenOptions::new().create(true).append(true).open(path)?;
 
         writeln!(file, "{normalized}")?;
@@ -118,7 +118,7 @@ impl SessionManager {
 
     /// Read the raw JSONL content of a session
     pub fn read_session_raw(&self, session_id: &str) -> Result<String> {
-        let path = self.session_file_path(session_id);
+        let path = self.session_file_path(session_id)?;
         if !path.exists() {
             return Ok(String::new());
         }
@@ -128,8 +128,8 @@ impl SessionManager {
 
     /// Fork a session to create a new one with the same history
     pub fn fork_session(&self, old_id: &str, new_id: &str) -> Result<()> {
-        let old_path = self.session_file_path(old_id);
-        let new_path = self.session_file_path(new_id);
+        let old_path = self.session_file_path(old_id)?;
+        let new_path = self.session_file_path(new_id)?;
 
         if old_path.exists() {
             fs::copy(&old_path, &new_path)?;
@@ -147,7 +147,7 @@ impl SessionManager {
 
     /// Delete a session
     pub fn delete_session(&self, session_id: &str) -> Result<()> {
-        let path = self.session_file_path(session_id);
+        let path = self.session_file_path(session_id)?;
         if path.exists() {
             fs::remove_file(path)?;
         }

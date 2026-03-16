@@ -9,6 +9,7 @@ use axum::{
         Path, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
+    http::HeaderMap,
     response::IntoResponse,
     routing::get,
 };
@@ -24,7 +25,7 @@ use tracing::{debug, info, warn};
 
 use super::{
     subscription_hub::SharedSubscriptionHub, terminal_ws::validate_terminal_id,
-    workflow_events::WsEvent,
+    workflow_events::WsEvent, ws_origin::validate_ws_origin,
 };
 use crate::{DeploymentImpl, error::ApiError};
 
@@ -76,18 +77,27 @@ pub fn workflow_ws_routes() -> Router<DeploymentImpl> {
 
 /// WebSocket handler for workflow event subscription.
 async fn workflow_ws_handler(
+    headers: HeaderMap,
     ws: WebSocketUpgrade,
     Path(workflow_id): Path<String>,
     State(deployment): State<DeploymentImpl>,
     Extension(hub): Extension<SharedSubscriptionHub>,
 ) -> impl IntoResponse {
+    // SEC-003: Validate Origin header before WebSocket upgrade
+    if let Err((status, msg)) = validate_ws_origin(&headers) {
+        return (status, msg).into_response();
+    }
+
     // Validate workflow_id format (UUID)
     if let Err(e) = validate_terminal_id(&workflow_id) {
         warn!("Invalid workflow_id format: {} - {}", workflow_id, e);
         return ApiError::BadRequest(format!("Invalid workflow_id format: {e}")).into_response();
     }
 
-    ws.on_upgrade(move |socket| handle_workflow_socket(socket, workflow_id, hub, deployment))
+    // SEC-017: Enforce WebSocket message size limits (256 KB)
+    ws.max_message_size(256 * 1024)
+        .max_frame_size(256 * 1024)
+        .on_upgrade(move |socket| handle_workflow_socket(socket, workflow_id, hub, deployment))
 }
 
 /// Handle workflow WebSocket connection.

@@ -15,6 +15,7 @@ use axum::{
         Path, Query, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
+    http::HeaderMap,
     response::IntoResponse,
     routing::get,
 };
@@ -44,6 +45,7 @@ fn elapsed_since_millis(start_millis: u64) -> Duration {
 }
 
 use crate::{DeploymentImpl, error::ApiError};
+use super::ws_origin::validate_ws_origin;
 
 // BACKLOG-002: Runner container separation
 // ============================================================================
@@ -194,20 +196,29 @@ struct ResumeParams {
 
 /// WebSocket handler for terminal connection
 async fn terminal_ws_handler(
+    headers: HeaderMap,
     ws: WebSocketUpgrade,
     Path(terminal_id): Path<String>,
     Query(params): Query<ResumeParams>,
     State(deployment): State<DeploymentImpl>,
 ) -> impl IntoResponse {
+    // SEC-003: Validate Origin header before WebSocket upgrade
+    if let Err((status, msg)) = validate_ws_origin(&headers) {
+        return (status, msg).into_response();
+    }
+
     // Validate terminal_id format before proceeding
     if let Err(e) = validate_terminal_id(&terminal_id) {
         tracing::warn!("Invalid terminal_id format: {} - {}", terminal_id, e);
         return ApiError::BadRequest(format!("Invalid terminal_id format: {e}")).into_response();
     }
 
-    ws.on_upgrade(move |socket| {
-        handle_terminal_socket(socket, terminal_id, deployment, params.last_seq)
-    })
+    // SEC-017: Enforce WebSocket message size limits (256 KB)
+    ws.max_message_size(256 * 1024)
+        .max_frame_size(256 * 1024)
+        .on_upgrade(move |socket| {
+            handle_terminal_socket(socket, terminal_id, deployment, params.last_seq)
+        })
 }
 
 /// Handle terminal WebSocket connection with PTY.
