@@ -82,8 +82,8 @@ export function SetupWizardShell() {
   };
 
   return (
-    <div className="new-design flex min-h-screen items-start justify-center overflow-y-auto bg-primary p-base py-double font-ibm-plex-sans">
-      <div className="my-auto w-full max-w-2xl rounded-lg bg-secondary p-double shadow-lg">
+    <div className="new-design h-screen overflow-y-auto bg-primary font-ibm-plex-sans">
+      <div className="mx-auto my-double w-full max-w-2xl rounded-lg bg-secondary p-double shadow-lg">
         {/* Step indicator */}
         <div className="mb-double">
           <SetupWizardStepIndicator steps={steps} currentStep={currentStep} />
