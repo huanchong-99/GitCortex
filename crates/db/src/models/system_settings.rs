@@ -33,8 +33,7 @@ impl SystemSetting {
     pub async fn get_bool(pool: &SqlitePool, key: &str) -> anyhow::Result<bool> {
         let value = Self::get(pool, key).await?;
         Ok(value
-            .map(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1")
-            .unwrap_or(false))
+            .is_some_and(|v| v.trim().eq_ignore_ascii_case("true") || v.trim() == "1"))
     }
 
     /// Upsert a setting value. Creates the row if it doesn't exist, otherwise updates it.
