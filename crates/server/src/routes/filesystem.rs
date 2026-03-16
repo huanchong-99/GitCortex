@@ -168,9 +168,9 @@ pub async fn list_directory(
         }
         Err(FilesystemError::Io(e)) => {
             tracing::error!("Failed to read directory: {e}");
-            Ok(ResponseJson(ApiResponse::error(&format!(
-                "Failed to read directory: {e}"
-            ))))
+            Ok(ResponseJson(ApiResponse::error(
+                "Failed to read directory due to an internal error",
+            )))
         }
     }
 }
@@ -203,9 +203,9 @@ pub async fn list_git_repos(
         }
         Err(FilesystemError::Io(e)) => {
             tracing::error!("Failed to read directory: {e}");
-            Ok(ResponseJson(ApiResponse::error(&format!(
-                "Failed to read directory: {e}"
-            ))))
+            Ok(ResponseJson(ApiResponse::error(
+                "Failed to read directory due to an internal error",
+            )))
         }
     }
 }

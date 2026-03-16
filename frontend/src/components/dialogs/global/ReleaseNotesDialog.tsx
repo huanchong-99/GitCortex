@@ -30,7 +30,7 @@ const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
   }, [theme]);
 
   const handleOpenInBrowser = () => {
-    globalThis.window.open(releaseNotesUrl, '_blank');
+    globalThis.window.open(releaseNotesUrl, '_blank', 'noopener,noreferrer');
     modal.resolve();
   };
 
