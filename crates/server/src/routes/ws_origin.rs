@@ -86,15 +86,19 @@ mod tests {
     /// Helper: run validation with a specific GITCORTEX_CORS_ORIGINS value.
     /// Uses a closure to ensure test isolation (env var is set/unset around the call).
     fn with_env(val: Option<&str>, f: impl FnOnce()) {
-        // Safety: tests using this helper must not run in parallel if they
+        // SAFETY: tests using this helper must not run in parallel if they
         // rely on the same env var. `cargo test` runs tests in the same process
         // but sequentially by default within a single module.
-        match val {
-            Some(v) => std::env::set_var("GITCORTEX_CORS_ORIGINS", v),
-            None => std::env::remove_var("GITCORTEX_CORS_ORIGINS"),
+        unsafe {
+            match val {
+                Some(v) => std::env::set_var("GITCORTEX_CORS_ORIGINS", v),
+                None => std::env::remove_var("GITCORTEX_CORS_ORIGINS"),
+            }
         }
         f();
-        std::env::remove_var("GITCORTEX_CORS_ORIGINS");
+        unsafe {
+            std::env::remove_var("GITCORTEX_CORS_ORIGINS");
+        }
     }
 
     #[test]
