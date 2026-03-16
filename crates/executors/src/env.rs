@@ -30,7 +30,9 @@ const BLOCKED_ENV_VARS: &[&str] = &[
 ];
 
 fn is_blocked_env_var(key: &str) -> bool {
-    BLOCKED_ENV_VARS.iter().any(|&b| b.eq_ignore_ascii_case(key))
+    BLOCKED_ENV_VARS
+        .iter()
+        .any(|&b| b.eq_ignore_ascii_case(key))
 }
 
 /// Environment variables to inject into executor processes
@@ -98,9 +100,7 @@ impl ExecutionEnv {
                     format!("{existing}{sep}{value}")
                 };
                 command.env("PATH", combined);
-                warn!(
-                    "PATH env override was appended to system PATH instead of replacing it"
-                );
+                warn!("PATH env override was appended to system PATH instead of replacing it");
                 continue;
             }
 
