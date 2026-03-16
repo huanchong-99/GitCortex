@@ -131,7 +131,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = FunctionLengthRule::default();
+        let rule = FunctionLengthRule;
         rule.analyze(&ctx)
     }
 

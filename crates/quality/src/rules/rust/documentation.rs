@@ -176,7 +176,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = DocumentationRule::default();
+        let rule = DocumentationRule;
         rule.analyze(&ctx)
     }
 

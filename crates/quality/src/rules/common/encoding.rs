@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn non_utf8_source_file_produces_issue() {
-        let rule = EncodingRule::default();
+        let rule = EncodingRule;
         // Invalid UTF-8 bytes
         let content: &[u8] = &[0x80, 0x81, 0x82, 0x83];
         let config = default_config();
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn utf8_bom_produces_issue() {
-        let rule = EncodingRule::default();
+        let rule = EncodingRule;
         let mut content = vec![0xEF, 0xBB, 0xBF];
         content.extend_from_slice(b"fn main() {}");
         let text = std::str::from_utf8(&content[3..]).unwrap();
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn utf16_le_bom_produces_issue() {
-        let rule = EncodingRule::default();
+        let rule = EncodingRule;
         let content: &[u8] = &[0xFF, 0xFE, 0x00, 0x00];
         let config = default_config();
 
@@ -207,14 +207,14 @@ mod tests {
 
         let issues = rule.analyze(&ctx);
         // Expect two issues: non-UTF-8 + UTF-16 LE BOM
-        assert!(issues.len() >= 1);
+        assert!(!issues.is_empty());
         let bom_issue = issues.iter().find(|i| i.message.contains("UTF-16 LE BOM"));
         assert!(bom_issue.is_some(), "Expected a UTF-16 LE BOM issue");
     }
 
     #[test]
     fn clean_utf8_file_produces_no_issues() {
-        let rule = EncodingRule::default();
+        let rule = EncodingRule;
         let content = b"fn main() { println!(\"hello\"); }";
         let text = std::str::from_utf8(content).unwrap();
         let config = default_config();
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn non_source_binary_file_produces_no_non_utf8_issue() {
-        let rule = EncodingRule::default();
+        let rule = EncodingRule;
         // Binary content with a non-source extension
         let content: &[u8] = &[0x80, 0x81, 0x82, 0x83];
         let config = default_config();

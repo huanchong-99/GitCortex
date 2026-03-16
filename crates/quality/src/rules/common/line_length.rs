@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn short_lines_produce_no_issues() {
-        let rule = LineLengthRule::default();
+        let rule = LineLengthRule;
         let content = "fn main() {\n    println!(\"hello\");\n}\n";
         let config = RuleConfig::default();
         let ctx = make_ctx(content, &config);
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn long_lines_produce_single_issue_with_count() {
-        let rule = LineLengthRule::default();
+        let rule = LineLengthRule;
         let long_line = "x".repeat(150);
         let content = format!("short\n{}\nanother short\n{}\n", long_line, long_line);
         let config = RuleConfig::default();
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn url_lines_are_skipped() {
-        let rule = LineLengthRule::default();
+        let rule = LineLengthRule;
         let long_url = format!("// see https://example.com/{}", "a".repeat(150));
         let content = format!("{}\nshort line\n", long_url);
         let config = RuleConfig::default();
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn import_lines_are_skipped() {
-        let rule = LineLengthRule::default();
+        let rule = LineLengthRule;
         let long_import = format!("use crate::some::very::deeply::nested::module::{{{}}};", "A, ".repeat(50));
         let content = format!("{}\nshort\n", long_import);
         let config = RuleConfig::default();
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn binary_files_are_skipped() {
-        let rule = LineLengthRule::default();
+        let rule = LineLengthRule;
         let config = RuleConfig::default();
         let ctx = CommonAnalysisContext {
             file_path: "image.png",
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn custom_max_length_is_respected() {
-        let rule = LineLengthRule::default();
+        let rule = LineLengthRule;
         let content = "x".repeat(85);
         let mut config = RuleConfig::default();
         config.params.insert("max_length".to_string(), "80".to_string());

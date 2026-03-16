@@ -119,7 +119,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = UnsafeUsageRule::default();
+        let rule = UnsafeUsageRule;
         rule.analyze(&ctx)
     }
 

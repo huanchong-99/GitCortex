@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn detects_trailing_whitespace() {
-        let rule = TrailingWhitespaceRule::default();
+        let rule = TrailingWhitespaceRule;
         let src = "hello \nworld\nfoo \t\nbar\n";
         let config = RuleConfig::default();
         let ctx = make_context(src.as_bytes(), Some(src), true, &config);
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn no_issues_for_clean_file() {
-        let rule = TrailingWhitespaceRule::default();
+        let rule = TrailingWhitespaceRule;
         let src = "hello\nworld\n";
         let config = RuleConfig::default();
         let ctx = make_context(src.as_bytes(), Some(src), true, &config);
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn skips_binary_files() {
-        let rule = TrailingWhitespaceRule::default();
+        let rule = TrailingWhitespaceRule;
         let content = b"hello \nworld \n";
         let config = RuleConfig::default();
         let ctx = make_context(content, None, false, &config);

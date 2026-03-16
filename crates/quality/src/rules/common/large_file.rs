@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn text_file_within_limit_produces_no_issues() {
-        let rule = LargeFileRule::default();
+        let rule = LargeFileRule;
         let content = make_text_content(500);
         let bytes = content.as_bytes();
         let config = default_config();
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn text_file_exceeding_limit_produces_issue() {
-        let rule = LargeFileRule::default();
+        let rule = LargeFileRule;
         let content = make_text_content(1001);
         let bytes = content.as_bytes();
         let config = default_config();
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn binary_file_exceeding_limit_produces_issue() {
-        let rule = LargeFileRule::default();
+        let rule = LargeFileRule;
         let bytes = vec![0u8; 1_048_577];
         let mut config = default_config();
         config
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn binary_file_within_limit_produces_no_issues() {
-        let rule = LargeFileRule::default();
+        let rule = LargeFileRule;
         let bytes = vec![0u8; 1000];
         let config = default_config();
 

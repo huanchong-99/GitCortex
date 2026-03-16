@@ -175,7 +175,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = MagicNumbersRule::default();
+        let rule = MagicNumbersRule;
         rule.analyze(&ctx)
     }
 
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn rule_metadata_is_correct() {
-        let rule = MagicNumbersRule::default();
+        let rule = MagicNumbersRule;
         assert_eq!(rule.id(), "rust:magic-numbers");
         assert_eq!(rule.name(), "Magic Numbers");
         assert_eq!(rule.rule_type(), RuleType::CodeSmell);

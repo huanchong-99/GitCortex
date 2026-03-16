@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn no_duplication_produces_no_issues() {
-        let rule = DuplicationRule::default();
+        let rule = DuplicationRule;
         // 15 unique lines
         let content: String = (0..15)
             .map(|i| format!("let x{} = {};", i, i))
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn duplicated_block_is_detected() {
-        let rule = DuplicationRule::default();
+        let rule = DuplicationRule;
         // Create a block of 10 lines, then some unique lines, then repeat the same block.
         let block: Vec<String> = (0..10)
             .map(|i| format!("    let val = compute({});", i))
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn binary_file_is_skipped() {
-        let rule = DuplicationRule::default();
+        let rule = DuplicationRule;
         let content = b"\x00\x01\x02\x03";
         let config = default_config();
 

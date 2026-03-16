@@ -84,7 +84,7 @@ mod tests {
     use crate::rules::RuleConfig;
 
     fn analyze_content(content: &str) -> Vec<QualityIssue> {
-        let rule = TodoCommentsRule::default();
+        let rule = TodoCommentsRule;
         let syntax: syn::File = syn::parse_str("fn main() {}").unwrap();
         let config = RuleConfig::default();
 
@@ -144,7 +144,7 @@ fn main() {
 
     #[test]
     fn rule_metadata_is_correct() {
-        let rule = TodoCommentsRule::default();
+        let rule = TodoCommentsRule;
         assert_eq!(rule.id(), "rust:todo-comments");
         assert_eq!(rule.name(), "TODO/FIXME Comments");
         assert_eq!(rule.rule_type(), RuleType::CodeSmell);

@@ -94,7 +94,7 @@ mod tests {
     use crate::rules::RuleConfig;
 
     fn run_rule(source: &str) -> Vec<QualityIssue> {
-        let rule = TodoCommentsRule::default();
+        let rule = TodoCommentsRule;
         let lines: Vec<&str> = source.lines().collect();
         let config = RuleConfig::default();
         let ctx = TsAnalysisContext {
@@ -160,7 +160,7 @@ function add(a: number, b: number): number {
 
     #[test]
     fn rule_metadata_is_correct() {
-        let rule = TodoCommentsRule::default();
+        let rule = TodoCommentsRule;
         assert_eq!(rule.id(), "ts:todo-comments");
         assert_eq!(rule.name(), "TODO/FIXME Comments");
         assert_eq!(rule.rule_type(), RuleType::CodeSmell);

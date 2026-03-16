@@ -174,7 +174,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = ErrorHandlingRule::default();
+        let rule = ErrorHandlingRule;
         rule.analyze(&ctx)
     }
 

@@ -182,7 +182,7 @@ mod tests {
     use crate::rules::RuleConfig;
 
     fn run_rule(source: &str) -> Vec<QualityIssue> {
-        let rule = ImportOrderRule::default();
+        let rule = ImportOrderRule;
         let lines: Vec<&str> = source.lines().collect();
         let config = RuleConfig::default();
         let ctx = TsAnalysisContext {
@@ -236,7 +236,7 @@ import { util } from '@/utils';
 
     #[test]
     fn rule_metadata_is_correct() {
-        let rule = ImportOrderRule::default();
+        let rule = ImportOrderRule;
         assert_eq!(rule.id(), "ts:import-order");
         assert_eq!(rule.name(), "Import Order");
         assert_eq!(rule.rule_type(), RuleType::CodeSmell);

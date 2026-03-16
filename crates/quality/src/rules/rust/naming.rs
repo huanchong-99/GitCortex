@@ -263,7 +263,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = NamingConventionRule::default();
+        let rule = NamingConventionRule;
         rule.analyze(&ctx)
     }
 

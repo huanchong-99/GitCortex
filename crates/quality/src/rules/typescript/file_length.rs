@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn file_within_limit_produces_no_issues() {
-        let rule = FileLengthRule::default();
+        let rule = FileLengthRule;
         let content = make_content(100);
         let lines: Vec<&str> = content.lines().collect();
         let config = default_config();
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn file_exceeding_limit_produces_issue() {
-        let rule = FileLengthRule::default();
+        let rule = FileLengthRule;
         let content = make_content(401);
         let lines: Vec<&str> = content.lines().collect();
         let config = default_config();
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn custom_max_lines_is_respected() {
-        let rule = FileLengthRule::default();
+        let rule = FileLengthRule;
         let content = make_content(250);
         let lines: Vec<&str> = content.lines().collect();
         let mut config = default_config();

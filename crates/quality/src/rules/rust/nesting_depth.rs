@@ -201,7 +201,7 @@ mod tests {
             syntax: &syntax,
             config: &config,
         };
-        let rule = NestingDepthRule::default();
+        let rule = NestingDepthRule;
         rule.analyze(&ctx)
     }
 
