@@ -34,15 +34,14 @@ type StatusConfig = {
   spin?: boolean;
 };
 
-// TODO: G13-005 / G14-009 — Unify the various TerminalStatus type definitions
-// scattered across the codebase (TerminalCard.tsx, TerminalDots.tsx, wsStore.ts,
-// Workflows.tsx) with the canonical TerminalStatus from shared/types.ts.
-// The backend Rust enum in crates/db/src/models/terminal.rs is the source of truth.
+// G13-005 / G14-009: The canonical TerminalStatus source of truth is the
+// backend Rust enum in crates/db/src/models/terminal.rs (and shared/types.ts).
+// Other TerminalStatus definitions (TerminalCard.tsx, TerminalDots.tsx, wsStore.ts,
+// Workflows.tsx) should reference that canonical type.
 
-// TODO: G14-007 — WORKFLOW_STATUS_CONFIG includes 'idle' and 'queued' which are
-// not part of the backend WorkflowStatus enum. These are client-only display
-// states used for mapping. Consider documenting this explicitly or removing them
-// if they are no longer needed.
+// G14-007: WORKFLOW_STATUS_CONFIG includes 'idle' and 'queued' which are
+// client-only display states not part of the backend WorkflowStatus enum.
+// They are used for local UI mapping purposes only.
 
 const WORKFLOW_STATUS_CONFIG: Record<string, StatusConfig> = {
   created: {

@@ -18,24 +18,32 @@ FAIL_COUNT=0
 TOTAL_CHECKS=0
 
 pass() {
+  local msg="$1"
   PASS_COUNT=$((PASS_COUNT + 1))
   TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-  echo -e "  ${GREEN}PASS${RESET}  $1"
+  echo -e "  ${GREEN}PASS${RESET}  ${msg}"
+  return 0
 }
 
 fail() {
+  local msg="$1"
   FAIL_COUNT=$((FAIL_COUNT + 1))
   TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-  echo -e "  ${RED}FAIL${RESET}  $1"
+  echo -e "  ${RED}FAIL${RESET}  ${msg}"
+  return 0
 }
 
 info() {
-  echo -e "  ${CYAN}INFO${RESET}  $1"
+  local msg="$1"
+  echo -e "  ${CYAN}INFO${RESET}  ${msg}"
+  return 0
 }
 
 section() {
+  local title="$1"
   echo ""
-  echo -e "${BOLD}[$1]${RESET}"
+  echo -e "${BOLD}[${title}]${RESET}"
+  return 0
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -89,6 +97,7 @@ parse_requests() {
     count=$(echo "$stats_output" | grep -i 'cache hits' | head -1 | grep -oE '[0-9]+' | head -1 || true)
   fi
   echo "${count:-0}"
+  return 0
 }
 
 parse_cache_hits() {
@@ -96,6 +105,7 @@ parse_cache_hits() {
   local count
   count=$(echo "$stats_output" | grep -i 'cache hits' | head -1 | grep -oE '[0-9]+' | head -1 || true)
   echo "${count:-0}"
+  return 0
 }
 
 STATS_BEFORE="$(sccache --show-stats 2>&1)" || true

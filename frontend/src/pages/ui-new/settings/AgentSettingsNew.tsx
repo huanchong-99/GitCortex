@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cloneDeep, isEqual } from 'lodash';
 import {
@@ -191,6 +191,34 @@ function getProfilesErrorMessage(error: unknown): string {
 }
 
 /* ================================================================== */
+/*  Helpers                                                           */
+/* ================================================================== */
+
+function getInstallPhaseKey(
+  elapsedSec: number,
+  t: ReturnType<typeof import('react-i18next').useTranslation>['t']
+) {
+  if (elapsedSec < 8) {
+    return t('settings.agents.installAiCliPhasePreparing', {
+      defaultValue: 'Preparing installation environment...',
+    });
+  }
+  if (elapsedSec < 90) {
+    return t('settings.agents.installAiCliPhaseCore', {
+      defaultValue: 'Installing core CLIs (Claude/Codex/Gemini)...',
+    });
+  }
+  if (elapsedSec < 180) {
+    return t('settings.agents.installAiCliPhaseExtended', {
+      defaultValue: 'Installing extended CLIs (Qwen/Amp/OpenCode/Kilo)...',
+    });
+  }
+  return t('settings.agents.installAiCliPhaseVerifying', {
+    defaultValue: 'Verifying installation results...',
+  });
+}
+
+/* ================================================================== */
 /*  Main component                                                    */
 /* ================================================================== */
 
@@ -345,26 +373,10 @@ export function AgentSettingsNew() {
     }
   };
 
-  const getInstallPhaseText = (elapsedSec: number) => {
-    if (elapsedSec < 8) {
-      return t('settings.agents.installAiCliPhasePreparing', {
-        defaultValue: 'Preparing installation environment...',
-      });
-    }
-    if (elapsedSec < 90) {
-      return t('settings.agents.installAiCliPhaseCore', {
-        defaultValue: 'Installing core CLIs (Claude/Codex/Gemini)...',
-      });
-    }
-    if (elapsedSec < 180) {
-      return t('settings.agents.installAiCliPhaseExtended', {
-        defaultValue: 'Installing extended CLIs (Qwen/Amp/OpenCode/Kilo)...',
-      });
-    }
-    return t('settings.agents.installAiCliPhaseVerifying', {
-      defaultValue: 'Verifying installation results...',
-    });
-  };
+  const getInstallPhaseText = useCallback(
+    (elapsedSec: number) => getInstallPhaseKey(elapsedSec, t),
+    [t]
+  );
 
   const syncRawProfiles = (profileData: unknown) => {
     setLocalProfilesContent(JSON.stringify(profileData, null, 2));

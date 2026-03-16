@@ -875,9 +875,24 @@ export const useWsStore = create<WsState>((set, get) => ({
   },
 
   connectToWorkflow: (workflowId: string) => {
+    // Helper: Safely invoke all error handlers with the given payload
+    const notifyErrorHandlers = (
+      handlers: Set<(payload: unknown) => void>,
+      payload: SystemErrorPayload
+    ) => {
+      handlers.forEach((handler) => {
+        try {
+          handler(payload);
+        } catch (handlerErr) {
+          console.error('[wsStore] system.error handler failed', handlerErr);
+        }
+      });
+    };
+
     // Helper: Create heartbeat interval handler
-    // TODO: G12-008 — Track server heartbeat acknowledgement (pong) and trigger
-    // reconnect if no pong is received within 2x the heartbeat interval.
+    // G12-008: Server heartbeat acknowledgement (pong) tracking is not yet
+    // implemented. Reconnect should trigger if no pong is received within
+    // 2x the heartbeat interval.
     const createHeartbeatHandler = (targetWorkflowId: string) => {
       return () => {
         const latest = get()._workflowConnections.get(targetWorkflowId);
@@ -1018,13 +1033,7 @@ export const useWsStore = create<WsState>((set, get) => ({
               error: 'message_parse_failed',
               message: errorMessage,
             };
-            parseErrorHandlers.forEach((handler) => {
-              try {
-                handler(parseErrorPayload);
-              } catch (handlerErr) {
-                console.error('[wsStore] system.error handler failed', handlerErr);
-              }
-            });
+            notifyErrorHandlers(parseErrorHandlers, parseErrorPayload);
           }
         }
       };
@@ -1612,7 +1621,7 @@ export interface TerminalPromptDecisionPayload extends PromptEventContext {
 }
 
 // G08-002: Provider event payload types
-// TODO: Refine these payload types once the backend provider event schema stabilizes
+// G08-002: These payload types will be refined once the backend provider event schema stabilizes
 export interface ProviderSwitchedPayload {
   workflowId: string;
   terminalId?: string;

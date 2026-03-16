@@ -23,9 +23,7 @@ export function validateStep6Advanced(config: WizardConfig): Record<string, stri
     return boundCliTypeId === cliTypeId;
   };
 
-  if (!config.advanced.orchestrator.modelConfigId.trim()) {
-    errors.orchestratorModel = 'validation.advanced.orchestratorModelRequired';
-  } else {
+  if (config.advanced.orchestrator.modelConfigId.trim()) {
     // G25-016: Verify orchestrator model actually exists in configured models
     const orchestratorModel = config.models.find(
       (m) => m.id === config.advanced.orchestrator.modelConfigId
@@ -33,6 +31,8 @@ export function validateStep6Advanced(config: WizardConfig): Record<string, stri
     if (!orchestratorModel) {
       errors.orchestratorModel = 'validation.advanced.orchestratorModelNotFound';
     }
+  } else {
+    errors.orchestratorModel = 'validation.advanced.orchestratorModelRequired';
   }
 
   if (config.advanced.errorTerminal.enabled) {

@@ -47,9 +47,9 @@ export function useCliInstallProgress(
     // Reset state for new connection
     setState({ lines: [], isComplete: false, exitCode: null, error: null });
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(
-      `${protocol}//${window.location.host}/api/cli-types/${encodeURIComponent(cliTypeId)}/install/ws?job_id=${encodeURIComponent(jobId)}`
+      `${protocol}//${globalThis.location.host}/api/cli-types/${encodeURIComponent(cliTypeId)}/install/ws?job_id=${encodeURIComponent(jobId)}`
     );
     wsRef.current = ws;
 

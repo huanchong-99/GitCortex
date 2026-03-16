@@ -48,6 +48,7 @@ resolve_package() {
             exit 1
             ;;
     esac
+    return 0
 }
 
 # --- Detect command mapping (for post-install verification) ---
@@ -66,6 +67,7 @@ detect_command_for() {
         copilot)        echo "gh copilot --version" ;;
         *)              echo "" ;;
     esac
+    return 0
 }
 
 # --- Validate cli_name against whitelist ---

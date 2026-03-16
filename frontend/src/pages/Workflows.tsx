@@ -1343,7 +1343,7 @@ export function Workflows() {
 
   // G26-007: Compute merge progress from workflow tasks when status is 'merging'
   useEffect(() => {
-    if (!selectedWorkflowDetail || selectedWorkflowDetail.status !== 'merging') {
+    if (selectedWorkflowDetail?.status !== 'merging') {
       setMergeProgress(prev => prev === null ? prev : null);
       return;
     }
@@ -1384,16 +1384,16 @@ export function Workflows() {
   useEffect(() => {
     if (promptQueue.length === 0) return;
 
+    const isPromptStale = (item: (typeof promptQueue)[number], now: number) => {
+      const detectedAt = item.detected.detectedAt
+        ? new Date(item.detected.detectedAt).getTime()
+        : now;
+      return now - detectedAt >= PROMPT_QUEUE_TIMEOUT_MS;
+    };
+
     const timer = setInterval(() => {
       const now = Date.now();
-      setPromptQueue((prev) =>
-        prev.filter((item) => {
-          const detectedAt = item.detected.detectedAt
-            ? new Date(item.detected.detectedAt).getTime()
-            : now;
-          return now - detectedAt < PROMPT_QUEUE_TIMEOUT_MS;
-        })
-      );
+      setPromptQueue((prev) => prev.filter((item) => !isPromptStale(item, now)));
     }, 30_000); // Check every 30s
 
     return () => clearInterval(timer);

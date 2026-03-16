@@ -54,7 +54,7 @@ function StatusBadge({
     );
   }
 
-  if (!detection || !detection.isInstalled) {
+  if (!detection?.isInstalled) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
         <AlertCircle className="h-3 w-3" />

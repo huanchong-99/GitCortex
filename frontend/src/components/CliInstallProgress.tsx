@@ -115,9 +115,9 @@ export function CliInstallProgress({
         {lines.length === 0 && !isComplete && (
           <div className="text-gray-500">Waiting for output...</div>
         )}
-        {lines.map((line, index) => (
+        {lines.map((line) => (
           <div
-            key={index}
+            key={`${line.type}-${line.timestamp ?? ''}-${line.content.slice(0, 32)}`}
             className={`whitespace-pre-wrap break-all text-xs leading-5 ${getLineColor(line.type)}`}
           >
             {line.content}

@@ -487,6 +487,79 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
     return sanitizedHistoryLines.slice(start, start + HISTORY_PAGE_SIZE);
   }, [sanitizedHistoryLines, historyPage]);
 
+  const handleHistoryPrev = useCallback(() => setHistoryPage((p) => Math.max(0, p - 1)), []);
+  const handleHistoryNext = useCallback(() => setHistoryPage((p) => Math.min(totalHistoryPages - 1, p + 1)), [totalHistoryPages]);
+  const handleReloadHistory = useCallback(() => {
+    if (selectedTerminalId) {
+      loadTerminalHistory(selectedTerminalId);
+    }
+  }, [selectedTerminalId, loadTerminalHistory]);
+
+  const renderHistoryContent = () => {
+    if (currentHistory?.loading) {
+      return (
+        <div className="text-sm text-muted-foreground">
+          {t('terminalDebug.historyLoading', {
+            defaultValue: 'Loading terminal history...',
+          })}
+        </div>
+      );
+    }
+    if (currentHistory?.error) {
+      return (
+        <div className="space-y-3">
+          <div className="text-sm text-red-500">
+            {t('terminalDebug.historyLoadFailed', {
+              defaultValue: 'Failed to load terminal history.',
+            })}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleReloadHistory}>
+            {t('terminalDebug.reloadHistory', {
+              defaultValue: 'Reload history',
+            })}
+          </Button>
+        </div>
+      );
+    }
+    if (currentHistory?.lines.length) {
+      // G09-012 / G28-007: Render paginated segments instead of a single <pre>
+      return (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto pr-1">
+            {pagedHistoryLines.map((line, idx) => (
+              <pre
+                key={historyPage * HISTORY_PAGE_SIZE + idx}
+                className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground"
+              >
+                {line}
+              </pre>
+            ))}
+          </div>
+          {totalHistoryPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t mt-2">
+              <Button variant="outline" size="sm" disabled={historyPage === 0} onClick={handleHistoryPrev}>
+                {t('terminalDebug.historyPrev', { defaultValue: 'Previous' })}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {historyPage + 1} / {totalHistoryPages}
+              </span>
+              <Button variant="outline" size="sm" disabled={historyPage >= totalHistoryPages - 1} onClick={handleHistoryNext}>
+                {t('terminalDebug.historyNext', { defaultValue: 'Next' })}
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="text-sm text-muted-foreground">
+        {t('terminalDebug.historyEmpty', {
+          defaultValue: 'No terminal history available yet.',
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-full">
       <div className="w-64 border-r bg-muted/30 overflow-y-auto">
@@ -594,88 +667,7 @@ export function TerminalDebugView({ tasks, wsUrl }: Readonly<Props>) {
                         })}
                       </div>
 
-                      {(() => {
-                        if (currentHistory?.loading) {
-                          return (
-                            <div className="text-sm text-muted-foreground">
-                              {t('terminalDebug.historyLoading', {
-                                defaultValue: 'Loading terminal history...',
-                              })}
-                            </div>
-                          );
-                        } else if (currentHistory?.error) {
-                          return (
-                            <div className="space-y-3">
-                              <div className="text-sm text-red-500">
-                                {t('terminalDebug.historyLoadFailed', {
-                                  defaultValue: 'Failed to load terminal history.',
-                                })}
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  if (!selectedTerminalId) {
-                                    return;
-                                  }
-                                  loadTerminalHistory(selectedTerminalId);
-                                }}
-                              >
-                                {t('terminalDebug.reloadHistory', {
-                                  defaultValue: 'Reload history',
-                                })}
-                              </Button>
-                            </div>
-                          );
-                        } else if (currentHistory?.lines.length) {
-                          // G09-012 / G28-007: Render paginated segments instead of a single <pre>
-                          return (
-                            <div className="flex-1 min-h-0 flex flex-col">
-                              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto pr-1">
-                                {pagedHistoryLines.map((line, idx) => (
-                                  <pre
-                                    key={historyPage * HISTORY_PAGE_SIZE + idx}
-                                    className="text-xs leading-5 whitespace-pre-wrap break-words text-foreground"
-                                  >
-                                    {line}
-                                  </pre>
-                                ))}
-                              </div>
-                              {totalHistoryPages > 1 && (
-                                <div className="flex items-center justify-between pt-2 border-t mt-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={historyPage === 0}
-                                    onClick={() => setHistoryPage((p) => Math.max(0, p - 1))}
-                                  >
-                                    {t('terminalDebug.historyPrev', { defaultValue: 'Previous' })}
-                                  </Button>
-                                  <span className="text-xs text-muted-foreground">
-                                    {historyPage + 1} / {totalHistoryPages}
-                                  </span>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={historyPage >= totalHistoryPages - 1}
-                                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages - 1, p + 1))}
-                                  >
-                                    {t('terminalDebug.historyNext', { defaultValue: 'Next' })}
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div className="text-sm text-muted-foreground">
-                              {t('terminalDebug.historyEmpty', {
-                                defaultValue: 'No terminal history available yet.',
-                              })}
-                            </div>
-                          );
-                        }
-                      })()}
+                      {renderHistoryContent()}
                     </div>
                   );
                 } else {

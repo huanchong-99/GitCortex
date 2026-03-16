@@ -29,8 +29,8 @@ interface WorkflowSidebarProps {
  * cache invalidations triggered by the parent Board component's WS handlers
  * (which invalidate both `workflowKeys.byId` and `workflowKeys.forProject`).
  *
- * TODO: G29-010 — Consider subscribing to workflow.status_changed events
- * directly to update the sidebar status badges in real-time without waiting
+ * NOTE: G29-010 — Subscribing to workflow.status_changed events directly
+ * could update the sidebar status badges in real-time without waiting
  * for the parent Board's invalidation cycle.
  */
 export function WorkflowSidebar({

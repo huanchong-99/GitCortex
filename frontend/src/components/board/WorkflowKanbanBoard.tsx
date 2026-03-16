@@ -73,9 +73,9 @@ function KanbanColumn({ column, tasks, workflowId }: Readonly<KanbanColumnProps>
   );
 }
 
-// TODO: G29-006 — This component calls useWorkflow independently from Board.tsx
-// and TerminalActivityPanel. Consider lifting the workflow data to a shared
-// context or passing it as a prop to avoid redundant fetches.
+// G29-006: This component calls useWorkflow independently from Board.tsx
+// and TerminalActivityPanel. Workflow data could be lifted to a shared
+// context or passed as a prop to avoid redundant fetches.
 export function WorkflowKanbanBoard({ workflowId }: Readonly<WorkflowKanbanBoardProps>) {
   const { t } = useTranslation('workflow');
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');

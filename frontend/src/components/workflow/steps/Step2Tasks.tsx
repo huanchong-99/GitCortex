@@ -186,7 +186,7 @@ export const Step2Tasks: React.FC<Step2TasksProps> = ({
         {Array.from({ length: taskCount }, (_, i) => i).map((index) => {
           const getIndicatorClass = (): string => {
             const task = config[index];
-            if (task && task.name && task.description && task.branch) {
+            if (task?.name && task.description && task.branch) {
               return 'bg-brand';
             }
             if (index === currentTaskIndex) {

@@ -17,10 +17,10 @@ export function useCurrentUser() {
 
   const queryClient = useQueryClient();
   useEffect(() => {
-    if (!isSignedIn) {
-      queryClient.removeQueries({ queryKey: ['auth', 'user'] });
-    } else {
+    if (isSignedIn) {
       queryClient.invalidateQueries({ queryKey: ['auth', 'user'] });
+    } else {
+      queryClient.removeQueries({ queryKey: ['auth', 'user'] });
     }
   }, [queryClient, isSignedIn]);
 

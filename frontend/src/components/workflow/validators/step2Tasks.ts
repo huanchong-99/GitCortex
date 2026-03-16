@@ -24,20 +24,20 @@ export function validateStep2Tasks(config: WizardConfig): Record<string, string>
     if (!task.description.trim()) {
       errors[`task-${index}-description`] = 'validation.tasks.descriptionRequired';
     }
-    if (!task.branch.trim()) {
-      errors[`task-${index}-branch`] = 'validation.tasks.branchRequired';
-    } else {
+    if (task.branch.trim()) {
       const normalizedBranch = task.branch.trim().toLowerCase();
       const previousIndex = seenBranches.get(normalizedBranch);
-      if (previousIndex !== undefined) {
+      if (previousIndex === undefined) {
+        seenBranches.set(normalizedBranch, index);
+      } else {
         errors[`task-${index}-branch`] = 'validation.tasks.branchDuplicate';
         // Also mark the first occurrence if not already marked
         if (!errors[`task-${previousIndex}-branch`]) {
           errors[`task-${previousIndex}-branch`] = 'validation.tasks.branchDuplicate';
         }
-      } else {
-        seenBranches.set(normalizedBranch, index);
       }
+    } else {
+      errors[`task-${index}-branch`] = 'validation.tasks.branchRequired';
     }
   });
 

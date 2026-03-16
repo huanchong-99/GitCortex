@@ -142,10 +142,8 @@ export const TerminalEmulator = forwardRef<TerminalEmulatorRef, Props>(
       onData?.(data);
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'input', data }));
-      } else {
-        if (pendingInputRef.current.length < PENDING_INPUT_MAX_SIZE) {
-          pendingInputRef.current.push(data);
-        }
+      } else if (pendingInputRef.current.length < PENDING_INPUT_MAX_SIZE) {
+        pendingInputRef.current.push(data);
       }
     }, [onData]);
 

@@ -23,6 +23,7 @@ usage() {
 
 ensure_dir() {
   mkdir -p "${CI_BENCHMARK_DIR}"
+  return 0
 }
 
 cmd_start() {
@@ -30,6 +31,7 @@ cmd_start() {
   ensure_dir
   date +%s > "${CI_BENCHMARK_DIR}/${step_name}.start"
   echo "[benchmark] Started step: ${step_name}"
+  return 0
 }
 
 cmd_end() {
@@ -59,6 +61,7 @@ cmd_end() {
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo "| ${step_name} | ${duration}s |" >> "${GITHUB_STEP_SUMMARY}"
   fi
+  return 0
 }
 
 cmd_report() {
