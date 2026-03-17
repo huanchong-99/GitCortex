@@ -7,6 +7,10 @@ vi.mock('@/hooks/useWorkflows', () => ({
   useWorkflow: vi.fn(),
 }));
 
+vi.mock('@/hooks/useWorkflowInvalidation', () => ({
+  useWorkflowInvalidation: vi.fn(),
+}));
+
 vi.mock('@/components/pipeline/OrchestratorHeader', () => ({
   OrchestratorHeader: () => <div data-testid="orchestrator-header" />,
 }));
