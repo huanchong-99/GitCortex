@@ -27,6 +27,7 @@
       "baseUrlPlaceholder": "https://api.openai.com/v1",
       "modelIdLabel": "Model",
       "modelIdPlaceholder": "Select a model",
+      "modelIdManualPlaceholder": "Enter model ID, e.g. claude-3-5-sonnet-20241022",
       "fetchModelsButton": "Fetch Models",
       "fetchingModels": "Fetching models...",
       "verifyButton": "Verify Connection",

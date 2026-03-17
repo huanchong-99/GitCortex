@@ -157,7 +157,9 @@
       },
       "apiKey": {
         "label": "API Key",
-        "placeholder": "输入 API Key"
+        "placeholder": "输入 API Key",
+        "show": "显示 API Key",
+        "hide": "隐藏 API Key"
       },
       "modelId": {
         "label": "模型 ID",
@@ -329,7 +331,9 @@
     "tasks": {
       "required": "至少需要一个任务",
       "nameRequired": "请输入任务名称",
-      "descriptionRequired": "请输入任务描述"
+      "descriptionRequired": "请输入任务描述",
+      "branchDuplicate": "分支名称重复",
+      "branchRequired": "请输入分支名称"
     },
     "models": {
       "required": "至少添加一个模型配置"

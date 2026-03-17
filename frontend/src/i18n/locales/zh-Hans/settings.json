@@ -354,6 +354,48 @@
           "helper": "磁盘上 git 仓库的绝对路径。"
         }
       },
+      "repositories": {
+        "title": "仓库",
+        "description": "管理此项目中的 Git 仓库",
+        "loading": "加载仓库中...",
+        "deleteButton": "删除仓库",
+        "empty": "尚未配置仓库",
+        "addButton": "添加仓库",
+        "errors": {
+          "loadFailed": "加载仓库失败",
+          "addFailed": "添加仓库失败",
+          "deleteFailed": "删除仓库失败"
+        }
+      },
+      "repoPicker": {
+        "title": "选择 Git 仓库",
+        "subtitle": "选择要添加到此项目的 Git 仓库",
+        "browseTitle": "选择已有的 Git 仓库",
+        "fromExisting": "从已有仓库",
+        "fromExistingDesc": "从系统中选择已有的仓库",
+        "createNew": "创建新仓库",
+        "createNewDesc": "初始化新的 Git 仓库",
+        "backToOptions": "返回选项",
+        "browse": "浏览仓库",
+        "browseDesc": "浏览并选择系统上的任意仓库",
+        "showMore": "显示另外 {{count}} 个仓库",
+        "showLess": "收起",
+        "repoName": "仓库名称",
+        "repoNameHint": "这将作为新仓库的文件夹名称",
+        "parentDir": "父目录",
+        "parentDirHint": "留空则使用当前工作目录",
+        "selectParentDir": "选择父目录",
+        "selectParentDirDesc": "选择创建新仓库的位置",
+        "createRepo": "创建仓库",
+        "creating": "创建中...",
+        "registering": "正在注册仓库...",
+        "errors": {
+          "loadFailed": "加载仓库失败",
+          "registerFailed": "注册仓库失败",
+          "nameRequired": "仓库名称为必填项",
+          "createFailed": "创建仓库失败"
+        }
+      },
       "save": {
         "button": "保存项目设置",
         "success": "✓ 项目设置保存成功！",

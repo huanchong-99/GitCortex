@@ -217,15 +217,15 @@ export function SetupWizardStep2Model({
           </button>
         </div>
 
-        {/* Model Selector */}
-        {models.length > 0 && (
-          <div className="space-y-half">
-            <label
-              htmlFor="setup-model-id"
-              className="text-normal text-base"
-            >
-              {t('setup:wizard.model.modelIdLabel')}
-            </label>
+        {/* Model Selector (dropdown if models fetched, manual input otherwise) */}
+        <div className="space-y-half">
+          <label
+            htmlFor="setup-model-id"
+            className="text-normal text-base"
+          >
+            {t('setup:wizard.model.modelIdLabel')}
+          </label>
+          {models.length > 0 ? (
             <div className="relative">
               <select
                 id="setup-model-id"
@@ -251,8 +251,22 @@ export function SetupWizardStep2Model({
                 weight="bold"
               />
             </div>
-          </div>
-        )}
+          ) : (
+            <input
+              id="setup-model-id"
+              type="text"
+              value={modelId}
+              onChange={(e) => onModelIdChange(e.target.value)}
+              placeholder={t('setup:wizard.model.modelIdManualPlaceholder', { defaultValue: t('setup:wizard.model.modelIdPlaceholder') })}
+              className={cn(
+                'w-full rounded border border-border bg-secondary',
+                'px-base py-base text-base text-normal',
+                'placeholder:text-low placeholder:opacity-80',
+                'focus:outline-none focus:ring-1 focus:ring-brand'
+              )}
+            />
+          )}
+        </div>
 
         {/* Verify Connection */}
         {modelId && (

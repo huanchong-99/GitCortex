@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SpinnerGapIcon, WarningCircleIcon } from '@phosphor-icons/react';
 
-import { SettingsCard } from '@/components/ui-new/primitives/SettingsCard';
 import { Step3Models } from '@/components/workflow/steps/Step3Models';
 import { getDefaultWizardConfig } from '@/components/workflow/types';
 import { useUserSystem } from '@/components/ConfigProvider';
@@ -103,10 +102,7 @@ export function ModelsSettingsNew() {
         </div>
       )}
 
-      <SettingsCard
-        title={t('workflow:step3.title')}
-        description={t('workflow:steps.models.description')}
-      >
+      <div className="bg-panel rounded-lg border p-double">
         <div className="flex flex-col gap-base">
           {workflowModelsSaving && (
             <div className="flex items-center gap-half text-sm text-low">
@@ -120,7 +116,7 @@ export function ModelsSettingsNew() {
             dialogContentClassName="bg-panel border border-border text-high shadow-xl"
           />
         </div>
-      </SettingsCard>
+      </div>
     </div>
   );
 }

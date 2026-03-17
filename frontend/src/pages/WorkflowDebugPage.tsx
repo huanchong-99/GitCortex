@@ -1,8 +1,6 @@
-import { useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { useWorkflow, workflowKeys } from '@/hooks/useWorkflows';
-import { useWorkflowEvents } from '@/stores/wsStore';
+import { useWorkflow } from '@/hooks/useWorkflows';
+import { useWorkflowInvalidation } from '@/hooks/useWorkflowInvalidation';
 import { TerminalDebugView } from '@/components/terminal/TerminalDebugView';
 import type { Terminal, TerminalStatus } from '@/components/workflow/TerminalCard';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
@@ -39,27 +37,10 @@ function mapTerminalStatus(status: string): TerminalStatus {
 
 export function WorkflowDebugPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
-  const queryClient = useQueryClient();
   // G28-003: Use WebSocket events instead of 1.5s polling for real-time updates
   const { data: workflow, isLoading } = useWorkflow(workflowId ?? '');
 
-  const invalidateWorkflow = useCallback(() => {
-    if (!workflowId) return;
-    queryClient.invalidateQueries({ queryKey: workflowKeys.byId(workflowId) });
-  }, [queryClient, workflowId]);
-
-  const workflowEventHandlers = useMemo(
-    () => ({
-      onWorkflowStatusChanged: invalidateWorkflow,
-      onTaskStatusChanged: invalidateWorkflow,
-      onTerminalStatusChanged: invalidateWorkflow,
-      onTerminalCompleted: invalidateWorkflow,
-      onGitCommitDetected: invalidateWorkflow,
-    }),
-    [invalidateWorkflow]
-  );
-
-  useWorkflowEvents(workflowId, workflowEventHandlers);
+  useWorkflowInvalidation(workflowId);
 
   const workflowTasks = workflow?.tasks ?? [];
 

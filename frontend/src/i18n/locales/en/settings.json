@@ -354,6 +354,48 @@
           "helper": "The absolute path to your git repository on disk."
         }
       },
+      "repositories": {
+        "title": "Repositories",
+        "description": "Manage the git repositories in this project",
+        "loading": "Loading repositories...",
+        "deleteButton": "Delete repository",
+        "empty": "No repositories configured",
+        "addButton": "Add Repository",
+        "errors": {
+          "loadFailed": "Failed to load repositories",
+          "addFailed": "Failed to add repository",
+          "deleteFailed": "Failed to delete repository"
+        }
+      },
+      "repoPicker": {
+        "title": "Select Git Repository",
+        "subtitle": "Choose a git repository to add to this project",
+        "browseTitle": "Choose an existing git repository",
+        "fromExisting": "From Git Repository",
+        "fromExistingDesc": "Select an existing repository from your system",
+        "createNew": "Create New Repository",
+        "createNewDesc": "Initialize a new git repository",
+        "backToOptions": "Back to options",
+        "browse": "Browse for repository",
+        "browseDesc": "Browse and select any repository on your system",
+        "showMore": "Show {{count}} more repositories",
+        "showLess": "Show less",
+        "repoName": "Repository Name",
+        "repoNameHint": "This will be the folder name for your new repository",
+        "parentDir": "Parent Directory",
+        "parentDirHint": "Leave empty to use your current working directory",
+        "selectParentDir": "Select Parent Directory",
+        "selectParentDirDesc": "Choose where to create the new repository",
+        "createRepo": "Create Repository",
+        "creating": "Creating...",
+        "registering": "Registering repository...",
+        "errors": {
+          "loadFailed": "Failed to load repositories",
+          "registerFailed": "Failed to register repository",
+          "nameRequired": "Repository name is required",
+          "createFailed": "Failed to create repository"
+        }
+      },
       "save": {
         "button": "Save Project Settings",
         "success": "✓ Project settings saved successfully!",

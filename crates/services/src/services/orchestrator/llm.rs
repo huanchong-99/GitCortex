@@ -227,9 +227,19 @@ impl OpenAICompatibleClient {
             .build()
             .expect("Failed to create HTTP client");
 
+        // Normalize base_url: ensure it ends with /v1 for OpenAI-compatible endpoints.
+        // The client appends /chat/completions directly, so base_url must include /v1.
+        // TODO: consolidate with ensure_v1() in crates/server/src/routes/models.rs
+        let trimmed = config.base_url.trim_end_matches('/');
+        let base_url = if trimmed.ends_with("/v1") {
+            trimmed.to_string()
+        } else {
+            format!("{trimmed}/v1")
+        };
+
         Self {
             client,
-            base_url: config.base_url.trim_end_matches('/').to_string(),
+            base_url,
             api_key: config.api_key.clone(),
             model: config.model.clone(),
         }

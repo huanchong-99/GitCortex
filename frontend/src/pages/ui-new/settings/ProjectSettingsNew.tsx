@@ -213,19 +213,19 @@ export function ProjectSettingsNew() {
       .then(setRepositories)
       .catch((err) => {
         setRepoError(
-          err instanceof Error ? err.message : 'Failed to load repositories'
+          err instanceof Error ? err.message : t('settings.projects.repositories.errors.loadFailed')
         );
         setRepositories([]);
       })
       .finally(() => setLoadingRepos(false));
-  }, [selectedProjectId]);
+  }, [selectedProjectId, t]);
 
   const handleAddRepository = async () => {
     if (!selectedProjectId) return;
 
     const repo = await RepoPickerDialog.show({
-      title: 'Select Git Repository',
-      description: 'Choose a git repository to add to this project',
+      title: t('settings.projects.repoPicker.title'),
+      description: t('settings.projects.repoPicker.subtitle'),
     });
 
     if (!repo) return;
@@ -253,7 +253,7 @@ export function ProjectSettingsNew() {
       });
     } catch (err) {
       setRepoError(
-        err instanceof Error ? err.message : 'Failed to add repository'
+        err instanceof Error ? err.message : t('settings.projects.repositories.errors.addFailed')
       );
     } finally {
       setAddingRepo(false);
@@ -279,7 +279,7 @@ export function ProjectSettingsNew() {
       });
     } catch (err) {
       setRepoError(
-        err instanceof Error ? err.message : 'Failed to delete repository'
+        err instanceof Error ? err.message : t('settings.projects.repositories.errors.deleteFailed')
       );
     } finally {
       setDeletingRepoId(null);
@@ -455,8 +455,8 @@ export function ProjectSettingsNew() {
 
           {/* Repositories Card */}
           <SettingsCard
-            title="Repositories"
-            description="Manage the git repositories in this project"
+            title={t('settings.projects.repositories.title')}
+            description={t('settings.projects.repositories.description')}
           >
             <SettingsSection>
               {repoError && <ErrorAlert message={repoError} />}
@@ -468,7 +468,7 @@ export function ProjectSettingsNew() {
                     weight="bold"
                   />
                   <span className="ml-half text-sm text-low">
-                    Loading repositories...
+                    {t('settings.projects.repositories.loading')}
                   </span>
                 </div>
               ) : (
@@ -504,8 +504,8 @@ export function ProjectSettingsNew() {
                         ) : (
                           <IconButton
                             icon={TrashIcon}
-                            aria-label="Delete repository"
-                            title="Delete repository"
+                            aria-label={t('settings.projects.repositories.deleteButton')}
+                            title={t('settings.projects.repositories.deleteButton')}
                             onClick={() => {
                               handleDeleteRepository(repo.id);
                             }}
@@ -517,7 +517,7 @@ export function ProjectSettingsNew() {
 
                   {repositories.length === 0 && !loadingRepos && (
                     <div className="text-center py-base text-sm text-low">
-                      No repositories configured
+                      {t('settings.projects.repositories.empty')}
                     </div>
                   )}
 
@@ -536,7 +536,7 @@ export function ProjectSettingsNew() {
                     ) : (
                       <PlusIcon className="size-icon-xs" weight="bold" />
                     )}
-                    Add Repository
+                    {t('settings.projects.repositories.addButton')}
                   </Button>
                 </div>
               )}

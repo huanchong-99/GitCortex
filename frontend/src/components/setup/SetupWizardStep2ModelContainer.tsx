@@ -43,7 +43,9 @@ export function SetupWizardStep2ModelContainer({
     reset: resetVerification,
   } = useModelVerification();
 
-  const canProceed = isVerified && modelId !== '';
+  // Allow proceeding if model ID is manually entered, even without verification.
+  // Third-party OpenAI-compatible endpoints may not support the verification API.
+  const canProceed = modelId.trim() !== '' && apiKey.trim() !== '';
 
   const handleApiTypeChange = useCallback(
     (newType: string) => {
@@ -104,7 +106,7 @@ export function SetupWizardStep2ModelContainer({
       baseUrl: baseUrl || DEFAULT_BASE_URLS[apiType] || '',
       apiKey,
       modelId,
-      isVerified: true,
+      isVerified,
     };
 
     // Save to workflow_model_library in config
@@ -119,6 +121,7 @@ export function SetupWizardStep2ModelContainer({
     baseUrl,
     apiKey,
     modelId,
+    isVerified,
     updateAndSaveConfig,
     onNext,
   ]);
