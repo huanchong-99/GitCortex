@@ -876,7 +876,7 @@ impl LocalContainerService {
     ///
     /// For Codex: copies the user's global `~/.codex/` config (auth.json + config.toml)
     /// into an isolated CODEX_HOME so the workspace process inherits auth settings.
-    async fn resolve_executor_env_vars(
+    fn resolve_executor_env_vars(
         &self,
         base_executor: BaseCodingAgent,
         _executor_action: &ExecutorAction,
@@ -1158,7 +1158,7 @@ impl ContainerService for LocalContainerService {
         // Without this, Codex (and other CLIs) in workspace mode cannot authenticate
         // because the isolated workspace environment doesn't inherit global CLI configs.
         if let Some(base_executor) = executor_action.base_executor() {
-            let profile_vars = self.resolve_executor_env_vars(base_executor, executor_action).await;
+            let profile_vars = self.resolve_executor_env_vars(base_executor, executor_action);
             env.merge(&profile_vars);
         }
 
