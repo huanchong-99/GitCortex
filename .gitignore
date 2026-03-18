@@ -67,3 +67,6 @@ coverage/
 AGENTS.md
 CLAUDE.md
 .claude/
+
+# Local test cases
+docs/undeveloped/current/GitCortex\ 1.0\ 发布测试用例.md
