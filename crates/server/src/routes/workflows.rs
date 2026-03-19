@@ -3606,7 +3606,8 @@ mod recovery_response_tests {
                 started_at TEXT,
                 completed_at TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pause_reason TEXT
             )
             ",
         )
