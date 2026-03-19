@@ -1186,7 +1186,8 @@ mod tests {
                 started_at TEXT,
                 completed_at TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pause_reason TEXT
             )
             ",
         )
@@ -1242,7 +1243,8 @@ mod tests {
                 default_agent_working_dir TEXT,
                 remote_project_id TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pause_reason TEXT
             )
             ",
         )
@@ -1263,7 +1265,8 @@ mod tests {
                 parallel_setup_script INTEGER NOT NULL DEFAULT 0,
                 dev_server_script TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pause_reason TEXT
             )
             ",
         )

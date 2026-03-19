@@ -86,7 +86,8 @@ fn bench_find_by_id(c: &mut Criterion) {
                 started_at TEXT,
                 completed_at TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pause_reason TEXT
             )
             "#
         )
@@ -314,7 +315,8 @@ fn bench_find_by_project_with_status(c: &mut Criterion) {
                 started_at TEXT,
                 completed_at TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                pause_reason TEXT
             )
             "#
         )

@@ -36,7 +36,8 @@ async fn test_runtime_starts_and_stops_workflow() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
@@ -119,7 +120,8 @@ async fn test_runtime_prevents_duplicate_start() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
@@ -195,7 +197,8 @@ async fn test_runtime_validates_workflow_state() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
@@ -286,7 +289,8 @@ async fn test_runtime_recovers_running_workflows() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
@@ -363,7 +367,8 @@ async fn test_runtime_stop_all() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
@@ -451,7 +456,8 @@ async fn test_runtime_enforces_concurrent_limit() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
@@ -543,7 +549,8 @@ async fn test_start_workflow_rolls_back_on_agent_creation_failure() {
             started_at TEXT,
             completed_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            pause_reason TEXT
         )
     ").execute(&pool).await.unwrap();
 
