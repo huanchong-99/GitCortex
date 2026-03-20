@@ -357,11 +357,12 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
       }}>
         <DialogContent
           className={cn(
-            'max-w-2xl max-h-[90vh] overflow-y-auto',
+            'flex flex-col max-w-2xl max-h-[90vh] overflow-hidden !gap-0 !p-0 sm:rounded-xl shadow-2xl',
             dialogContentClassName
           )}
         >
-          <DialogHeader>
+          {/* 对话框头部：增加更多留白，视觉更舒适 */}
+          <DialogHeader className="px-8 pt-8 pb-2 shrink-0">
             <DialogTitle>
               {editingModel ? t('step3.dialog.editTitle') : t('step3.dialog.addTitle')}
             </DialogTitle>
@@ -370,7 +371,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-base py-base">
+          {/* 表单内容区：增加容器内边距和表单项间距，设置为内部滚动并隐藏原生滚动条 */}
+          <div className="flex-1 flex flex-col gap-4 px-8 py-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {/* Display Name */}
             <Field>
               <FieldLabel htmlFor="displayName">{t('step3.fields.displayName.label')}</FieldLabel>
@@ -594,8 +596,8 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
             </Field>
           </div>
 
-          <DialogFooter className="sticky bottom-0 z-10 border-t border-border bg-[hsl(var(--card))] px-base py-base">
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+          <DialogFooter className="shrink-0 border-t border-border bg-[hsl(var(--card))] px-8 py-5">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={handleCloseDialog}
