@@ -626,63 +626,163 @@ fn truncate_output(value: &str, max_chars: usize) -> String {
     }
 }
 
-fn resolve_ai_cli_install_script() -> Option<PathBuf> {
-    let mut candidates = vec![PathBuf::from("/opt/gitcortex/install/install-ai-clis.sh")];
-    if let Ok(cwd) = std::env::current_dir() {
-        candidates.push(cwd.join("scripts/docker/install/install-ai-clis.sh"));
-    }
-    candidates.push(PathBuf::from("scripts/docker/install/install-ai-clis.sh"));
+fn resolve_install_single_cli_script() -> Option<PathBuf> {
+    if cfg!(target_os = "windows") {
+        let mut candidates = Vec::new();
 
-    candidates.into_iter().find(|path| path.is_file())
+        // Check GITCORTEX_INSTALL_DIR (set by tray app)
+        if let Ok(install_dir) = std::env::var("GITCORTEX_INSTALL_DIR") {
+            candidates
+                .push(PathBuf::from(&install_dir).join("scripts/install-single-cli.ps1"));
+        }
+
+        // Relative to executable
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                candidates.push(exe_dir.join("scripts/install-single-cli.ps1"));
+            }
+        }
+
+        // Development paths
+        if let Ok(cwd) = std::env::current_dir() {
+            candidates.push(cwd.join("installer/scripts/install-single-cli.ps1"));
+        }
+
+        candidates.into_iter().find(|path| path.is_file())
+    } else {
+        // Unix: batch script
+        let mut candidates = vec![PathBuf::from("/opt/gitcortex/install/install-ai-clis.sh")];
+        if let Ok(cwd) = std::env::current_dir() {
+            candidates.push(cwd.join("scripts/docker/install/install-ai-clis.sh"));
+        }
+        candidates.push(PathBuf::from("scripts/docker/install/install-ai-clis.sh"));
+
+        candidates.into_iter().find(|path| path.is_file())
+    }
 }
+
+/// CLI names to install in batch mode.
+const BATCH_INSTALL_CLIS: &[&str] = &[
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "amp",
+    "cursor-agent",
+    "qwen-code",
+    "opencode",
+    "droid",
+];
 
 async fn install_ai_clis(
     State(_deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<InstallAiClisResponse>>, ApiError> {
-    let Some(script_path) = resolve_ai_cli_install_script() else {
+    let Some(script_path) = resolve_install_single_cli_script() else {
         return Err(ApiError::BadRequest(
             "AI CLI install script not found".to_string(),
         ));
     };
 
-    let mut command = Command::new("bash");
-    command
-        .arg(&script_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    if cfg!(target_os = "windows") {
+        // Windows: invoke install-single-cli.ps1 for each CLI sequentially
+        let mut combined_output = String::new();
+        let mut all_success = true;
+        let mut last_exit_code = 0;
 
-    let install_result =
-        match tokio::time::timeout(Duration::from_secs(1800), command.output()).await {
-            Ok(Ok(output)) => {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let combined = if stderr.trim().is_empty() {
-                    stdout.to_string()
-                } else if stdout.trim().is_empty() {
-                    stderr.to_string()
-                } else {
-                    format!("{stdout}\n{stderr}")
-                };
-                InstallAiClisResponse {
-                    installed: output.status.success(),
-                    exit_code: output.status.code().unwrap_or(-1),
-                    script_path: script_path.display().to_string(),
-                    output: truncate_output(&combined, 16_000),
+        for cli_name in BATCH_INSTALL_CLIS {
+            combined_output.push_str(&format!("=== Installing {cli_name} ===\n"));
+
+            let mut command = Command::new("powershell.exe");
+            command
+                .arg("-ExecutionPolicy")
+                .arg("Bypass")
+                .arg("-File")
+                .arg(&script_path)
+                .arg("install")
+                .arg(cli_name)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+
+            match tokio::time::timeout(Duration::from_secs(300), command.output()).await {
+                Ok(Ok(output)) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    if !stdout.is_empty() {
+                        combined_output.push_str(&stdout);
+                    }
+                    if !stderr.is_empty() {
+                        combined_output.push_str(&stderr);
+                    }
+                    let code = output.status.code().unwrap_or(-1);
+                    if code != 0 {
+                        all_success = false;
+                        last_exit_code = code;
+                        combined_output
+                            .push_str(&format!("[WARN] {cli_name} exited with code {code}\n"));
+                    }
+                }
+                Ok(Err(err)) => {
+                    all_success = false;
+                    last_exit_code = -1;
+                    combined_output
+                        .push_str(&format!("[ERROR] Failed to run script for {cli_name}: {err}\n"));
+                }
+                Err(_) => {
+                    all_success = false;
+                    last_exit_code = -1;
+                    combined_output
+                        .push_str(&format!("[ERROR] {cli_name} installation timed out\n"));
                 }
             }
-            Ok(Err(err)) => InstallAiClisResponse {
-                installed: false,
-                exit_code: -1,
-                script_path: script_path.display().to_string(),
-                output: format!("Failed to execute install script: {err}"),
-            },
-            Err(_) => InstallAiClisResponse {
-                installed: false,
-                exit_code: -1,
-                script_path: script_path.display().to_string(),
-                output: "AI CLI installation timed out after 30 minutes".to_string(),
-            },
-        };
+            combined_output.push('\n');
+        }
 
-    Ok(ResponseJson(ApiResponse::success(install_result)))
+        Ok(ResponseJson(ApiResponse::success(InstallAiClisResponse {
+            installed: all_success,
+            exit_code: last_exit_code,
+            script_path: script_path.display().to_string(),
+            output: truncate_output(&combined_output, 16_000),
+        })))
+    } else {
+        // Unix: run batch install script directly
+        let mut command = Command::new("bash");
+        command
+            .arg(&script_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let install_result =
+            match tokio::time::timeout(Duration::from_secs(1800), command.output()).await {
+                Ok(Ok(output)) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let combined = if stderr.trim().is_empty() {
+                        stdout.to_string()
+                    } else if stdout.trim().is_empty() {
+                        stderr.to_string()
+                    } else {
+                        format!("{stdout}\n{stderr}")
+                    };
+                    InstallAiClisResponse {
+                        installed: output.status.success(),
+                        exit_code: output.status.code().unwrap_or(-1),
+                        script_path: script_path.display().to_string(),
+                        output: truncate_output(&combined, 16_000),
+                    }
+                }
+                Ok(Err(err)) => InstallAiClisResponse {
+                    installed: false,
+                    exit_code: -1,
+                    script_path: script_path.display().to_string(),
+                    output: format!("Failed to execute install script: {err}"),
+                },
+                Err(_) => InstallAiClisResponse {
+                    installed: false,
+                    exit_code: -1,
+                    script_path: script_path.display().to_string(),
+                    output: "AI CLI installation timed out after 30 minutes".to_string(),
+                },
+            };
+
+        Ok(ResponseJson(ApiResponse::success(install_result)))
+    }
 }
