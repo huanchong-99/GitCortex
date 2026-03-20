@@ -258,8 +258,8 @@
         "loginDetectedTooltip": "找到此代理的最近身份验证凭据",
         "installationFound": "检测到以前使用",
         "installationFoundTooltip": "找到代理配置。您可能需要登录才能使用它。",
-        "notFound": "未知",
-        "notFoundTooltip": "我们无法验证此代理是否已设置，但请继续尝试。"
+        "notFound": "未检测到",
+        "notFoundTooltip": "未找到此代理的安装或配置。请确保已安装 Node.js 并运行 npm install -g 安装对应的 AI CLI。"
       },
       "installAiCli": "一键安装 AI CLI",
       "refreshAvailability": "刷新可用性",

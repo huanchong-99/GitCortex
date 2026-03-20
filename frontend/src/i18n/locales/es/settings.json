@@ -256,8 +256,8 @@
         "loginDetectedTooltip": "Se encontraron credenciales de autenticación recientes para este agente",
         "installationFound": "Uso previo detectado",
         "installationFoundTooltip": "Se encontró la configuración del agente. Es posible que debas iniciar sesión para usarlo.",
-        "notFound": "Desconocido",
-        "notFoundTooltip": "No pudimos verificar que este agente esté configurado, pero pruébalo."
+        "notFound": "No detectado",
+        "notFoundTooltip": "No se encontró instalación ni configuración para este agente. Asegúrate de tener Node.js instalado y ejecuta npm install -g para instalar el AI CLI."
       },
       "editor": {
         "formLabel": "Editar JSON",

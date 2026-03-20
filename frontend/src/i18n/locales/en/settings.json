@@ -258,8 +258,8 @@
         "loginDetectedTooltip": "Recent authentication credentials found for this agent",
         "installationFound": "Previous Usage Detected",
         "installationFoundTooltip": "Agent configuration found. You may need to log in to use it.",
-        "notFound": "Unknown",
-        "notFoundTooltip": "We couldn't verify this agent is set up, but go ahead and try it."
+        "notFound": "Not Detected",
+        "notFoundTooltip": "No installation or configuration found for this agent. Make sure Node.js is installed and run npm install -g to install the AI CLI."
       },
       "installAiCli": "One-click Install AI CLIs",
       "refreshAvailability": "Refresh availability",
