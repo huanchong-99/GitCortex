@@ -14,30 +14,36 @@ function Log-Info  { param([string]$msg) Write-Host "[INFO]  $msg" }
 function Log-Error { param([string]$msg) Write-Host "[ERROR] $msg" -ForegroundColor Red }
 function Log-Warn  { param([string]$msg) Write-Host "[WARN]  $msg" -ForegroundColor Yellow }
 
-# --- Resolve bundled tools ---
-# If GITCORTEX_INSTALL_DIR is set, use bundled Node.js/npm/gh from there.
+# --- Resolve tools ---
+# Check bundled tools first (legacy installs), then fall back to system PATH.
 $InstallDir = $env:GITCORTEX_INSTALL_DIR
 if (-not $InstallDir) {
-    # Fallback: assume script is in installer/scripts/ relative to install dir
     $InstallDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
 
-# Build PATH with bundled tools first
-$BundledPaths = @()
+$ExtraPaths = @()
+
+# Legacy bundled paths (older installs that still have these)
 $NodeDir = Join-Path $InstallDir "node_portable"
-if (Test-Path $NodeDir) { $BundledPaths += $NodeDir }
-$GitDir = Join-Path $InstallDir "mingit\cmd"
-if (Test-Path $GitDir) { $BundledPaths += $GitDir }
-$GhDir = Join-Path $InstallDir "gh"
-if (Test-Path $GhDir) { $BundledPaths += $GhDir }
-
-# Also include npm global bin directory
+if (Test-Path $NodeDir) { $ExtraPaths += $NodeDir }
 $NpmGlobalBin = Join-Path $NodeDir "node_modules\.bin"
-if (Test-Path $NpmGlobalBin) { $BundledPaths += $NpmGlobalBin }
+if (Test-Path $NpmGlobalBin) { $ExtraPaths += $NpmGlobalBin }
+$GitDir = Join-Path $InstallDir "mingit\cmd"
+if (Test-Path $GitDir) { $ExtraPaths += $GitDir }
+$GhDir = Join-Path $InstallDir "gh"
+if (Test-Path $GhDir) { $ExtraPaths += $GhDir }
 
-if ($BundledPaths.Count -gt 0) {
-    $env:PATH = ($BundledPaths -join ";") + ";" + $env:PATH
+# System npm global bin (where npm install -g puts executables)
+$AppDataNpm = Join-Path $env:APPDATA "npm"
+if (Test-Path $AppDataNpm) { $ExtraPaths += $AppDataNpm }
+
+if ($ExtraPaths.Count -gt 0) {
+    $env:PATH = ($ExtraPaths -join ";") + ";" + $env:PATH
 }
+
+# Suppress npm update notices
+$env:NO_UPDATE_NOTIFIER = "1"
+$env:NPM_CONFIG_UPDATE_NOTIFIER = "false"
 
 # --- Validation ---
 $ValidClis = @("claude-code","codex","gemini-cli","amp","cursor-agent","qwen-code","copilot","opencode","droid")

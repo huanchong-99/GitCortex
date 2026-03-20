@@ -181,6 +181,7 @@ impl TrayApp {
         cmd.current_dir(&self.install_dir)
             .envs(env_vars)
             .env("PATH", &combined_path)
+            .env("GITCORTEX_INSTALL_DIR", &self.install_dir)
             .stdout(stdout_file)
             .stderr(stderr_file);
 
