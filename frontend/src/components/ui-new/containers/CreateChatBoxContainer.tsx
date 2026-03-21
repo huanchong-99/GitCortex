@@ -178,12 +178,12 @@ export function CreateChatBoxContainer() {
     try {
       const modelConfig = getPlannerModelConfig();
       const draft = await planningDraftsApi.create({
-        project_id: projectId,
+        projectId,
         name: message.slice(0, 100),
-        planner_model_id: modelConfig?.modelId,
-        planner_api_type: modelConfig?.apiType,
-        planner_base_url: modelConfig?.baseUrl,
-        planner_api_key: modelConfig?.apiKey,
+        plannerModelId: modelConfig?.modelId,
+        plannerApiType: modelConfig?.apiType,
+        plannerBaseUrl: modelConfig?.baseUrl,
+        plannerApiKey: modelConfig?.apiKey,
       });
       setPlanningDraftId(draft.id);
 

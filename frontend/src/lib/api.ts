@@ -533,12 +533,12 @@ export interface MaterializeResponse {
 
 export const planningDraftsApi = {
   create: async (data: {
-    project_id: string;
+    projectId: string;
     name?: string;
-    planner_model_id?: string;
-    planner_api_type?: string;
-    planner_base_url?: string;
-    planner_api_key?: string;
+    plannerModelId?: string;
+    plannerApiType?: string;
+    plannerBaseUrl?: string;
+    plannerApiKey?: string;
   }): Promise<PlanningDraftResponse> => {
     const response = await makeRequest('/api/planning-drafts', {
       method: 'POST',

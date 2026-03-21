@@ -76,12 +76,12 @@ export function PlanningChatContainer() {
       try {
         const modelConfig = getFirstModelConfig();
         const draft = await planningDraftsApi.create({
-          project_id: selectedProjectId,
+          projectId: selectedProjectId,
           name: trimmed.slice(0, 100),
-          planner_model_id: modelConfig?.modelId,
-          planner_api_type: modelConfig?.apiType,
-          planner_base_url: modelConfig?.baseUrl,
-          planner_api_key: modelConfig?.apiKey,
+          plannerModelId: modelConfig?.modelId,
+          plannerApiType: modelConfig?.apiType,
+          plannerBaseUrl: modelConfig?.baseUrl,
+          plannerApiKey: modelConfig?.apiKey,
         });
         setDraftId(draft.id);
         const newMessages = await planningDraftsApi.sendMessage(
