@@ -82,14 +82,19 @@ impl FeishuAuth {
         Ok(token)
     }
 
-    /// Acquire WebSocket endpoint URL from Feishu
+    /// Acquire WebSocket endpoint URL from Feishu.
+    ///
+    /// Per the official SDK, this endpoint authenticates via AppID/AppSecret
+    /// in the request body (not Bearer token).
     pub async fn acquire_ws_endpoint(&self) -> Result<WsEndpointResponse> {
-        let token = self.get_tenant_token().await?;
         let url = format!("{}/callback/ws/endpoint", self.config.base_url);
         let resp = self
             .http_client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .json(&serde_json::json!({
+                "AppID": self.config.app_id,
+                "AppSecret": self.config.app_secret,
+            }))
             .send()
             .await?;
 
