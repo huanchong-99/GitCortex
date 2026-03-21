@@ -481,9 +481,6 @@
         "appSecret": "App Secret",
         "secretPlaceholderNew": "Enter app secret",
         "secretPlaceholderExisting": "Enter new secret to update",
-        "tenantKey": "Tenant Key (optional)",
-        "tenantKeyPlaceholder": "Leave empty for default tenant",
-        "baseUrl": "API Base URL",
         "save": "Save Configuration",
         "saveSuccess": "Feishu configuration saved successfully.",
         "saveError": "Failed to save Feishu configuration.",
@@ -568,7 +565,16 @@
       "connected": "Connected",
       "disconnected": "Disconnected",
       "notConfigured": "Not configured",
-      "reconnect": "Reconnect"
+      "reconnect": "Reconnect",
+      "testTitle": "Connection Test",
+      "testDescription": "Verify the Feishu connection by sending and receiving messages.",
+      "testSend": "Send Test",
+      "testReceive": "Receive Test",
+      "testSendSuccess": "Message sent, please check Feishu",
+      "testSendFail": "Failed to send test message",
+      "testReceiveWaiting": "Waiting for message from Feishu (30s)...",
+      "testReceiveSuccess": "Message received successfully",
+      "testReceiveTimeout": "No message received within 30 seconds"
     }
   },
   "runtime": {

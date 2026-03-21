@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+/// Event type for incoming chat messages.
+pub const EVENT_TYPE_MESSAGE: &str = "im.message.receive_v1";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeishuEvent {
     pub schema: Option<String>,

@@ -311,6 +311,27 @@ impl ExternalConversationBinding {
         .await
     }
 
+    /// Find the most recently updated active binding for a given provider
+    /// (any conversation). Used by test-send when no chat_id is specified.
+    pub async fn find_latest_active(
+        pool: &SqlitePool,
+        provider: &str,
+    ) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, ExternalConversationBinding>(
+            r"
+            SELECT *
+            FROM external_conversation_binding
+            WHERE provider = ?1
+              AND is_active = 1
+            ORDER BY updated_at DESC
+            LIMIT 1
+            ",
+        )
+        .bind(provider)
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn deactivate(
         pool: &SqlitePool,
         provider: &str,

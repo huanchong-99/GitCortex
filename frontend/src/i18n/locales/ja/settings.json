@@ -482,7 +482,16 @@
       "connected": "接続済み",
       "disconnected": "切断済み",
       "notConfigured": "未設定",
-      "reconnect": "再接続"
+      "reconnect": "再接続",
+      "testTitle": "接続テスト",
+      "testDescription": "メッセージの送受信でFeishu接続を確認します。",
+      "testSend": "送信テスト",
+      "testReceive": "受信テスト",
+      "testSendSuccess": "メッセージ送信済み、Feishuを確認してください",
+      "testSendFail": "テストメッセージの送信に失敗しました",
+      "testReceiveWaiting": "Feishuからのメッセージを待機中（30秒）...",
+      "testReceiveSuccess": "メッセージを正常に受信しました",
+      "testReceiveTimeout": "30秒以内にメッセージを受信できませんでした"
     }
   }
 }

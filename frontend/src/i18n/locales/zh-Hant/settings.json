@@ -493,7 +493,16 @@
       "connected": "已連線",
       "disconnected": "已斷線",
       "notConfigured": "未設定",
-      "reconnect": "重新連線"
+      "reconnect": "重新連線",
+      "testTitle": "連線測試",
+      "testDescription": "透過傳送和接收訊息來驗證飛書連線是否正常。",
+      "testSend": "傳送測試",
+      "testReceive": "接收測試",
+      "testSendSuccess": "訊息已傳送，請檢查飛書",
+      "testSendFail": "傳送測試訊息失敗",
+      "testReceiveWaiting": "等待飛書訊息中（30秒）...",
+      "testReceiveSuccess": "訊息接收成功",
+      "testReceiveTimeout": "30秒內未收到訊息"
     }
   }
 }

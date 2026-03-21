@@ -24,7 +24,7 @@ use super::chat_connector::ChatConnector;
 use super::orchestrator::message_bus::SharedMessageBus;
 
 const FEISHU_PROVIDER: &str = "feishu";
-const EVENT_TYPE_MESSAGE: &str = "im.message.receive_v1";
+use feishu_connector::events::EVENT_TYPE_MESSAGE;
 
 // ---------------------------------------------------------------------------
 // FeishuService
@@ -38,6 +38,9 @@ pub struct FeishuService {
     messenger: Arc<FeishuMessenger>,
     pool: SqlitePool,
     bus: SharedMessageBus,
+    /// Optional broadcast sender for forwarding events to external subscribers
+    /// (e.g. test-receive endpoint).
+    event_broadcaster: Option<tokio::sync::broadcast::Sender<FeishuEvent>>,
 }
 
 impl FeishuService {
@@ -54,6 +57,7 @@ impl FeishuService {
             messenger,
             pool,
             bus,
+            event_broadcaster: None,
         }
     }
 
@@ -95,6 +99,7 @@ impl FeishuService {
         let pool = &self.pool;
         let bus = &self.bus;
         let messenger = &self.messenger;
+        let broadcaster = &self.event_broadcaster;
 
         tokio::select! {
             conn_result = connect_fut => {
@@ -102,7 +107,7 @@ impl FeishuService {
                     tracing::error!(error = %e, "Feishu WebSocket connection ended with error");
                 }
             }
-            () = Self::process_events_inner(event_rx, pool, bus, messenger) => {
+            () = Self::process_events_inner(event_rx, pool, bus, messenger, broadcaster) => {
                 tracing::info!("Feishu event processing loop ended");
             }
         }
@@ -116,8 +121,14 @@ impl FeishuService {
         pool: &SqlitePool,
         bus: &SharedMessageBus,
         messenger: &Arc<FeishuMessenger>,
+        broadcaster: &Option<tokio::sync::broadcast::Sender<FeishuEvent>>,
     ) {
         while let Some(event) = event_rx.recv().await {
+            if let Some(tx) = broadcaster {
+                if tx.receiver_count() > 0 {
+                    let _ = tx.send(event.clone());
+                }
+            }
             if let Err(e) = Self::handle_event_inner(&event, pool, bus, messenger).await {
                 tracing::warn!(error = %e, "Failed to handle Feishu event");
             }
@@ -313,6 +324,12 @@ impl FeishuService {
     /// Get a reference to the messenger (useful for building a [`FeishuConnector`]).
     pub fn messenger(&self) -> &Arc<FeishuMessenger> {
         &self.messenger
+    }
+
+    /// Set an event broadcaster for forwarding incoming events to external
+    /// subscribers (e.g. test-receive endpoint).
+    pub fn set_event_broadcaster(&mut self, tx: tokio::sync::broadcast::Sender<FeishuEvent>) {
+        self.event_broadcaster = Some(tx);
     }
 }
 

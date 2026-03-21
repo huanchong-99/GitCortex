@@ -482,7 +482,16 @@
       "connected": "연결됨",
       "disconnected": "연결 해제됨",
       "notConfigured": "구성되지 않음",
-      "reconnect": "재연결"
+      "reconnect": "재연결",
+      "testTitle": "연결 테스트",
+      "testDescription": "메시지 송수신으로 Feishu 연결을 확인합니다.",
+      "testSend": "전송 테스트",
+      "testReceive": "수신 테스트",
+      "testSendSuccess": "메시지 전송됨, Feishu를 확인하세요",
+      "testSendFail": "테스트 메시지 전송 실패",
+      "testReceiveWaiting": "Feishu 메시지 대기 중 (30초)...",
+      "testReceiveSuccess": "메시지 수신 성공",
+      "testReceiveTimeout": "30초 이내에 메시지를 수신하지 못했습니다"
     }
   }
 }

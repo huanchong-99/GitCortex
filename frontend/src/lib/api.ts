@@ -1549,4 +1549,22 @@ export const feishuApi = {
     });
     return handleApiResponse(response);
   },
+
+  testSend: async (
+    chatId?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await makeRequest('/api/integrations/feishu/test-send', {
+      method: 'POST',
+      body: JSON.stringify({ chatId }),
+    });
+    return handleApiResponse(response);
+  },
+
+  testReceive: async (): Promise<{ success: boolean; message: string }> => {
+    const response = await makeRequest('/api/integrations/feishu/test-receive', {
+      method: 'POST',
+      signal: AbortSignal.timeout(35000),
+    });
+    return handleApiResponse(response);
+  },
 };

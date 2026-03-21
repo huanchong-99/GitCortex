@@ -6,6 +6,8 @@ import {
   XCircleIcon,
   SpinnerGapIcon,
   WarningIcon,
+  PaperPlaneRightIcon,
+  EnvelopeSimpleIcon,
 } from '@phosphor-icons/react';
 import { feishuApi, makeRequest, handleApiResponse } from '@/lib/api';
 import { SettingsCard } from '@/components/ui-new/primitives/SettingsCard';
@@ -45,8 +47,13 @@ export function FeishuSettingsNew() {
   const [feishuEnabled, setFeishuEnabled] = useState(false);
   const [appId, setAppId] = useState('');
   const [appSecret, setAppSecret] = useState('');
-  const [tenantKey, setTenantKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState('https://open.feishu.cn');
+
+  const [testingSend, setTestingSend] = useState(false);
+  const [testingReceive, setTestingReceive] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   /* ------------------------------------------------------------------ */
   /*  Data fetching                                                      */
@@ -59,8 +66,6 @@ export function FeishuSettingsNew() {
       setFeishuEnabled(data.featureEnabled);
       if (data.configSummary) {
         setAppId(data.configSummary.appId);
-        setBaseUrl(data.configSummary.baseUrl);
-        setTenantKey(data.configSummary.tenantKey || '');
       }
     } catch {
       setError(t('settings.feishu.loadError'));
@@ -103,8 +108,6 @@ export function FeishuSettingsNew() {
       await feishuApi.updateConfig({
         appId: appId.trim(),
         appSecret: appSecret.trim(),
-        tenantKey: tenantKey.trim() || undefined,
-        baseUrl: baseUrl.trim() || undefined,
         enabled: true,
       });
       setSuccess(t('settings.feishu.form.saveSuccess'));
@@ -134,6 +137,41 @@ export function FeishuSettingsNew() {
       setError(t('settings.feishu.reconnectError'));
     } finally {
       setReconnecting(false);
+    }
+  };
+
+  const handleTestSend = async () => {
+    try {
+      setTestingSend(true);
+      setTestResult(null);
+      const result = await feishuApi.testSend();
+      setTestResult({ success: result.success, message: result.message });
+    } catch {
+      setTestResult({
+        success: false,
+        message: t('settings:newDesign.feishu.testSendFail'),
+      });
+    } finally {
+      setTestingSend(false);
+    }
+  };
+
+  const handleTestReceive = async () => {
+    try {
+      setTestingReceive(true);
+      setTestResult({
+        success: true,
+        message: t('settings:newDesign.feishu.testReceiveWaiting'),
+      });
+      const result = await feishuApi.testReceive();
+      setTestResult({ success: result.success, message: result.message });
+    } catch {
+      setTestResult({
+        success: false,
+        message: t('settings:newDesign.feishu.testReceiveTimeout'),
+      });
+    } finally {
+      setTestingReceive(false);
     }
   };
 
@@ -240,6 +278,65 @@ export function FeishuSettingsNew() {
         </SettingsCard>
       )}
 
+      {/* Connection Test — only when connected */}
+      {feishuEnabled && isConnected && (
+        <SettingsCard
+          title={t('settings:newDesign.feishu.testTitle')}
+          description={t('settings:newDesign.feishu.testDescription')}
+        >
+          <SettingsSection>
+            <div className="flex flex-wrap gap-base">
+              <PrimaryButton
+                variant="secondary"
+                onClick={handleTestSend}
+                disabled={testingSend || testingReceive}
+                actionIcon={testingSend ? 'spinner' : PaperPlaneRightIcon}
+                value={t('settings:newDesign.feishu.testSend')}
+              />
+              <PrimaryButton
+                variant="secondary"
+                onClick={handleTestReceive}
+                disabled={testingSend || testingReceive}
+                actionIcon={testingReceive ? 'spinner' : EnvelopeSimpleIcon}
+                value={t('settings:newDesign.feishu.testReceive')}
+              />
+            </div>
+
+            {testingReceive && (
+              <div className="mt-base flex items-center gap-2 text-low">
+                <SpinnerGapIcon className="size-icon-sm animate-spin" />
+                <span className="text-sm">
+                  {t('settings:newDesign.feishu.testReceiveWaiting')}
+                </span>
+              </div>
+            )}
+
+            {testResult && !testingReceive && (
+              <div
+                className={`mt-base rounded border p-base text-sm ${
+                  testResult.success
+                    ? 'border-success/30 bg-success/10 text-success'
+                    : 'border-error/30 bg-error/10 text-error'
+                }`}
+              >
+                {testResult.success ? (
+                  <CheckCircleIcon
+                    className="mr-1 inline size-icon-sm"
+                    weight="fill"
+                  />
+                ) : (
+                  <XCircleIcon
+                    className="mr-1 inline size-icon-sm"
+                    weight="fill"
+                  />
+                )}
+                {testResult.message}
+              </div>
+            )}
+          </SettingsSection>
+        </SettingsCard>
+      )}
+
       {/* Configuration form — only when integration is enabled */}
       {feishuEnabled && (
         <SettingsCard
@@ -274,20 +371,6 @@ export function FeishuSettingsNew() {
               }
             />
 
-            <SettingsInput
-              label={t('settings.feishu.form.tenantKey')}
-              value={tenantKey}
-              onChange={setTenantKey}
-              placeholder={t('settings.feishu.form.tenantKeyPlaceholder')}
-            />
-
-            <SettingsInput
-              label={t('settings.feishu.form.baseUrl')}
-              type="url"
-              value={baseUrl}
-              onChange={setBaseUrl}
-              placeholder="https://open.feishu.cn"
-            />
           </SettingsSection>
 
           <div className="mt-base flex justify-end">

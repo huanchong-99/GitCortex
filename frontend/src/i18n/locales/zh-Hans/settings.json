@@ -481,9 +481,6 @@
         "appSecret": "应用密钥",
         "secretPlaceholderNew": "输入应用密钥",
         "secretPlaceholderExisting": "输入新密钥以更新",
-        "tenantKey": "租户密钥（可选）",
-        "tenantKeyPlaceholder": "留空使用默认租户",
-        "baseUrl": "API 基础 URL",
         "save": "保存配置",
         "saveSuccess": "飞书配置保存成功。",
         "saveError": "保存飞书配置失败。",
@@ -568,7 +565,16 @@
       "connected": "已连接",
       "disconnected": "已断开",
       "notConfigured": "未配置",
-      "reconnect": "重新连接"
+      "reconnect": "重新连接",
+      "testTitle": "连接测试",
+      "testDescription": "通过发送和接收消息来验证飞书连接是否正常。",
+      "testSend": "发送测试",
+      "testReceive": "接收测试",
+      "testSendSuccess": "消息已发送，请检查飞书",
+      "testSendFail": "发送测试消息失败",
+      "testReceiveWaiting": "等待飞书消息中（30秒）...",
+      "testReceiveSuccess": "消息接收成功",
+      "testReceiveTimeout": "30秒内未收到消息"
     }
   },
   "runtime": {

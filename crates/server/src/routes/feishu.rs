@@ -1,9 +1,11 @@
 //! Feishu (Lark) integration management API routes.
 //!
 //! Provides configuration management and status monitoring:
-//! - GET  /api/integrations/feishu/status     — Connection status
-//! - PUT  /api/integrations/feishu/config      — Update configuration
-//! - POST /api/integrations/feishu/reconnect   — Trigger reconnection
+//! - GET  /api/integrations/feishu/status       — Connection status
+//! - PUT  /api/integrations/feishu/config        — Update configuration
+//! - POST /api/integrations/feishu/reconnect     — Trigger reconnection
+//! - POST /api/integrations/feishu/test-send     — Send a test message
+//! - POST /api/integrations/feishu/test-receive  — Wait for an incoming message
 
 use axum::{
     Extension, Json, Router,
@@ -277,6 +279,164 @@ async fn reconnect(
 }
 
 // ---------------------------------------------------------------------------
+// Test request / response types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestSendRequest {
+    pub chat_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TestResultResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+// ---------------------------------------------------------------------------
+// Test handlers
+// ---------------------------------------------------------------------------
+
+/// POST /api/integrations/feishu/test-send
+///
+/// Sends a test message ("Hello from GitCortex") to the specified chat, or
+/// to the most recently active conversation binding.
+async fn test_send(
+    State(deployment): State<DeploymentImpl>,
+    Extension(feishu_handle): Extension<SharedFeishuHandle>,
+    Json(payload): Json<TestSendRequest>,
+) -> Result<Json<ApiResponse<TestResultResponse>>, ApiError> {
+    if !is_feishu_enabled(&deployment.db().pool).await {
+        return Err(ApiError::Conflict(
+            "Feishu integration is disabled".to_string(),
+        ));
+    }
+
+    let handle_guard = feishu_handle.read().await;
+    let Some(ref h) = *handle_guard else {
+        return Err(ApiError::Conflict(
+            "Feishu connector is not running".to_string(),
+        ));
+    };
+
+    if !*h.connected.read().await {
+        return Err(ApiError::Conflict(
+            "Feishu is not connected".to_string(),
+        ));
+    }
+
+    let messenger = h.messenger.clone();
+    drop(handle_guard);
+
+    // Resolve chat_id: use provided value or find from conversation bindings
+    let chat_id = if let Some(ref id) = payload.chat_id {
+        id.clone()
+    } else {
+        // Try to find the most recent active binding
+        let binding = db::models::ExternalConversationBinding::find_latest_active(
+            &deployment.db().pool,
+            "feishu",
+        )
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to query bindings: {e}")))?;
+
+        match binding {
+            Some(b) => b.conversation_id,
+            None => {
+                return Ok(Json(ApiResponse::success(TestResultResponse {
+                    success: false,
+                    message: "No chat_id provided and no active conversation binding found. Please send a message to the bot in Feishu first, or use /bind <workflow_id>.".to_string(),
+                })));
+            }
+        }
+    };
+
+    match messenger.send_text(&chat_id, "Hello from GitCortex / 你好，来自 GitCortex 的测试消息").await {
+        Ok(_) => Ok(Json(ApiResponse::success(TestResultResponse {
+            success: true,
+            message: "Test message sent successfully".to_string(),
+        }))),
+        Err(e) => Ok(Json(ApiResponse::success(TestResultResponse {
+            success: false,
+            message: format!("Failed to send message: {e}"),
+        }))),
+    }
+}
+
+/// POST /api/integrations/feishu/test-receive
+///
+/// Waits up to 30 seconds for an incoming message from Feishu.
+async fn test_receive(
+    State(deployment): State<DeploymentImpl>,
+    Extension(feishu_handle): Extension<SharedFeishuHandle>,
+) -> Result<Json<ApiResponse<TestResultResponse>>, ApiError> {
+    if !is_feishu_enabled(&deployment.db().pool).await {
+        return Err(ApiError::Conflict(
+            "Feishu integration is disabled".to_string(),
+        ));
+    }
+
+    let handle_guard = feishu_handle.read().await;
+    let Some(ref h) = *handle_guard else {
+        return Err(ApiError::Conflict(
+            "Feishu connector is not running".to_string(),
+        ));
+    };
+
+    if !*h.connected.read().await {
+        return Err(ApiError::Conflict(
+            "Feishu is not connected".to_string(),
+        ));
+    }
+
+    let mut rx = h.event_tx.subscribe();
+    drop(handle_guard);
+
+    let timeout = tokio::time::Duration::from_secs(30);
+    match tokio::time::timeout(timeout, async {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    // Check if it's a message event
+                    if let Some(ref header) = event.header {
+                        if header.event_type == feishu_connector::events::EVENT_TYPE_MESSAGE {
+                            if let Ok(msg) = feishu_connector::events::parse_message_event(&event) {
+                                let text = feishu_connector::events::parse_text_content(&msg.content);
+                                return text;
+                            }
+                        }
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::debug!(lagged = n, "Test-receive subscriber lagged");
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    break;
+                }
+            }
+        }
+        String::new()
+    })
+    .await
+    {
+        Ok(text) if !text.is_empty() => Ok(Json(ApiResponse::success(TestResultResponse {
+            success: true,
+            message: format!("Received: {text}"),
+        }))),
+        Ok(_) => Ok(Json(ApiResponse::success(TestResultResponse {
+            success: false,
+            message: "Event channel closed unexpectedly".to_string(),
+        }))),
+        Err(_) => Ok(Json(ApiResponse::success(TestResultResponse {
+            success: false,
+            message: "No message received within 30 seconds".to_string(),
+        }))),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -285,4 +445,6 @@ pub fn router() -> Router<DeploymentImpl> {
         .route("/feishu/status", get(get_status))
         .route("/feishu/config", put(update_config))
         .route("/feishu/reconnect", post(reconnect))
+        .route("/feishu/test-send", post(test_send))
+        .route("/feishu/test-receive", post(test_receive))
 }

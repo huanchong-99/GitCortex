@@ -482,7 +482,16 @@
       "connected": "Conectado",
       "disconnected": "Desconectado",
       "notConfigured": "No configurado",
-      "reconnect": "Reconectar"
+      "reconnect": "Reconectar",
+      "testTitle": "Prueba de conexión",
+      "testDescription": "Verifica la conexión con Feishu enviando y recibiendo mensajes.",
+      "testSend": "Enviar prueba",
+      "testReceive": "Recibir prueba",
+      "testSendSuccess": "Mensaje enviado, revisa Feishu",
+      "testSendFail": "Error al enviar el mensaje de prueba",
+      "testReceiveWaiting": "Esperando mensaje de Feishu (30s)...",
+      "testReceiveSuccess": "Mensaje recibido correctamente",
+      "testReceiveTimeout": "No se recibió mensaje en 30 segundos"
     }
   }
 }

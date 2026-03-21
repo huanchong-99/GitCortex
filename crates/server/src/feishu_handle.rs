@@ -3,6 +3,9 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use feishu_connector::events::FeishuEvent;
+use feishu_connector::messages::FeishuMessenger;
+
 /// Shared state for the Feishu connector, accessible from route handlers.
 #[derive(Clone)]
 pub struct FeishuHandle {
@@ -10,6 +13,10 @@ pub struct FeishuHandle {
     pub connected: Arc<RwLock<bool>>,
     /// Signal to trigger a reconnect (drop old task, spawn new one).
     pub reconnect_tx: tokio::sync::mpsc::Sender<()>,
+    /// Messenger for sending messages to Feishu.
+    pub messenger: Arc<FeishuMessenger>,
+    /// Broadcast channel for incoming Feishu events (used by test-receive).
+    pub event_tx: tokio::sync::broadcast::Sender<FeishuEvent>,
 }
 
 pub type SharedFeishuHandle = Arc<RwLock<Option<FeishuHandle>>>;
