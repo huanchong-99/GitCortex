@@ -148,10 +148,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockCliTypes,
-            }),
+            Promise.resolve(mockCliTypes),
         } as Response)
       );
 
@@ -185,10 +182,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockCliTypes,
-            }),
+            Promise.resolve(mockCliTypes),
         } as Response)
       );
 
@@ -206,10 +200,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockDetectionResults,
-            }),
+            Promise.resolve(mockDetectionResults),
         } as Response)
       );
 
@@ -245,10 +236,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockDetectionResults,
-            }),
+            Promise.resolve(mockDetectionResults),
         } as Response)
       );
 
@@ -268,10 +256,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockModels,
-            }),
+            Promise.resolve(mockModels),
         } as Response)
       );
 
@@ -315,10 +300,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockModels,
-            }),
+            Promise.resolve(mockModels),
         } as Response)
       );
 
@@ -336,10 +318,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockCliTypes,
-            }),
+            Promise.resolve(mockCliTypes),
         } as Response)
       );
 
@@ -359,10 +338,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockDetectionResults,
-            }),
+            Promise.resolve(mockDetectionResults),
         } as Response)
       );
 
@@ -389,10 +365,7 @@ describe('useCliTypes', () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve({
-              success: true,
-              data: mockModels,
-            }),
+            Promise.resolve(mockModels),
         } as Response)
       );
 
