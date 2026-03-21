@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateMode } from '@/contexts/CreateModeContext';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useCreateAttachments } from '@/hooks/useCreateAttachments';
@@ -42,8 +42,22 @@ export function CreateChatBoxContainer() {
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // === Planning Draft state ===
-  const [planningDraftId, setPlanningDraftId] = useState<string | null>(null);
+  // === Planning Draft state (persisted in URL) ===
+  const [searchParams, setSearchParams] = useSearchParams();
+  const planningDraftId = searchParams.get('draftId');
+  const setPlanningDraftId = useCallback(
+    (id: string | null) => {
+      setSearchParams((prev) => {
+        if (id) {
+          prev.set('draftId', id);
+        } else {
+          prev.delete('draftId');
+        }
+        return prev;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
   const [isCreatingDraft, setIsCreatingDraft] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [localMessages, setLocalMessages] = useState<PlanningMessageResponse[]>([]);
@@ -208,6 +222,7 @@ export function CreateChatBoxContainer() {
     effectiveProfile,
     updateAndSaveConfig,
     getPlannerModelConfig,
+    setPlanningDraftId,
     setMessage,
     clearAttachments,
     clearCreateDraft,

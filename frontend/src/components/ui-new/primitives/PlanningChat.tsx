@@ -187,7 +187,7 @@ export function PlanningChat({
       <div className="px-double py-half border-b flex items-center gap-half">
         <span className="text-xs text-low">{t('conversation.planning.title')}</span>
         <span className="text-xs px-1 py-px rounded bg-brand/10 text-brand">
-          {t(`planning.status.${draft.status}`)}
+          {t(`conversation.planning.status.${draft.status}`)}
         </span>
       </div>
 
