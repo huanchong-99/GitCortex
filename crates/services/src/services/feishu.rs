@@ -99,7 +99,7 @@ impl FeishuService {
         let pool = &self.pool;
         let bus = &self.bus;
         let messenger = &self.messenger;
-        let broadcaster = &self.event_broadcaster;
+        let broadcaster = self.event_broadcaster.as_ref();
 
         tokio::select! {
             conn_result = connect_fut => {
@@ -121,7 +121,7 @@ impl FeishuService {
         pool: &SqlitePool,
         bus: &SharedMessageBus,
         messenger: &Arc<FeishuMessenger>,
-        broadcaster: &Option<tokio::sync::broadcast::Sender<FeishuEvent>>,
+        broadcaster: Option<&tokio::sync::broadcast::Sender<FeishuEvent>>,
     ) {
         while let Some(event) = event_rx.recv().await {
             if let Some(tx) = broadcaster {
