@@ -227,6 +227,7 @@ impl TerminalLauncher {
                                 BaseCodingAgent::ClaudeCode,
                             ),
                             working_dir: None,
+                            allow_user_questions: false,
                         }),
                         None,
                     );

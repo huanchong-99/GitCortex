@@ -201,6 +201,7 @@ pub async fn follow_up(
             session_id: agent_session_id,
             executor_profile_id: executor_profile_id.clone(),
             working_dir: working_dir.clone(),
+            allow_user_questions: true,
         })
     } else {
         ExecutorActionType::CodingAgentInitialRequest(
@@ -208,6 +209,7 @@ pub async fn follow_up(
                 prompt,
                 executor_profile_id: executor_profile_id.clone(),
                 working_dir,
+                allow_user_questions: true,
             },
         )
     };

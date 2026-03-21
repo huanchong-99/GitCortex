@@ -962,6 +962,7 @@ pub trait ContainerService {
                 prompt,
                 executor_profile_id: executor_profile_id.clone(),
                 working_dir,
+                allow_user_questions: false,
             }),
             cleanup_action.map(Box::new),
         );

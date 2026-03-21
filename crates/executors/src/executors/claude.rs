@@ -78,6 +78,14 @@ pub struct ClaudeCode {
     #[ts(skip)]
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     approvals_service: Option<Arc<dyn ExecutorApprovalService>>,
+
+    /// When true, the AskUserQuestion tool is NOT disabled — allowing the CLI
+    /// to ask clarifying questions. Used for workspace session mode where the
+    /// user is directly chatting. Defaults to false (workflow terminal mode).
+    #[serde(skip)]
+    #[ts(skip)]
+    #[derivative(PartialEq = "ignore")]
+    pub allow_user_questions: bool,
 }
 
 impl ClaudeCode {
@@ -123,8 +131,10 @@ impl ClaudeCode {
             "--output-format=stream-json",
             "--input-format=stream-json",
             "--include-partial-messages",
-            "--disallowedTools=AskUserQuestion",
         ]);
+        if !self.allow_user_questions {
+            builder = builder.extend_params(["--disallowedTools=AskUserQuestion"]);
+        }
 
         apply_overrides(builder, &self.cmd)
     }
@@ -172,6 +182,10 @@ impl ClaudeCode {
 impl StandardCodingAgentExecutor for ClaudeCode {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals_service = Some(approvals);
+    }
+
+    fn set_allow_user_questions(&mut self, allow: bool) {
+        self.allow_user_questions = allow;
     }
 
     async fn spawn(
@@ -2068,6 +2082,7 @@ mod tests {
             },
             approvals_service: None,
             disable_api_key: None,
+            allow_user_questions: false,
         };
         let msg_store = Arc::new(MsgStore::new());
         let current_dir = std::path::PathBuf::from("/tmp/test-worktree");

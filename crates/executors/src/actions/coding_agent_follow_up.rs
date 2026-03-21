@@ -26,6 +26,9 @@ pub struct CodingAgentFollowUpRequest {
     /// If None, uses the container_ref directory directly.
     #[serde(default)]
     pub working_dir: Option<String>,
+    /// Allow the CLI to ask clarifying questions via AskUserQuestion tool.
+    #[serde(default)]
+    pub allow_user_questions: bool,
 }
 
 impl CodingAgentFollowUpRequest {
@@ -73,6 +76,9 @@ impl Executable for CodingAgentFollowUpRequest {
                 ))?;
 
             agent.use_approvals(approvals.clone());
+            if self.allow_user_questions {
+                agent.set_allow_user_questions(true);
+            }
 
             agent
                 .spawn_follow_up(&effective_dir, &self.prompt, &self.session_id, env)

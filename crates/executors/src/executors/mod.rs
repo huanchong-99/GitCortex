@@ -192,6 +192,10 @@ impl AvailabilityInfo {
 pub trait StandardCodingAgentExecutor {
     fn use_approvals(&mut self, _approvals: Arc<dyn ExecutorApprovalService>) {}
 
+    /// Allow the executor to ask the user clarifying questions.
+    /// Only relevant for session mode where the user is directly chatting.
+    fn set_allow_user_questions(&mut self, _allow: bool) {}
+
     async fn spawn(
         &self,
         current_dir: &Path,

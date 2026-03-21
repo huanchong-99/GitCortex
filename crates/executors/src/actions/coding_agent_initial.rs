@@ -25,6 +25,10 @@ pub struct CodingAgentInitialRequest {
     /// If None, uses the container_ref directory directly.
     #[serde(default)]
     pub working_dir: Option<String>,
+    /// Allow the CLI to ask clarifying questions via AskUserQuestion tool.
+    /// True for workspace session mode (direct user chat), false for workflow terminals.
+    #[serde(default)]
+    pub allow_user_questions: bool,
 }
 
 impl CodingAgentInitialRequest {
@@ -65,6 +69,9 @@ impl Executable for CodingAgentInitialRequest {
                 ))?;
 
             agent.use_approvals(approvals.clone());
+            if self.allow_user_questions {
+                agent.set_allow_user_questions(true);
+            }
 
             agent.spawn(&effective_dir, &self.prompt, env).await
         }
