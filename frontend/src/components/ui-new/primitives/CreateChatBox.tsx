@@ -51,6 +51,9 @@ interface CreateChatBoxProps {
   readonly error?: string | null;
   readonly projectId?: string;
   readonly agent?: BaseCodingAgent | null;
+  /** Override the submit button label (default: "Create" / "Creating...") */
+  readonly sendLabel?: string;
+  readonly sendingLabel?: string;
   readonly onPasteFiles?: (files: File[]) => void;
   /** Local images for immediate preview (before saved to server) */
   readonly localImages?: LocalImageMetadata[];
@@ -73,6 +76,8 @@ export function CreateChatBox({
   agent,
   onPasteFiles,
   localImages,
+  sendLabel,
+  sendingLabel,
 }: Readonly<CreateChatBoxProps>) {
   const { t } = useTranslation('tasks');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,8 +232,8 @@ export function CreateChatBox({
           actionIcon={isSending ? 'spinner' : undefined}
           value={
             isSending
-              ? t('conversation.workspace.creating')
-              : t('conversation.workspace.create')
+              ? (sendingLabel ?? t('conversation.workspace.creating'))
+              : (sendLabel ?? t('conversation.workspace.create'))
           }
         />
       }

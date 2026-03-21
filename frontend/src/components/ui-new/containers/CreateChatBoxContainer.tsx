@@ -20,7 +20,6 @@ import {
   useMaterializeDraft,
 } from '@/hooks/usePlanningDraft';
 import { CreateChatBox } from '../primitives/CreateChatBox';
-import { PlanningChat } from '../primitives/PlanningChat';
 
 export function CreateChatBoxContainer() {
   const { t } = useTranslation('common');
@@ -295,40 +294,84 @@ export function CreateChatBoxContainer() {
     );
   }
 
-  // === Phase 2 render: Planning conversation ===
-  if (planningDraftId) {
-    return (
-      <div className="relative flex flex-1 flex-col bg-primary h-full">
-        <PlanningChat
-          draft={planningDraft ?? null}
-          messages={planningMessages}
-          editor={{
-            value: message,
-            onChange: setMessage,
-          }}
-          isThinking={isThinking}
-          isConfirming={confirmMutation.isPending}
-          isMaterializing={materializeMutation.isPending}
-          projectId={projectId}
-          onSend={handlePlanningMessage}
-          onConfirm={handleConfirm}
-          onMaterialize={handleMaterialize}
-        />
-      </div>
-    );
-  }
+  // Determine if we're in planning conversation mode
+  const isInPlanningMode = !!planningDraftId;
+  const draftStatus = planningDraft?.status;
+  const isSpecReady = draftStatus === 'spec_ready';
+  const isConfirmed = draftStatus === 'confirmed';
 
-  // === Phase 1 render: Initial input (standard CreateChatBox UI) ===
   return (
-    <div className="relative flex flex-1 flex-col bg-primary h-full justify-end">
-      <div className="flex justify-center @container">
-        <CreateChatBox
+    <div className="relative flex flex-1 flex-col bg-primary h-full overflow-hidden">
+      {/* Planning conversation messages (Phase 2 only) */}
+      {isInPlanningMode && (
+        <>
+          {/* Status badge */}
+          <div className="shrink-0 px-double py-half border-b flex items-center gap-half">
+            <span className="text-xs text-low">{tTasks('conversation.planning.title')}</span>
+            {draftStatus && (
+              <span className="text-xs px-1 py-px rounded bg-brand/10 text-brand">
+                {tTasks(`conversation.planning.status.${draftStatus}`)}
+              </span>
+            )}
+            {isSpecReady && (
+              <button
+                onClick={handleConfirm}
+                disabled={confirmMutation.isPending}
+                className="ml-auto text-xs px-base py-half rounded bg-brand text-white hover:bg-brand/90 disabled:opacity-50"
+              >
+                {confirmMutation.isPending ? '...' : tTasks('conversation.planning.confirmButton')}
+              </button>
+            )}
+            {isConfirmed && (
+              <button
+                onClick={handleMaterialize}
+                disabled={materializeMutation.isPending}
+                className="ml-auto text-xs px-base py-half rounded bg-brand text-white hover:bg-brand/90 disabled:opacity-50"
+              >
+                {materializeMutation.isPending ? '...' : tTasks('conversation.planning.materializeButton')}
+              </button>
+            )}
+          </div>
+
+          {/* Scrollable message list */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-double py-base space-y-base">
+            {planningMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg px-base py-half text-sm whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-brand/10 text-high'
+                      : 'bg-secondary text-normal'
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {isThinking && (
+              <div className="flex justify-start">
+                <div className="bg-secondary rounded-lg px-base py-half text-sm text-low animate-pulse">
+                  {tTasks('conversation.planning.thinking')}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Input area — same CreateChatBox for both phases */}
+      <div className={isInPlanningMode ? 'shrink-0 pb-[48px]' : 'flex-1 flex flex-col justify-end'}>
+        <div className="flex justify-center @container">
+          <CreateChatBox
           editor={{
             value: message,
             onChange: setMessage,
           }}
-          onSend={handleInitialSubmit}
-          isSending={isCreatingDraft}
+          onSend={isInPlanningMode ? handlePlanningMessage : handleInitialSubmit}
+          isSending={isCreatingDraft || isThinking}
           executor={{
             selected: effectiveProfile?.executor ?? null,
             options: Object.keys(profiles || {}) as BaseCodingAgent[],
@@ -363,7 +406,10 @@ export function CreateChatBoxContainer() {
           agent={effectiveProfile?.executor ?? null}
           onPasteFiles={uploadFiles}
           localImages={localImages}
+          sendLabel={isInPlanningMode ? tTasks('conversation.actions.send') : undefined}
+          sendingLabel={isInPlanningMode ? tTasks('conversation.planning.thinking') : undefined}
         />
+        </div>
       </div>
     </div>
   );
