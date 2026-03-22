@@ -185,23 +185,29 @@ export function WorkspacesLayout() {
                           minSize={20}
                           className="min-w-0 h-full overflow-hidden"
                         >
-                          {isConciergeMode ? (
-                            <ConciergeChatContainer
-                              initialSessionId={conciergeSessionId}
-                            />
-                          ) : isCreateMode ? (
-                            <CreateChatBoxContainer />
-                          ) : (
-                            <WorkspacesMainContainer
-                              selectedWorkspace={selectedWorkspace ?? null}
-                              selectedSession={selectedSession}
-                              sessions={sessions}
-                              onSelectSession={selectSession}
-                              isLoading={isLoading}
-                              isNewSessionMode={isNewSessionMode}
-                              onStartNewSession={startNewSession}
-                            />
-                          )}
+                          {(() => {
+                            if (isConciergeMode) {
+                              return (
+                                <ConciergeChatContainer
+                                  initialSessionId={conciergeSessionId}
+                                />
+                              );
+                            }
+                            if (isCreateMode) {
+                              return <CreateChatBoxContainer />;
+                            }
+                            return (
+                              <WorkspacesMainContainer
+                                selectedWorkspace={selectedWorkspace ?? null}
+                                selectedSession={selectedSession}
+                                sessions={sessions}
+                                onSelectSession={selectSession}
+                                isLoading={isLoading}
+                                isNewSessionMode={isNewSessionMode}
+                                onStartNewSession={startNewSession}
+                              />
+                            );
+                          })()}
                         </Panel>
                       )}
 

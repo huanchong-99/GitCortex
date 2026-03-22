@@ -14,6 +14,27 @@ import {
   useExpandedAll,
 } from '@/stores/useUiPreferencesStore';
 
+function workflowStatusClass(status: string): string {
+  if (status === 'running' || status === 'completed') return 'bg-success/20 text-success';
+  if (status === 'failed') return 'bg-error/20 text-error';
+  return 'bg-tertiary text-low';
+}
+
+function taskStatusDotClass(status: string): string {
+  if (status === 'completed') return 'bg-success';
+  if (status === 'running') return 'bg-success animate-pulse';
+  if (status === 'failed') return 'bg-error';
+  return 'bg-tertiary';
+}
+
+function terminalStatusDotClass(status: string): string {
+  if (status === 'working') return 'bg-success animate-pulse';
+  if (status === 'completed') return 'bg-success';
+  if (status === 'failed') return 'bg-error';
+  if (status === 'waiting') return 'bg-brand';
+  return 'bg-tertiary';
+}
+
 export interface RightSidebarProps {
   readonly isCreateMode: boolean;
   readonly isConciergeMode?: boolean;
@@ -52,12 +73,7 @@ export function RightSidebar({
         <div className="border-b px-base py-half">
           <h3 className="text-sm font-medium text-high truncate">{conciergeWorkflow.name}</h3>
           <div className="flex items-center gap-half mt-px">
-            <span className={`rounded-full px-1.5 py-px text-xs ${
-              conciergeWorkflow.status === 'running' ? 'bg-success/20 text-success' :
-              conciergeWorkflow.status === 'completed' ? 'bg-success/20 text-success' :
-              conciergeWorkflow.status === 'failed' ? 'bg-error/20 text-error' :
-              'bg-tertiary text-low'
-            }`}>
+            <span className={`rounded-full px-1.5 py-px text-xs ${workflowStatusClass(conciergeWorkflow.status)}`}>
               {conciergeWorkflow.status}
             </span>
             <a
@@ -75,12 +91,7 @@ export function RightSidebar({
             {tasks.map(task => (
               <div key={task.id} className="rounded border bg-primary/50 px-half py-half">
                 <div className="flex items-center gap-half">
-                  <span className={`inline-block size-2 shrink-0 rounded-full ${
-                    task.status === 'completed' ? 'bg-success' :
-                    task.status === 'running' ? 'bg-success animate-pulse' :
-                    task.status === 'failed' ? 'bg-error' :
-                    'bg-tertiary'
-                  }`} />
+                  <span className={`inline-block size-2 shrink-0 rounded-full ${taskStatusDotClass(task.status)}`} />
                   <span className="text-xs text-normal truncate">{task.name}</span>
                 </div>
                 {task.branch && (
@@ -95,13 +106,7 @@ export function RightSidebar({
                       <span
                         key={term.id}
                         title={`${term.role ?? 'T' + String(term.orderIndex + 1)}: ${term.status}`}
-                        className={`inline-block size-1.5 rounded-full ${
-                          term.status === 'working' ? 'bg-success animate-pulse' :
-                          term.status === 'completed' ? 'bg-success' :
-                          term.status === 'failed' ? 'bg-error' :
-                          term.status === 'waiting' ? 'bg-brand' :
-                          'bg-tertiary'
-                        }`}
+                        className={`inline-block size-1.5 rounded-full ${terminalStatusDotClass(term.status)}`}
                       />
                     ))}
                   </div>

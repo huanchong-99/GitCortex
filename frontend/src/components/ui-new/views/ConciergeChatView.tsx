@@ -11,6 +11,27 @@ import {
 import type { ConciergeMessage, ConciergeSession } from '@/lib/conciergeApi';
 import type { WorkflowDetailDto } from 'shared/types';
 
+function workflowStatusClass(status: string): string {
+  if (status === 'running' || status === 'completed') return 'bg-success/20 text-success';
+  if (status === 'failed') return 'bg-error/20 text-error';
+  return 'bg-secondary text-low';
+}
+
+function taskDotClass(status: string): string {
+  if (status === 'completed') return 'bg-success';
+  if (status === 'running') return 'bg-success animate-pulse';
+  if (status === 'failed') return 'bg-error';
+  return 'bg-secondary';
+}
+
+function termDotClass(status: string): string {
+  if (status === 'working') return 'bg-success animate-pulse';
+  if (status === 'completed') return 'bg-success';
+  if (status === 'failed') return 'bg-error';
+  if (status === 'waiting') return 'bg-brand';
+  return 'bg-secondary';
+}
+
 interface ConciergeChatViewProps {
   readonly messages: readonly ConciergeMessage[];
   readonly isLoading: boolean;
@@ -118,12 +139,7 @@ function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetail
     <div className="mx-base rounded border bg-secondary/50 px-base py-half">
       <div className="flex items-center gap-half text-sm">
         <span className="font-medium text-normal">{workflow.name}</span>
-        <span className={`rounded-full px-1.5 py-px text-xs ${
-          workflow.status === 'running' ? 'bg-success/20 text-success' :
-          workflow.status === 'completed' ? 'bg-success/20 text-success' :
-          workflow.status === 'failed' ? 'bg-error/20 text-error' :
-          'bg-secondary text-low'
-        }`}>
+        <span className={`rounded-full px-1.5 py-px text-xs ${workflowStatusClass(workflow.status)}`}>
           {workflow.status}
         </span>
         <a
@@ -141,12 +157,7 @@ function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetail
           </span>
           {tasks.map(task => (
             <div key={task.id} className="flex items-center gap-half text-xs">
-              <span className={`inline-block size-1.5 rounded-full ${
-                task.status === 'completed' ? 'bg-success' :
-                task.status === 'running' ? 'bg-success animate-pulse' :
-                task.status === 'failed' ? 'bg-error' :
-                'bg-secondary'
-              }`} />
+              <span className={`inline-block size-1.5 rounded-full ${taskDotClass(task.status)}`} />
               <span className="truncate text-normal">{task.name}</span>
               {(task.terminals ?? []).length > 0 && (
                 <div className="ml-auto flex gap-px">
@@ -154,13 +165,7 @@ function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetail
                     <span
                       key={term.id}
                       title={`${term.role ?? 'terminal'}: ${term.status}`}
-                      className={`inline-block size-1.5 rounded-full ${
-                        term.status === 'working' ? 'bg-success animate-pulse' :
-                        term.status === 'completed' ? 'bg-success' :
-                        term.status === 'failed' ? 'bg-error' :
-                        term.status === 'waiting' ? 'bg-brand' :
-                        'bg-secondary'
-                      }`}
+                      className={`inline-block size-1.5 rounded-full ${termDotClass(term.status)}`}
                     />
                   ))}
                 </div>
@@ -200,8 +205,7 @@ export function ConciergeChatView({
       {/* Header */}
       <div className="flex items-center gap-base border-b px-base py-half">
         <ChatCircleIcon className="size-icon-sm text-brand" weight="fill" />
-        <h2 className="text-lg font-medium text-high">{sessionName}</h2>
-        {activeWorkflowId && (
+        <h2 className="text-lg font-medium text-high">{sessionName}</h2>{activeWorkflowId && (
           <a
             href={`/pipeline/${activeWorkflowId}`}
             className="flex items-center gap-1 rounded-full bg-success/20 px-base py-px text-xs text-success hover:bg-success/30 transition-colors"

@@ -19,6 +19,7 @@ CREATE TABLE concierge_session_new (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-INSERT INTO concierge_session_new SELECT * FROM concierge_session;
+INSERT INTO concierge_session_new (id, name, active_project_id, active_workflow_id, active_planning_draft_id, feishu_sync, progress_notifications, llm_model_id, llm_api_type, llm_base_url, llm_api_key_encrypted, created_at, updated_at)
+SELECT id, name, active_project_id, active_workflow_id, active_planning_draft_id, feishu_sync, progress_notifications, llm_model_id, llm_api_type, llm_base_url, llm_api_key_encrypted, created_at, updated_at FROM concierge_session;
 DROP TABLE concierge_session;
 ALTER TABLE concierge_session_new RENAME TO concierge_session;
