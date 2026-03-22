@@ -310,6 +310,145 @@ impl LLMClient for OpenAICompatibleClient {
     }
 }
 
+// ============================================================================
+// Anthropic-compatible LLM client
+// ============================================================================
+
+/// LLM client for Anthropic-compatible APIs (POST /v1/messages).
+///
+/// Used when `api_type` is `"anthropic"`. Handles the Anthropic message format
+/// with `x-api-key` header and structured content blocks.
+pub struct AnthropicCompatibleClient {
+    client: Client,
+    base_url: String,
+    api_key: String,
+    model: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AnthropicRequest {
+    model: String,
+    messages: Vec<AnthropicMessage>,
+    max_tokens: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct AnthropicMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AnthropicResponse {
+    content: Vec<AnthropicContentBlock>,
+    usage: Option<AnthropicUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AnthropicContentBlock {
+    text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AnthropicUsage {
+    input_tokens: i32,
+    output_tokens: i32,
+}
+
+impl AnthropicCompatibleClient {
+    pub fn new(config: &OrchestratorConfig) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(config.timeout_secs))
+            .build()
+            .expect("Failed to create HTTP client");
+
+        // Normalize base_url: ensure it ends with /v1 for Anthropic endpoints.
+        let trimmed = config.base_url.trim_end_matches('/');
+        let base_url = if trimmed.ends_with("/v1") {
+            trimmed.to_string()
+        } else {
+            format!("{trimmed}/v1")
+        };
+
+        Self {
+            client,
+            base_url,
+            api_key: config.api_key.clone(),
+            model: config.model.clone(),
+        }
+    }
+
+    async fn chat_once(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
+        let url = format!("{}/messages", self.base_url);
+
+        // Extract system message and convert the rest
+        let mut system_prompt = None;
+        let mut api_messages = Vec::new();
+        for m in &messages {
+            if m.role == "system" {
+                system_prompt = Some(m.content.clone());
+            } else {
+                api_messages.push(AnthropicMessage {
+                    role: m.role.clone(),
+                    content: m.content.clone(),
+                });
+            }
+        }
+
+        let request = AnthropicRequest {
+            model: self.model.clone(),
+            messages: api_messages,
+            max_tokens: 4096,
+            system: system_prompt,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!("LLM API error: {status} - {body}"));
+        }
+
+        let api_response: AnthropicResponse = response.json().await?;
+        let content = api_response
+            .content
+            .iter()
+            .filter_map(|block| block.text.as_deref())
+            .collect::<Vec<_>>()
+            .join("");
+
+        if content.is_empty() {
+            return Err(anyhow::anyhow!("Anthropic API returned empty content"));
+        }
+
+        let usage = api_response.usage.map(|u| LLMUsage {
+            prompt_tokens: u.input_tokens,
+            completion_tokens: u.output_tokens,
+            total_tokens: u.input_tokens + u.output_tokens,
+        });
+
+        Ok(LLMResponse { content, usage })
+    }
+}
+
+#[async_trait]
+impl LLMClient for AnthropicCompatibleClient {
+    async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
+        self.chat_once(messages).await
+    }
+}
+
 /// Build terminal completion prompt
 ///
 /// This helper function encapsulates the logic for building prompts
@@ -334,23 +473,44 @@ pub fn build_terminal_completion_prompt(
 /// [`ResilientLLMClient`] that wraps the primary provider plus all fallbacks
 /// with automatic circuit-breaking and failover.  Otherwise the original
 /// single-provider path is used (fully backward compatible).
+/// Determine whether to use Anthropic protocol based on api_type and base_url.
+fn should_use_anthropic_protocol(config: &OrchestratorConfig) -> bool {
+    if config.api_type == "anthropic" {
+        return true;
+    }
+    // Auto-detect: if the base URL contains "anthropic" in the path,
+    // the upstream expects Anthropic protocol regardless of api_type label.
+    let url_lower = config.base_url.to_lowercase();
+    url_lower.contains("/anthropic")
+}
+
+/// Build a single rate-limited LLM client based on api_type and base_url.
+fn build_single_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
+    let rps = config.rate_limit_requests_per_second;
+    if should_use_anthropic_protocol(config) {
+        let client = AnthropicCompatibleClient::new(config);
+        let client = RateLimitedClient::new(client, rps)?;
+        Ok(Box::new(client))
+    } else {
+        let client = OpenAICompatibleClient::new(config);
+        let client = RateLimitedClient::new(client, rps)?;
+        Ok(Box::new(client))
+    }
+}
+
 pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn LLMClient>> {
     config.validate().map_err(|e| anyhow::anyhow!(e))?;
 
     if config.fallback_providers.is_empty() {
-        // Original single-provider path.
-        let client = OpenAICompatibleClient::new(config);
-        let client = RateLimitedClient::new(client, config.rate_limit_requests_per_second)?;
-        Ok(Box::new(client))
+        build_single_client(config)
     } else {
         // Multi-provider resilient path.
         let primary_name = format!("primary({})", config.model);
-        let primary_client = OpenAICompatibleClient::new(config);
-        let primary_client =
-            RateLimitedClient::new(primary_client, config.rate_limit_requests_per_second)?;
+        let rps = config.rate_limit_requests_per_second;
+        let primary_client: Box<dyn LLMClient> = build_single_client(config)?;
 
         let mut providers: Vec<(String, Box<dyn LLMClient>)> =
-            vec![(primary_name, Box::new(primary_client))];
+            vec![(primary_name, primary_client)];
 
         let mut fallbacks: Vec<_> = config.fallback_providers.clone();
         fallbacks.sort_by_key(|p| p.priority);
@@ -362,13 +522,11 @@ pub fn create_llm_client(config: &OrchestratorConfig) -> anyhow::Result<Box<dyn 
                 api_key: fb.api_key.clone(),
                 model: fb.model.clone(),
                 timeout_secs: config.timeout_secs,
-                rate_limit_requests_per_second: config.rate_limit_requests_per_second,
+                rate_limit_requests_per_second: rps,
                 ..Default::default()
             };
-            let fb_client = OpenAICompatibleClient::new(&fb_config);
-            let fb_client =
-                RateLimitedClient::new(fb_client, config.rate_limit_requests_per_second)?;
-            providers.push((fb.name.clone(), Box::new(fb_client)));
+            let fb_client = build_single_client(&fb_config)?;
+            providers.push((fb.name.clone(), fb_client));
         }
 
         tracing::info!(

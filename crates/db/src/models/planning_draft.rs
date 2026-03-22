@@ -168,6 +168,18 @@ impl PlanningDraft {
             .await
     }
 
+    pub async fn find_by_materialized_workflow(
+        pool: &SqlitePool,
+        workflow_id: &str,
+    ) -> sqlx::Result<Option<Self>> {
+        sqlx::query_as::<_, Self>(
+            "SELECT * FROM planning_draft WHERE materialized_workflow_id = ?1 LIMIT 1",
+        )
+        .bind(workflow_id)
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, Self>(
             "SELECT * FROM planning_draft WHERE project_id = ?1 ORDER BY created_at DESC",

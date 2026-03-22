@@ -64,6 +64,8 @@ fn build_cors_layer() -> CorsLayer {
 pub mod approvals;
 pub mod chat_integrations;
 pub mod ci_webhook;
+pub mod concierge;
+pub mod concierge_ws;
 pub mod cli_status_sse;
 pub mod cli_types;
 pub mod config;
@@ -104,11 +106,25 @@ pub mod workflows;
 pub mod ws_origin;
 pub mod workflows_dto;
 
-pub fn router(deployment: DeploymentImpl, hub: SharedSubscriptionHub, feishu_handle: SharedFeishuHandle, cli_health_monitor: SharedCliHealthMonitor) -> IntoMakeService<Router> {
-    build_router(deployment, hub, feishu_handle, cli_health_monitor).into_make_service()
+pub fn router(
+    deployment: DeploymentImpl,
+    hub: SharedSubscriptionHub,
+    feishu_handle: SharedFeishuHandle,
+    cli_health_monitor: SharedCliHealthMonitor,
+    concierge_agent: std::sync::Arc<services::services::concierge::ConciergeAgent>,
+    concierge_broadcaster: std::sync::Arc<services::services::concierge::ConciergeBroadcaster>,
+) -> IntoMakeService<Router> {
+    build_router(deployment, hub, feishu_handle, cli_health_monitor, concierge_agent, concierge_broadcaster).into_make_service()
 }
 
-pub fn build_router(deployment: DeploymentImpl, hub: SharedSubscriptionHub, feishu_handle: SharedFeishuHandle, cli_health_monitor: SharedCliHealthMonitor) -> Router {
+pub fn build_router(
+    deployment: DeploymentImpl,
+    hub: SharedSubscriptionHub,
+    feishu_handle: SharedFeishuHandle,
+    cli_health_monitor: SharedCliHealthMonitor,
+    concierge_agent: std::sync::Arc<services::services::concierge::ConciergeAgent>,
+    concierge_broadcaster: std::sync::Arc<services::services::concierge::ConciergeBroadcaster>,
+) -> Router {
     let outer_deployment = deployment.clone();
     // G32-015: Clone before moving into base_routes so we can also attach to outer router.
     let outer_feishu_handle = feishu_handle.clone();
@@ -147,14 +163,18 @@ pub fn build_router(deployment: DeploymentImpl, hub: SharedSubscriptionHub, feis
         .nest("/workflows", quality::quality_workflow_routes())
         .nest("/quality", quality::quality_routes())
         .nest("/ci", ci_webhook::ci_webhook_routes())
+        .nest("/concierge", concierge::concierge_routes())
         .nest("/terminal", terminal_ws::terminal_ws_routes())
         .nest("/terminals", terminals::terminal_routes())
         .nest("/terminals", quality::quality_terminal_routes())
         // WebSocket routes for workflow events (requires Extension layer for hub)
         .nest("/ws", workflow_ws::workflow_ws_routes())
+        .nest("/ws", concierge_ws::concierge_ws_routes())
         .layer(Extension(hub))
         .layer(Extension(cli_health_monitor))
         .layer(Extension(feishu_handle))
+        .layer(Extension(concierge_agent))
+        .layer(Extension(concierge_broadcaster))
         .layer(axum::middleware::from_fn(require_api_token))
         // G18-005: CORS configuration. In production, set GITCORTEX_CORS_ORIGINS
         // to restrict allowed origins (comma-separated). When unset, allows all

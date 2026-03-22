@@ -41,6 +41,10 @@ pub struct FeishuService {
     /// Optional broadcast sender for forwarding events to external subscribers
     /// (e.g. test-receive endpoint).
     event_broadcaster: Option<tokio::sync::broadcast::Sender<FeishuEvent>>,
+    /// Optional Concierge Agent for unified conversational interface.
+    concierge_agent: Option<Arc<super::concierge::ConciergeAgent>>,
+    /// Shared config for reading workflow model library.
+    shared_config: Option<Arc<tokio::sync::RwLock<super::config::Config>>>,
 }
 
 impl FeishuService {
@@ -58,7 +62,22 @@ impl FeishuService {
             pool,
             bus,
             event_broadcaster: None,
+            concierge_agent: None,
+            shared_config: None,
         }
+    }
+
+    /// Set the Concierge Agent for unified conversational routing.
+    pub fn set_concierge_agent(&mut self, agent: Arc<super::concierge::ConciergeAgent>) {
+        self.concierge_agent = Some(agent);
+    }
+
+    /// Set the shared config for reading workflow model library.
+    pub fn set_shared_config(
+        &mut self,
+        config: Arc<tokio::sync::RwLock<super::config::Config>>,
+    ) {
+        self.shared_config = Some(config);
     }
 
     /// Try to create a service from the enabled [`FeishuAppConfig`] row in the
@@ -100,6 +119,8 @@ impl FeishuService {
         let bus = &self.bus;
         let messenger = &self.messenger;
         let broadcaster = self.event_broadcaster.as_ref();
+        let concierge = self.concierge_agent.as_ref();
+        let shared_config = &self.shared_config;
 
         tokio::select! {
             conn_result = connect_fut => {
@@ -107,7 +128,7 @@ impl FeishuService {
                     tracing::error!(error = %e, "Feishu WebSocket connection ended with error");
                 }
             }
-            () = Self::process_events_inner(event_rx, pool, bus, messenger, broadcaster) => {
+            () = Self::process_events_inner(event_rx, pool, bus, messenger, broadcaster, concierge, shared_config) => {
                 tracing::info!("Feishu event processing loop ended");
             }
         }
@@ -122,6 +143,8 @@ impl FeishuService {
         bus: &SharedMessageBus,
         messenger: &Arc<FeishuMessenger>,
         broadcaster: Option<&tokio::sync::broadcast::Sender<FeishuEvent>>,
+        concierge_agent: Option<&Arc<super::concierge::ConciergeAgent>>,
+        shared_config: &Option<Arc<tokio::sync::RwLock<super::config::Config>>>,
     ) {
         while let Some(event) = event_rx.recv().await {
             if let Some(tx) = broadcaster {
@@ -133,7 +156,9 @@ impl FeishuService {
             } else {
                 tracing::debug!("No broadcaster configured");
             }
-            if let Err(e) = Self::handle_event_inner(&event, pool, bus, messenger).await {
+            if let Err(e) =
+                Self::handle_event_inner(&event, pool, bus, messenger, concierge_agent, shared_config).await
+            {
                 tracing::warn!(error = %e, "Failed to handle Feishu event");
             }
         }
@@ -145,6 +170,8 @@ impl FeishuService {
         pool: &SqlitePool,
         bus: &SharedMessageBus,
         messenger: &Arc<FeishuMessenger>,
+        concierge_agent: Option<&Arc<super::concierge::ConciergeAgent>>,
+        shared_config: &Option<Arc<tokio::sync::RwLock<super::config::Config>>>,
     ) -> Result<()> {
         let Some(header) = &event.header else {
             tracing::debug!("Ignoring Feishu event without header");
@@ -152,7 +179,9 @@ impl FeishuService {
         };
 
         match header.event_type.as_str() {
-            EVENT_TYPE_MESSAGE => Self::handle_message_inner(event, pool, bus, messenger).await,
+            EVENT_TYPE_MESSAGE => {
+                Self::handle_message_inner(event, pool, bus, messenger, concierge_agent, shared_config).await
+            }
             other => {
                 tracing::debug!(event_type = %other, "Ignoring unhandled Feishu event type");
                 Ok(())
@@ -162,13 +191,15 @@ impl FeishuService {
 
     /// Handle an incoming chat message.
     ///
-    /// Parses the message, checks for slash commands (`/bind`, `/unbind`),
-    /// and otherwise forwards the text to the bound workflow's orchestrator.
+    /// Routes through the Concierge Agent if available, falling back to
+    /// the legacy `/bind` + orchestrator-forwarding path.
     async fn handle_message_inner(
         event: &FeishuEvent,
         pool: &SqlitePool,
         bus: &SharedMessageBus,
         messenger: &Arc<FeishuMessenger>,
+        concierge_agent: Option<&Arc<super::concierge::ConciergeAgent>>,
+        shared_config: &Option<Arc<tokio::sync::RwLock<super::config::Config>>>,
     ) -> Result<()> {
         let msg = events::parse_message_event(event)?;
 
@@ -188,7 +219,7 @@ impl FeishuService {
             return Ok(());
         }
 
-        // Slash commands
+        // Legacy slash commands (backward compatible)
         if let Some(workflow_id) = text.strip_prefix("/bind ").map(str::trim) {
             return Self::handle_bind_inner(&msg, workflow_id, pool, messenger).await;
         }
@@ -196,8 +227,218 @@ impl FeishuService {
             return Self::handle_unbind_inner(&msg, pool, messenger).await;
         }
 
-        // Regular message -> forward to orchestrator via binding
+        // If Concierge Agent is available, route through it
+        if let Some(concierge) = concierge_agent {
+            return Self::handle_via_concierge(&msg, text, pool, messenger, concierge, shared_config).await;
+        }
+
+        // Fallback: legacy direct orchestrator forwarding
         Self::forward_to_orchestrator_inner(&msg, text, pool, bus, messenger).await
+    }
+
+    /// Route a message through the Concierge Agent.
+    ///
+    /// Finds or creates a ConciergeSession for this Feishu chat,
+    /// processes the message, and sends the response back.
+    async fn handle_via_concierge(
+        msg: &ReceivedMessage,
+        text: &str,
+        pool: &SqlitePool,
+        messenger: &Arc<FeishuMessenger>,
+        concierge: &Arc<super::concierge::ConciergeAgent>,
+        shared_config: &Option<Arc<tokio::sync::RwLock<super::config::Config>>>,
+    ) -> Result<()> {
+        use db::models::concierge::{ConciergeMessage, ConciergeSession, ConciergeSessionChannel};
+
+        // Find or create session for this Feishu chat
+        let mut session =
+            match ConciergeSession::find_by_channel(pool, FEISHU_PROVIDER, &msg.chat_id).await? {
+                Some(s) => s,
+                None => {
+                    let mut new_session =
+                        ConciergeSession::new(&text.chars().take(50).collect::<String>());
+                    new_session.feishu_sync = true; // Feishu-initiated = always sync
+                    ConciergeSession::insert(pool, &new_session).await?;
+
+                    ConciergeSessionChannel::upsert(
+                        pool,
+                        &new_session.id,
+                        FEISHU_PROVIDER,
+                        &msg.chat_id,
+                        Some(&msg.sender_open_id),
+                    )
+                    .await?;
+
+                    tracing::info!(
+                        chat_id = %msg.chat_id,
+                        session_id = %new_session.id,
+                        "Created new Concierge session from Feishu"
+                    );
+                    new_session
+                }
+            };
+
+        // ── LLM model selection flow ──
+        // If session has no LLM config, we need to configure it first.
+        if session.llm_api_key_encrypted.is_none() {
+            let models = Self::get_available_models(shared_config).await?;
+
+            if models.is_empty() {
+                messenger
+                    .reply_text(
+                        &msg.message_id,
+                        "没有可用的 AI 模型配置。请先在 GitCortex 设置页面配置至少一个模型的 API Key。",
+                    )
+                    .await?;
+                return Ok(());
+            }
+
+            if models.len() == 1 {
+                // Only one model — use it directly, no need to ask
+                Self::apply_model_to_session(&mut session, &models[0]);
+                Self::persist_session_llm(pool, &session).await?;
+                tracing::info!(
+                    display_name = %models[0].display_name,
+                    "Auto-selected single available model for Concierge"
+                );
+                // Fall through to process the message normally
+            } else {
+                // Multiple models — check if user is replying with a selection number
+                if let Some(idx) = Self::parse_model_selection(text, models.len()) {
+                    Self::apply_model_to_session(&mut session, &models[idx]);
+                    Self::persist_session_llm(pool, &session).await?;
+                    messenger
+                        .reply_text(
+                            &msg.message_id,
+                            &format!("已选择 {} ，现在可以开始对话了！", models[idx].display_name),
+                        )
+                        .await?;
+                    return Ok(());
+                }
+
+                // Not a selection — save user's message, then ask them to pick
+                let user_msg = ConciergeMessage::new_user(
+                    &session.id,
+                    text,
+                    Some(FEISHU_PROVIDER),
+                    Some(&msg.sender_open_id),
+                );
+                ConciergeMessage::insert(pool, &user_msg).await?;
+
+                let prompt = Self::build_model_selection_prompt(&models);
+                messenger.reply_text(&msg.message_id, &prompt).await?;
+                return Ok(());
+            }
+        }
+
+        // ── Normal message processing ──
+        match concierge
+            .process_message(
+                &session.id,
+                text,
+                Some(FEISHU_PROVIDER),
+                Some(&msg.sender_open_id),
+            )
+            .await
+        {
+            Ok(response) => {
+                messenger.reply_text(&msg.message_id, &response).await?;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    chat_id = %msg.chat_id,
+                    error = %e,
+                    "Concierge processing failed"
+                );
+                messenger
+                    .reply_text(
+                        &msg.message_id,
+                        &format!("抱歉，出现了错误: {e}"),
+                    )
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get all models from the workflow model library in config.
+    async fn get_available_models(
+        shared_config: &Option<Arc<tokio::sync::RwLock<super::config::Config>>>,
+    ) -> Result<Vec<super::config::WorkflowModelLibraryItem>> {
+        let config = shared_config
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No shared config available"))?;
+        let config = config.read().await;
+        let models: Vec<_> = config
+            .workflow_model_library
+            .iter()
+            .filter(|m| !m.api_key.is_empty())
+            .cloned()
+            .collect();
+        Ok(models)
+    }
+
+    /// Apply a workflow model library item's credentials to a ConciergeSession.
+    fn apply_model_to_session(
+        session: &mut db::models::concierge::ConciergeSession,
+        item: &super::config::WorkflowModelLibraryItem,
+    ) {
+        // Encrypt the API key before storing
+        match db::models::concierge::ConciergeSession::encrypt_api_key(&item.api_key) {
+            Ok(encrypted) => session.llm_api_key_encrypted = Some(encrypted),
+            Err(e) => tracing::warn!("Failed to encrypt API key for concierge: {e}"),
+        }
+        session.llm_api_type = Some(item.api_type.clone());
+        session.llm_base_url = Some(item.base_url.clone());
+        session.llm_model_id = Some(item.model_id.clone());
+    }
+
+    /// Persist LLM config from a session object to the database.
+    async fn persist_session_llm(
+        pool: &SqlitePool,
+        session: &db::models::concierge::ConciergeSession,
+    ) -> Result<()> {
+        db::models::concierge::ConciergeSession::update_llm_config(
+            pool,
+            &session.id,
+            session.llm_model_id.as_deref(),
+            session.llm_api_type.as_deref(),
+            session.llm_base_url.as_deref(),
+            session.llm_api_key_encrypted.as_deref(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Build a user-facing model selection prompt.
+    fn build_model_selection_prompt(
+        models: &[super::config::WorkflowModelLibraryItem],
+    ) -> String {
+        let mut prompt = String::from("请选择要使用的 AI 模型（输入数字）：\n\n");
+        for (i, m) in models.iter().enumerate() {
+            let verified_tag = if m.is_verified { " ✅" } else { "" };
+            prompt.push_str(&format!(
+                "  {}. {} ({}){}\n",
+                i + 1,
+                m.display_name,
+                m.model_id,
+                verified_tag
+            ));
+        }
+        prompt.push_str("\n回复数字即可选择，例如回复 1");
+        prompt
+    }
+
+    /// Try to parse a model selection response (e.g., "1", "2", "3").
+    fn parse_model_selection(text: &str, max: usize) -> Option<usize> {
+        let trimmed = text.trim();
+        let num: usize = trimmed.parse().ok()?;
+        if num >= 1 && num <= max {
+            Some(num - 1) // 0-indexed
+        } else {
+            None
+        }
     }
 
     /// `/bind <workflow_id>` -- create or update a conversation binding.

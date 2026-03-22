@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   planningDraftsApi,
+  attemptsApi,
   type PlanningDraftResponse,
   type PlanningMessageResponse,
 } from '@/lib/api';
@@ -84,5 +85,15 @@ export function useMaterializeDraft() {
     mutationFn: async (draftId: string) => {
       return planningDraftsApi.materialize(draftId);
     },
+  });
+}
+
+/** Fetch planning draft messages associated with a workspace */
+export function useWorkspacePlanningMessages(workspaceId: string | null) {
+  return useQuery({
+    queryKey: ['workspace', workspaceId, 'planning-messages'] as const,
+    queryFn: () => attemptsApi.getPlanningMessages(workspaceId!),
+    enabled: !!workspaceId,
+    staleTime: Infinity,
   });
 }

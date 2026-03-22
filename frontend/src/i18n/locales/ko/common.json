@@ -130,6 +130,10 @@
     "archived": "보관됨",
     "loading": "로딩 중...",
     "selectToStart": "워크스페이스를 선택하여 시작",
+    "planningConversation": "기획 대화",
+    "messages": "개 메시지",
+    "planningUser": "사용자",
+    "planningPlanner": "플래너",
     "draft": "초안",
     "viewArchive": "보관함 보기",
     "backToActive": "활성으로 돌아가기",
@@ -314,5 +318,20 @@
   "dialogs": {
     "selectGitRepository": "Git 저장소 선택",
     "chooseExistingRepo": "기존 저장소 폴더 선택"
+  },
+  "concierge": {
+    "title": "AI 어시스턴트",
+    "newSession": "새 대화",
+    "noSessions": "대화 없음",
+    "sendPlaceholder": "메시지 입력...",
+    "send": "보내기",
+    "sourceFeishu": "Feishu",
+    "sourceWeb": "웹",
+    "toolExecuting": "실행 중...",
+    "toolCompleted": "완료",
+    "systemMessage": "시스템",
+    "sessionList": "대화 목록",
+    "feishuSync": "Feishu 동기화",
+    "progressNotifications": "진행 알림"
   }
 }

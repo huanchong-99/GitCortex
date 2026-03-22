@@ -47,6 +47,7 @@ import { WorkflowDebugPage } from '@/pages/WorkflowDebugPage';
 import { Workflows } from '@/pages/Workflows';
 
 // New design pages
+import { Assistant } from '@/pages/ui-new/Assistant';
 import { Workspaces } from '@/pages/ui-new/Workspaces';
 import { WorkspacesLanding } from '@/pages/ui-new/WorkspacesLanding';
 
@@ -128,6 +129,7 @@ function AppContent() {
               <Route path="debug/:workflowId" element={<WorkflowDebugPage />} />
 
               {/* Orchestrated Workspace mode */}
+              <Route path="assistant" element={<Assistant />} />
               <Route path="workspaces" element={<WorkspacesLanding />} />
               <Route path="workspaces/create" element={<Workspaces />} />
               <Route path="workspaces/:workspaceId" element={<Workspaces />} />

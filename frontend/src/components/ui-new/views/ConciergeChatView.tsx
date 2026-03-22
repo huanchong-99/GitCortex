@@ -1,0 +1,291 @@
+import {
+  PaperPlaneTiltIcon,
+  RobotIcon,
+  UserIcon,
+  WrenchIcon,
+  CaretDownIcon,
+  PlusIcon,
+  ChatCircleIcon,
+  ArrowSquareOutIcon,
+} from '@phosphor-icons/react';
+import type { ConciergeMessage, ConciergeSession } from '@/lib/conciergeApi';
+import type { WorkflowDetailDto } from 'shared/types';
+
+interface ConciergeChatViewProps {
+  readonly messages: readonly ConciergeMessage[];
+  readonly isLoading: boolean;
+  readonly sessionName: string;
+  readonly sessions: readonly ConciergeSession[];
+  readonly activeSessionId: string | null;
+  readonly onSelectSession: (id: string) => void;
+  readonly onCreateSession: () => void;
+  readonly inputValue: string;
+  readonly onInputChange: (value: string) => void;
+  readonly onSubmit: () => void;
+  readonly showSessions: boolean;
+  readonly onToggleSessions: () => void;
+  readonly bottomRef: React.RefObject<HTMLDivElement>;
+  readonly activeWorkflowId: string | null;
+  readonly workflow: WorkflowDetailDto | null;
+}
+
+function SourceBadge({ provider }: { readonly provider: string | null }) {
+  if (!provider) return null;
+  const label = provider === 'feishu' ? '飞书' : '网页';
+  return (
+    <span className="inline-flex items-center rounded bg-secondary px-1 py-px text-xs text-low">
+      {label}
+    </span>
+  );
+}
+
+function ToolMessage({ message }: { readonly message: ConciergeMessage }) {
+  const isCall = message.role === 'tool_call';
+  const label = isCall
+    ? `Tool: ${message.toolName ?? 'unknown'}`
+    : `Result: ${message.toolName ?? 'unknown'}`;
+
+  return (
+    <details className="rounded border bg-secondary px-base py-half text-sm text-low">
+      <summary className="flex cursor-pointer items-center gap-1 select-none">
+        <WrenchIcon className="size-icon-xs shrink-0" />
+        <span>{label}</span>
+        <CaretDownIcon className="size-icon-xs ml-auto" />
+      </summary>
+      <pre className="mt-half overflow-x-auto whitespace-pre-wrap font-ibm-plex-mono text-xs text-normal">
+        {message.content}
+      </pre>
+    </details>
+  );
+}
+
+function MessageBubble({ message }: { readonly message: ConciergeMessage }) {
+  if (message.role === 'tool_call' || message.role === 'tool_result') {
+    return <ToolMessage message={message} />;
+  }
+
+  const isUser = message.role === 'user';
+  const isSystem = message.role === 'system';
+
+  if (isSystem) {
+    return (
+      <div className="mx-auto max-w-md rounded bg-secondary px-base py-half text-center text-xs text-low">
+        {message.content}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex gap-half ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      <div
+        className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
+          isUser ? 'bg-brand/20 text-brand' : 'bg-secondary text-normal'
+        }`}
+      >
+        {isUser ? (
+          <UserIcon className="size-icon-xs" weight="bold" />
+        ) : (
+          <RobotIcon className="size-icon-xs" weight="bold" />
+        )}
+      </div>
+      <div
+        className={`max-w-[75%] rounded px-base py-half text-base ${
+          isUser ? 'bg-brand/10 text-high' : 'bg-secondary text-normal'
+        }`}
+      >
+        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        <div className="mt-px flex items-center gap-1">
+          <SourceBadge provider={message.sourceProvider} />
+          <span className="text-xs text-low">
+            {new Date(message.createdAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetailDto }) {
+  const tasks = workflow.tasks ?? [];
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const allTerminals = tasks.flatMap(t => t.terminals ?? []);
+  const workingTerminals = allTerminals.filter(t => t.status === 'working');
+
+  return (
+    <div className="mx-base rounded border bg-secondary/50 px-base py-half">
+      <div className="flex items-center gap-half text-sm">
+        <span className="font-medium text-normal">{workflow.name}</span>
+        <span className={`rounded-full px-1.5 py-px text-xs ${
+          workflow.status === 'running' ? 'bg-success/20 text-success' :
+          workflow.status === 'completed' ? 'bg-success/20 text-success' :
+          workflow.status === 'failed' ? 'bg-error/20 text-error' :
+          'bg-secondary text-low'
+        }`}>
+          {workflow.status}
+        </span>
+        <a
+          href={`/pipeline/${workflow.id}`}
+          className="ml-auto flex items-center gap-1 text-xs text-brand hover:text-brand/80"
+        >
+          <ArrowSquareOutIcon className="size-icon-xs" />
+          Pipeline
+        </a>
+      </div>
+      {tasks.length > 0 && (
+        <div className="mt-half flex flex-col gap-px">
+          <span className="text-xs text-low">
+            Tasks: {completedTasks}/{tasks.length} completed
+          </span>
+          {tasks.map(task => (
+            <div key={task.id} className="flex items-center gap-half text-xs">
+              <span className={`inline-block size-1.5 rounded-full ${
+                task.status === 'completed' ? 'bg-success' :
+                task.status === 'running' ? 'bg-success animate-pulse' :
+                task.status === 'failed' ? 'bg-error' :
+                'bg-secondary'
+              }`} />
+              <span className="truncate text-normal">{task.name}</span>
+              {(task.terminals ?? []).length > 0 && (
+                <div className="ml-auto flex gap-px">
+                  {(task.terminals ?? []).map(term => (
+                    <span
+                      key={term.id}
+                      title={`${term.role ?? 'terminal'}: ${term.status}`}
+                      className={`inline-block size-1.5 rounded-full ${
+                        term.status === 'working' ? 'bg-success animate-pulse' :
+                        term.status === 'completed' ? 'bg-success' :
+                        term.status === 'failed' ? 'bg-error' :
+                        term.status === 'waiting' ? 'bg-brand' :
+                        'bg-secondary'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {workingTerminals.length > 0 && (
+            <span className="text-xs text-low">
+              {workingTerminals.length} terminal{workingTerminals.length > 1 ? 's' : ''} working
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ConciergeChatView({
+  messages,
+  isLoading,
+  sessionName,
+  sessions,
+  activeSessionId,
+  onSelectSession,
+  onCreateSession,
+  inputValue,
+  onInputChange,
+  onSubmit,
+  showSessions,
+  onToggleSessions,
+  bottomRef,
+  activeWorkflowId,
+  workflow,
+}: ConciergeChatViewProps) {
+  return (
+    <div className="flex h-full flex-col bg-primary font-ibm-plex-sans">
+      {/* Header */}
+      <div className="flex items-center gap-base border-b px-base py-half">
+        <ChatCircleIcon className="size-icon-sm text-brand" weight="fill" />
+        <h2 className="text-lg font-medium text-high">{sessionName}</h2>
+        {activeWorkflowId && (
+          <a
+            href={`/pipeline/${activeWorkflowId}`}
+            className="flex items-center gap-1 rounded-full bg-success/20 px-base py-px text-xs text-success hover:bg-success/30 transition-colors"
+          >
+            <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" />
+            查看工作流进度
+          </a>
+        )}
+        <div className="relative ml-auto">
+          <button
+            type="button"
+            onClick={onToggleSessions}
+            className="flex items-center gap-1 rounded bg-secondary px-half py-px text-sm text-normal hover:text-high"
+          >
+            Sessions
+            <CaretDownIcon className="size-icon-xs" />
+          </button>
+          {showSessions && (
+            <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded border bg-panel shadow-md">
+              {sessions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onSelectSession(s.id)}
+                  className={`block w-full truncate px-base py-half text-left text-sm hover:bg-secondary ${
+                    s.id === activeSessionId ? 'text-brand' : 'text-normal'
+                  }`}
+                >
+                  {s.name || s.id.slice(0, 8)}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={onCreateSession}
+                className="flex w-full items-center gap-1 border-t px-base py-half text-sm text-low hover:text-normal"
+              >
+                <PlusIcon className="size-icon-xs" />
+                New session
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Workflow Progress */}
+      {workflow && <WorkflowProgressPanel workflow={workflow} />}
+
+      {/* Messages */}
+      <div className="flex-1 space-y-base overflow-y-auto p-base">
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+        {isLoading && (
+          <div className="flex items-center gap-half text-sm text-low">
+            <RobotIcon className="size-icon-xs animate-pulse" />
+            Thinking...
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+        className="flex items-center gap-half border-t px-base py-half"
+      >
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => onInputChange(e.target.value)}
+          placeholder="Type a message..."
+          className="flex-1 rounded bg-secondary px-base py-half text-base text-normal placeholder:text-low focus:outline-none focus:ring-1 focus:ring-brand"
+        />
+        <button
+          type="submit"
+          disabled={!inputValue.trim() || isLoading}
+          className="flex items-center justify-center rounded bg-brand/90 p-half text-white hover:bg-brand disabled:opacity-40"
+        >
+          <PaperPlaneTiltIcon className="size-icon-sm" weight="bold" />
+        </button>
+      </form>
+    </div>
+  );
+}

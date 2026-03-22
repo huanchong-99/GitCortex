@@ -149,6 +149,10 @@
     "archived": "Archived",
     "loading": "Loading...",
     "selectToStart": "Select a workspace to get started",
+    "planningConversation": "Planning Conversation",
+    "messages": "messages",
+    "planningUser": "User",
+    "planningPlanner": "Planner",
     "draft": "Draft",
     "viewArchive": "View Archive",
     "backToActive": "Back to Active",
@@ -367,5 +371,20 @@
     "currentProject": "Project:",
     "bindRepoTo": "Bind repository → project \"{{project}}\"",
     "repoBoundTo": "Bound to project \"{{project}}\""
+  },
+  "concierge": {
+    "title": "AI Assistant",
+    "newSession": "New Conversation",
+    "noSessions": "No conversations yet",
+    "sendPlaceholder": "Type a message...",
+    "send": "Send",
+    "sourceFeishu": "Feishu",
+    "sourceWeb": "Web",
+    "toolExecuting": "Executing...",
+    "toolCompleted": "Completed",
+    "systemMessage": "System",
+    "sessionList": "Conversations",
+    "feishuSync": "Feishu Sync",
+    "progressNotifications": "Progress Notifications"
   }
 }

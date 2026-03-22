@@ -16,6 +16,7 @@ pub mod workspace_repo;
 
 // GitCortex Workflow models
 pub mod cli_install_history;
+pub mod concierge;
 pub mod cli_type;
 pub mod feishu_config;
 pub mod git_event;
@@ -29,6 +30,7 @@ pub mod terminal;
 pub mod workflow;
 
 pub use cli_type::*;
+pub use concierge::*;
 pub use git_event::*;
 pub use orchestrator_message::*;
 pub use quality_issue::*;

@@ -8,6 +8,7 @@ import {
   usePersistedExpanded,
 } from '@/stores/useUiPreferencesStore';
 import { WorkspacesSidebar } from '@/components/ui-new/views/WorkspacesSidebar';
+import { useConciergeSessions } from '@/hooks/useConcierge';
 
 // Fixed UUID for the universal workspace draft (same as in useCreateModeState.ts)
 const DRAFT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
@@ -48,6 +49,8 @@ export function WorkspacesSidebarContainer() {
     return title || 'New Workspace';
   }, [draftScratch]);
 
+  const { data: conciergeSessions } = useConciergeSessions();
+
   return (
     <WorkspacesSidebar
       workspaces={activeWorkspaces}
@@ -62,6 +65,7 @@ export function WorkspacesSidebarContainer() {
       onSelectCreate={navigateToCreate}
       showArchive={showArchive}
       onShowArchiveChange={setShowArchive}
+      conciergeSessions={conciergeSessions ?? []}
     />
   );
 }

@@ -6,7 +6,8 @@ import { GitPanelContainer } from '@/components/ui-new/containers/GitPanelContai
 import { useChangesView } from '@/contexts/ChangesViewContext';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
-import type { Workspace, RepoWithTargetBranch } from 'shared/types';
+import type { Workspace, RepoWithTargetBranch, WorkflowDetailDto } from 'shared/types';
+import { ArrowSquareOutIcon, GitBranchIcon } from '@phosphor-icons/react';
 import {
   RIGHT_MAIN_PANEL_MODES,
   type RightMainPanelMode,
@@ -15,6 +16,8 @@ import {
 
 export interface RightSidebarProps {
   readonly isCreateMode: boolean;
+  readonly isConciergeMode?: boolean;
+  readonly conciergeWorkflow?: WorkflowDetailDto | null;
   readonly rightMainPanelMode: RightMainPanelMode | null;
   readonly selectedWorkspace: Workspace | undefined;
   readonly repos: RepoWithTargetBranch[];
@@ -22,6 +25,8 @@ export interface RightSidebarProps {
 
 export function RightSidebar({
   isCreateMode,
+  isConciergeMode,
+  conciergeWorkflow,
   rightMainPanelMode,
   selectedWorkspace,
   repos,
@@ -30,6 +35,92 @@ export function RightSidebar({
   const { viewProcessInPanel } = useLogsPanel();
   const { diffs } = useWorkspaceContext();
   const { setExpanded } = useExpandedAll();
+
+  if (isConciergeMode) {
+    if (!conciergeWorkflow) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center p-base text-center text-sm text-low">
+          <p>No active workflow</p>
+          <p className="mt-half text-xs">Start a conversation to create a workflow</p>
+        </div>
+      );
+    }
+
+    const tasks = conciergeWorkflow.tasks ?? [];
+    return (
+      <div className="flex h-full flex-col bg-secondary">
+        <div className="border-b px-base py-half">
+          <h3 className="text-sm font-medium text-high truncate">{conciergeWorkflow.name}</h3>
+          <div className="flex items-center gap-half mt-px">
+            <span className={`rounded-full px-1.5 py-px text-xs ${
+              conciergeWorkflow.status === 'running' ? 'bg-success/20 text-success' :
+              conciergeWorkflow.status === 'completed' ? 'bg-success/20 text-success' :
+              conciergeWorkflow.status === 'failed' ? 'bg-error/20 text-error' :
+              'bg-tertiary text-low'
+            }`}>
+              {conciergeWorkflow.status}
+            </span>
+            <a
+              href={`/pipeline/${conciergeWorkflow.id}`}
+              className="ml-auto flex items-center gap-1 text-xs text-brand hover:text-brand/80"
+            >
+              <ArrowSquareOutIcon className="size-icon-xs" />
+              Pipeline
+            </a>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-base">
+          <span className="text-xs font-medium text-low">Tasks ({tasks.length})</span>
+          <div className="mt-half flex flex-col gap-half">
+            {tasks.map(task => (
+              <div key={task.id} className="rounded border bg-primary/50 px-half py-half">
+                <div className="flex items-center gap-half">
+                  <span className={`inline-block size-2 shrink-0 rounded-full ${
+                    task.status === 'completed' ? 'bg-success' :
+                    task.status === 'running' ? 'bg-success animate-pulse' :
+                    task.status === 'failed' ? 'bg-error' :
+                    'bg-tertiary'
+                  }`} />
+                  <span className="text-xs text-normal truncate">{task.name}</span>
+                </div>
+                {task.branch && (
+                  <div className="mt-px flex items-center gap-1 text-xs text-low">
+                    <GitBranchIcon className="size-icon-xs shrink-0" />
+                    <span className="truncate">{task.branch}</span>
+                  </div>
+                )}
+                {(task.terminals ?? []).length > 0 && (
+                  <div className="mt-px flex gap-1">
+                    {(task.terminals ?? []).map(term => (
+                      <span
+                        key={term.id}
+                        title={`${term.role ?? 'T' + String(term.orderIndex + 1)}: ${term.status}`}
+                        className={`inline-block size-1.5 rounded-full ${
+                          term.status === 'working' ? 'bg-success animate-pulse' :
+                          term.status === 'completed' ? 'bg-success' :
+                          term.status === 'failed' ? 'bg-error' :
+                          term.status === 'waiting' ? 'bg-brand' :
+                          'bg-tertiary'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="border-t px-base py-half">
+          <a
+            href={`/debug/${conciergeWorkflow.id}`}
+            className="flex w-full items-center justify-center gap-1 rounded bg-secondary px-base py-half text-xs text-low hover:text-normal transition-colors"
+          >
+            Debug Terminals
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   if (isCreateMode) {
     return <GitPanelCreateContainer />;

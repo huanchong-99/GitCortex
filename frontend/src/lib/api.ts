@@ -773,6 +773,15 @@ export const attemptsApi = {
     return handleApiResponse<string | null>(response);
   },
 
+  getPlanningMessages: async (
+    workspaceId: string
+  ): Promise<PlanningMessageResponse[]> => {
+    const response = await makeRequest(
+      `/api/task-attempts/${workspaceId}/planning-messages`
+    );
+    return handleApiResponse<PlanningMessageResponse[]>(response);
+  },
+
   merge: async (
     attemptId: string,
     data: MergeTaskAttemptRequest

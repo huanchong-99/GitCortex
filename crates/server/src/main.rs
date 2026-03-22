@@ -177,10 +177,23 @@ async fn main() -> Result<(), GitCortexError> {
     let _event_bridge_handle = event_bridge.spawn();
     tracing::info!("WebSocket event bridge started");
 
+    // Initialize Concierge Agent (must be created before Feishu connector)
+    let concierge_broadcaster = Arc::new(services::services::concierge::ConciergeBroadcaster::new());
+    let concierge_agent = {
+        let mut agent = services::services::concierge::ConciergeAgent::new(
+            deployment.db().pool.clone(),
+            concierge_broadcaster.clone(),
+        );
+        agent.set_shared_config(deployment.config().clone());
+        agent.set_message_bus(deployment.message_bus().clone());
+        Arc::new(agent)
+    };
+    tracing::info!("Concierge Agent initialized");
+
     // Conditional Feishu connector startup
     let feishu_handle = server::feishu_handle::new_shared_handle();
     if db::models::system_settings::SystemSetting::is_feishu_enabled(&deployment.db().pool).await {
-        match start_feishu_connector(&deployment, &feishu_handle).await {
+        match start_feishu_connector(&deployment, &feishu_handle, concierge_agent.clone()).await {
             Ok(()) => tracing::info!("Feishu connector started"),
             Err(e) => tracing::warn!("Feishu connector startup skipped: {e}"),
         }
@@ -189,7 +202,14 @@ async fn main() -> Result<(), GitCortexError> {
     }
 
     let cli_health_monitor = deployment.cli_health_monitor().clone();
-    let app_router = routes::router(deployment.clone(), subscription_hub, feishu_handle, cli_health_monitor);
+    let app_router = routes::router(
+        deployment.clone(),
+        subscription_hub,
+        feishu_handle,
+        cli_health_monitor,
+        concierge_agent,
+        concierge_broadcaster,
+    );
 
     let port = std::env::var("BACKEND_PORT")
         .or_else(|_| std::env::var("PORT"))
@@ -330,6 +350,7 @@ fn decrypt_feishu_secret(encrypted: &str) -> anyhow::Result<String> {
 async fn start_feishu_connector(
     deployment: &DeploymentImpl,
     feishu_handle: &SharedFeishuHandle,
+    concierge_agent: Arc<services::services::concierge::ConciergeAgent>,
 ) -> Result<(), AnyhowError> {
     use feishu_connector::{reconnect::ReconnectPolicy, types::ClientConfig};
     use services::services::feishu::FeishuService;
@@ -346,6 +367,10 @@ async fn start_feishu_connector(
             "No enabled Feishu config found in database; skipping connector startup"
         ));
     };
+
+    // Inject Concierge Agent and shared config so Feishu messages route through it
+    service.set_concierge_agent(concierge_agent);
+    service.set_shared_config(deployment.config().clone());
 
     let (reconnect_tx, mut reconnect_rx) = tokio::sync::mpsc::channel::<()>(1);
     let connected = service.connected_flag();

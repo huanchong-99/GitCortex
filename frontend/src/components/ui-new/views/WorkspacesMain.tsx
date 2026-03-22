@@ -1,8 +1,15 @@
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CaretRightIcon } from '@phosphor-icons/react';
 import type { Session } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { SessionChatBoxContainer } from '@/components/ui-new/containers/SessionChatBoxContainer';
+
+interface PlanningMessage {
+  readonly id: string;
+  readonly role: 'user' | 'assistant';
+  readonly content: string;
+}
 import { ContextBarContainer } from '@/components/ui-new/containers/ContextBarContainer';
 import { ConversationList } from '../containers/ConversationListContainer';
 import { EntriesProvider } from '@/contexts/EntriesContext';
@@ -29,6 +36,12 @@ interface WorkspacesMainProps {
   onStartNewSession?: () => void;
   /** Diff statistics from the workspace */
   diffStats?: DiffStats;
+  /** Planning draft conversation messages */
+  planningMessages?: readonly PlanningMessage[];
+  /** Whether planning messages are expanded */
+  showPlanningMessages?: boolean;
+  /** Toggle planning messages visibility */
+  onTogglePlanningMessages?: () => void;
 }
 
 export function WorkspacesMain({
@@ -41,6 +54,9 @@ export function WorkspacesMain({
   isNewSessionMode,
   onStartNewSession,
   diffStats,
+  planningMessages,
+  showPlanningMessages = true,
+  onTogglePlanningMessages,
 }: Readonly<WorkspacesMainProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const session = workspaceWithSession?.session;
@@ -79,8 +95,45 @@ export function WorkspacesMain({
                 );
               }
               return (
-                <div className="flex-1 min-h-0 overflow-hidden flex justify-center">
+                <div className="flex-1 min-h-0 overflow-y-auto flex justify-center">
                   <div className="w-chat max-w-full h-full">
+                    {planningMessages && planningMessages.length > 0 && (
+                      <div className="border-b border-primary mb-base">
+                        <button
+                          onClick={onTogglePlanningMessages}
+                          className="w-full flex items-center gap-half px-base py-half text-sm text-low hover:text-normal transition-colors"
+                        >
+                          <CaretRightIcon
+                            className={`size-icon-xs transition-transform ${showPlanningMessages ? 'rotate-90' : ''}`}
+                          />
+                          <span>{t('common:workspaces.planningConversation')}</span>
+                          <span className="text-xs text-low ml-auto">
+                            {planningMessages.length} {t('common:workspaces.messages')}
+                          </span>
+                        </button>
+                        {showPlanningMessages && (
+                          <div className="px-base pb-base space-y-half">
+                            {planningMessages.map((msg) => (
+                              <div
+                                key={msg.id}
+                                className={`rounded p-half text-sm ${
+                                  msg.role === 'user'
+                                    ? 'bg-brand/10 text-high'
+                                    : 'bg-secondary text-normal'
+                                }`}
+                              >
+                                <div className="text-xs text-low mb-px font-medium">
+                                  {msg.role === 'user' ? t('common:workspaces.planningUser') : t('common:workspaces.planningPlanner')}
+                                </div>
+                                <div className="whitespace-pre-wrap break-words">
+                                  {msg.content}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <RetryUiProvider>
                       <ConversationList attempt={workspaceWithSession} />
                     </RetryUiProvider>

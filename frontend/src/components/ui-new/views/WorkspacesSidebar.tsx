@@ -1,6 +1,12 @@
-import { PlusIcon, ArrowLeftIcon, ArchiveIcon } from '@phosphor-icons/react';
+import {
+  PlusIcon,
+  ArrowLeftIcon,
+  ArchiveIcon,
+  ChatCircleIcon,
+} from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { Workspace } from '@/components/ui-new/hooks/useWorkspaces';
+import type { ConciergeSession } from '@/lib/conciergeApi';
 import { InputField } from '@/components/ui-new/primitives/InputField';
 import { WorkspaceSummary } from '@/components/ui-new/primitives/WorkspaceSummary';
 import { SectionHeader } from '../primitives/SectionHeader';
@@ -23,6 +29,8 @@ interface WorkspacesSidebarProps {
   showArchive?: boolean;
   /** Handler for toggling archive view */
   onShowArchiveChange?: (show: boolean) => void;
+  /** Concierge chat sessions */
+  conciergeSessions?: readonly ConciergeSession[];
 }
 
 export function WorkspacesSidebar({
@@ -38,6 +46,7 @@ export function WorkspacesSidebar({
   onSelectCreate,
   showArchive = false,
   onShowArchiveChange,
+  conciergeSessions = [],
 }: Readonly<WorkspacesSidebarProps>) {
   const { t } = useTranslation(['tasks', 'common']);
   const searchLower = searchQuery.toLowerCase();
@@ -140,6 +149,27 @@ export function WorkspacesSidebar({
                 prStatus={workspace.prStatus}
                 onClick={() => onSelectWorkspace(workspace.id)}
               />
+            ))}
+            {/* Concierge sessions inline with active workspaces */}
+            {conciergeSessions.map((session) => (
+              <a
+                key={`concierge-${session.id}`}
+                href={`/workspaces/create?conciergeId=${session.id}`}
+                className="flex items-center gap-half rounded bg-secondary/50 px-base py-half text-sm text-normal hover:bg-secondary hover:text-high transition-colors"
+              >
+                <ChatCircleIcon
+                  className="size-icon-xs text-brand shrink-0"
+                  weight="fill"
+                />
+                <span className="truncate">
+                  {session.name || session.id.slice(0, 8)}
+                </span>
+                {session.activeWorkflowId && (
+                  <span className="ml-auto shrink-0 rounded-full bg-success/20 px-1 py-px text-xs text-success">
+                    running
+                  </span>
+                )}
+              </a>
             ))}
           </div>
         )}

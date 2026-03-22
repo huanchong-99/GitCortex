@@ -365,9 +365,11 @@ impl OrchestratorAgent {
         let cli_summary = cli_types
             .iter()
             .map(|cli| {
+                // Only show models that have API keys configured — the agent
+                // must not pick models without credentials.
                 let models: Vec<String> = model_configs
                     .iter()
-                    .filter(|model| model.cli_type_id == cli.id)
+                    .filter(|model| model.cli_type_id == cli.id && model.has_api_key)
                     .map(|model| format!("{} ({})", model.id, model.display_name))
                     .collect();
                 format!(
@@ -375,7 +377,7 @@ impl OrchestratorAgent {
                     cli.id,
                     cli.display_name,
                     if models.is_empty() {
-                        "no models".to_string()
+                        "no configured models".to_string()
                     } else {
                         models.join(", ")
                     }
@@ -3197,12 +3199,78 @@ impl OrchestratorAgent {
             return Ok(());
         };
 
-        for instruction in instructions {
+        // Track ID remaps: LLM may use non-UUID IDs like "task-infra" that get
+        // replaced with proper UUIDs.  Subsequent instructions in the same batch
+        // need these mappings so their cross-references stay consistent.
+        let mut id_remap = std::collections::HashMap::<String, String>::new();
+
+        for mut instruction in instructions {
             Self::validate_instruction_whitelist(&instruction)?;
+            Self::remap_instruction_ids(&mut instruction, &mut id_remap);
             self.execute_single_instruction(instruction).await?;
         }
 
         Ok(())
+    }
+
+    /// Replaces non-UUID IDs in an instruction with proper UUIDs, recording the
+    /// mapping so later instructions in the same batch can resolve references.
+    fn remap_instruction_ids(
+        instruction: &mut OrchestratorInstruction,
+        remap: &mut std::collections::HashMap<String, String>,
+    ) {
+        fn resolve(id: &mut String, remap: &std::collections::HashMap<String, String>) {
+            if let Some(new_id) = remap.get(id.as_str()) {
+                *id = new_id.clone();
+            }
+        }
+
+        fn ensure_uuid_opt(
+            id: &mut Option<String>,
+            remap: &mut std::collections::HashMap<String, String>,
+        ) {
+            let old_id = match id.as_deref() {
+                Some(s) => s.to_string(),
+                None => return,
+            };
+            // Already mapped from a previous instruction?
+            if let Some(new_id) = remap.get(&old_id) {
+                *id = Some(new_id.clone());
+                return;
+            }
+            // Non-UUID → generate a fresh UUID and record the mapping
+            if uuid::Uuid::parse_str(&old_id).is_err() {
+                let new_id = uuid::Uuid::new_v4().to_string();
+                remap.insert(old_id, new_id.clone());
+                *id = Some(new_id);
+            }
+        }
+
+        match instruction {
+            OrchestratorInstruction::CreateTask { task_id, .. } => {
+                ensure_uuid_opt(task_id, remap);
+            }
+            OrchestratorInstruction::CreateTerminal {
+                terminal_id,
+                task_id,
+                ..
+            } => {
+                resolve(task_id, remap);
+                ensure_uuid_opt(terminal_id, remap);
+            }
+            OrchestratorInstruction::StartTerminal { terminal_id, .. }
+            | OrchestratorInstruction::CloseTerminal { terminal_id, .. }
+            | OrchestratorInstruction::SendToTerminal { terminal_id, .. }
+            | OrchestratorInstruction::ReviewCode { terminal_id, .. }
+            | OrchestratorInstruction::FixIssues { terminal_id, .. } => {
+                resolve(terminal_id, remap);
+            }
+            OrchestratorInstruction::CompleteTask { task_id, .. }
+            | OrchestratorInstruction::StartTask { task_id, .. } => {
+                resolve(task_id, remap);
+            }
+            _ => {}
+        }
     }
 
     async fn execute_single_instruction(

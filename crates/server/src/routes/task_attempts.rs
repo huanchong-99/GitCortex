@@ -2075,6 +2075,44 @@ pub async fn mark_seen(
     Ok(ResponseJson(ApiResponse::success(())))
 }
 
+/// Returns planning draft conversation messages for a workspace.
+///
+/// Traces: Workspace → Task (shared_task_id) → WorkflowTask → Workflow
+///       → PlanningDraft (materialized_workflow_id) → Messages
+async fn get_planning_messages(
+    State(deployment): State<DeploymentImpl>,
+    Extension(workspace): Extension<Workspace>,
+) -> Result<ResponseJson<ApiResponse<Vec<db::models::planning_draft::PlanningDraftMessage>>>, ApiError>
+{
+    use db::models::planning_draft::{PlanningDraft, PlanningDraftMessage};
+    use db::models::workflow::WorkflowTask;
+
+    let pool = &deployment.db().pool;
+    let empty = || ResponseJson(ApiResponse::success(vec![]));
+
+    let task = Task::find_by_id(pool, workspace.task_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("Task not found".to_string()))?;
+
+    let shared_task_id = match task.shared_task_id {
+        Some(id) => id,
+        None => return Ok(empty()),
+    };
+
+    let workflow_id = match WorkflowTask::find_by_id(pool, &shared_task_id.to_string()).await? {
+        Some(wt) => wt.workflow_id,
+        None => return Ok(empty()),
+    };
+
+    let draft = match PlanningDraft::find_by_materialized_workflow(pool, &workflow_id).await? {
+        Some(d) => d,
+        None => return Ok(empty()),
+    };
+
+    let messages = PlanningDraftMessage::list_by_draft(pool, &draft.id).await?;
+    Ok(ResponseJson(ApiResponse::success(messages)))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_attempt_id_router = Router::new()
         .route(
@@ -2106,6 +2144,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/repos", get(get_task_attempt_repos))
         .route("/search", get(search_workspace_files))
         .route("/first-message", get(get_first_user_message))
+        .route("/planning-messages", get(get_planning_messages))
         .route("/mark-seen", put(mark_seen))
         .layer(from_fn_with_state(
             deployment.clone(),

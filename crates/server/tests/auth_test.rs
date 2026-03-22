@@ -37,6 +37,18 @@ fn create_test_cli_health_monitor() -> SharedCliHealthMonitor {
     Arc::new(CliHealthMonitor::new(0))
 }
 
+fn create_test_concierge_agent() -> Arc<services::services::concierge::ConciergeAgent> {
+    let pool = sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap();
+    Arc::new(services::services::concierge::ConciergeAgent::new(
+        pool,
+        Arc::new(services::services::concierge::ConciergeBroadcaster::new()),
+    ))
+}
+
+fn create_test_concierge_broadcaster() -> Arc<services::services::concierge::ConciergeBroadcaster> {
+    Arc::new(services::services::concierge::ConciergeBroadcaster::new())
+}
+
 /// RAII guard for managing environment variables during tests.
 ///
 /// IMPORTANT: The MutexGuard is held for the entire lifetime of this struct,
@@ -96,7 +108,7 @@ async fn test_allows_requests_when_token_unset() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Request without auth header should succeed
     let response = app
@@ -125,7 +137,7 @@ async fn test_rejects_requests_without_authorization() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Request without auth header should fail
     let response = app
@@ -154,7 +166,7 @@ async fn test_rejects_requests_with_invalid_token() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Request with wrong token should fail
     let response = app
@@ -184,7 +196,7 @@ async fn test_allows_requests_with_valid_token() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Request with correct token should succeed
     let response = app
@@ -214,7 +226,7 @@ async fn test_rejects_requests_with_malformed_auth_header() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Request with malformed auth header (missing "Bearer" prefix) should fail
     let response = app
@@ -244,7 +256,7 @@ async fn test_token_comparison_is_case_sensitive() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Request with different case should fail
     let response = app
@@ -274,7 +286,7 @@ async fn test_multiple_requests_with_same_token() {
     let deployment = DeploymentImpl::new()
         .await
         .expect("Failed to create deployment");
-    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor());
+    let app = build_router(deployment, create_test_hub(), new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     // Multiple requests with valid token should all succeed
     for i in 0..3 {

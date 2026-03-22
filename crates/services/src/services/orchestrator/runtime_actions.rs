@@ -112,7 +112,10 @@ impl RuntimeActionService {
             )
         });
         let task = WorkflowTask {
-            id: spec.task_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            id: spec
+                .task_id
+                .filter(|id| Uuid::parse_str(id).is_ok())
+                .unwrap_or_else(|| Uuid::new_v4().to_string()),
             workflow_id: workflow_id.to_string(),
             vk_task_id: None,
             name: spec.name,
@@ -173,6 +176,7 @@ impl RuntimeActionService {
         let mut terminal = Terminal {
             id: spec
                 .terminal_id
+                .filter(|id| Uuid::parse_str(id).is_ok())
                 .unwrap_or_else(|| Uuid::new_v4().to_string()),
             workflow_task_id: task.id.clone(),
             cli_type_id: cli_type.id,

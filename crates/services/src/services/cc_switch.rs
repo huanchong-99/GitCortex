@@ -746,7 +746,7 @@ impl CCSwitchService {
                     } else {
                         (None, None)
                     };
-                let effective_base_url = terminal
+                let mut effective_base_url = terminal
                     .custom_base_url
                     .clone()
                     .or(orchestrator_base_url.clone());
@@ -782,7 +782,23 @@ impl CCSwitchService {
                         fallback_api_key = config.env.auth_token.or(config.env.api_key);
                     }
 
-                    // If global config also doesn't have API key, try workflow orchestrator
+                    // Try model_config credentials (from Settings → Models)
+                    if fallback_api_key.is_none() {
+                        if let Ok(Some(model_key)) = model_config.get_api_key() {
+                            fallback_api_key = Some(model_key);
+                            if effective_base_url.is_none() {
+                                effective_base_url = model_config.base_url.clone();
+                            }
+                            tracing::info!(
+                                terminal_id = %terminal.id,
+                                model_config_id = %model_config.id,
+                                has_base_url = model_config.base_url.is_some(),
+                                "Using model_config credentials for terminal"
+                            );
+                        }
+                    }
+
+                    // If model_config also doesn't have API key, try workflow orchestrator
                     // BUT only if the base URLs are compatible (same API service)
                     if fallback_api_key.is_none() {
                         // Check if base URLs are compatible

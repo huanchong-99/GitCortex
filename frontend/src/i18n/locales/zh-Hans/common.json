@@ -149,6 +149,10 @@
     "archived": "已归档",
     "loading": "加载中...",
     "selectToStart": "选择一个工作区开始",
+    "planningConversation": "规划对话",
+    "messages": "条消息",
+    "planningUser": "用户",
+    "planningPlanner": "规划器",
     "draft": "草稿",
     "viewArchive": "查看归档",
     "backToActive": "返回活跃",
@@ -367,5 +371,20 @@
     "currentProject": "项目：",
     "bindRepoTo": "确认绑定仓库 → 项目「{{project}}」",
     "repoBoundTo": "已绑定到项目「{{project}}」"
+  },
+  "concierge": {
+    "title": "AI 助理",
+    "newSession": "新建对话",
+    "noSessions": "暂无对话",
+    "sendPlaceholder": "输入消息...",
+    "send": "发送",
+    "sourceFeishu": "飞书",
+    "sourceWeb": "网页",
+    "toolExecuting": "执行中...",
+    "toolCompleted": "已完成",
+    "systemMessage": "系统",
+    "sessionList": "对话列表",
+    "feishuSync": "飞书同步",
+    "progressNotifications": "进度推送"
   }
 }

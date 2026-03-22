@@ -25,6 +25,18 @@ fn create_test_cli_health_monitor() -> SharedCliHealthMonitor {
     Arc::new(CliHealthMonitor::new(0))
 }
 
+fn create_test_concierge_agent() -> Arc<services::services::concierge::ConciergeAgent> {
+    let pool = sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap();
+    Arc::new(services::services::concierge::ConciergeAgent::new(
+        pool,
+        Arc::new(services::services::concierge::ConciergeBroadcaster::new()),
+    ))
+}
+
+fn create_test_concierge_broadcaster() -> Arc<services::services::concierge::ConciergeBroadcaster> {
+    Arc::new(services::services::concierge::ConciergeBroadcaster::new())
+}
+
 /// Helper: Setup test environment
 async fn setup_test() -> (DeploymentImpl, Uuid) {
     let deployment = DeploymentImpl::new()
@@ -149,7 +161,7 @@ async fn test_start_workflow_requires_ready_status() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::build_router(deployment.clone(), create_test_hub(), server::feishu_handle::new_shared_handle(), create_test_cli_health_monitor());
+    let app = server::routes::build_router(deployment.clone(), create_test_hub(), server::feishu_handle::new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     let request = Request::builder()
         .method("POST")
@@ -233,7 +245,7 @@ async fn test_start_workflow_without_orchestrator() {
     };
     use tower::ServiceExt;
 
-    let app = server::routes::build_router(deployment.clone(), create_test_hub(), server::feishu_handle::new_shared_handle(), create_test_cli_health_monitor());
+    let app = server::routes::build_router(deployment.clone(), create_test_hub(), server::feishu_handle::new_shared_handle(), create_test_cli_health_monitor(), create_test_concierge_agent(), create_test_concierge_broadcaster());
 
     let request = Request::builder()
         .method("POST")

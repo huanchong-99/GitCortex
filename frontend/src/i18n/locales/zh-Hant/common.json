@@ -130,6 +130,10 @@
     "archived": "已封存",
     "loading": "載入中...",
     "selectToStart": "選擇一個工作區開始",
+    "planningConversation": "規劃對話",
+    "messages": "則訊息",
+    "planningUser": "使用者",
+    "planningPlanner": "規劃器",
     "draft": "草稿",
     "viewArchive": "檢視封存",
     "backToActive": "返回活躍",
@@ -314,5 +318,20 @@
   "dialogs": {
     "selectGitRepository": "選擇 Git 倉庫",
     "chooseExistingRepo": "選擇一個已有的倉庫資料夾"
+  },
+  "concierge": {
+    "title": "AI 助理",
+    "newSession": "新建對話",
+    "noSessions": "暫無對話",
+    "sendPlaceholder": "輸入訊息...",
+    "send": "傳送",
+    "sourceFeishu": "飛書",
+    "sourceWeb": "網頁",
+    "toolExecuting": "執行中...",
+    "toolCompleted": "已完成",
+    "systemMessage": "系統",
+    "sessionList": "對話列表",
+    "feishuSync": "飛書同步",
+    "progressNotifications": "進度推送"
   }
 }

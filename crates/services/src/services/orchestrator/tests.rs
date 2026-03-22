@@ -909,18 +909,21 @@ mod orchestrator_tests {
             prompt_watcher,
         )));
 
+        let runtime_task_id = Uuid::new_v4().to_string();
+        let instruction = format!(
+            r#"[
+                {{"type":"create_task","task_id":"{}","name":"Runtime Task","description":"Nothing to execute","order_index":0}},
+                {{"type":"complete_task","task_id":"{}","summary":"No terminals needed"}},
+                {{"type":"set_workflow_planning_complete","summary":"Planning is finished"}}
+            ]"#,
+            runtime_task_id, runtime_task_id
+        );
         agent
-            .execute_instruction(
-                r#"[
-                    {"type":"create_task","task_id":"task-runtime","name":"Runtime Task","description":"Nothing to execute","order_index":0},
-                    {"type":"complete_task","task_id":"task-runtime","summary":"No terminals needed"},
-                    {"type":"set_workflow_planning_complete","summary":"Planning is finished"}
-                ]"#,
-            )
+            .execute_instruction(&instruction)
             .await
             .expect("runtime planning array should execute");
 
-        let task = db::models::WorkflowTask::find_by_id(&pool, "task-runtime")
+        let task = db::models::WorkflowTask::find_by_id(&pool, &runtime_task_id)
             .await
             .unwrap()
             .expect("task should be created");

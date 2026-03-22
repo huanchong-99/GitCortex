@@ -130,6 +130,10 @@
     "archived": "Archivado",
     "loading": "Cargando...",
     "selectToStart": "Selecciona un espacio de trabajo para comenzar",
+    "planningConversation": "Conversación de planificación",
+    "messages": "mensajes",
+    "planningUser": "Usuario",
+    "planningPlanner": "Planificador",
     "draft": "Borrador",
     "viewArchive": "Ver archivo",
     "backToActive": "Volver a activos",
@@ -314,5 +318,20 @@
   "dialogs": {
     "selectGitRepository": "Seleccionar repositorio Git",
     "chooseExistingRepo": "Elegir una carpeta de repositorio existente"
+  },
+  "concierge": {
+    "title": "Asistente IA",
+    "newSession": "Nueva conversación",
+    "noSessions": "Sin conversaciones",
+    "sendPlaceholder": "Escribe un mensaje...",
+    "send": "Enviar",
+    "sourceFeishu": "Feishu",
+    "sourceWeb": "Web",
+    "toolExecuting": "Ejecutando...",
+    "toolCompleted": "Completado",
+    "systemMessage": "Sistema",
+    "sessionList": "Conversaciones",
+    "feishuSync": "Sincronización Feishu",
+    "progressNotifications": "Notificaciones de progreso"
   }
 }

@@ -1,9 +1,10 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState, useCallback } from 'react';
 import type { Workspace, Session } from 'shared/types';
 import { createWorkspaceWithSession } from '@/types/attempt';
 import { WorkspacesMain } from '@/components/ui-new/views/WorkspacesMain';
 import { useTask } from '@/hooks/useTask';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
+import { useWorkspacePlanningMessages } from '@/hooks/usePlanningDraft';
 
 interface WorkspacesMainContainerProps {
   readonly selectedWorkspace: Workspace | null;
@@ -34,6 +35,16 @@ export function WorkspacesMainContainer({
     enabled: !!selectedWorkspace?.taskId,
   });
 
+  const [showPlanningMessages, setShowPlanningMessages] = useState(true);
+  const handleTogglePlanningMessages = useCallback(() => {
+    setShowPlanningMessages((v) => !v);
+  }, []);
+
+  // Fetch planning conversation messages (from draft that created this workspace)
+  const { data: planningMessages } = useWorkspacePlanningMessages(
+    selectedWorkspace?.id ?? null
+  );
+
   // Create WorkspaceWithSession for ConversationList
   const workspaceWithSession = useMemo(() => {
     if (!selectedWorkspace) return undefined;
@@ -50,6 +61,9 @@ export function WorkspacesMainContainer({
       projectId={task?.projectId}
       isNewSessionMode={isNewSessionMode}
       onStartNewSession={onStartNewSession}
+      planningMessages={planningMessages}
+      showPlanningMessages={showPlanningMessages}
+      onTogglePlanningMessages={handleTogglePlanningMessages}
       diffStats={{
         filesChanged: diffStats.files_changed,
         linesAdded: diffStats.lines_added,

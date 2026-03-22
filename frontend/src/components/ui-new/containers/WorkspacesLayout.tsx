@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Group, Layout, Panel, Separator } from 'react-resizable-panels';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
 import { ExecutionProcessesProvider } from '@/contexts/ExecutionProcessesContext';
@@ -12,6 +13,7 @@ import { WorkspacesMainContainer } from '@/components/ui-new/containers/Workspac
 import { RightSidebar } from '@/components/ui-new/containers/RightSidebar';
 import { ChangesPanelContainer } from '@/components/ui-new/containers/ChangesPanelContainer';
 import { CreateChatBoxContainer } from '@/components/ui-new/containers/CreateChatBoxContainer';
+import { ConciergeChatContainer } from '@/components/ui-new/containers/ConciergeChatContainer';
 import { NavbarContainer } from '@/components/ui-new/containers/NavbarContainer';
 import { PreviewBrowserContainer } from '@/components/ui-new/containers/PreviewBrowserContainer';
 import { WorkspacesGuideDialog } from '@/components/ui-new/dialogs/WorkspacesGuideDialog';
@@ -24,6 +26,8 @@ import {
   RIGHT_MAIN_PANEL_MODES,
 } from '@/stores/useUiPreferencesStore';
 
+import { useConciergeSession } from '@/hooks/useConcierge';
+import { useWorkflow } from '@/hooks/useWorkflows';
 import { useCommandBarShortcut } from '@/hooks/useCommandBarShortcut';
 
 const WORKSPACES_GUIDE_ID = 'workspaces-guide';
@@ -87,6 +91,14 @@ export function WorkspacesLayout() {
     updateAndSaveConfig,
     loading: configLoading,
   } = useUserSystem();
+
+  const [searchParams] = useSearchParams();
+  const conciergeSessionId = searchParams.get('conciergeId');
+  const isConciergeMode = Boolean(conciergeSessionId);
+
+  const { data: conciergeSession } = useConciergeSession(conciergeSessionId);
+  const conciergeWorkflowId = conciergeSession?.activeWorkflowId ?? null;
+  const { data: conciergeWorkflow } = useWorkflow(conciergeWorkflowId ?? '');
 
   useCommandBarShortcut(() => {
     void import('@/components/ui-new/dialogs/CommandBarDialog').then(
@@ -173,7 +185,11 @@ export function WorkspacesLayout() {
                           minSize={20}
                           className="min-w-0 h-full overflow-hidden"
                         >
-                          {isCreateMode ? (
+                          {isConciergeMode ? (
+                            <ConciergeChatContainer
+                              initialSessionId={conciergeSessionId}
+                            />
+                          ) : isCreateMode ? (
                             <CreateChatBoxContainer />
                           ) : (
                             <WorkspacesMainContainer
@@ -227,6 +243,8 @@ export function WorkspacesLayout() {
                       <div className="w-[300px] max-w-[30vw] shrink-0 h-full overflow-hidden">
                         <RightSidebar
                           isCreateMode={isCreateMode}
+                          isConciergeMode={isConciergeMode}
+                          conciergeWorkflow={conciergeWorkflow ?? null}
                           rightMainPanelMode={rightMainPanelMode}
                           selectedWorkspace={selectedWorkspace}
                           repos={repos}
