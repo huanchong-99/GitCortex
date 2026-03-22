@@ -210,8 +210,7 @@ export function ConciergeChatView({
             href={`/pipeline/${activeWorkflowId}`}
             className="flex items-center gap-1 rounded-full bg-success/20 px-base py-px text-xs text-success hover:bg-success/30 transition-colors"
           >
-            <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" />
-            查看工作流进度
+            <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" /><span>查看工作流进度</span>
           </a>
         )}
         <div className="relative ml-auto">
