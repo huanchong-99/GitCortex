@@ -466,7 +466,7 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                   setIsFormVerified(false);
                 }}
                 placeholder={t('step3.fields.baseUrl.placeholder')}
-                disabled={formData.apiType !== 'openai-compatible'}
+                disabled={formData.apiType !== 'openai-compatible' && formData.apiType !== 'anthropic-compatible'}
                 className={cn(
                   'w-full bg-secondary rounded-sm border px-base py-half text-base text-high',
                   'placeholder:text-low placeholder:opacity-80',

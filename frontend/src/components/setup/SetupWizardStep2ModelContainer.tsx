@@ -85,7 +85,7 @@ export function SetupWizardStep2ModelContainer({
     fetchModels(
       apiType,
       apiKey,
-      apiType === 'openai-compatible' ? baseUrl : undefined
+      apiType === 'openai-compatible' || apiType === 'anthropic-compatible' ? baseUrl : undefined
     ).catch(() => { /* handled internally */ });
   }, [apiType, apiKey, baseUrl, fetchModels]);
 
@@ -93,7 +93,7 @@ export function SetupWizardStep2ModelContainer({
     verifyModel({
       apiType,
       apiKey,
-      baseUrl: apiType === 'openai-compatible' ? baseUrl : undefined,
+      baseUrl: apiType === 'openai-compatible' || apiType === 'anthropic-compatible' ? baseUrl : undefined,
       modelId,
     }).catch(() => { /* handled internally */ });
   }, [apiType, apiKey, baseUrl, modelId, verifyModel]);
