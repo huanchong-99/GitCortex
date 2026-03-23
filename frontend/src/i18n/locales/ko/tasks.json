@@ -685,6 +685,14 @@
         "confirmed": "확인됨",
         "materialized": "워크플로우 생성됨",
         "cancelled": "취소됨"
+      },
+      "progress": {
+        "title": "워크플로우 실행",
+        "openBoard": "보드 열기",
+        "events": "이벤트",
+        "noTasks": "오케스트레이터 대기 중...",
+        "connected": "연결됨",
+        "reconnecting": "재연결 중..."
       }
     },
     "saveAsDefault": "기본값으로 저장",

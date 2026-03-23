@@ -713,7 +713,15 @@
         "materialized": "工作流已创建",
         "cancelled": "已取消"
       },
-      "needRepo": "请至少添加一个仓库以开始规划"
+      "needRepo": "请至少添加一个仓库以开始规划",
+      "progress": {
+        "title": "工作流执行",
+        "openBoard": "打开看板",
+        "events": "事件",
+        "noTasks": "等待编排器...",
+        "connected": "已连接",
+        "reconnecting": "重新连接中..."
+      }
     },
     "saveAsDefault": "设为默认",
     "updatedTodos": "更新的待办事项",

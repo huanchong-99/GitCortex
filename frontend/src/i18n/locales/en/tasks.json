@@ -257,7 +257,15 @@
         "materialized": "Workflow Created",
         "cancelled": "Cancelled"
       },
-      "needRepo": "Add at least one repository to start planning"
+      "needRepo": "Add at least one repository to start planning",
+      "progress": {
+        "title": "Workflow Execution",
+        "openBoard": "Open Board",
+        "events": "Events",
+        "noTasks": "Waiting for orchestrator...",
+        "connected": "Connected",
+        "reconnecting": "Reconnecting..."
+      }
     },
     "saveAsDefault": "Save as default",
     "you": "You",

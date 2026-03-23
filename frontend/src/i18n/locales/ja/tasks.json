@@ -685,6 +685,14 @@
         "confirmed": "確認済み",
         "materialized": "ワークフロー作成済み",
         "cancelled": "キャンセル"
+      },
+      "progress": {
+        "title": "ワークフロー実行",
+        "openBoard": "ボードを開く",
+        "events": "イベント",
+        "noTasks": "オーケストレーターを待機中...",
+        "connected": "接続済み",
+        "reconnecting": "再接続中..."
       }
     },
     "saveAsDefault": "デフォルトとして保存",

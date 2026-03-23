@@ -685,6 +685,14 @@
         "confirmed": "Confirmado",
         "materialized": "Flujo Creado",
         "cancelled": "Cancelado"
+      },
+      "progress": {
+        "title": "Ejecucion del Flujo",
+        "openBoard": "Abrir Tablero",
+        "events": "Eventos",
+        "noTasks": "Esperando al orquestador...",
+        "connected": "Conectado",
+        "reconnecting": "Reconectando..."
       }
     },
     "saveAsDefault": "Guardar como predeterminado",

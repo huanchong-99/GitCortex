@@ -685,6 +685,14 @@
         "confirmed": "已確認",
         "materialized": "工作流已建立",
         "cancelled": "已取消"
+      },
+      "progress": {
+        "title": "工作流執行",
+        "openBoard": "開啟看板",
+        "events": "事件",
+        "noTasks": "等待編排器...",
+        "connected": "已連線",
+        "reconnecting": "重新連線中..."
       }
     },
     "saveAsDefault": "設為預設",

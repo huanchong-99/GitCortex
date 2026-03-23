@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateMode } from '@/contexts/CreateModeContext';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useCreateAttachments } from '@/hooks/useCreateAttachments';
+import { WorkflowProgressContainer } from './WorkflowProgressContainer';
 import { getVariantOptions, areProfilesEqual } from '@/utils/executor';
 import type { ExecutorProfileId, BaseCodingAgent } from 'shared/types';
 import type { ModelConfig as WorkflowModelConfig } from '@/components/workflow/types';
@@ -340,15 +341,9 @@ export function CreateChatBoxContainer() {
               </button>
             )}
             {isMaterialized && (
-              <div className="ml-auto flex items-center gap-base">
-                <span className="text-xs text-success animate-pulse">Workflow Running</span>
-                <button
-                  onClick={handleOpenBoard}
-                  className="text-xs px-base py-half rounded bg-brand text-white hover:bg-brand/90"
-                >
-                  {t('workspace.openBoard', { defaultValue: 'Open Board' })}
-                </button>
-              </div>
+              <span className="ml-auto text-xs px-1 py-px rounded bg-success/10 text-success">
+                Running
+              </span>
             )}
           </div>
 
@@ -376,6 +371,12 @@ export function CreateChatBoxContainer() {
                   {tTasks('conversation.planning.thinking')}
                 </div>
               </div>
+            )}
+            {isMaterialized && materializedWorkflowId && (
+              <WorkflowProgressContainer
+                workflowId={materializedWorkflowId}
+                onOpenBoard={handleOpenBoard}
+              />
             )}
           </div>
         </>
