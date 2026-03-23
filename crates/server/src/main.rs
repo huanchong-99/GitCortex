@@ -201,6 +201,38 @@ async fn main() -> Result<(), GitCortexError> {
         tracing::debug!("Feishu integration disabled (neither env var nor database setting enabled)");
     }
 
+    // Sync config.json model library → DB on startup so the Orchestrator
+    // Agent can always see user-configured models even after a DB reset.
+    {
+        let cfg = deployment.config().read().await;
+        let pool = &deployment.db().pool;
+        for item in &cfg.workflow_model_library {
+            let cli_type_id = item.cli_type_id.as_deref().unwrap_or("cli-codex");
+            if let Err(e) = db::models::ModelConfig::create_custom(
+                pool, &item.id, cli_type_id, &item.display_name, &item.model_id,
+            ).await {
+                tracing::warn!(model_id = %item.id, error = %e, "Startup model sync failed");
+                continue;
+            }
+            if !item.api_key.is_empty() {
+                let mut tmp_model = db::models::ModelConfig {
+                    id: String::new(), cli_type_id: String::new(), name: String::new(),
+                    display_name: String::new(), api_model_id: None, is_default: false,
+                    is_official: false, created_at: chrono::Utc::now(), updated_at: chrono::Utc::now(),
+                    encrypted_api_key: None, base_url: None, api_type: None, has_api_key: false,
+                };
+                if let Ok(()) = tmp_model.set_api_key(&item.api_key) {
+                    if let Some(ref encrypted) = tmp_model.encrypted_api_key {
+                        let _ = db::models::ModelConfig::update_credentials(
+                            pool, &item.id, encrypted, Some(&item.base_url), &item.api_type,
+                        ).await;
+                    }
+                }
+            }
+            tracing::info!(model_id = %item.id, "Startup: synced model config to DB");
+        }
+    }
+
     let cli_health_monitor = deployment.cli_health_monitor().clone();
     let app_router = routes::router(
         deployment.clone(),

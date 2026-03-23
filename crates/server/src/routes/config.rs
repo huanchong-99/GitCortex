@@ -211,6 +211,67 @@ async fn handle_config_events(deployment: &DeploymentImpl, old: &Config, new: &C
             deployment_clone.trigger_auto_project_setup().await;
         });
     }
+
+    // Sync workflow_model_library → model_config DB table so the
+    // Orchestrator Agent can see user-configured models.
+    sync_model_library_to_db(deployment, &new.workflow_model_library).await;
+}
+
+/// Sync `workflow_model_library` entries from config.json into the
+/// `model_config` DB table with encrypted credentials.
+async fn sync_model_library_to_db(
+    deployment: &DeploymentImpl,
+    items: &[services::services::config::WorkflowModelLibraryItem],
+) {
+    let pool = &deployment.db().pool;
+    for item in items {
+        let cli_type_id = item.cli_type_id.as_deref().unwrap_or("cli-codex");
+        // Upsert the model record
+        if let Err(e) = db::models::ModelConfig::create_custom(
+            pool,
+            &item.id,
+            cli_type_id,
+            &item.display_name,
+            &item.model_id,
+        )
+        .await
+        {
+            tracing::warn!(model_id = %item.id, error = %e, "Failed to sync model config to DB");
+            continue;
+        }
+
+        // Store encrypted credentials
+        if !item.api_key.is_empty() {
+            let mut tmp = db::models::ModelConfig {
+                id: String::new(),
+                cli_type_id: String::new(),
+                name: String::new(),
+                display_name: String::new(),
+                api_model_id: None,
+                is_default: false,
+                is_official: false,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                encrypted_api_key: None,
+                base_url: None,
+                api_type: None,
+                has_api_key: false,
+            };
+            if let Ok(()) = tmp.set_api_key(&item.api_key) {
+                if let Some(ref encrypted) = tmp.encrypted_api_key {
+                    let _ = db::models::ModelConfig::update_credentials(
+                        pool,
+                        &item.id,
+                        encrypted,
+                        Some(&item.base_url),
+                        &item.api_type,
+                    )
+                    .await;
+                }
+            }
+        }
+        tracing::info!(model_id = %item.id, display_name = %item.display_name, "Synced model config to DB");
+    }
 }
 
 async fn get_sound(Path(sound): Path<SoundFile>) -> Result<Response, ApiError> {
