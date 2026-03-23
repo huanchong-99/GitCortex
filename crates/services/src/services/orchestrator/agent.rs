@@ -3089,15 +3089,67 @@ impl OrchestratorAgent {
         trimmed
     }
 
+    /// Extract JSON from a response that may contain explanatory text around it.
+    fn extract_json_from_mixed_response(response: &str) -> Option<String> {
+        // Try extracting from ```json ... ``` fenced block
+        if let Some(start) = response.find("```json") {
+            let after_fence = &response[start + 7..];
+            if let Some(end) = after_fence.find("```") {
+                return Some(after_fence[..end].trim().to_string());
+            }
+        }
+        if let Some(start) = response.find("```\n") {
+            let after_fence = &response[start + 4..];
+            if let Some(end) = after_fence.find("```") {
+                let candidate = after_fence[..end].trim();
+                if candidate.starts_with('[') || candidate.starts_with('{') {
+                    return Some(candidate.to_string());
+                }
+            }
+        }
+        // Try finding the first [ or { and matching to its end
+        let first_bracket = response.find('[').unwrap_or(usize::MAX);
+        let first_brace = response.find('{').unwrap_or(usize::MAX);
+        let start = first_bracket.min(first_brace);
+        if start < response.len() {
+            let remaining = &response[start..];
+            // Find the last matching ] or }
+            let end_char = if remaining.starts_with('[') { ']' } else { '}' };
+            if let Some(end) = remaining.rfind(end_char) {
+                return Some(remaining[..=end].to_string());
+            }
+        }
+        None
+    }
+
     fn parse_instructions(response: &str) -> Option<Vec<OrchestratorInstruction>> {
+        // First try direct parse
         let normalized = Self::normalize_instruction_payload(response);
-        serde_json::from_str::<Vec<OrchestratorInstruction>>(normalized)
+        let direct = serde_json::from_str::<Vec<OrchestratorInstruction>>(normalized)
             .ok()
             .or_else(|| {
                 serde_json::from_str::<OrchestratorInstruction>(normalized)
                     .ok()
                     .map(|instruction| vec![instruction])
-            })
+            });
+        if direct.is_some() {
+            return direct;
+        }
+
+        // Fallback: extract JSON from mixed text response
+        if let Some(extracted) = Self::extract_json_from_mixed_response(response) {
+            tracing::info!(extracted_len = extracted.len(), "Extracted JSON from mixed LLM response");
+            return serde_json::from_str::<Vec<OrchestratorInstruction>>(&extracted)
+                .ok()
+                .or_else(|| {
+                    serde_json::from_str::<OrchestratorInstruction>(&extracted)
+                        .ok()
+                        .map(|i| vec![i])
+                });
+        }
+
+        tracing::warn!(response_preview = &response[..response.len().min(500)], "Could not parse any instructions from LLM response");
+        None
     }
 
     fn instruction_type_name(instruction: &OrchestratorInstruction) -> &'static str {
