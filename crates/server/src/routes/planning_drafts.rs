@@ -310,12 +310,38 @@ async fn send_message(
                 }
 
                 // Auto-transition: if LLM produced a ```json PLANNING_SPEC block,
-                // move draft from gathering → spec_ready.
-                // Use fenced block detection to avoid false positives from conversational mentions.
+                // move draft from gathering → spec_ready and extract spec content.
                 if draft.status == "gathering"
                     && (response.content.contains("```json\n") || response.content.contains("```\n"))
                     && response.content.contains("\"productGoal\"")
                 {
+                    // Extract the JSON block from the fenced code block
+                    let json_block = response.content
+                        .split("```json\n").nth(1)
+                        .or_else(|| response.content.split("```\n").nth(1))
+                        .and_then(|s| s.split("```").next())
+                        .unwrap_or("");
+
+                    let (req_summary, tech_spec) = if let Ok(spec) =
+                        serde_json::from_str::<serde_json::Value>(json_block)
+                    {
+                        let goal = spec["productGoal"].as_str().unwrap_or("").to_string();
+                        (goal, json_block.to_string())
+                    } else {
+                        (String::new(), json_block.to_string())
+                    };
+
+                    // Store extracted spec content
+                    if let Err(e) = PlanningDraft::update_spec(
+                        &deployment.db().pool,
+                        &draft_id,
+                        Some(&req_summary),
+                        Some(&tech_spec),
+                        None,
+                    ).await {
+                        tracing::warn!(draft_id = %draft_id, "Failed to save extracted spec: {e}");
+                    }
+
                     if let Err(e) = PlanningDraft::update_status(
                         &deployment.db().pool,
                         &draft_id,
@@ -325,7 +351,7 @@ async fn send_message(
                     {
                         tracing::warn!(draft_id = %draft_id, "Failed to auto-transition to spec_ready: {e}");
                     } else {
-                        tracing::info!(draft_id = %draft_id, "Auto-transitioned draft to spec_ready");
+                        tracing::info!(draft_id = %draft_id, req_summary = %req_summary, "Auto-transitioned draft to spec_ready with extracted spec");
                     }
                 }
             }

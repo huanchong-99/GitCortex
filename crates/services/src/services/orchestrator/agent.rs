@@ -576,8 +576,19 @@ impl OrchestratorAgent {
             tracing::error!("Failed to auto-dispatch initial tasks: {}", e);
             // Don't fail the workflow, just log the error
         }
-        if let Err(e) = self.run_initial_agent_planning_if_needed().await {
-            tracing::error!("Failed to run initial agent-planned cycle: {}", e);
+        // Retry initial planning up to 3 times with backoff (LLM may 504 on first attempt).
+        for attempt in 1..=3u32 {
+            match self.run_initial_agent_planning_if_needed().await {
+                Ok(()) => break,
+                Err(e) => {
+                    tracing::error!(attempt, "Failed to run initial agent-planned cycle: {}", e);
+                    if attempt < 3 {
+                        let delay = Duration::from_secs(10 * u64::from(attempt));
+                        tracing::info!(retry_in_secs = delay.as_secs(), "Retrying initial planning...");
+                        sleep(delay).await;
+                    }
+                }
+            }
         }
 
         // 濞存粌顑勫▎銏狀嚗椤忓棗绠?
