@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkflow, workflowKeys } from '@/hooks/useWorkflows';
+import { makeRequest, handleApiResponse } from '@/lib/api';
 import {
   useWorkflowEvents,
   type GitCommitPayload,
@@ -120,7 +121,34 @@ export function useWorkflowLiveStatus(workflowId: string | null) {
   // Read from ref + renderTick to get latest events while keeping a stable reference shape
   const _tick = renderTickRef.current;
   void _tick;
-  const events = eventsRef.current;
+
+  // Fetch persisted events from backend
+  const { data: persistedEvents } = useQuery({
+    queryKey: ['workflowEvents', workflowId],
+    queryFn: async () => {
+      const res = await makeRequest(`/api/workflows/${workflowId}/events`);
+      return handleApiResponse<Array<{ id: string; event_type: string; summary: string; created_at: string }>>(res);
+    },
+    enabled: !!workflowId,
+    staleTime: 30_000,
+  });
+
+  // Merge persisted events with live events
+  const events = useMemo(() => {
+    const historical: LiveEvent[] = (persistedEvents ?? []).map((e) => ({
+      id: e.id,
+      type: e.event_type as LiveEvent['type'],
+      timestamp: e.created_at,
+      summary: e.summary,
+    }));
+    // Live events take priority (newest first)
+    if (eventsRef.current.length > 0) {
+      const liveIds = new Set(eventsRef.current.map((e) => e.id));
+      const merged = [...eventsRef.current, ...historical.filter((e) => !liveIds.has(e.id))];
+      return merged.slice(0, MAX_EVENTS);
+    }
+    return historical;
+  }, [persistedEvents, _tick]);
 
   return {
     workflowStatus,

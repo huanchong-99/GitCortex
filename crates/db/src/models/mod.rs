@@ -28,6 +28,7 @@ pub mod quality_run;
 pub mod system_settings;
 pub mod terminal;
 pub mod workflow;
+pub mod workflow_event;
 
 pub use cli_type::*;
 pub use concierge::*;

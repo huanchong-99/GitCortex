@@ -172,6 +172,7 @@ pub fn workflows_routes() -> Router<DeploymentImpl> {
         .route("/recover", post(recover_workflows))
         .route("/{workflow_id}", get(get_workflow).delete(delete_workflow))
         .route("/{workflow_id}/status", put(update_workflow_status))
+        .route("/{workflow_id}/events", get(get_workflow_events))
         .route("/{workflow_id}/prepare", post(prepare_workflow))
         .route("/{workflow_id}/start", post(start_workflow))
         .route("/{workflow_id}/pause", post(pause_workflow))
@@ -3053,6 +3054,19 @@ async fn list_orchestrator_messages(
 
 /// POST /api/workflows/:workflow_id/merge
 /// Execute merge terminal for workflow
+async fn get_workflow_events(
+    State(deployment): State<DeploymentImpl>,
+    Path(workflow_id): Path<Uuid>,
+) -> Result<ResponseJson<ApiResponse<Vec<db::models::workflow_event::WorkflowEvent>>>, ApiError> {
+    let events = db::models::workflow_event::WorkflowEvent::find_by_workflow(
+        &deployment.db().pool,
+        &workflow_id.to_string(),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
+    Ok(Json(ApiResponse::success(events)))
+}
+
 async fn merge_workflow(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<Uuid>,

@@ -713,6 +713,7 @@ impl OrchestratorAgent {
                         db::models::WorkflowTask::update_status(
                             &self.db.pool, &task.id, "completed",
                         ).await?;
+                        self.persist_event("task_status", &format!("Task \"{}\" completed", task.name)).await;
                     }
                 }
                 "pending" => {
@@ -736,6 +737,25 @@ impl OrchestratorAgent {
             }
         }
         Ok(())
+    }
+
+    /// Persist a workflow event to the database for historical retrieval.
+    async fn persist_event(&self, event_type: &str, summary: &str) {
+        let workflow_id = {
+            let state = self.state.read().await;
+            state.workflow_id.clone()
+        };
+        let event = db::models::workflow_event::WorkflowEvent {
+            id: uuid::Uuid::new_v4().to_string(),
+            workflow_id,
+            event_type: event_type.to_string(),
+            summary: summary.to_string(),
+            metadata: None,
+            created_at: chrono::Utc::now(),
+        };
+        if let Err(e) = db::models::workflow_event::WorkflowEvent::insert(&self.db.pool, &event).await {
+            tracing::debug!(error = %e, "Failed to persist workflow event (table may not exist yet)");
+        }
     }
 
     async fn recover_stalled_terminals(
@@ -4322,6 +4342,7 @@ impl OrchestratorAgent {
             task_id,
             instruction
         );
+        self.persist_event("terminal_status", &format!("Terminal {} dispatched", &active_terminal.id[..8.min(active_terminal.id.len())])).await;
 
         Ok(())
     }
@@ -4887,6 +4908,9 @@ impl OrchestratorAgent {
 
         tracing::debug!("Broadcast task status: {} -> {}", task_id, status);
 
+        // 4. Persist event for historical retrieval
+        self.persist_event("task_status", &format!("Task {} {}", &task_id[..8.min(task_id.len())], status)).await;
+
         Ok(())
     }
 
@@ -4960,6 +4984,8 @@ impl OrchestratorAgent {
             workflow_id = %workflow_id,
             "Workflow auto-synced to completed after all tasks completed"
         );
+
+        self.persist_event("workflow_status", "Workflow completed").await;
 
         // Auto-merge completed task branches
         if self.config.auto_merge_on_completion {
