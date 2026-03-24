@@ -177,6 +177,26 @@ impl ConciergeSession {
         .await
     }
 
+    /// Find ALL sessions (active + inactive) bound to a specific channel.
+    pub async fn find_all_by_channel(
+        pool: &SqlitePool,
+        provider: &str,
+        external_id: &str,
+    ) -> sqlx::Result<Vec<Self>> {
+        sqlx::query_as::<_, Self>(
+            r"
+            SELECT s.* FROM concierge_session s
+            JOIN concierge_session_channel c ON c.session_id = s.id
+            WHERE c.provider = ?1 AND c.external_id = ?2
+            ORDER BY s.updated_at DESC
+            ",
+        )
+        .bind(provider)
+        .bind(external_id)
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn update_active_project(
         pool: &SqlitePool,
         id: &str,
@@ -369,6 +389,32 @@ impl ConciergeSessionChannel {
         .execute(pool)
         .await?;
         Ok(rows.rows_affected())
+    }
+
+    /// Switch: deactivate all channels for provider+external_id, then activate
+    /// only the one for target_session_id.
+    pub async fn switch_active_session(
+        pool: &SqlitePool,
+        provider: &str,
+        external_id: &str,
+        target_session_id: &str,
+    ) -> sqlx::Result<()> {
+        sqlx::query(
+            "UPDATE concierge_session_channel SET is_active = 0 WHERE provider = ?1 AND external_id = ?2",
+        )
+        .bind(provider)
+        .bind(external_id)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "UPDATE concierge_session_channel SET is_active = 1 WHERE provider = ?1 AND external_id = ?2 AND session_id = ?3",
+        )
+        .bind(provider)
+        .bind(external_id)
+        .bind(target_session_id)
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn delete_by_id(pool: &SqlitePool, id: &str) -> sqlx::Result<u64> {

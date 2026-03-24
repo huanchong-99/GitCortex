@@ -227,6 +227,26 @@ impl FeishuService {
             return Self::handle_unbind_inner(&msg, pool, messenger).await;
         }
 
+        // Session management commands
+        if text.eq_ignore_ascii_case("/help") {
+            return Self::handle_help(&msg, messenger).await;
+        }
+        if text.eq_ignore_ascii_case("/list") {
+            return Self::handle_list_sessions(&msg, pool, messenger).await;
+        }
+        if text.eq_ignore_ascii_case("/current") {
+            return Self::handle_current_session(&msg, pool, messenger).await;
+        }
+        if let Some(name) = text.strip_prefix("/new ").map(str::trim) {
+            return Self::handle_new_session(&msg, name, pool, messenger, shared_config).await;
+        }
+        if text.eq_ignore_ascii_case("/new") {
+            return Self::handle_new_session(&msg, "New Session", pool, messenger, shared_config).await;
+        }
+        if let Some(num_str) = text.strip_prefix("/switch ").map(str::trim) {
+            return Self::handle_switch_session(&msg, num_str, pool, messenger).await;
+        }
+
         // If Concierge Agent is available, route through it
         if let Some(concierge) = concierge_agent {
             return Self::handle_via_concierge(&msg, text, pool, messenger, concierge, shared_config).await;
@@ -301,18 +321,24 @@ impl FeishuService {
                     display_name = %models[0].display_name,
                     "Auto-selected single available model for Concierge"
                 );
-                // Fall through to process the message normally
+                // Send welcome on first connection, then fall through to process the message
+                let welcome = format!(
+                    "🤖 已自动选择 {}。\n\n{}",
+                    models[0].display_name,
+                    Self::build_help_text()
+                );
+                messenger.reply_text(&msg.message_id, &welcome).await?;
             } else {
                 // Multiple models — check if user is replying with a selection number
                 if let Some(idx) = Self::parse_model_selection(text, models.len()) {
                     Self::apply_model_to_session(&mut session, &models[idx]);
                     Self::persist_session_llm(pool, &session).await?;
-                    messenger
-                        .reply_text(
-                            &msg.message_id,
-                            &format!("已选择 {} ，现在可以开始对话了！", models[idx].display_name),
-                        )
-                        .await?;
+                    let welcome = format!(
+                        "✅ 已选择 {}，开始对话吧！\n\n{}",
+                        models[idx].display_name,
+                        Self::build_help_text()
+                    );
+                    messenger.reply_text(&msg.message_id, &welcome).await?;
                     return Ok(());
                 }
 
@@ -439,6 +465,157 @@ impl FeishuService {
         } else {
             None
         }
+    }
+
+    // ── Session management command handlers ──
+
+    fn build_help_text() -> String {
+        [
+            "📖 GitCortex 飞书命令指南\n",
+            "💬 会话管理：",
+            "  /new <名称>  — 创建新会话（当前会话自动归档）",
+            "  /list       — 显示所有会话列表",
+            "  /switch <N> — 切换到第N个会话",
+            "  /current    — 显示当前会话信息",
+            "",
+            "🔗 工作流绑定：",
+            "  /bind <ID>  — 绑定到指定工作流",
+            "  /unbind     — 解除工作流绑定",
+            "",
+            "ℹ️ 其他：",
+            "  /help       — 显示此帮助信息",
+            "",
+            "直接发送消息即可与 AI 助手对话，AI 可以帮你创建项目、规划任务、监控工作流进度。",
+        ]
+        .join("\n")
+    }
+
+    async fn handle_help(
+        msg: &ReceivedMessage,
+        messenger: &Arc<FeishuMessenger>,
+    ) -> Result<()> {
+        messenger.reply_text(&msg.message_id, &Self::build_help_text()).await?;
+        Ok(())
+    }
+
+    async fn handle_list_sessions(
+        msg: &ReceivedMessage,
+        pool: &SqlitePool,
+        messenger: &Arc<FeishuMessenger>,
+    ) -> Result<()> {
+        use db::models::concierge::ConciergeSession;
+
+        let sessions = ConciergeSession::find_all_by_channel(pool, FEISHU_PROVIDER, &msg.chat_id).await?;
+        if sessions.is_empty() {
+            messenger.reply_text(&msg.message_id, "暂无会话。发送任意消息开始新对话。").await?;
+            return Ok(());
+        }
+
+        let active = ConciergeSession::find_by_channel(pool, FEISHU_PROVIDER, &msg.chat_id).await?;
+        let active_id = active.map(|s| s.id);
+
+        let mut lines = vec!["📋 会话列表：\n".to_string()];
+        for (i, session) in sessions.iter().enumerate() {
+            let marker = if Some(&session.id) == active_id.as_ref() { "👉 " } else { "   " };
+            let name = if session.name.is_empty() { &session.id[..8] } else { &session.name };
+            lines.push(format!("{}{}. {}", marker, i + 1, name));
+        }
+        lines.push("\n使用 /switch <编号> 切换会话".to_string());
+
+        messenger.reply_text(&msg.message_id, &lines.join("\n")).await?;
+        Ok(())
+    }
+
+    async fn handle_current_session(
+        msg: &ReceivedMessage,
+        pool: &SqlitePool,
+        messenger: &Arc<FeishuMessenger>,
+    ) -> Result<()> {
+        use db::models::concierge::ConciergeSession;
+
+        let session = ConciergeSession::find_by_channel(pool, FEISHU_PROVIDER, &msg.chat_id).await?;
+        match session {
+            Some(s) => {
+                let name = if s.name.is_empty() { s.id[..8].to_string() } else { s.name.clone() };
+                let wf = s.active_workflow_id.as_deref().unwrap_or("无");
+                let text = format!("📌 当前会话：{}\n🔗 工作流：{}\n🤖 模型：{}", name, wf, s.llm_model_id.as_deref().unwrap_or("未配置"));
+                messenger.reply_text(&msg.message_id, &text).await?;
+            }
+            None => {
+                messenger.reply_text(&msg.message_id, "当前没有活跃会话。发送任意消息开始新对话。").await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_new_session(
+        msg: &ReceivedMessage,
+        name: &str,
+        pool: &SqlitePool,
+        messenger: &Arc<FeishuMessenger>,
+        shared_config: Option<&Arc<tokio::sync::RwLock<super::config::Config>>>,
+    ) -> Result<()> {
+        use db::models::concierge::{ConciergeSession, ConciergeSessionChannel};
+
+        // Deactivate current channel binding
+        ConciergeSessionChannel::deactivate(pool, FEISHU_PROVIDER, &msg.chat_id).await?;
+
+        // Create new session
+        let mut new_session = ConciergeSession::new(name);
+        new_session.feishu_sync = true;
+
+        // Auto-apply model if only one available
+        if let Ok(models) = Self::get_available_models(shared_config).await {
+            if models.len() == 1 {
+                Self::apply_model_to_session(&mut new_session, &models[0]);
+            }
+        }
+
+        ConciergeSession::insert(pool, &new_session).await?;
+        ConciergeSessionChannel::upsert(
+            pool,
+            &new_session.id,
+            FEISHU_PROVIDER,
+            &msg.chat_id,
+            Some(&msg.sender_open_id),
+        ).await?;
+
+        tracing::info!(session_id = %new_session.id, name = %name, "Created new session via /new command");
+
+        let reply = if new_session.llm_api_key_encrypted.is_some() {
+            format!("✅ 已创建新会话「{}」，可以开始对话了！", name)
+        } else {
+            format!("✅ 已创建新会话「{}」。请选择模型后开始对话。", name)
+        };
+        messenger.reply_text(&msg.message_id, &reply).await?;
+        Ok(())
+    }
+
+    async fn handle_switch_session(
+        msg: &ReceivedMessage,
+        num_str: &str,
+        pool: &SqlitePool,
+        messenger: &Arc<FeishuMessenger>,
+    ) -> Result<()> {
+        use db::models::concierge::{ConciergeSession, ConciergeSessionChannel};
+
+        let sessions = ConciergeSession::find_all_by_channel(pool, FEISHU_PROVIDER, &msg.chat_id).await?;
+        let idx: usize = match num_str.trim().parse::<usize>() {
+            Ok(n) if n >= 1 && n <= sessions.len() => n - 1,
+            _ => {
+                messenger.reply_text(&msg.message_id, &format!("请输入 1-{} 之间的数字。使用 /list 查看会话列表。", sessions.len())).await?;
+                return Ok(());
+            }
+        };
+
+        let target = &sessions[idx];
+        ConciergeSessionChannel::switch_active_session(
+            pool, FEISHU_PROVIDER, &msg.chat_id, &target.id,
+        ).await?;
+
+        let name = if target.name.is_empty() { &target.id[..8] } else { &target.name };
+        messenger.reply_text(&msg.message_id, &format!("🔄 已切换到会话「{}」", name)).await?;
+        Ok(())
     }
 
     /// `/bind <workflow_id>` -- create or update a conversation binding.
