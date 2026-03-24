@@ -69,11 +69,14 @@ export function WorkspacesSidebarContainer() {
     return [...draftWorkspaces, ...activeWorkspaces];
   }, [planningDrafts, activeWorkspaces]);
 
-  // Route draft clicks to the create page with draftId param
+  // Route clicks based on item type
   const handleSelectWorkspace = useCallback((id: string) => {
     if (id.startsWith('draft-')) {
-      const draftId = id.slice(6); // Remove 'draft-' prefix
+      const draftId = id.slice(6);
       navigate(`/workspaces/create?draftId=${draftId}`);
+    } else if (id.startsWith('concierge-')) {
+      const sessionId = id.slice(10);
+      navigate(`/workspaces/create?conciergeId=${sessionId}`);
     } else {
       selectWorkspace(id);
     }

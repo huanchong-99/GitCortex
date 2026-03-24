@@ -48,6 +48,8 @@ interface ConciergeChatViewProps {
   readonly bottomRef: React.RefObject<HTMLDivElement>;
   readonly activeWorkflowId: string | null;
   readonly workflow: WorkflowDetailDto | null;
+  readonly feishuSync?: boolean;
+  readonly onToggleFeishuSync?: () => void;
 }
 
 function SourceBadge({ provider }: { readonly provider: string | null }) {
@@ -199,6 +201,8 @@ export function ConciergeChatView({
   bottomRef,
   activeWorkflowId,
   workflow,
+  feishuSync = false,
+  onToggleFeishuSync,
 }: ConciergeChatViewProps) {
   return (
     <div className="flex h-full flex-col bg-primary font-ibm-plex-sans">
@@ -212,6 +216,21 @@ export function ConciergeChatView({
           >
             <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" /><span>查看工作流进度</span>
           </a>
+        )}
+        {onToggleFeishuSync && (
+          <button
+            type="button"
+            onClick={onToggleFeishuSync}
+            className={`flex items-center gap-1 rounded px-half py-px text-xs transition-colors ${
+              feishuSync
+                ? 'bg-brand/20 text-brand hover:bg-brand/30'
+                : 'bg-secondary text-low hover:text-normal'
+            }`}
+            title={feishuSync ? '飞书同步已开启' : '飞书同步已关闭'}
+          >
+            <span className={`inline-block size-1.5 rounded-full ${feishuSync ? 'bg-brand' : 'bg-secondary'}`} />
+            飞书同步
+          </button>
         )}
         <div className="relative ml-auto">
           <button

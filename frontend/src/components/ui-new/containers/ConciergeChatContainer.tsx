@@ -5,6 +5,7 @@ import {
   useSendConciergeMessage,
   useCreateConciergeSession,
   useConciergeSessions,
+  useUpdateConciergeSettings,
   conciergeKeys,
 } from '@/hooks/useConcierge';
 import { useConciergeWsStore } from '@/stores/conciergeWsStore';
@@ -120,6 +121,16 @@ export function ConciergeChatContainer({
 
   // Find active session name
   const activeSession = sessions?.find((s) => s.id === activeSessionId);
+
+  // Feishu sync toggle
+  const updateSettings = useUpdateConciergeSettings();
+  const handleToggleFeishuSync = useCallback(() => {
+    if (!activeSessionId || !activeSession) return;
+    updateSettings.mutate({
+      sessionId: activeSessionId,
+      data: { feishuSync: !activeSession.feishuSync },
+    });
+  }, [activeSessionId, activeSession, updateSettings]);
   const activeWorkflowId = activeSession?.activeWorkflowId ?? null;
   const { data: workflow } = useWorkflow(activeWorkflowId ?? '');
   useWorkflowInvalidation(activeWorkflowId ?? undefined);
@@ -142,6 +153,8 @@ export function ConciergeChatContainer({
       bottomRef={bottomRef}
       activeWorkflowId={activeSession?.activeWorkflowId ?? null}
       workflow={workflow ?? null}
+      feishuSync={activeSession?.feishuSync ?? false}
+      onToggleFeishuSync={handleToggleFeishuSync}
     />
   );
 }

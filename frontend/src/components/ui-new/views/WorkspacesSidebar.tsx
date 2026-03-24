@@ -2,7 +2,6 @@ import {
   PlusIcon,
   ArrowLeftIcon,
   ArchiveIcon,
-  ChatCircleIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { Workspace } from '@/components/ui-new/hooks/useWorkspaces';
@@ -150,26 +149,16 @@ export function WorkspacesSidebar({
                 onClick={() => onSelectWorkspace(workspace.id)}
               />
             ))}
-            {/* Concierge sessions inline with active workspaces */}
+            {/* Concierge sessions (Feishu/chat) inline with workspaces */}
             {conciergeSessions.map((session) => (
-              <a
+              <WorkspaceSummary
                 key={`concierge-${session.id}`}
-                href={`/workspaces/create?conciergeId=${session.id}`}
-                className="flex items-center gap-half rounded bg-secondary/50 px-base py-half text-sm text-normal hover:bg-secondary hover:text-high transition-colors"
-              >
-                <ChatCircleIcon
-                  className="size-icon-xs text-brand shrink-0"
-                  weight="fill"
-                />
-                <span className="truncate">
-                  {session.name || session.id.slice(0, 8)}
-                </span>
-                {session.activeWorkflowId && (
-                  <span className="ml-auto shrink-0 rounded-full bg-success/20 px-1 py-px text-xs text-success">
-                    running
-                  </span>
-                )}
-              </a>
+                name={`${session.feishuSync ? '🔗 ' : ''}${session.name || session.id.slice(0, 8)}`}
+                workspaceId={`concierge-${session.id}`}
+                isActive={false}
+                isRunning={!!session.activeWorkflowId}
+                onClick={() => onSelectWorkspace(`concierge-${session.id}`)}
+              />
             ))}
           </div>
         )}
