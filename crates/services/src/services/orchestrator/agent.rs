@@ -627,6 +627,14 @@ impl OrchestratorAgent {
                             "Failed while auto-completing stalled tasks"
                         );
                     }
+                    // Check if workflow can be marked as completed
+                    if let Err(error) = self.auto_sync_workflow_completion(&workflow_id).await {
+                        tracing::warn!(
+                            workflow_id = %workflow_id,
+                            error = %error,
+                            "Failed while syncing workflow completion"
+                        );
+                    }
                 }
             }
         }
