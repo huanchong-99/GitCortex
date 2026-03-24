@@ -2060,8 +2060,10 @@ mod orchestrator_tests {
             task_id
         );
 
+        // execute_instruction logs errors internally but returns Ok (batch continuation).
+        // Verify the failure through side effects instead.
         let result = agent.execute_instruction(&instruction_json).await;
-        assert!(result.is_err(), "StartTask should fail without PTY");
+        assert!(result.is_ok(), "execute_instruction should return Ok (errors are handled internally)");
 
         let terminal = Terminal::find_by_id(&db.pool, &terminal_id)
             .await

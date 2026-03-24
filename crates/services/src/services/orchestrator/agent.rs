@@ -762,10 +762,6 @@ impl OrchestratorAgent {
         &self,
         tracker: &mut StallRecoveryTracker,
     ) -> anyhow::Result<()> {
-        // Auto-complete tasks where all terminals are done but task is still running.
-        // This handles the case where the Agent LLM fails to emit complete_task.
-        self.auto_complete_stalled_tasks().await?;
-
         let workflow_id = {
             let state = self.state.read().await;
             if state.run_state != OrchestratorRunState::Idle {
