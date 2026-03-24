@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkflow, workflowKeys } from '@/hooks/useWorkflows';
 import { makeRequest, handleApiResponse } from '@/lib/api';
@@ -30,9 +30,7 @@ const MAX_EVENTS = 50;
  */
 export function useWorkflowLiveStatus(workflowId: string | null) {
   const queryClient = useQueryClient();
-  const eventsRef = useRef<LiveEvent[]>([]);
-  // Force re-render counter — incremented when eventsRef changes
-  const renderTickRef = useRef(0);
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
 
   const {
     data: workflow,
@@ -65,9 +63,7 @@ export function useWorkflowLiveStatus(workflowId: string | null) {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         timestamp: new Date().toISOString(),
       };
-      const next = [entry, ...eventsRef.current].slice(0, MAX_EVENTS);
-      eventsRef.current = next;
-      renderTickRef.current += 1;
+      setLiveEvents((prev) => [entry, ...prev].slice(0, MAX_EVENTS));
     },
     [],
   );
@@ -118,9 +114,7 @@ export function useWorkflowLiveStatus(workflowId: string | null) {
 
   const workflowStatus = workflow?.status ?? null;
   const tasks = workflow?.tasks ?? [];
-  // Read from ref + renderTick to get latest events while keeping a stable reference shape
-  const _tick = renderTickRef.current;
-  void _tick;
+  // liveEventCount triggers re-render when new WS events arrive
 
   // Fetch persisted events from backend
   const { data: persistedEvents } = useQuery({
@@ -142,13 +136,13 @@ export function useWorkflowLiveStatus(workflowId: string | null) {
       summary: e.summary,
     }));
     // Live events take priority (newest first)
-    if (eventsRef.current.length > 0) {
-      const liveIds = new Set(eventsRef.current.map((e) => e.id));
-      const merged = [...eventsRef.current, ...historical.filter((e) => !liveIds.has(e.id))];
+    if (liveEvents.length > 0) {
+      const liveIds = new Set(liveEvents.map((e) => e.id));
+      const merged = [...liveEvents, ...historical.filter((e) => !liveIds.has(e.id))];
       return merged.slice(0, MAX_EVENTS);
     }
     return historical;
-  }, [persistedEvents, _tick]);
+  }, [persistedEvents, liveEvents]);
 
   return {
     workflowStatus,

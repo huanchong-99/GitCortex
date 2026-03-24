@@ -105,7 +105,7 @@ export function CreateChatBoxContainer() {
     } else if (planningDraft && !planningDraft.materializedWorkflowId) {
       setMaterializedWorkflowId(null);
     }
-  }, [planningDraft?.materializedWorkflowId, planningDraft?.id]);
+  }, [planningDraft]);
 
   // Attachment handling
   const handleInsertMarkdown = useCallback(
