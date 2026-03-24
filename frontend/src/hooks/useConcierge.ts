@@ -21,6 +21,7 @@ export function useConciergeSessions() {
   return useQuery({
     queryKey: conciergeKeys.sessions(),
     queryFn: () => conciergeApi.listSessions(),
+    refetchInterval: 10_000, // Poll every 10s to pick up Feishu-created sessions
   });
 }
 
