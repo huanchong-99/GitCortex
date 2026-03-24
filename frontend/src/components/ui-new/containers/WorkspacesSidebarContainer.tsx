@@ -9,10 +9,9 @@ import {
   usePersistedExpanded,
 } from '@/stores/useUiPreferencesStore';
 import { WorkspacesSidebar } from '@/components/ui-new/views/WorkspacesSidebar';
-import { useConciergeSessions } from '@/hooks/useConcierge';
+import { useConciergeSessions, conciergeKeys } from '@/hooks/useConcierge';
 import { useQueryClient } from '@tanstack/react-query';
 import { conciergeApi } from '@/lib/conciergeApi';
-import { conciergeKeys } from '@/hooks/useConcierge';
 import { usePlanningDrafts } from '@/hooks/usePlanningDraft';
 import type { Workspace } from '@/components/ui-new/hooks/useWorkspaces';
 
@@ -107,7 +106,6 @@ export function WorkspacesSidebarContainer() {
       await conciergeApi.deleteSession(sessionId);
       queryClient.invalidateQueries({ queryKey: conciergeKeys.sessions() });
     }
-    // TODO: draft deletion if needed
   }, [queryClient]);
 
   return (
