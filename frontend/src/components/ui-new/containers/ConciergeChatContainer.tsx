@@ -135,10 +135,23 @@ export function ConciergeChatContainer({
   const updateSettings = useUpdateConciergeSettings();
   const handleToggleFeishuSync = useCallback(() => {
     if (!activeSessionId || !activeSession) return;
-    updateSettings.mutate({
-      sessionId: activeSessionId,
-      data: { feishuSync: !activeSession.feishuSync },
-    });
+    const currentlyOn = activeSession.feishuSync;
+    if (currentlyOn) {
+      // Turning off — just disable
+      updateSettings.mutate({
+        sessionId: activeSessionId,
+        data: { feishuSync: false },
+      });
+    } else {
+      // Turning on — ask about history sync
+      const syncHistory = globalThis.confirm(
+        '是否同步历史消息到飞书？\n\n选择「确定」将把之前的对话记录全量发送到飞书。\n选择「取消」则仅同步后续新消息。'
+      );
+      updateSettings.mutate({
+        sessionId: activeSessionId,
+        data: { feishuSync: true, syncHistory },
+      });
+    }
   }, [activeSessionId, activeSession, updateSettings]);
   const activeWorkflowId = activeSession?.activeWorkflowId ?? null;
   const { data: workflow } = useWorkflow(activeWorkflowId ?? '');

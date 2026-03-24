@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use services::services::concierge::ConciergeAgent;
 use utils::response::ApiResponse;
 
-use crate::{DeploymentImpl, error::ApiError};
+use crate::{DeploymentImpl, error::ApiError, feishu_handle::SharedFeishuHandle};
 
 pub type SharedConciergeAgent = Arc<ConciergeAgent>;
 
@@ -72,6 +72,7 @@ pub struct AddChannelRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSettingsRequest {
     pub feishu_sync: Option<bool>,
+    pub sync_history: Option<bool>,
     pub progress_notifications: Option<bool>,
     pub sync_tools: Option<bool>,
     pub sync_terminal: Option<bool>,
@@ -244,11 +245,12 @@ async fn remove_channel(
 
 async fn update_settings(
     State(deployment): State<DeploymentImpl>,
+    Extension(feishu_handle): Extension<SharedFeishuHandle>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateSettingsRequest>,
 ) -> Result<ResponseJson<ApiResponse<ConciergeSession>>, ApiError> {
     let pool = &deployment.db().pool;
-    let _session = ConciergeSession::find_by_id(pool, &id)
+    let session = ConciergeSession::find_by_id(pool, &id)
         .await
         .map_err(|e| ApiError::Internal(format!("{e}")))?
         .ok_or_else(|| ApiError::NotFound("Session not found".to_string()))?;
@@ -257,6 +259,82 @@ async fn update_settings(
         ConciergeSession::update_feishu_sync(pool, &id, feishu_sync)
             .await
             .map_err(|e| ApiError::Internal(format!("{e}")))?;
+
+        // When enabling feishu sync with sync_history, push existing messages to Feishu
+        if feishu_sync && payload.sync_history.unwrap_or(false) {
+            let handle_guard = feishu_handle.read().await;
+            if let Some(ref h) = *handle_guard {
+                if *h.connected.read().await {
+                    let messenger = h.messenger.clone();
+                    // Resolve chat_id from last received message or DB binding
+                    let last_id = h.last_chat_id.try_read().ok().and_then(|g| g.clone());
+                    drop(handle_guard);
+
+                    let chat_id = if let Some(cid) = last_id {
+                        Some(cid)
+                    } else {
+                        db::models::ExternalConversationBinding::find_latest_active(
+                            pool, "feishu",
+                        )
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(|b| b.conversation_id)
+                    };
+
+                    if let Some(chat_id) = chat_id {
+                        let messages = ConciergeMessage::list_by_session(pool, &id)
+                            .await
+                            .unwrap_or_default();
+                        let session_name = session.name.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = messenger
+                                .send_text(
+                                    &chat_id,
+                                    &format!(
+                                        "[Concierge: {}] Syncing conversation history...",
+                                        session_name
+                                    ),
+                                )
+                                .await
+                            {
+                                tracing::warn!("Failed to send Feishu history header: {e}");
+                                return;
+                            }
+                            for msg in &messages {
+                                let prefix = match msg.role.as_str() {
+                                    "user" => "[User]",
+                                    "assistant" => "[Assistant]",
+                                    "tool_call" => "[Tool Call]",
+                                    "tool_result" => "[Tool Result]",
+                                    _ => "[System]",
+                                };
+                                let text = format!("{prefix} {}", msg.content);
+                                let truncated = if text.len() > 4000 {
+                                    format!("{}...(truncated)", &text[..4000])
+                                } else {
+                                    text
+                                };
+                                if let Err(e) =
+                                    messenger.send_text(&chat_id, &truncated).await
+                                {
+                                    tracing::warn!(
+                                        "Failed to push concierge message to Feishu: {e}"
+                                    );
+                                    break;
+                                }
+                            }
+                            tracing::info!(
+                                "Feishu history sync complete: {} messages sent",
+                                messages.len()
+                            );
+                        });
+                    }
+                } else {
+                    drop(handle_guard);
+                }
+            }
+        }
     }
     if let Some(progress) = payload.progress_notifications {
         ConciergeSession::update_progress_notifications(pool, &id, progress)

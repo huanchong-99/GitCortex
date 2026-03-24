@@ -47,6 +47,7 @@ export interface SendMessageRequest {
 
 export interface UpdateSettingsRequest {
   feishuSync?: boolean;
+  syncHistory?: boolean;
   progressNotifications?: boolean;
   syncTools?: boolean;
   syncTerminal?: boolean;
