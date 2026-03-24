@@ -5,6 +5,7 @@ import { useCreateMode } from '@/contexts/CreateModeContext';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useCreateAttachments } from '@/hooks/useCreateAttachments';
 import { WorkflowProgressContainer } from './WorkflowProgressContainer';
+import { useWorkflow } from '@/hooks/useWorkflows';
 import { getVariantOptions, areProfilesEqual } from '@/utils/executor';
 import type { ExecutorProfileId, BaseCodingAgent } from 'shared/types';
 import type { ModelConfig as WorkflowModelConfig } from '@/components/workflow/types';
@@ -21,6 +22,24 @@ import {
   useMaterializeDraft,
 } from '@/hooks/usePlanningDraft';
 import { CreateChatBox } from '../primitives/CreateChatBox';
+
+function WorkflowStatusBadge({ workflowId }: Readonly<{ workflowId: string | null }>) {
+  const { data: workflow } = useWorkflow(workflowId ?? '');
+  const status = workflow?.status ?? 'running';
+  const isCompleted = status === 'completed';
+  const isFailed = status === 'failed';
+  const colorClass = isCompleted
+    ? 'bg-success/10 text-success'
+    : isFailed
+      ? 'bg-error/10 text-error'
+      : 'bg-brand/10 text-brand animate-pulse';
+  const label = isCompleted ? 'Completed' : isFailed ? 'Failed' : 'Running';
+  return (
+    <span className={`ml-auto text-xs px-1 py-px rounded ${colorClass}`}>
+      {label}
+    </span>
+  );
+}
 
 export function CreateChatBoxContainer() {
   const { t } = useTranslation('common');
@@ -355,11 +374,7 @@ export function CreateChatBoxContainer() {
                 {materializeMutation.isPending ? '...' : tTasks('conversation.planning.materializeButton')}
               </button>
             )}
-            {isMaterialized && (
-              <span className="ml-auto text-xs px-1 py-px rounded bg-success/10 text-success">
-                Running
-              </span>
-            )}
+            {isMaterialized && <WorkflowStatusBadge workflowId={materializedWorkflowId} />}
           </div>
 
           {/* Scrollable message list */}
