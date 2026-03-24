@@ -34,6 +34,7 @@ export function CreateChatBoxContainer() {
     message,
     setMessage,
     selectedProjectId,
+    setSelectedProjectId,
     clearDraft: clearCreateDraft,
     hasInitialValue,
   } = useCreateMode();
@@ -70,6 +71,13 @@ export function CreateChatBoxContainer() {
   const materializeMutation = useMaterializeDraft();
 
   const planningMessages = serverMessages ?? localMessages;
+
+  // Sync right sidebar project when a draft is loaded from the sidebar
+  useEffect(() => {
+    if (planningDraft?.projectId && planningDraft.projectId !== selectedProjectId) {
+      setSelectedProjectId(planningDraft.projectId);
+    }
+  }, [planningDraft?.projectId, selectedProjectId, setSelectedProjectId]);
 
   // Attachment handling
   const handleInsertMarkdown = useCallback(
