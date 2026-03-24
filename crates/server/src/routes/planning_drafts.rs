@@ -139,15 +139,17 @@ async fn list_drafts(
     State(deployment): State<DeploymentImpl>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<ResponseJson<ApiResponse<Vec<DraftResponse>>>, ApiError> {
-    let project_id_str = params
-        .get("project_id")
-        .ok_or_else(|| ApiError::BadRequest("project_id is required".to_string()))?;
-    let project_id = Uuid::parse_str(project_id_str)
-        .map_err(|_| ApiError::BadRequest("project_id must be a valid UUID".to_string()))?;
-
-    let drafts = PlanningDraft::find_by_project(&deployment.db().pool, project_id)
-        .await
-        .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?;
+    let drafts = if let Some(project_id_str) = params.get("project_id") {
+        let project_id = Uuid::parse_str(project_id_str)
+            .map_err(|_| ApiError::BadRequest("project_id must be a valid UUID".to_string()))?;
+        PlanningDraft::find_by_project(&deployment.db().pool, project_id)
+            .await
+            .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?
+    } else {
+        PlanningDraft::find_all(&deployment.db().pool)
+            .await
+            .map_err(|e| ApiError::Internal(format!("Database error: {e}")))?
+    };
 
     let dtos: Vec<DraftResponse> = drafts.into_iter().map(DraftResponse::from).collect();
     Ok(Json(ApiResponse::success(dtos)))

@@ -180,6 +180,14 @@ impl PlanningDraft {
         .await
     }
 
+    pub async fn find_all(pool: &SqlitePool) -> sqlx::Result<Vec<Self>> {
+        sqlx::query_as::<_, Self>(
+            "SELECT * FROM planning_draft ORDER BY created_at DESC",
+        )
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn find_by_project(pool: &SqlitePool, project_id: Uuid) -> sqlx::Result<Vec<Self>> {
         sqlx::query_as::<_, Self>(
             "SELECT * FROM planning_draft WHERE project_id = ?1 ORDER BY created_at DESC",
