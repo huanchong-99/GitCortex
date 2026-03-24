@@ -164,7 +164,7 @@ mod orchestrator_tests {
         assert_eq!(config.base_url, "https://api.openai.com/v1");
         assert_eq!(config.model, "gpt-4o");
         assert_eq!(config.max_retries, 3);
-        assert_eq!(config.timeout_secs, 120);
+        assert_eq!(config.timeout_secs, 300);
         assert!(!config.system_prompt.is_empty());
     }
 
