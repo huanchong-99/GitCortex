@@ -98,12 +98,14 @@ export function CreateChatBoxContainer() {
     }
   }, [planningDraft?.projectId, selectedProjectId, setSelectedProjectId]);
 
-  // Restore materializedWorkflowId from draft data (survives navigation)
+  // Sync materializedWorkflowId from draft data when switching drafts
   useEffect(() => {
-    if (planningDraft?.materializedWorkflowId && !materializedWorkflowId) {
+    if (planningDraft?.materializedWorkflowId) {
       setMaterializedWorkflowId(planningDraft.materializedWorkflowId);
+    } else if (planningDraft && !planningDraft.materializedWorkflowId) {
+      setMaterializedWorkflowId(null);
     }
-  }, [planningDraft?.materializedWorkflowId, materializedWorkflowId]);
+  }, [planningDraft?.materializedWorkflowId, planningDraft?.id]);
 
   // Attachment handling
   const handleInsertMarkdown = useCallback(
