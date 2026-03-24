@@ -14,7 +14,7 @@ export const conciergeKeys = {
   session: (sessionId: string) => ['concierge', 'sessions', sessionId] as const,
   messages: (sessionId: string) =>
     ['concierge', 'sessions', sessionId, 'messages'] as const,
-  feishuChannel: () => [...['concierge'], 'feishu-channel'] as const,
+  feishuChannel: () => ['concierge', 'feishu-channel'] as const,
 };
 
 /** List all concierge sessions */
