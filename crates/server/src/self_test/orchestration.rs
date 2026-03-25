@@ -77,11 +77,11 @@ pub async fn run_orchestration_tests(
         return results;
     }
 
-    // Test 2: Create model config for GLM-5
+    // Test 2: Configure model credentials for GLM-5
     let start = Instant::now();
-    let model_config_id = test_create_model_config(&client, &api).await;
+    let model_config_id = test_configure_model(&client, &api).await;
     results.push(TestResult {
-        name: "create_model_config".to_string(),
+        name: "configure_model".to_string(),
         group: "orchestration".to_string(),
         passed: model_config_id.is_ok(),
         duration_ms: start.elapsed().as_millis() as u64,
@@ -235,19 +235,19 @@ async fn test_cli_installed() -> Result<(), String> {
     Ok(())
 }
 
-async fn test_create_model_config(
+async fn test_configure_model(
     client: &reqwest::Client,
     api: &dyn Fn(&str) -> String,
 ) -> Result<String, String> {
-    let model_id = format!("e2e-glm5-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("test"));
+    // Use the pre-seeded model-claude-sonnet and update its credentials
+    // to point to ZhipuAI GLM-5 endpoint
+    let model_id = "model-claude-sonnet";
 
-    // Use the cli_types model creation endpoint
     let resp = client
         .put(api(&format!(
             "/cli_types/cli-claude-code/models/{model_id}/credentials"
         )))
         .json(&json!({
-            "displayName": "E2E GLM-5",
             "apiModelId": e2e_model(),
             "baseUrl": e2e_base_url(),
             "apiKey": e2e_api_key(),
@@ -255,20 +255,20 @@ async fn test_create_model_config(
         }))
         .send()
         .await
-        .map_err(|e| format!("Failed to create model config: {e}"))?;
+        .map_err(|e| format!("Failed to update model credentials: {e}"))?;
 
     let status = resp.status().as_u16();
     let body = resp.text().await.unwrap_or_default();
 
     if status >= 400 {
         return Err(format!(
-            "Create model config returned {status}: {}",
+            "Update model credentials returned {status}: {}",
             &body[..body.len().min(300)]
         ));
     }
 
-    eprintln!("  Created model config: {model_id}");
-    Ok(model_id)
+    eprintln!("  Configured model {model_id} with GLM-5 credentials");
+    Ok(model_id.to_string())
 }
 
 async fn setup_git_repo(repo_path: &Path) -> Result<(), String> {
