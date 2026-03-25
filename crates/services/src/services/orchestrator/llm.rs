@@ -646,7 +646,7 @@ mod anthropic_protocol_tests {
     #[test]
     fn test_unknown_type_with_anthropic_url_autodetects() {
         let config = OrchestratorConfig {
-            api_type: "".to_string(),
+            api_type: String::new(),
             base_url: "https://proxy.example.com/anthropic/v1".to_string(),
             api_key: "test-key".to_string(),
             model: "test".to_string(),
@@ -658,7 +658,7 @@ mod anthropic_protocol_tests {
     #[test]
     fn test_unknown_type_without_anthropic_url() {
         let config = OrchestratorConfig {
-            api_type: "".to_string(),
+            api_type: String::new(),
             base_url: "https://api.openai.com/v1".to_string(),
             api_key: "test-key".to_string(),
             model: "gpt-4".to_string(),
