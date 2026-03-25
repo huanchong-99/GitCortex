@@ -39,6 +39,7 @@ pub mod feishu_handle;
 pub mod mcp;
 pub mod middleware;
 pub mod routes;
+pub mod self_test;
 
 #[cfg(test)]
 pub mod tests;

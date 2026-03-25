@@ -12,6 +12,7 @@
 use std::sync::Arc;
 
 use anyhow::{self, Error as AnyhowError};
+use clap::{Parser, Subcommand};
 use deployment::{Deployment, DeploymentError};
 use server::{
     DeploymentImpl, routes,
@@ -29,6 +30,26 @@ use utils::{
     port_file::write_port_file,
     sentry::{self as sentry_utils, SentrySource, sentry_layer},
 };
+
+#[derive(Parser)]
+#[command(name = "gitcortex-server", about = "GitCortex Server")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run headless API self-test (full coverage, ~164 tests)
+    SelfTest {
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
+        /// Run only specific test groups (comma-separated, e.g. "infra,config,projects")
+        #[arg(long)]
+        filter: Option<String>,
+    },
+}
 
 const DEV_DEFAULT_ENCRYPTION_KEY: &str = "12345678901234567890123456789012";
 
@@ -113,6 +134,18 @@ pub enum GitCortexError {
 
 #[tokio::main]
 async fn main() -> Result<(), GitCortexError> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::SelfTest { json, filter }) => {
+            let exit_code = server::self_test::run(json, filter).await;
+            std::process::exit(exit_code);
+        }
+        None => run_server().await,
+    }
+}
+
+async fn run_server() -> Result<(), GitCortexError> {
     // Load environment variables from .env file
     dotenv::dotenv().ok();
     ensure_dev_encryption_key();
@@ -280,7 +313,10 @@ async fn main() -> Result<(), GitCortexError> {
 
     tracing::info!("Server running on http://{host}:{actual_port}");
 
-    if !cfg!(debug_assertions) && !std::path::Path::new("/.dockerenv").exists() {
+    if !cfg!(debug_assertions)
+        && !std::path::Path::new("/.dockerenv").exists()
+        && std::env::var("GITCORTEX_NO_BROWSER").is_err()
+    {
         tracing::info!("Opening browser...");
         tokio::spawn(async move {
             if let Err(e) = open_browser(&format!("http://127.0.0.1:{actual_port}")) {

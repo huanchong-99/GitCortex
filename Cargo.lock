@@ -6506,6 +6506,7 @@ dependencies = [
  "axum 0.8.7",
  "base64 0.21.7",
  "chrono",
+ "clap",
  "criterion",
  "db",
  "deployment",

@@ -90,6 +90,9 @@ Filename: "{app}\scripts\setup-windows.cmd"; Description: "Setup dev environment
 ; Run post-installation self-check
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\scripts\post-install-check.ps1"" -SkipServerTest"; Description: "Run post-installation self-check"; Flags: postinstall skipifsilent unchecked nowait runascurrentuser
 
+; Run self-diagnostic test (headless API test covering all endpoints)
+Filename: "{app}\gitcortex-server.exe"; Parameters: "self-test"; Description: "Run self-diagnostic test (verifies all API endpoints)"; Flags: postinstall skipifsilent unchecked nowait runascurrentuser
+
 ; Open web UI after install
 Filename: "http://127.0.0.1:{#DefaultPort}"; Description: "Open {#MyAppName} in browser"; Flags: shellexec nowait postinstall skipifsilent unchecked
 
