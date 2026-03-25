@@ -275,14 +275,18 @@ async fn verify_openai_model(
         })?;
 
     let status = response.status();
-    if status.is_success() {
-        tracing::info!("Model {} verified successfully", model_id);
-        return Ok(true);
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        tracing::warn!("Model verification failed: {} - {}", status, body);
+        return Ok(false);
     }
 
-    let body = response.text().await.unwrap_or_default();
-    tracing::warn!("Model verification failed: {} - {}", status, body);
-    Ok(false)
+    if !verify_response_body_ok(&response.text().await.unwrap_or_default(), &["choices", "content"], "OpenAI") {
+        return Ok(false);
+    }
+
+    tracing::info!("Model {} verified successfully", model_id);
+    Ok(true)
 }
 
 // ============================================================================
@@ -329,9 +333,39 @@ async fn verify_anthropic_model(
     api_key: &str,
     model_id: &str,
 ) -> Result<bool, ApiError> {
-    // For Anthropic, we verify by checking if the model exists in the list
-    let models = list_anthropic_models(client, base_url, api_key).await?;
-    Ok(models.iter().any(|model| model == model_id))
+    let root = ensure_anthropic_root(base_url);
+    let url = join_url(&root, "messages");
+    tracing::debug!("Verifying Anthropic model {} at: {}", model_id, url);
+
+    let payload = serde_json::json!({
+        "model": model_id,
+        "messages": [{"role": "user", "content": "ping"}],
+        "max_tokens": 1
+    });
+
+    let response = client
+        .post(&url)
+        .header("x-api-key", api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to verify model: {e}")))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        tracing::warn!("Anthropic model verification failed: {} - {}", status, body);
+        return Ok(false);
+    }
+
+    if !verify_response_body_ok(&response.text().await.unwrap_or_default(), &[], "Anthropic") {
+        return Ok(false);
+    }
+
+    tracing::info!("Anthropic model {} verified successfully", model_id);
+    Ok(true)
 }
 
 // ============================================================================
@@ -383,6 +417,27 @@ async fn verify_google_model(
     let models = list_google_models(client, base_url, api_key).await?;
     let target = model_id.trim();
     Ok(models.iter().any(|model| model == target))
+}
+
+// ============================================================================
+// Shared verification helpers
+// ============================================================================
+
+/// Validates that a 200 response body does not contain a top-level "error" key
+/// and (optionally) contains at least one of the `expected_keys`.
+/// Some providers (e.g., BigModel.cn) return HTTP 200 with error payloads.
+fn verify_response_body_ok(body: &str, expected_keys: &[&str], label: &str) -> bool {
+    if let Ok(json) = serde_json::from_str::<Value>(body) {
+        if json.get("error").is_some() {
+            tracing::warn!("{label} verification returned 200 but body contains error: {body}");
+            return false;
+        }
+        if !expected_keys.is_empty() && expected_keys.iter().all(|k| json.get(*k).is_none()) {
+            tracing::warn!("{label} verification returned 200 but body has no {expected_keys:?}: {body}");
+            return false;
+        }
+    }
+    true
 }
 
 // ============================================================================

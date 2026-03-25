@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-import { feishuApi } from '@/lib/api';
+import { feishuApi, makeRequest, handleApiResponse } from '@/lib/api';
 import { SetupWizardStep4Integrations } from './SetupWizardStep4Integrations';
 
 interface SetupWizardStep4IntegrationsContainerProps {
@@ -25,6 +25,13 @@ export function SetupWizardStep4IntegrationsContainer({
 
     try {
       setSaving(true);
+      // Enable Feishu feature flag first (required by config endpoint)
+      const enableResponse = await makeRequest('/api/system-settings', {
+        method: 'PUT',
+        body: JSON.stringify({ feishu_enabled: true }),
+      });
+      await handleApiResponse(enableResponse);
+
       await feishuApi.updateConfig({
         appId: feishuAppId.trim(),
         appSecret: feishuAppSecret.trim(),

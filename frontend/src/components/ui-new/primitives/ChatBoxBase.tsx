@@ -152,7 +152,7 @@ export function ChatBoxBase({
       {/* Header - Stats and selector */}
       {visualVariant === VisualVariant.NORMAL && (
         <div className="flex items-center gap-base bg-secondary px-base py-[9px] @chat:rounded-t-md border-b">
-          <div className="flex flex-1 items-center gap-base text-sm">
+          <div className="flex flex-1 min-w-0 items-center gap-base text-sm">
             {headerLeft}
           </div>
           <Toolbar className="gap-[9px]">{headerRight}</Toolbar>
@@ -178,7 +178,7 @@ export function ChatBoxBase({
 
         {/* Footer - Controls */}
         <div className="flex items-end justify-between">
-          <Toolbar className="flex-1 gap-double">
+          <Toolbar className="flex-1 min-w-0 gap-double">
             {(visualVariant === VisualVariant.NORMAL ||
               visualVariant === VisualVariant.EDIT) &&
               variant &&
@@ -205,7 +205,7 @@ export function ChatBoxBase({
               <SendModeToggle sendOnEnter={sendOnEnter} onToggle={onToggleSendMode} />
             )}
           </Toolbar>
-          <div className="flex gap-base">{footerRight}</div>
+          <div className="flex shrink-0 gap-base">{footerRight}</div>
         </div>
       </div>
     </div>

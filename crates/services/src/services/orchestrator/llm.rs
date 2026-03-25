@@ -415,12 +415,20 @@ impl AnthropicCompatibleClient {
             }
         }
 
+        let msg_count = api_messages.len();
         let request = AnthropicRequest {
             model: self.model.clone(),
             messages: api_messages,
             max_tokens: 2048,
             system: system_prompt,
         };
+
+        tracing::debug!(
+            url = %url,
+            model = %self.model,
+            msg_count = msg_count,
+            "Anthropic-compatible LLM request starting"
+        );
 
         let response = self
             .client
@@ -432,8 +440,13 @@ impl AnthropicCompatibleClient {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        tracing::debug!(
+            status = %status,
+            "Anthropic-compatible LLM response received"
+        );
+
+        if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(anyhow::anyhow!("LLM API error: {status} - {body}"));
         }
@@ -493,11 +506,13 @@ pub fn build_terminal_completion_prompt(
 /// single-provider path is used (fully backward compatible).
 /// Determine whether to use Anthropic protocol based on api_type and base_url.
 fn should_use_anthropic_protocol(config: &OrchestratorConfig) -> bool {
-    if config.api_type == "anthropic" || config.api_type == "anthropic-compatible" {
-        return true;
+    // Explicit api_type takes priority — user knows their endpoint best
+    match config.api_type.as_str() {
+        "anthropic" | "anthropic-compatible" => return true,
+        "openai" | "openai-compatible" | "google" => return false,
+        _ => {}
     }
-    // Auto-detect: if the base URL contains "anthropic" in the path,
-    // the upstream expects Anthropic protocol regardless of api_type label.
+    // Auto-detect only when api_type is not explicitly set
     let url_lower = config.base_url.to_lowercase();
     url_lower.contains("/anthropic")
 }
@@ -597,5 +612,58 @@ mod rate_limit_tests {
 
         let result = client.chat(messages.clone()).await;
         assert!(result.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod anthropic_protocol_tests {
+    use super::*;
+
+    #[test]
+    fn test_explicit_openai_compatible_with_anthropic_url() {
+        let config = OrchestratorConfig {
+            api_type: "openai-compatible".to_string(),
+            base_url: "https://open.bigmodel.cn/api/anthropic".to_string(),
+            api_key: "test-key".to_string(),
+            model: "glm-5".to_string(),
+            ..Default::default()
+        };
+        assert!(!should_use_anthropic_protocol(&config));
+    }
+
+    #[test]
+    fn test_explicit_anthropic_type() {
+        let config = OrchestratorConfig {
+            api_type: "anthropic-compatible".to_string(),
+            base_url: "https://api.anthropic.com".to_string(),
+            api_key: "test-key".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
+            ..Default::default()
+        };
+        assert!(should_use_anthropic_protocol(&config));
+    }
+
+    #[test]
+    fn test_unknown_type_with_anthropic_url_autodetects() {
+        let config = OrchestratorConfig {
+            api_type: "".to_string(),
+            base_url: "https://proxy.example.com/anthropic/v1".to_string(),
+            api_key: "test-key".to_string(),
+            model: "test".to_string(),
+            ..Default::default()
+        };
+        assert!(should_use_anthropic_protocol(&config));
+    }
+
+    #[test]
+    fn test_unknown_type_without_anthropic_url() {
+        let config = OrchestratorConfig {
+            api_type: "".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "test-key".to_string(),
+            model: "gpt-4".to_string(),
+            ..Default::default()
+        };
+        assert!(!should_use_anthropic_protocol(&config));
     }
 }

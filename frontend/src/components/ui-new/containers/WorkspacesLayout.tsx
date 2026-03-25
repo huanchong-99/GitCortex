@@ -159,7 +159,7 @@ export function WorkspacesLayout() {
         sessionId: selectedSessionId,
       }}
     >
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col h-full">
         <NavbarContainer />
         <div className="flex flex-1 min-h-0">
           {isLeftSidebarVisible && (

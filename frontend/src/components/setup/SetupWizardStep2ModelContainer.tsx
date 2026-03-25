@@ -23,7 +23,7 @@ export function SetupWizardStep2ModelContainer({
   onBack,
   onSkip,
 }: Readonly<SetupWizardStep2ModelContainerProps>) {
-  const { updateAndSaveConfig } = useUserSystem();
+  const { config, updateAndSaveConfig } = useUserSystem();
 
   const [displayName, setDisplayName] = useState('');
   const [apiType, setApiType] = useState<string>('anthropic');
@@ -102,6 +102,7 @@ export function SetupWizardStep2ModelContainer({
     const newModel: ModelConfig = {
       id: `model-${crypto.randomUUID()}`,
       displayName: displayName || modelId,
+      cliTypeId: 'cli-claude-code',
       apiType: apiType as ApiType,
       baseUrl: baseUrl || DEFAULT_BASE_URLS[apiType] || '',
       apiKey,
@@ -109,13 +110,16 @@ export function SetupWizardStep2ModelContainer({
       isVerified,
     };
 
-    // Save to workflow_model_library in config
+    // Merge with existing models (do NOT overwrite)
+    const existingModels = (config as Record<string, unknown>)?.workflow_model_library;
+    const currentModels = Array.isArray(existingModels) ? existingModels as ModelConfig[] : [];
     await updateAndSaveConfig({
-      workflow_model_library: [newModel],
+      workflow_model_library: [...currentModels, newModel],
     } as Parameters<typeof updateAndSaveConfig>[0]);
 
     onNext();
   }, [
+    config,
     displayName,
     apiType,
     baseUrl,

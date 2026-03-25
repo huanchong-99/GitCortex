@@ -22,7 +22,7 @@ const isWorkflowModelConfig = (
   return (
     typeof item.id === 'string' &&
     typeof item.displayName === 'string' &&
-    (cliTypeId === undefined || typeof cliTypeId === 'string') &&
+    (cliTypeId == null || typeof cliTypeId === 'string') &&
     typeof item.apiType === 'string' &&
     typeof item.baseUrl === 'string' &&
     typeof item.apiKey === 'string' &&
