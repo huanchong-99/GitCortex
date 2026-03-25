@@ -232,6 +232,16 @@ jobs:
         which claude || where claude || echo "claude not in PATH yet"
         claude --version
 
+    - name: Pre-configure Claude Code (skip first-launch dialogs)
+      shell: bash
+      run: |
+        # Create global settings to skip interactive first-launch setup
+        CLAUDE_DIR="$APPDATA/claude"
+        mkdir -p "$CLAUDE_DIR"
+        # Write settings that mark first-launch as complete
+        echo '{"theme":"dark","hasCompletedOnboarding":true}' > "$CLAUDE_DIR/settings.json"
+        echo "Pre-configured Claude Code at $CLAUDE_DIR/settings.json"
+
     - name: Build server (release)
       run: cargo build --release -p server
 
