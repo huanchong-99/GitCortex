@@ -100,11 +100,7 @@ pub async fn run(json: bool, filter: Option<String>) -> i32 {
     eprintln!("Shutting down test server...");
     server.shutdown().await;
 
-    if report.failed > 0 {
-        1
-    } else {
-        0
-    }
+    i32::from(report.failed > 0)
 }
 
 fn print_human_report(report: &SelfTestReport) {
@@ -115,7 +111,7 @@ fn print_human_report(report: &SelfTestReport) {
     let mut current_group = String::new();
     for r in &report.results {
         if r.group != current_group {
-            current_group = r.group.clone();
+            current_group.clone_from(&r.group);
             eprintln!("\n  [{current_group}]");
         }
         let icon = if r.passed { "PASS" } else { "FAIL" };

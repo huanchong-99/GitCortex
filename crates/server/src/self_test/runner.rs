@@ -18,7 +18,7 @@ use crate::DeploymentImpl;
 pub struct TestServer {
     pub base_url: String,
     pub port: u16,
-    _temp_dir: TempDir,
+    temp_dir: TempDir,
     shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
@@ -130,14 +130,14 @@ impl TestServer {
         Ok(TestServer {
             base_url,
             port,
-            _temp_dir: temp_dir,
+            temp_dir,
             shutdown_tx: Some(shutdown_tx),
         })
     }
 
     /// Get the temp directory path (for creating git repos, etc.)
     pub fn temp_dir(&self) -> PathBuf {
-        self._temp_dir.path().to_path_buf()
+        self.temp_dir.path().to_path_buf()
     }
 
     /// Gracefully shut down the server and clean up temp directory.

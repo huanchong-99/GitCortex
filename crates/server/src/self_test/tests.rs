@@ -1434,7 +1434,7 @@ async fn test_ci_webhook(ctx: &mut TestContext) -> Result<(), String> {
         "conclusion": "success",
         "sha": "abc123def456789",
         "branch": "main",
-        "run_id": 12345678u64,
+        "run_id": 12_345_678_u64,
         "run_url": "https://github.com/test/repo/actions/runs/12345678"
     });
     let resp = ctx.client.post(ctx.api("/ci/webhook"))
