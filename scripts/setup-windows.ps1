@@ -914,12 +914,31 @@ Write-Host (T "TITLE") -ForegroundColor Cyan
 Write-Host (T "SUBTITLE") -ForegroundColor DarkGray
 Write-Host ""
 
-# Check network connectivity
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# Ensure TLS 1.2 and handle SSL certificate trust issues on clean Windows
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+
+# On fresh Windows installs, the root CA certificate store may be outdated,
+# causing SSL/TLS handshake failures ("未能为 SSL/TLS 安全通道建立信任关系").
+# Bypass certificate validation for the setup script only.
+if (-not ([System.Management.Automation.PSTypeName]'TrustAllCertsPolicy').Type) {
+    Add-Type @"
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+public class TrustAllCertsPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(
+        ServicePoint srvPoint, X509Certificate certificate,
+        WebRequest request, int certificateProblem) { return true; }
+}
+"@
+}
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+
+# Check network connectivity (actual HTTPS, not just DNS)
 $networkOk = $false
-foreach ($testHost in @("github.com", "aka.ms", "nodejs.org")) {
+foreach ($testUrl in @("https://github.com", "https://aka.ms", "https://nodejs.org")) {
     try {
-        $null = [System.Net.Dns]::GetHostAddresses($testHost)
+        $null = Invoke-WebRequest -Uri $testUrl -UseBasicParsing -TimeoutSec 10 -Method Head
         $networkOk = $true
         break
     } catch { }
