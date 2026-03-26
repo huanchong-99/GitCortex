@@ -156,6 +156,23 @@ impl TrayApp {
         // Create logs directory and redirect server output to log file
         let logs_dir = self.install_dir.join("logs");
         let _ = fs::create_dir_all(&logs_dir);
+
+        // Rotate logs: keep daily logs, auto-delete files older than 7 days
+        if let Ok(entries) = fs::read_dir(&logs_dir) {
+            let week_ago = std::time::SystemTime::now()
+                - std::time::Duration::from_secs(7 * 24 * 3600);
+            for entry in entries.flatten() {
+                if let Ok(meta) = entry.metadata() {
+                    if let Ok(modified) = meta.modified() {
+                        if modified < week_ago {
+                            let _ = fs::remove_file(entry.path());
+                            tracing::info!("Deleted old log: {}", entry.path().display());
+                        }
+                    }
+                }
+            }
+        }
+
         let log_file_path = logs_dir.join("server.log");
 
         let stdout_file = fs::File::create(&log_file_path)

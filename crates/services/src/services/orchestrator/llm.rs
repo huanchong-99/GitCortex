@@ -430,10 +430,14 @@ impl AnthropicCompatibleClient {
             "Anthropic-compatible LLM request starting"
         );
 
+        // Send both x-api-key (official Anthropic) and Authorization: Bearer
+        // (third-party Anthropic-compatible providers like ZhipuAI). Real Anthropic
+        // ignores Bearer; ZhipuAI ignores x-api-key. Both work simultaneously.
         let response = self
             .client
             .post(&url)
             .header("x-api-key", &self.api_key)
+            .header("Authorization", format!("Bearer {}", self.api_key))
             .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")
             .json(&request)

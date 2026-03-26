@@ -71,7 +71,8 @@ NO_UPDATE_NOTIFIER=1
 NPM_CONFIG_UPDATE_NOTIFIER=false
 
 # Logging level (debug/info/warn/error)
-RUST_LOG=info
+# debug enables verbose diagnostics for troubleshooting
+RUST_LOG=debug
 "@
 
 # Write or append
