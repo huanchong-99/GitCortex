@@ -279,12 +279,13 @@ fn create_claude_settings(
 
     // Skip all first-launch interactive dialogs on clean installs:
     // - Theme selector, security notes, workspace trust, bypass confirmation
+    // These field names match what Claude Code actually reads from settings.json.
     settings_map.insert(
         "hasCompletedOnboarding".to_string(),
         serde_json::Value::Bool(true),
     );
     settings_map.insert(
-        "hasAcknowledgedDangerousSkipPermissions".to_string(),
+        "skipDangerousModePermissionPrompt".to_string(),
         serde_json::Value::Bool(true),
     );
 
