@@ -1020,35 +1020,25 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 
-# 3. Update root certificates from Windows Update (best effort)
+# 3. Update root certificates from Windows Update (best effort, requires admin)
 try {
-    $rootCertUrl = "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab"
     $cabPath = Join-Path $env:TEMP "authrootstl.cab"
-    certutil -urlcache -f $rootCertUrl $cabPath 2>$null | Out-Null
+    # Use HTTP (not HTTPS) since certs may be broken — this is Microsoft's official root cert URL
+    certutil -urlcache -f "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab" $cabPath 2>&1 | Out-Null
     if (Test-Path $cabPath) {
-        certutil -addstore -f root $cabPath 2>$null | Out-Null
-        Remove-Item $cabPath -ErrorAction SilentlyContinue
+        certutil -addstore -f root $cabPath 2>&1 | Out-Null
+        Remove-Item $cabPath -Force -ErrorAction SilentlyContinue
+        Write-Host "  Root certificates updated from Windows Update" -ForegroundColor DarkGray
     }
-} catch { }
+} catch {
+    # Non-fatal — will rely on TrustAllCertsPolicy if certs are still outdated
+}
 
 # 4. Set a proper User-Agent (CDNs reject default PowerShell agent)
 $global:SetupUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PowerShell/$($PSVersionTable.PSVersion)"
 
-# Check network connectivity
-$networkOk = $false
-foreach ($testUrl in @("https://github.com", "https://aka.ms", "https://nodejs.org")) {
-    try {
-        $null = Invoke-WebRequest -Uri $testUrl -UseBasicParsing -TimeoutSec 15 -Method Head -UserAgent $global:SetupUserAgent
-        $networkOk = $true
-        break
-    } catch { }
-}
-if (-not $networkOk) {
-    Write-Err "Cannot reach github.com, aka.ms, or nodejs.org."
-    Write-Err "This script requires internet access to download tools."
-    Write-Warn "Please check your network connection and try again."
-    Pause-BeforeExit 1
-}
+# Network connectivity is verified implicitly by the first download attempt.
+# No blocking check here — individual downloads handle their own errors.
 
 # Check PowerShell version
 if ($PSVersionTable.PSVersion.Major -lt 5) {
