@@ -468,7 +468,7 @@ function Install-Winget {
         $depsAsset = $null
 
         try {
-            $releaseJson = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-cli/releases/latest" -UseBasicParsing -TimeoutSec 15 -UserAgent $global:SetupUserAgent | ConvertFrom-Json
+            $releaseJson = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-cli/releases/latest" -UseBasicParsing -TimeoutSec 15 | ConvertFrom-Json
             $bundleAsset = $releaseJson.assets | Where-Object { $_.name -like "*.msixbundle" } | Select-Object -First 1
             $depsAsset   = $releaseJson.assets | Where-Object { $_.name -eq "DesktopAppInstaller_Dependencies.zip" } | Select-Object -First 1
             $licenseAsset = $releaseJson.assets | Where-Object { $_.name -like "*License*.xml" } | Select-Object -First 1
@@ -491,7 +491,7 @@ function Install-Winget {
         if ($depsAsset -and $depsAsset.browser_download_url) {
             $depsZip = Join-Path $tempDir "deps.zip"
             $depsExtract = Join-Path $tempDir "deps"
-            Invoke-WebRequest -Uri $depsAsset.browser_download_url -OutFile $depsZip -UseBasicParsing -UserAgent $global:SetupUserAgent
+            Invoke-WebRequest -Uri $depsAsset.browser_download_url -OutFile $depsZip -UseBasicParsing
             Expand-Archive -Path $depsZip -DestinationPath $depsExtract -Force
 
             # Install all x64 dependencies
@@ -507,20 +507,20 @@ function Install-Winget {
         } else {
             # Fallback: download VCLibs from Microsoft CDN
             $vcLibsPath = Join-Path $tempDir "Microsoft.VCLibs.x64.14.00.Desktop.appx"
-            Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -OutFile $vcLibsPath -UseBasicParsing -UserAgent $global:SetupUserAgent
+            Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -OutFile $vcLibsPath -UseBasicParsing
             Add-AppxPackage -Path $vcLibsPath -ErrorAction Stop
         }
 
         # 3. Download and install winget msixbundle
         Write-Info (T "WINGET_DEP_XAML")
         $wingetBundle = Join-Path $tempDir "Microsoft.DesktopAppInstaller.msixbundle"
-        Invoke-WebRequest -Uri $bundleUrl -OutFile $wingetBundle -UseBasicParsing -UserAgent $global:SetupUserAgent
+        Invoke-WebRequest -Uri $bundleUrl -OutFile $wingetBundle -UseBasicParsing
         Add-AppxPackage -Path $wingetBundle -ErrorAction Stop
 
         # 4. Provision for all users (best effort, needs license)
         if ($licenseUrl) {
             $licensePath = Join-Path $tempDir "License1.xml"
-            Invoke-WebRequest -Uri $licenseUrl -OutFile $licensePath -UseBasicParsing -UserAgent $global:SetupUserAgent
+            Invoke-WebRequest -Uri $licenseUrl -OutFile $licensePath -UseBasicParsing
             try {
                 Add-AppxProvisionedPackage -Online -PackagePath $wingetBundle -LicensePath $licensePath -ErrorAction Stop | Out-Null
             } catch {
@@ -683,7 +683,7 @@ function Install-Direct {
 
     try {
         Write-Info "  Downloading $($info.Url)..."
-        Invoke-WebRequest -Uri $info.Url -OutFile $installerPath -UseBasicParsing -UserAgent $global:SetupUserAgent
+        Invoke-WebRequest -Uri $info.Url -OutFile $installerPath -UseBasicParsing
         Write-Info "  Running installer..."
         if ($info.IsMsi) {
             Start-Process "msiexec.exe" -ArgumentList "/i `"$installerPath`" $($info.Args)" -Wait -NoNewWindow
@@ -990,55 +990,8 @@ Write-Host (T "TITLE") -ForegroundColor Cyan
 Write-Host (T "SUBTITLE") -ForegroundColor DarkGray
 Write-Host ""
 
-# ── Fix HTTPS on clean Windows ──
-# Clean Windows installs have three common HTTPS problems:
-# 1. Only TLS 1.0/1.1 enabled (GitHub/CDNs require TLS 1.2+)
-# 2. Outdated root CA certificates (SSL handshake fails)
-# 3. Default PowerShell User-Agent blocked by CDNs (connection reset)
-# Fix all three before any download attempt.
-
-# 1. Enable all modern TLS versions
-try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-} catch {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-}
-
-# 2. Bypass SSL certificate validation (outdated root CA store)
-if (-not ([System.Management.Automation.PSTypeName]'TrustAllCertsPolicy').Type) {
-    Add-Type @"
-using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-public class TrustAllCertsPolicy : ICertificatePolicy {
-    public bool CheckValidationResult(
-        ServicePoint srvPoint, X509Certificate certificate,
-        WebRequest request, int certificateProblem) { return true; }
-}
-"@
-}
-[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-[System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
-
-# 3. Update root certificates from Windows Update (best effort, requires admin)
-try {
-    $cabPath = Join-Path $env:TEMP "authrootstl.cab"
-    # Use HTTP (not HTTPS) since certs may be broken — this is Microsoft's official root cert URL
-    certutil -urlcache -f "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab" $cabPath 2>&1 | Out-Null
-    if (Test-Path $cabPath) {
-        certutil -addstore -f root $cabPath 2>&1 | Out-Null
-        Remove-Item $cabPath -Force -ErrorAction SilentlyContinue
-        Write-Host "  Root certificates updated from Windows Update" -ForegroundColor DarkGray
-    }
-} catch {
-    # Non-fatal — will rely on TrustAllCertsPolicy if certs are still outdated
-}
-
-# 4. Set a proper User-Agent (CDNs reject default PowerShell agent)
-$global:SetupUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PowerShell/$($PSVersionTable.PSVersion)"
-
-# Network connectivity is verified implicitly by the first download attempt.
-# No blocking check here — individual downloads handle their own errors.
+# Ensure TLS 1.2 for HTTPS downloads (same as original working version)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # Check PowerShell version
 if ($PSVersionTable.PSVersion.Major -lt 5) {
