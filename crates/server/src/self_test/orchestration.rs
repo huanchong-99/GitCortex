@@ -72,7 +72,7 @@ pub async fn run_orchestration_tests(
     });
 
     // If CLI not installed, skip remaining tests
-    if !results.last().map_or(false, |r| r.passed) {
+    if !results.last().is_some_and(|r| r.passed) {
         eprintln!("Claude Code not installed — skipping remaining orchestration tests");
         return results;
     }
@@ -105,7 +105,7 @@ pub async fn run_orchestration_tests(
         error: repo_setup.err(),
     });
 
-    if !results.last().map_or(false, |r| r.passed) {
+    if !results.last().is_some_and(|r| r.passed) {
         return results;
     }
 
