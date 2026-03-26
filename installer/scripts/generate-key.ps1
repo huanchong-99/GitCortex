@@ -70,9 +70,8 @@ $BashLine
 NO_UPDATE_NOTIFIER=1
 NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# Logging level (debug/info/warn/error)
-# debug enables verbose diagnostics for troubleshooting
-RUST_LOG=debug
+# Logging level — verbose for server/services, suppress noisy modules
+RUST_LOG=warn,server=debug,services=debug,db=info,executors=info,local_deployment=info,utils=info,services::services::filesystem=warn,services::services::pr_monitor=info
 "@
 
 # Write or append
