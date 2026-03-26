@@ -232,15 +232,37 @@ jobs:
         which claude || where claude || echo "claude not in PATH yet"
         claude --version
 
-    - name: Pre-configure Claude Code (skip first-launch dialogs)
+    - name: Pre-configure Claude Code (skip ALL first-launch dialogs)
       shell: bash
       run: |
-        # Create global settings to skip interactive first-launch setup
-        CLAUDE_DIR="$APPDATA/claude"
+        # Claude Code stores user config in ~/.claude/
+        CLAUDE_DIR="$HOME/.claude"
         mkdir -p "$CLAUDE_DIR"
-        # Write settings that mark first-launch as complete
-        echo '{"theme":"dark","hasCompletedOnboarding":true}' > "$CLAUDE_DIR/settings.json"
-        echo "Pre-configured Claude Code at $CLAUDE_DIR/settings.json"
+
+        # Mark onboarding and terms as completed to skip ALL interactive dialogs:
+        # - Theme selector
+        # - Security notes ("Press Enter to continue")
+        # - Workspace trust dialog
+        # - Bypass permissions confirmation
+        cat > "$CLAUDE_DIR/settings.json" << 'SETTINGS'
+        {
+          "permissions": {
+            "allow": [],
+            "deny": []
+          },
+          "hasCompletedOnboarding": true,
+          "hasAcknowledgedDangerousSkipPermissions": true
+        }
+        SETTINGS
+
+        # Also write the terms acceptance marker
+        echo '{"accepted":true,"version":"2.0"}' > "$CLAUDE_DIR/terms_accepted.json"
+
+        # Write a blank statsig file to skip analytics prompts
+        echo '{}' > "$CLAUDE_DIR/statsig.json"
+
+        echo "Pre-configured Claude Code at $CLAUDE_DIR"
+        ls -la "$CLAUDE_DIR"
 
     - name: Build server (release)
       run: cargo build --release -p server
