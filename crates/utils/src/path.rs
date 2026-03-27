@@ -182,11 +182,11 @@ mod tests {
     }
 
     #[test]
-    fn test_get_gitcortex_temp_dir_env_override() {
-        let dir = std::path::PathBuf::from("/custom/temp/gitcortex");
-        unsafe { std::env::set_var("GITCORTEX_TEMP_DIR", &dir) };
-        let result = get_gitcortex_temp_dir();
+    fn test_get_solodawn_temp_dir_env_override() {
+        let dir = std::path::PathBuf::from("/custom/temp/solodawn");
+        unsafe { std::env::set_var("SOLODAWN_TEMP_DIR", &dir) };
+        let result = get_solodawn_temp_dir();
         assert_eq!(result, dir);
-        unsafe { std::env::remove_var("GITCORTEX_TEMP_DIR") };
+        unsafe { std::env::remove_var("SOLODAWN_TEMP_DIR") };
     }
 }
