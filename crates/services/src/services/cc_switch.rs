@@ -1094,13 +1094,20 @@ impl CCSwitchService {
                     .clone()
                     .unwrap_or_else(|| model_config.name.clone());
 
+                // [H04] Compute effective_base_url BEFORE create_gemini_env so the
+                // .env file includes the orchestrator fallback URL when the terminal
+                // has no custom_base_url.  Previously, terminal.custom_base_url was
+                // passed directly, discarding the fallback and causing Gemini CLI
+                // to use the wrong endpoint when reading the .env file.
+                let effective_base_url = terminal.custom_base_url.clone().or(fallback_base_url);
+
                 // G22-003: Propagate .env creation failure instead of silently swallowing it.
                 // A missing .env can cause Gemini CLI to fall back to global auth,
                 // leading to unexpected billing or auth errors.
                 create_gemini_env(
                     &gemini_home,
                     &api_key,
-                    terminal.custom_base_url.as_deref(),
+                    effective_base_url.as_deref(),
                     &model,
                 )
                 .map_err(|e| {
@@ -1118,8 +1125,7 @@ impl CCSwitchService {
                     gemini_home.to_string_lossy().to_string(),
                 );
 
-                // Handle base URL
-                let effective_base_url = terminal.custom_base_url.clone().or(fallback_base_url);
+                // Handle base URL — effective_base_url already computed above
                 if let Some(base_url) = &effective_base_url {
                     env.set
                         .insert("GOOGLE_GEMINI_BASE_URL".to_string(), base_url.clone());
