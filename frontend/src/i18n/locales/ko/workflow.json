@@ -186,6 +186,11 @@
       "displayNameRequired": "Model name is required",
       "baseUrlRequired": "Base URL is required",
       "modelIdRequired": "Model ID is required"
+    },
+    "warnings": {
+      "urlV1Compatible": "URL이 /v1로 끝나지만 API 유형이 호환 모드로 설정되어 있습니다. 호환 공급자는 일반적으로 URL에 /v1이 필요하지 않습니다.",
+      "zhipuaiOpenai": "ZhipuAI가 감지되었습니다. API 유형을 \"openai-compatible\"로 변경하는 것을 고려하세요.",
+      "zhipuaiAnthropic": "ZhipuAI가 감지되었습니다. API 유형을 \"anthropic-compatible\"로 변경하는 것을 고려하세요."
     }
   },
   "step4": {

@@ -95,8 +95,8 @@ export function ModelsSettingsNew() {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    apiKey: model.apiKey,
-                    baseUrl: model.baseUrl || null,
+                    apiKey: model.apiKey?.trim(),
+                    baseUrl: model.baseUrl?.trim() || null,
                     apiType: model.apiType,
                   }),
                 }

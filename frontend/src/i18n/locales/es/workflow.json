@@ -186,6 +186,11 @@
       "displayNameRequired": "Model name is required",
       "baseUrlRequired": "Base URL is required",
       "modelIdRequired": "Model ID is required"
+    },
+    "warnings": {
+      "urlV1Compatible": "La URL termina en /v1 pero el tipo de API está configurado en modo compatible. Los proveedores compatibles normalmente no necesitan /v1 en la URL.",
+      "zhipuaiOpenai": "Se detectó ZhipuAI. Considere usar \"openai-compatible\" como tipo de API.",
+      "zhipuaiAnthropic": "Se detectó ZhipuAI. Considere usar \"anthropic-compatible\" como tipo de API."
     }
   },
   "step4": {

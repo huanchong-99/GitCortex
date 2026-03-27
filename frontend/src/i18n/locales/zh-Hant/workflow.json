@@ -186,6 +186,11 @@
       "displayNameRequired": "Model name is required",
       "baseUrlRequired": "Base URL is required",
       "modelIdRequired": "Model ID is required"
+    },
+    "warnings": {
+      "urlV1Compatible": "URL 以 /v1 結尾，但 API 類型設定為相容模式。相容模式的提供商通常不需要在 URL 中包含 /v1。",
+      "zhipuaiOpenai": "偵測到智譜AI位址。建議將 API 類型更改為 \"openai-compatible\"。",
+      "zhipuaiAnthropic": "偵測到智譜AI位址。建議將 API 類型更改為 \"anthropic-compatible\"。"
     }
   },
   "step4": {

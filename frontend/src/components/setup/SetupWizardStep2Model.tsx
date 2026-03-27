@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import {
   CheckCircleIcon,
   WarningCircleIcon,
+  WarningIcon,
   CircleNotchIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -35,6 +36,7 @@ export interface SetupWizardStep2ModelProps {
   isVerified: boolean;
   verifyError: string | null;
   isVerifying: boolean;
+  urlWarning: string | null;
   onDisplayNameChange: (v: string) => void;
   onApiTypeChange: (v: string) => void;
   onApiKeyChange: (v: string) => void;
@@ -61,6 +63,7 @@ export function SetupWizardStep2Model({
   isVerified,
   verifyError,
   isVerifying,
+  urlWarning,
   onDisplayNameChange,
   onApiTypeChange,
   onApiKeyChange,
@@ -195,6 +198,12 @@ export function SetupWizardStep2Model({
                 'focus:outline-none focus:ring-1 focus:ring-brand'
               )}
             />
+            {urlWarning && (
+              <p className="flex items-center gap-half text-xs text-warning mt-half">
+                <WarningIcon className="size-icon-xs shrink-0" weight="fill" />
+                {urlWarning}
+              </p>
+            )}
           </div>
         )}
 

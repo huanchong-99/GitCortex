@@ -187,6 +187,11 @@
       "displayNameRequired": "请输入模型名称",
       "baseUrlRequired": "请输入 Base URL",
       "modelIdRequired": "请选择或输入模型 ID"
+    },
+    "warnings": {
+      "urlV1Compatible": "URL 以 /v1 结尾，但 API 类型设置为兼容模式。兼容模式的提供商通常不需要在 URL 中包含 /v1。",
+      "zhipuaiOpenai": "检测到智谱AI地址。建议将 API 类型更改为 \"openai-compatible\"。",
+      "zhipuaiAnthropic": "检测到智谱AI地址。建议将 API 类型更改为 \"anthropic-compatible\"。"
     }
   },
   "step4": {

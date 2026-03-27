@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useModelVerification } from '@/hooks/useModelVerification';
@@ -23,6 +24,7 @@ export function SetupWizardStep2ModelContainer({
   onBack,
   onSkip,
 }: Readonly<SetupWizardStep2ModelContainerProps>) {
+  const { t } = useTranslation('workflow');
   const { config, updateAndSaveConfig } = useUserSystem();
 
   const [displayName, setDisplayName] = useState('');
@@ -46,6 +48,27 @@ export function SetupWizardStep2ModelContainer({
   // Allow proceeding if model ID is manually entered, even without verification.
   // Third-party OpenAI-compatible endpoints may not support the verification API.
   const canProceed = modelId.trim() !== '' && apiKey.trim() !== '';
+
+  const urlWarning = useMemo(() => {
+    const url = baseUrl.trim();
+    if (!url || !apiType) return null;
+
+    const isCompatible = apiType.endsWith('-compatible');
+
+    if (isCompatible && url.endsWith('/v1')) {
+      return t('step3.warnings.urlV1Compatible');
+    }
+
+    if (url.includes('bigmodel.cn') && apiType === 'openai') {
+      return t('step3.warnings.zhipuaiOpenai');
+    }
+
+    if (url.includes('bigmodel.cn') && apiType === 'anthropic') {
+      return t('step3.warnings.zhipuaiAnthropic');
+    }
+
+    return null;
+  }, [baseUrl, apiType, t]);
 
   const handleApiTypeChange = useCallback(
     (newType: string) => {
@@ -99,14 +122,16 @@ export function SetupWizardStep2ModelContainer({
   }, [apiType, apiKey, baseUrl, modelId, verifyModel]);
 
   const handleNext = useCallback(async () => {
+    const trimmedKey = apiKey.trim();
+    const trimmedUrl = baseUrl.trim();
     const newModel: ModelConfig = {
       id: `model-${crypto.randomUUID()}`,
-      displayName: displayName || modelId,
+      displayName: (displayName || modelId).trim(),
       cliTypeId: 'cli-claude-code',
       apiType: apiType as ApiType,
-      baseUrl: baseUrl || DEFAULT_BASE_URLS[apiType] || '',
-      apiKey,
-      modelId,
+      baseUrl: trimmedUrl || DEFAULT_BASE_URLS[apiType] || '',
+      apiKey: trimmedKey,
+      modelId: modelId.trim(),
       isVerified,
     };
 
@@ -142,6 +167,7 @@ export function SetupWizardStep2ModelContainer({
       isVerified={isVerified}
       verifyError={verifyError}
       isVerifying={isVerifying}
+      urlWarning={urlWarning}
       onDisplayNameChange={setDisplayName}
       onApiTypeChange={handleApiTypeChange}
       onApiKeyChange={handleApiKeyChange}

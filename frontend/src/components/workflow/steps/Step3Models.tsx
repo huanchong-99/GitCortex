@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   PlusIcon,
   PencilSimpleIcon,
@@ -7,6 +7,7 @@ import {
   ArrowsClockwiseIcon,
   EyeIcon,
   EyeSlashIcon,
+  WarningIcon,
 } from '@phosphor-icons/react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
 import {
@@ -96,6 +97,28 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isFormVerified, setIsFormVerified] = useState(false);
+
+  const urlWarning = useMemo(() => {
+    const url = formData.baseUrl.trim();
+    const apiType = formData.apiType;
+    if (!url || !apiType) return null;
+
+    const isCompatible = apiType.endsWith('-compatible');
+
+    if (isCompatible && url.endsWith('/v1')) {
+      return t('step3.warnings.urlV1Compatible');
+    }
+
+    if (url.includes('bigmodel.cn') && apiType === 'openai') {
+      return t('step3.warnings.zhipuaiOpenai');
+    }
+
+    if (url.includes('bigmodel.cn') && apiType === 'anthropic') {
+      return t('step3.warnings.zhipuaiAnthropic');
+    }
+
+    return null;
+  }, [formData, t]);
 
   const handleOpenAddDialog = () => {
     setEditingModel(null);
@@ -256,12 +279,12 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
 
     const newModel: ModelConfig = {
       id: editingModel?.id ?? `model-${crypto.randomUUID()}`,
-      displayName: formData.displayName,
+      displayName: formData.displayName.trim(),
       cliTypeId: formData.cliTypeId,
       apiType: formData.apiType,
-      baseUrl: formData.baseUrl,
-      apiKey: formData.apiKey,
-      modelId: formData.modelId,
+      baseUrl: formData.baseUrl.trim(),
+      apiKey: formData.apiKey.trim(),
+      modelId: formData.modelId.trim(),
       isVerified: isFormVerified,
     };
 
@@ -476,6 +499,12 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
                 )}
               />
               {formErrors.baseUrl && <FieldError>{formErrors.baseUrl}</FieldError>}
+              {urlWarning && (
+                <p className="flex items-center gap-half text-xs text-warning mt-half">
+                  <WarningIcon className="size-icon-xs shrink-0" weight="fill" />
+                  {urlWarning}
+                </p>
+              )}
             </Field>
 
             {/* API Key */}
