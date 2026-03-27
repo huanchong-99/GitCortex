@@ -2,7 +2,7 @@
 # CI Workflow: Windows Installer Build
 # Triggers: push tag v*.*.*
 # Jobs: build-installer
-# Produces: GitCortex-Setup-v{version}.exe uploaded to GitHub Release
+# Produces: SoloDawn-Setup-v{version}.exe uploaded to GitHub Release
 # ============================================================================
 name: Build Windows Installer
 
@@ -58,25 +58,25 @@ jobs:
       run: pnpm build
 
     # --- Build Rust binaries ---
-    - name: Build gitcortex-server
+    - name: Build solodawn-server
       run: cargo build --release -p server
 
-    - name: Build gitcortex-tray
-      run: cargo build --release -p gitcortex-tray
+    - name: Build solodawn-tray
+      run: cargo build --release -p solodawn-tray
 
     # --- Prepare installer build directory ---
     - name: Prepare build directory
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Path installer/build -Force
-        Copy-Item target/release/server.exe installer/build/gitcortex-server.exe
-        Copy-Item target/release/gitcortex-tray.exe installer/build/gitcortex-tray.exe
+        Copy-Item target/release/server.exe installer/build/solodawn-server.exe
+        Copy-Item target/release/solodawn-tray.exe installer/build/solodawn-tray.exe
 
     # --- Create placeholder icon if not present ---
     - name: Create placeholder icon
       shell: pwsh
       run: |
-        if (-not (Test-Path installer/assets/gitcortex.ico)) {
+        if (-not (Test-Path installer/assets/solodawn.ico)) {
           # Create a minimal valid ICO file (1x1 pixel, for CI builds)
           # In production, replace with a real icon
           $iconBytes = [byte[]]@(
@@ -85,7 +85,7 @@ jobs:
             0x00, 0x00, 0x16, 0x00, 0x00, 0x00
           )
           # Write a minimal ICO header; real icon should be provided
-          [System.IO.File]::WriteAllBytes("installer/assets/gitcortex.ico", $iconBytes)
+          [System.IO.File]::WriteAllBytes("installer/assets/solodawn.ico", $iconBytes)
           Write-Host "Created placeholder icon (replace with real .ico for production)"
         }
 
@@ -109,12 +109,12 @@ jobs:
           Write-Error "ISCC.exe not found"
           exit 1
         }
-        & $iscc installer/gitcortex.iss
+        & $iscc installer/solodawn.iss
 
     # --- Upload to release ---
     - name: Upload installer to release
       uses: softprops/action-gh-release@c95fe1c8d4547f8c42bd29fae893987ccd1e411b # v2.2.1
       with:
-        files: installer/output/GitCortex-Setup-*.exe
+        files: installer/output/SoloDawn-Setup-*.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

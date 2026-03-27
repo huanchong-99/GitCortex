@@ -10,16 +10,16 @@ set -euo pipefail
 #   ./scripts/migrate_auto_confirm.sh <db_path>                # dry-run
 #
 # Examples:
-#   ./scripts/migrate_auto_confirm.sh --dry-run --db ./gitcortex.db
-#   ./scripts/migrate_auto_confirm.sh --apply --db ./gitcortex.db
-#   ./scripts/migrate_auto_confirm.sh ./gitcortex.db
+#   ./scripts/migrate_auto_confirm.sh --dry-run --db ./solodawn.db
+#   ./scripts/migrate_auto_confirm.sh --apply --db ./solodawn.db
+#   ./scripts/migrate_auto_confirm.sh ./solodawn.db
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SQL_FILE="${SCRIPT_DIR}/migrate_auto_confirm.sql"
 
 MODE="dry-run"
 AUTO_YES=0
-DB_PATH="./gitcortex.db"
+DB_PATH="./solodawn.db"
 POSITIONAL_DB=""
 
 usage() {
@@ -32,14 +32,14 @@ Usage:
 Options:
   --dry-run      Preview rows where auto_confirm=0 (default mode)
   --apply        Apply migration (set auto_confirm=1)
-  --db <path>    SQLite database file path (default: ./gitcortex.db)
+  --db <path>    SQLite database file path (default: ./solodawn.db)
   --yes, -y      Skip interactive confirmation in --apply mode
   --help, -h     Show this help
 
 Examples:
-  $0 --dry-run --db ./gitcortex.db
-  $0 --apply --db ./gitcortex.db --yes
-  $0 ./gitcortex.db
+  $0 --dry-run --db ./solodawn.db
+  $0 --apply --db ./solodawn.db --yes
+  $0 ./solodawn.db
 EOF
   return 0
 }

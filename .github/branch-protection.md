@@ -1,6 +1,6 @@
 # Branch Protection Rules
 
-Recommended GitHub branch protection configuration for GitCortex.
+Recommended GitHub branch protection configuration for SoloDawn.
 
 ## `main` branch
 

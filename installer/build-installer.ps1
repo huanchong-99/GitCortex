@@ -1,5 +1,5 @@
 # ============================================================================
-# GitCortex Installer Build Script (Lightweight)
+# SoloDawn Installer Build Script (Lightweight)
 # Compiles Rust binaries and invokes Inno Setup compiler.
 # No dependency downloads — assumes system Node.js, Git, npm.
 # Usage: powershell -ExecutionPolicy Bypass -File build-installer.ps1
@@ -34,13 +34,13 @@ if (-not $SkipRustBuild) {
     & pnpm build
     Pop-Location
 
-    Write-Host "  Building gitcortex-server..."
+    Write-Host "  Building solodawn-server..."
     & cargo build --release -p server
-    Copy-Item "target\release\server.exe" (Join-Path $BuildDir "gitcortex-server.exe") -Force
+    Copy-Item "target\release\server.exe" (Join-Path $BuildDir "solodawn-server.exe") -Force
 
-    Write-Host "  Building gitcortex-tray..."
-    & cargo build --release -p gitcortex-tray
-    Copy-Item "target\release\gitcortex-tray.exe" (Join-Path $BuildDir "gitcortex-tray.exe") -Force
+    Write-Host "  Building solodawn-tray..."
+    & cargo build --release -p solodawn-tray
+    Copy-Item "target\release\solodawn-tray.exe" (Join-Path $BuildDir "solodawn-tray.exe") -Force
 
     Pop-Location
 }
@@ -56,7 +56,7 @@ if (-not (Test-Path $InnoSetupPath)) {
     exit 1
 }
 
-$IssFile = Join-Path $ScriptDir "gitcortex.iss"
+$IssFile = Join-Path $ScriptDir "solodawn.iss"
 Write-Host "  Running ISCC: $IssFile"
 & $InnoSetupPath $IssFile
 
