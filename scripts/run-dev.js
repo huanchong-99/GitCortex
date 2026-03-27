@@ -452,12 +452,26 @@ async function main() {
   await ensurePortAvailable(ports.backend, "Backend");
   await ensurePortAvailable(ports.frontend, "Frontend");
 
+  // Auto-detect protoc if not already set (required by feishu-connector gRPC build)
+  let protoc = process.env.PROTOC;
+  if (!protoc) {
+    const candidates = [
+      "C:\\protoc\\bin\\protoc.exe",
+      "C:\\tools\\protoc\\bin\\protoc.exe",
+      path.join(os.homedir(), "protoc", "bin", "protoc.exe"),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) { protoc = c; break; }
+    }
+  }
+
   const env = {
     ...process.env,
     FRONTEND_PORT: String(ports.frontend),
     BACKEND_PORT: String(ports.backend),
     DISABLE_WORKTREE_ORPHAN_CLEANUP: "1",
     RUST_LOG: "debug",
+    ...(protoc ? { PROTOC: protoc } : {}),
   };
 
   // Start backend
