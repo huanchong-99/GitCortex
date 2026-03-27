@@ -56,7 +56,7 @@ function isBenignWsProxyError(error: unknown): boolean {
 
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
 const sentryUploadEnabled = Boolean(sentryAuthToken);
-const buildSourcemap = process.env.GITCORTEX_BUILD_SOURCEMAP !== "0";
+const buildSourcemap = process.env.SOLODAWN_BUILD_SOURCEMAP !== "0";
 
 export default defineConfig({
   plugins: [
@@ -80,7 +80,7 @@ export default defineConfig({
       ? [
           sentryVitePlugin({
             org: "bloop-ai",
-            project: "gitcortex",
+            project: "solodawn",
             authToken: sentryAuthToken,
             telemetry: false,
           }),

@@ -232,9 +232,9 @@ pnpm install
 
 # 2. 设置加密密钥（必需，恰好 32 个字符）
 # Linux/macOS:
-export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
+export SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"
 # Windows PowerShell:
-$env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
+$env:SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"
 
 # 3. 初始化数据库
 pnpm run prepare-db
@@ -259,7 +259,7 @@ cargo build --release -p server
 cd frontend && pnpm build && cd ..
 
 # 3. 设置加密密钥（必需）
-export GITCORTEX_ENCRYPTION_KEY="你的32位加密密钥"
+export SOLODAWN_ENCRYPTION_KEY="你的32位加密密钥"
 
 # 4. 运行
 ./target/release/server

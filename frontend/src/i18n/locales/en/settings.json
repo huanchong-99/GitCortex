@@ -467,7 +467,7 @@
       "status": {
         "title": "Connection Status",
         "description": "Current Feishu WebSocket connection state.",
-        "featureDisabled": "Feishu integration is disabled. Set GITCORTEX_FEISHU_ENABLED=true to enable.",
+        "featureDisabled": "Feishu integration is disabled. Set SOLODAWN_FEISHU_ENABLED=true to enable.",
         "connected": "Connected",
         "disconnected": "Disconnected",
         "notConfigured": "Not configured",

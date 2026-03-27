@@ -232,9 +232,9 @@ pnpm install
 
 # 2. Set encryption key (required, exactly 32 characters)
 # Linux/macOS:
-export GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
+export SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"
 # Windows PowerShell:
-$env:GITCORTEX_ENCRYPTION_KEY="12345678901234567890123456789012"
+$env:SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"
 
 # 3. Initialize database
 pnpm run prepare-db
@@ -259,7 +259,7 @@ cargo build --release -p server
 cd frontend && pnpm build && cd ..
 
 # 3. Set encryption key (required)
-export GITCORTEX_ENCRYPTION_KEY="your-32-character-secret-key-here"
+export SOLODAWN_ENCRYPTION_KEY="your-32-character-secret-key-here"
 
 # 4. Run
 ./target/release/server

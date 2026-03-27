@@ -111,7 +111,7 @@ function AppContent() {
       <ThemeProvider initialTheme={config?.theme || ThemeMode.SYSTEM}>
         <SearchProvider>
           <SentryRoutes>
-            {/* ========== GITCORTEX DESIGN ROUTES ========== */}
+            {/* ========== SOLODAWN DESIGN ROUTES ========== */}
             <Route
               path="/"
               element={

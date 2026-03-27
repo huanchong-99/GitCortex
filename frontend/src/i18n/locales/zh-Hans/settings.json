@@ -467,7 +467,7 @@
       "status": {
         "title": "连接状态",
         "description": "当前飞书 WebSocket 连接状态。",
-        "featureDisabled": "飞书集成已禁用。设置 GITCORTEX_FEISHU_ENABLED=true 以启用。",
+        "featureDisabled": "飞书集成已禁用。设置 SOLODAWN_FEISHU_ENABLED=true 以启用。",
         "connected": "已连接",
         "disconnected": "已断开",
         "notConfigured": "未配置",
