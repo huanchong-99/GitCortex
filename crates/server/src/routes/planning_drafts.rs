@@ -442,21 +442,59 @@ async fn send_message(
 fn build_llm_client_from_draft(
     draft: &PlanningDraft,
 ) -> Option<Box<dyn services::services::orchestrator::LLMClient>> {
+    tracing::info!(
+        draft_id = %draft.id,
+        api_type = ?draft.planner_api_type,
+        base_url = ?draft.planner_base_url,
+        model_id = ?draft.planner_model_id,
+        has_api_key = draft.planner_api_key.is_some(),
+        "Building LLM client from planning draft"
+    );
+
     let decrypted_key = match draft.get_api_key() {
-        Ok(key) => key,
+        Ok(key) => {
+            tracing::debug!(
+                draft_id = %draft.id,
+                key_present = key.is_some(),
+                "API key decryption result"
+            );
+            key
+        }
         Err(e) => {
             tracing::warn!("Failed to decrypt planner API key for draft {}: {e}", draft.id);
             return None;
         }
     };
+
     let config = OrchestratorConfig::from_workflow(
         draft.planner_api_type.as_deref(),
         draft.planner_base_url.as_deref(),
         decrypted_key.as_deref(),
         draft.planner_model_id.as_deref(),
-    )?;
+    );
+    let config = match config {
+        Some(c) => c,
+        None => {
+            tracing::warn!(
+                draft_id = %draft.id,
+                has_api_type = draft.planner_api_type.is_some(),
+                has_base_url = draft.planner_base_url.is_some(),
+                has_api_key = decrypted_key.is_some(),
+                has_model_id = draft.planner_model_id.is_some(),
+                "OrchestratorConfig creation returned None — missing required fields"
+            );
+            return None;
+        }
+    };
+
     match create_llm_client(&config) {
-        Ok(client) => Some(client),
+        Ok(client) => {
+            tracing::info!(
+                draft_id = %draft.id,
+                "LLM client created successfully for planning draft"
+            );
+            Some(client)
+        }
         Err(e) => {
             tracing::warn!("Failed to create LLM client for planning draft: {e}");
             None

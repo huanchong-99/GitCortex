@@ -65,10 +65,12 @@ impl PlanningDraft {
             ));
         }
 
-        key_str
+        let key = key_str
             .as_bytes()
             .try_into()
-            .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))
+            .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))?;
+        tracing::debug!("Encryption key loaded from environment");
+        Ok(key)
     }
 
     /// Encrypt and store the planner API key.
@@ -85,7 +87,12 @@ impl PlanningDraft {
         let mut combined = nonce.to_vec();
         combined.extend_from_slice(&ciphertext);
 
-        self.planner_api_key = Some(general_purpose::STANDARD.encode(&combined));
+        let encrypted = general_purpose::STANDARD.encode(&combined);
+        tracing::debug!(
+            encrypted_len = encrypted.len(),
+            "API key encrypted successfully"
+        );
+        self.planner_api_key = Some(encrypted);
         Ok(())
     }
 
@@ -113,9 +120,14 @@ impl PlanningDraft {
                     .decrypt(nonce, ciphertext)
                     .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
 
-                Ok(Some(String::from_utf8(plaintext_bytes).map_err(|e| {
+                let decrypted = String::from_utf8(plaintext_bytes).map_err(|e| {
                     anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}")
-                })?))
+                })?;
+                tracing::debug!(
+                    key_len = decrypted.len(),
+                    "API key decrypted successfully"
+                );
+                Ok(Some(decrypted))
             }
         }
     }
