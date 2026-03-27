@@ -38,7 +38,7 @@ jobs:
         context: .
         file: docker/Dockerfile
         push: false
-        tags: gitcortex:ci-test
+        tags: solodawn:ci-test
         cache-from: type=gha
         cache-to: type=gha,mode=max
 

@@ -33,10 +33,10 @@ jobs:
       uses: ./.github/actions/setup-sccache
 
     - name: Run cargo clippy
-      run: cargo clippy --workspace --exclude gitcortex-tray --all-targets --all-features -- -D warnings
+      run: cargo clippy --workspace --exclude solodawn-tray --all-targets --all-features -- -D warnings
 
     - name: Run cargo nextest
-      run: cargo nextest run --workspace --exclude gitcortex-tray --lib --test-threads=1
+      run: cargo nextest run --workspace --exclude solodawn-tray --lib --test-threads=1
 
     - name: Show sccache statistics
       if: always()

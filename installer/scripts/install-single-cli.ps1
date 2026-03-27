@@ -16,7 +16,7 @@ function Log-Warn  { param([string]$msg) Write-Host "[WARN]  $msg" -ForegroundCo
 
 # --- Resolve tools ---
 # Check bundled tools first (legacy installs), then fall back to system PATH.
-$InstallDir = $env:GITCORTEX_INSTALL_DIR
+$InstallDir = $env:SOLODAWN_INSTALL_DIR
 if (-not $InstallDir) {
     $InstallDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }

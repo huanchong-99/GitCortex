@@ -1,4 +1,4 @@
-# Generate GITCORTEX_ENCRYPTION_KEY, auto-detect bash path, write to .env file.
+# Generate SOLODAWN_ENCRYPTION_KEY, auto-detect bash path, write to .env file.
 # Usage: generate-key.ps1 -EnvFile <path> [-InstallDir <path>]
 param(
     [Parameter(Mandatory=$true)][string]$EnvFile,
@@ -46,18 +46,18 @@ if ($BashPath) {
 
 # Build .env content
 $envContent = @"
-# GitCortex Environment Configuration
+# SoloDawn Environment Configuration
 # Generated during installation - DO NOT share these values.
 
 # Encryption key for API key storage (32 bytes, required)
-GITCORTEX_ENCRYPTION_KEY=$EncryptionKey
+SOLODAWN_ENCRYPTION_KEY=$EncryptionKey
 
 # API authentication token (optional, enables Bearer auth on all endpoints)
 # Uncomment to require Bearer token for API access:
-# GITCORTEX_API_TOKEN=your-token-here
+# SOLODAWN_API_TOKEN=your-token-here
 
 # Local mode: skip API token requirement (localhost-only, safe)
-GITCORTEX_LOCAL_MODE=1
+SOLODAWN_LOCAL_MODE=1
 
 # Server configuration
 BACKEND_PORT=23456
@@ -77,8 +77,8 @@ RUST_LOG=warn,server=debug,services=debug,db=info,executors=info,local_deploymen
 # Write or append
 if (Test-Path $EnvFile) {
     $existing = Get-Content $EnvFile -Raw
-    if ($existing -match "GITCORTEX_ENCRYPTION_KEY=") {
-        Write-Host "[INFO] GITCORTEX_ENCRYPTION_KEY already exists in $EnvFile, skipping."
+    if ($existing -match "SOLODAWN_ENCRYPTION_KEY=") {
+        Write-Host "[INFO] SOLODAWN_ENCRYPTION_KEY already exists in $EnvFile, skipping."
     } else {
         $existing = [System.IO.File]::ReadAllText($EnvFile)
         [System.IO.File]::WriteAllText($EnvFile, $existing + "`n" + $envContent, (New-Object System.Text.UTF8Encoding $false))

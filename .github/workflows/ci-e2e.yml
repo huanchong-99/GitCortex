@@ -112,9 +112,9 @@ jobs:
     - name: Run E2E self-test
       shell: bash
       env:
-        GITCORTEX_ENCRYPTION_KEY: "12345678901234567890123456789012"
-        GITCORTEX_LOCAL_MODE: "1"
-        GITCORTEX_NO_BROWSER: "1"
+        SOLODAWN_ENCRYPTION_KEY: "12345678901234567890123456789012"
+        SOLODAWN_LOCAL_MODE: "1"
+        SOLODAWN_NO_BROWSER: "1"
         RUST_LOG: "warn,server=info"
       run: |
         ${{ matrix.binary }} self-test --json 2>self-test-stderr.log | tee self-test-results.json
@@ -270,9 +270,9 @@ jobs:
     - name: Run orchestration E2E test
       shell: bash
       env:
-        GITCORTEX_ENCRYPTION_KEY: "12345678901234567890123456789012"
-        GITCORTEX_LOCAL_MODE: "1"
-        GITCORTEX_NO_BROWSER: "1"
+        SOLODAWN_ENCRYPTION_KEY: "12345678901234567890123456789012"
+        SOLODAWN_LOCAL_MODE: "1"
+        SOLODAWN_NO_BROWSER: "1"
         RUST_LOG: "warn,server=info,services=info"
         E2E_API_KEY: ${{ secrets.E2E_API_KEY }}
         E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}

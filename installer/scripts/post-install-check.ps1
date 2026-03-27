@@ -1,5 +1,5 @@
 # ============================================================================
-# GitCortex Post-Installation Self-Check Script (Lightweight)
+# SoloDawn Post-Installation Self-Check Script (Lightweight)
 # Checks installation files, .env config, system dependencies, and AI CLIs.
 # Usage: powershell -ExecutionPolicy Bypass -File post-install-check.ps1
 # ============================================================================
@@ -21,12 +21,12 @@ if (-not $InstallDir) {
     elseif ($MyInvocation.MyCommand.Path) {
         $ScriptsDir = Split-Path -Parent $MyInvocation.MyCommand.Path
         $Candidate = Split-Path -Parent $ScriptsDir
-        if (Test-Path (Join-Path $Candidate "gitcortex-server.exe")) {
+        if (Test-Path (Join-Path $Candidate "solodawn-server.exe")) {
             $InstallDir = $Candidate
         }
     }
     if (-not $InstallDir) {
-        $InstallDir = "C:\Program Files\GitCortex"
+        $InstallDir = "C:\Program Files\SoloDawn"
     }
 }
 
@@ -80,7 +80,7 @@ function Test-FilePath {
 # ====================================
 Write-Host ""
 Write-Host "====================================" -ForegroundColor Cyan
-Write-Host "  GitCortex Post-Installation Check" -ForegroundColor Cyan
+Write-Host "  SoloDawn Post-Installation Check" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host "  Install Dir: $InstallDir"
 Write-Host ""
@@ -90,11 +90,11 @@ Write-Host ""
 # ============================================================================
 Write-Host "--- 1. File System ---" -ForegroundColor White
 
-Test-FilePath "File System" "gitcortex-server.exe" "gitcortex-server.exe"
-Test-FilePath "File System" "gitcortex-tray.exe" "gitcortex-tray.exe"
+Test-FilePath "File System" "solodawn-server.exe" "solodawn-server.exe"
+Test-FilePath "File System" "solodawn-tray.exe" "solodawn-tray.exe"
 Test-FilePath "File System" ".env" ".env"
 Test-FilePath "File System" "scripts\" "scripts"
-Test-FilePath "File System" "assets\GitCortex.ico" "assets\GitCortex.ico"
+Test-FilePath "File System" "assets\solodawn.ico" "assets\solodawn.ico"
 
 Write-Host ""
 
@@ -140,9 +140,9 @@ if (Test-Path $EnvFile) {
 
 if ($EnvParseOk) {
     # Encryption key
-    if ($EnvVars.ContainsKey("GITCORTEX_ENCRYPTION_KEY")) {
-        Add-Check -Group "Environment" -Name "GITCORTEX_ENCRYPTION_KEY exists" -Status "PASS"
-        $EncKey = $EnvVars["GITCORTEX_ENCRYPTION_KEY"]
+    if ($EnvVars.ContainsKey("SOLODAWN_ENCRYPTION_KEY")) {
+        Add-Check -Group "Environment" -Name "SOLODAWN_ENCRYPTION_KEY exists" -Status "PASS"
+        $EncKey = $EnvVars["SOLODAWN_ENCRYPTION_KEY"]
 
         if ($EncKey.Length -eq 32) {
             Add-Check -Group "Environment" -Name "ENCRYPTION_KEY length=32" -Status "PASS"
@@ -157,16 +157,16 @@ if ($EnvParseOk) {
             Add-Check -Group "Environment" -Name "ENCRYPTION_KEY pure ASCII" -Status "FAIL" -Detail "Contains non-ASCII characters"
         }
     } else {
-        Add-Check -Group "Environment" -Name "GITCORTEX_ENCRYPTION_KEY exists" -Status "FAIL" -Detail "Key not found in .env"
+        Add-Check -Group "Environment" -Name "SOLODAWN_ENCRYPTION_KEY exists" -Status "FAIL" -Detail "Key not found in .env"
         Add-Check -Group "Environment" -Name "ENCRYPTION_KEY length=32" -Status "FAIL" -Detail "Key missing"
         Add-Check -Group "Environment" -Name "ENCRYPTION_KEY pure ASCII" -Status "FAIL" -Detail "Key missing"
     }
 
     # Local mode
-    if ($EnvVars["GITCORTEX_LOCAL_MODE"] -eq "1") {
-        Add-Check -Group "Environment" -Name "GITCORTEX_LOCAL_MODE=1" -Status "PASS"
+    if ($EnvVars["SOLODAWN_LOCAL_MODE"] -eq "1") {
+        Add-Check -Group "Environment" -Name "SOLODAWN_LOCAL_MODE=1" -Status "PASS"
     } else {
-        Add-Check -Group "Environment" -Name "GITCORTEX_LOCAL_MODE=1" -Status "WARN" -Detail "Not set to 1"
+        Add-Check -Group "Environment" -Name "SOLODAWN_LOCAL_MODE=1" -Status "WARN" -Detail "Not set to 1"
     }
 
     # Backend port
@@ -350,7 +350,7 @@ if (Test-Path $ClaudeCredentials) {
 if ($ClaudeHasAuth) {
     Add-Check -Group "AI CLIs" -Name "Claude Code auth" -Status "PASS" -Detail "credentials.json found"
 } else {
-    Add-Check -Group "AI CLIs" -Name "Claude Code auth" -Status "WARN" -Detail "No ~/.claude/credentials.json -- run 'claude login' or configure API key in GitCortex settings"
+    Add-Check -Group "AI CLIs" -Name "Claude Code auth" -Status "WARN" -Detail "No ~/.claude/credentials.json -- run 'claude login' or configure API key in SoloDawn settings"
 }
 
 Write-Host ""
@@ -361,7 +361,7 @@ Write-Host ""
 Write-Host "--- 6. Server Startup ---" -ForegroundColor White
 
 $BackendPort = if ($EnvVars.ContainsKey("BACKEND_PORT")) { $EnvVars["BACKEND_PORT"] } else { "23456" }
-$ServerExe = Join-Path $InstallDir "gitcortex-server.exe"
+$ServerExe = Join-Path $InstallDir "solodawn-server.exe"
 $ServerStartedByUs = $false
 $ServerRunning = $false
 
@@ -430,7 +430,7 @@ if ($SkipServerTest) {
                 Add-Check -Group "Server" -Name "Server startup" -Status "FAIL" -Detail $_.Exception.Message
             }
         } elseif (-not (Test-Path $ServerExe)) {
-            Add-Check -Group "Server" -Name "Server startup" -Status "FAIL" -Detail "gitcortex-server.exe not found"
+            Add-Check -Group "Server" -Name "Server startup" -Status "FAIL" -Detail "solodawn-server.exe not found"
         }
     }
 
@@ -487,10 +487,10 @@ if ($SkipServerTest -or -not $ServerRunning) {
             Add-Check -Group "Frontend" -Name "GET / returns HTML" -Status "FAIL" -Detail "Content-Type: $ct"
         }
         $html = $resp.Content
-        if ($html -match 'id="root"' -or $html -match "GitCortex") {
+        if ($html -match 'id="root"' -or $html -match "SoloDawn") {
             Add-Check -Group "Frontend" -Name "HTML contains expected marker" -Status "PASS"
         } else {
-            Add-Check -Group "Frontend" -Name "HTML contains expected marker" -Status "WARN" -Detail "No 'id=root' or 'GitCortex' found"
+            Add-Check -Group "Frontend" -Name "HTML contains expected marker" -Status "WARN" -Detail "No 'id=root' or 'SoloDawn' found"
         }
     } catch {
         Add-Check -Group "Frontend" -Name "GET / returns HTML" -Status "FAIL" -Detail $_.Exception.Message
@@ -505,7 +505,7 @@ Write-Host ""
 # ============================================================================
 Write-Host "--- 8. Database & Data Directory ---" -ForegroundColor White
 
-$DataDir = Join-Path $env:APPDATA "bloop\gitcortex"
+$DataDir = Join-Path $env:APPDATA "bloop\solodawn"
 if (Test-Path $DataDir) {
     Add-Check -Group "Database" -Name "Data directory exists" -Status "PASS" -Detail $DataDir
 
@@ -548,8 +548,8 @@ Write-Host "--- 9. Windows Integration ---" -ForegroundColor White
 
 # Firewall rule
 try {
-    $fwOutput = & netsh advfirewall firewall show rule name="GitCortex Server" 2>&1
-    if ($fwOutput -match "GitCortex Server") {
+    $fwOutput = & netsh advfirewall firewall show rule name="SoloDawn Server" 2>&1
+    if ($fwOutput -match "SoloDawn Server") {
         Add-Check -Group "Windows" -Name "Firewall rule exists" -Status "PASS"
     } else {
         Add-Check -Group "Windows" -Name "Firewall rule exists" -Status "WARN" -Detail "No firewall rule found"

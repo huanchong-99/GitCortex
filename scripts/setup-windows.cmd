@@ -1,7 +1,7 @@
 @echo off
 
 echo ============================================
-echo  GitCortex Windows Environment Setup
+echo  SoloDawn Windows Environment Setup
 echo ============================================
 echo.
 

@@ -1,7 +1,7 @@
 ﻿<#
 .SYNOPSIS
-    GitCortex Windows One-Click Environment Setup
-    GitCortex Windows 一键开发环境配置
+    SoloDawn Windows One-Click Environment Setup
+    SoloDawn Windows 一键开发环境配置
 
 .DESCRIPTION
     Installs all required development tools and optionally AI CLI tools
@@ -143,8 +143,8 @@ $script:Messages = @{
         LANG_CHOICE_PROMPT         = "输入 1/2（默认 1）"
         YESNO_INVALID              = "请输入 y 或 n。"
 
-        TITLE                      = "=== GitCortex Windows 开发环境一键配置 ==="
-        SUBTITLE                   = "本脚本将安装 GitCortex 所需的全部开发工具"
+        TITLE                      = "=== SoloDawn Windows 开发环境一键配置 ==="
+        SUBTITLE                   = "本脚本将安装 SoloDawn 所需的全部开发工具"
 
         ERR_WINGET_NOT_FOUND       = "未找到 winget，正在自动安装..."
         WINGET_INSTALLING          = "正在下载并安装 winget 及其依赖项..."
@@ -180,7 +180,7 @@ $script:Messages = @{
 
         PROMPT_CONTINUE            = "是否继续？(Y/n)"
         PROMPT_PROJECT_SETUP       = "是否初始化项目？（运行 pnpm install + prepare-db）"
-        PROMPT_ENCRYPTION_KEY      = "请输入 GITCORTEX_ENCRYPTION_KEY（必须 32 个字符，直接回车自动生成）:"
+        PROMPT_ENCRYPTION_KEY      = "请输入 SOLODAWN_ENCRYPTION_KEY（必须 32 个字符，直接回车自动生成）:"
         KEY_GENERATED              = "已自动生成加密密钥"
 
         VERIFY_TITLE               = "=== 安装验证报告 ==="
@@ -207,8 +207,8 @@ $script:Messages = @{
         LANG_CHOICE_PROMPT         = "Enter 1/2 (default 2)"
         YESNO_INVALID              = "Please answer y or n."
 
-        TITLE                      = "=== GitCortex Windows Development Environment Setup ==="
-        SUBTITLE                   = "This script will install all development tools required by GitCortex"
+        TITLE                      = "=== SoloDawn Windows Development Environment Setup ==="
+        SUBTITLE                   = "This script will install all development tools required by SoloDawn"
 
         ERR_WINGET_NOT_FOUND       = "winget not found, installing automatically..."
         WINGET_INSTALLING          = "Downloading and installing winget with dependencies..."
@@ -244,7 +244,7 @@ $script:Messages = @{
 
         PROMPT_CONTINUE            = "Continue? (Y/n)"
         PROMPT_PROJECT_SETUP       = "Initialize project? (run pnpm install + prepare-db)"
-        PROMPT_ENCRYPTION_KEY      = "Enter GITCORTEX_ENCRYPTION_KEY (exactly 32 chars, press Enter to auto-generate):"
+        PROMPT_ENCRYPTION_KEY      = "Enter SOLODAWN_ENCRYPTION_KEY (exactly 32 chars, press Enter to auto-generate):"
         KEY_GENERATED              = "Auto-generated encryption key"
 
         VERIFY_TITLE               = "=== Installation Verification Report ==="
@@ -677,7 +677,7 @@ function Install-Direct {
 
     Write-Info (Tf "INSTALLING" @("$DisplayName (direct download)"))
 
-    $tempDir = Join-Path $env:TEMP "gitcortex-install-$(Get-Random)"
+    $tempDir = Join-Path $env:TEMP "solodawn-install-$(Get-Random)"
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     $installerPath = Join-Path $tempDir $info.FileName
 
@@ -1301,12 +1301,12 @@ if (-not $SkipProjectSetup) {
         Write-Host ("-" * 50) -ForegroundColor DarkGray
 
         # 1. Generate encryption key and set as persistent env var
-        if (-not $env:GITCORTEX_ENCRYPTION_KEY) {
+        if (-not $env:SOLODAWN_ENCRYPTION_KEY) {
             $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
             $key = -join (1..32 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
-            $env:GITCORTEX_ENCRYPTION_KEY = $key
+            $env:SOLODAWN_ENCRYPTION_KEY = $key
             # Persist to user environment so it survives terminal restarts
-            [System.Environment]::SetEnvironmentVariable("GITCORTEX_ENCRYPTION_KEY", $key, "User")
+            [System.Environment]::SetEnvironmentVariable("SOLODAWN_ENCRYPTION_KEY", $key, "User")
             Write-Ok (T "KEY_GENERATED")
         }
 

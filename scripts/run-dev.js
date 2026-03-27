@@ -9,7 +9,7 @@ const { getPorts } = require("./setup-dev-environment");
 
 const children = new Set();
 let shuttingDown = false;
-const devLockPath = path.join(os.tmpdir(), "gitcortex", "run-dev.lock");
+const devLockPath = path.join(os.tmpdir(), "solodawn", "run-dev.lock");
 let lockFd = null;
 
 function getPathKey(env) {

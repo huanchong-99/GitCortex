@@ -43,8 +43,8 @@ fi
 if ! search "fn get_api_key" crates/db/src/models/workflow.rs >/dev/null 2>&1; then
   fail "get_api_key not found in crates/db/src/models/workflow.rs"
 fi
-if ! search "GITCORTEX_ENCRYPTION_KEY" crates/db/src/models/workflow.rs >/dev/null 2>&1; then
-  fail "GITCORTEX_ENCRYPTION_KEY not referenced in crates/db/src/models/workflow.rs"
+if ! search "SOLODAWN_ENCRYPTION_KEY" crates/db/src/models/workflow.rs >/dev/null 2>&1; then
+  fail "SOLODAWN_ENCRYPTION_KEY not referenced in crates/db/src/models/workflow.rs"
 fi
 if ! search "set_api_key" crates/server/src/routes/workflows.rs >/dev/null 2>&1; then
   fail "Workflow API does not use set_api_key for encryption"

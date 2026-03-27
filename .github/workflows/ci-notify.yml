@@ -1,7 +1,7 @@
 # ============================================================================
 # CI Workflow: Notify Orchestrator
 # Triggers: workflow_run completion of ci-basic, ci-quality, ci-docker
-# Purpose: Posts CI results to GitCortex API for orchestrator consumption
+# Purpose: Posts CI results to SoloDawn API for orchestrator consumption
 # Required check for: None (notification-only)
 # ============================================================================
 name: CI Notify Orchestrator
@@ -17,16 +17,16 @@ on:
 
 jobs:
   notify:
-    name: Notify GitCortex API
+    name: Notify SoloDawn API
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-    - name: Post result to GitCortex orchestrator
+    - name: Post result to SoloDawn orchestrator
       env:
-        GITCORTEX_API_URL: ${{ vars.GITCORTEX_API_URL || 'http://localhost:23456' }}
-        GITCORTEX_API_TOKEN: ${{ secrets.GITCORTEX_API_TOKEN }}
-        GITCORTEX_CI_WEBHOOK_SECRET: ${{ secrets.GITCORTEX_CI_WEBHOOK_SECRET }}
+        SOLODAWN_API_URL: ${{ vars.SOLODAWN_API_URL || 'http://localhost:23456' }}
+        SOLODAWN_API_TOKEN: ${{ secrets.SOLODAWN_API_TOKEN }}
+        SOLODAWN_CI_WEBHOOK_SECRET: ${{ secrets.SOLODAWN_CI_WEBHOOK_SECRET }}
         WF_NAME: ${{ github.event.workflow_run.name }}
         WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         WF_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -71,18 +71,18 @@ jobs:
         echo "$PAYLOAD" | jq .
 
         # Build curl headers
-        CURL_HEADERS=(-H "Content-Type: application/json" -H "Authorization: Bearer ${GITCORTEX_API_TOKEN}")
+        CURL_HEADERS=(-H "Content-Type: application/json" -H "Authorization: Bearer ${SOLODAWN_API_TOKEN}")
 
         # G35-009: Compute HMAC-SHA256 signature if webhook secret is configured
-        if [ -n "$GITCORTEX_CI_WEBHOOK_SECRET" ]; then
-          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$GITCORTEX_CI_WEBHOOK_SECRET" | sed 's/^.* //')
+        if [ -n "$SOLODAWN_CI_WEBHOOK_SECRET" ]; then
+          SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SOLODAWN_CI_WEBHOOK_SECRET" | sed 's/^.* //')
           CURL_HEADERS+=(-H "X-Webhook-Signature: sha256=${SIGNATURE}")
           echo "HMAC signature computed and attached."
         fi
 
-        # POST to GitCortex API (best-effort, non-blocking)
+        # POST to SoloDawn API (best-effort, non-blocking)
         HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-          -X POST "${GITCORTEX_API_URL}/api/ci/webhook" \
+          -X POST "${SOLODAWN_API_URL}/api/ci/webhook" \
           "${CURL_HEADERS[@]}" \
           -d "$PAYLOAD" \
           --connect-timeout 10 \

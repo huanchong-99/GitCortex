@@ -1,13 +1,13 @@
 ; ============================================================================
-; GitCortex Windows Installer - Inno Setup Script (Lightweight)
+; SoloDawn Windows Installer - Inno Setup Script (Lightweight)
 ; Bundles: server + tray only. Requires system Node.js, Git, npm.
 ; ============================================================================
 
-#define MyAppName "GitCortex"
+#define MyAppName "SoloDawn"
 #define MyAppVersion "0.1.0"
-#define MyAppPublisher "GitCortex"
-#define MyAppURL "https://github.com/huanchong-99/GitCortex"
-#define MyAppExeName "gitcortex-tray.exe"
+#define MyAppPublisher "SoloDawn"
+#define MyAppURL "https://github.com/huanchong-99/SoloDawn"
+#define MyAppExeName "solodawn-tray.exe"
 #define DefaultPort "23456"
 
 [Setup]
@@ -22,15 +22,15 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\LICENSE
 OutputDir=output
-OutputBaseFilename=GitCortex-Setup-v{#MyAppVersion}
+OutputBaseFilename=SoloDawn-Setup-v{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-SetupIconFile=assets\GitCortex.ico
-UninstallDisplayIcon={app}\gitcortex-tray.exe
+SetupIconFile=assets\solodawn.ico
+UninstallDisplayIcon={app}\solodawn-tray.exe
 MinVersion=10.0
 ShowLanguageDialog=auto
 
@@ -44,7 +44,7 @@ Name: "compact"; Description: "Compact installation (server only)"
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
-Name: "server"; Description: "GitCortex Server"; Types: full compact custom; Flags: fixed
+Name: "server"; Description: "SoloDawn Server"; Types: full compact custom; Flags: fixed
 Name: "tray"; Description: "System Tray Helper"; Types: full custom
 
 [Tasks]
@@ -54,8 +54,8 @@ Name: "firewall"; Description: "Add Windows Firewall exception (port {#DefaultPo
 
 [Files]
 ; Core binaries
-Source: "build\gitcortex-server.exe"; DestDir: "{app}"; Components: server; Flags: ignoreversion
-Source: "build\gitcortex-tray.exe"; DestDir: "{app}"; Components: tray; Flags: ignoreversion
+Source: "build\solodawn-server.exe"; DestDir: "{app}"; Components: server; Flags: ignoreversion
+Source: "build\solodawn-tray.exe"; DestDir: "{app}"; Components: tray; Flags: ignoreversion
 
 ; Installer helper scripts
 Source: "scripts\generate-key.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
@@ -67,7 +67,7 @@ Source: "..\scripts\setup-windows.cmd"; DestDir: "{app}\scripts"; Flags: ignorev
 Source: "..\scripts\setup-windows.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
 ; Assets
-Source: "assets\GitCortex.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
+Source: "assets\solodawn.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Components: tray
@@ -91,15 +91,15 @@ Filename: "{app}\scripts\setup-windows.cmd"; Description: "Setup dev environment
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\scripts\post-install-check.ps1"" -SkipServerTest"; Description: "Run post-installation self-check"; Flags: postinstall skipifsilent unchecked nowait runascurrentuser
 
 ; Run self-diagnostic test (headless API test covering all endpoints)
-Filename: "{app}\gitcortex-server.exe"; Parameters: "self-test"; Description: "Run self-diagnostic test (verifies all API endpoints)"; Flags: postinstall skipifsilent unchecked nowait runascurrentuser
+Filename: "{app}\solodawn-server.exe"; Parameters: "self-test"; Description: "Run self-diagnostic test (verifies all API endpoints)"; Flags: postinstall skipifsilent unchecked nowait runascurrentuser
 
 ; Open web UI after install
 Filename: "http://127.0.0.1:{#DefaultPort}"; Description: "Open {#MyAppName} in browser"; Flags: shellexec nowait postinstall skipifsilent unchecked
 
 [UninstallRun]
 ; Stop server before uninstall
-Filename: "taskkill"; Parameters: "/F /IM gitcortex-server.exe"; Flags: runhidden
-Filename: "taskkill"; Parameters: "/F /IM gitcortex-tray.exe"; Flags: runhidden
+Filename: "taskkill"; Parameters: "/F /IM solodawn-server.exe"; Flags: runhidden
+Filename: "taskkill"; Parameters: "/F /IM solodawn-tray.exe"; Flags: runhidden
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\scripts"
@@ -243,7 +243,7 @@ procedure AddFirewallRule();
 var
   ResultCode: Integer;
 begin
-  Exec('netsh', ExpandConstant('advfirewall firewall add rule name="GitCortex Server" dir=in action=allow protocol=TCP localport={#DefaultPort} program="{app}\gitcortex-server.exe"'),
+  Exec('netsh', ExpandConstant('advfirewall firewall add rule name="SoloDawn Server" dir=in action=allow protocol=TCP localport={#DefaultPort} program="{app}\solodawn-server.exe"'),
        '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
@@ -252,7 +252,7 @@ procedure RemoveFirewallRule();
 var
   ResultCode: Integer;
 begin
-  Exec('netsh', 'advfirewall firewall delete rule name="GitCortex Server"',
+  Exec('netsh', 'advfirewall firewall delete rule name="SoloDawn Server"',
        '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
