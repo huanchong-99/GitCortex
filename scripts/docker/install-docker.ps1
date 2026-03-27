@@ -50,7 +50,7 @@ $script:Messages = @{
         ERR_DOCKER_NOT_FOUND = "系统 PATH 中未找到 Docker。请先安装并启动 Docker Desktop。"
         ERR_HOST_PATH_MISSING = "主机工作区路径不存在: {0}"
         ERR_HOST_PATH_REQUIRED = "没有可用的主机工作区路径，安装终止。"
-        ERR_KEY_LEN = "GITCORTEX_ENCRYPTION_KEY 必须恰好 32 个字符。"
+        ERR_KEY_LEN = "SOLODAWN_ENCRYPTION_KEY 必须恰好 32 个字符。"
         ERR_ENV_EXISTS = ".env 已存在于 {0}。如需覆盖，请加 -Force。"
         ERR_UPDATE_ENV_MISSING = "更新模式需要现有的 .env 文件，但未找到: {0}"
         ERR_INSTALL_CANCELLED = "用户取消安装。"
@@ -59,14 +59,14 @@ $script:Messages = @{
         ERR_UP_FAILED = "docker compose up 失败。"
         ERR_DOWN_FAILED = "docker compose down -v 失败。"
 
-        TITLE = "=== GitCortex Docker 一键安装 ==="
+        TITLE = "=== SoloDawn Docker 一键安装 ==="
         ISOLATION_TITLE = "隔离模型："
         ISOLATION_1 = "1) 容器始终可访问自身文件系统。"
         ISOLATION_2 = "2) 容器可访问挂载到 {0} 的主机目录。"
         ISOLATION_3 = "3) 默认不会访问你的整块磁盘。"
 
         PROMPT_HOST_WORKSPACE = "要挂载到容器 {0} 的主机目录"
-        PROMPT_PORT = "GitCortex 主机端口"
+        PROMPT_PORT = "SoloDawn 主机端口"
         PROMPT_RUST_LOG = "RUST_LOG 日志级别"
         PROMPT_INSTALL_AI_CLIS = "构建镜像时安装 AI CLI（更慢，但更省事）"
         PROMPT_WEAK_NETWORK_PROFILE = "启用弱网/中国网络优化（推荐中国用户开启）"
@@ -75,7 +75,7 @@ $script:Messages = @{
         PROMPT_RUN_UP = "现在执行 docker compose up -d"
         PROMPT_RESET_DATA_VOLUME = "启动前清理旧容器和数据卷（会删除已有项目数据）"
         PROMPT_AUTO_KEY = "自动生成 32 位加密密钥"
-        PROMPT_INPUT_KEY = "输入 GITCORTEX_ENCRYPTION_KEY（必须 32 个字符）"
+        PROMPT_INPUT_KEY = "输入 SOLODAWN_ENCRYPTION_KEY（必须 32 个字符）"
         PROMPT_SET_API_TOKEN = "是否配置 Docker API Bearer Token"
         PROMPT_SET_ANTHROPIC = "现在设置 ANTHROPIC_API_KEY"
         PROMPT_SET_OPENAI = "现在设置 OPENAI_API_KEY"
@@ -136,7 +136,7 @@ $script:Messages = @{
         ERR_DOCKER_NOT_FOUND = "Docker is not available in PATH. Please install and start Docker Desktop first."
         ERR_HOST_PATH_MISSING = "Host workspace path does not exist: {0}"
         ERR_HOST_PATH_REQUIRED = "Cannot continue without host workspace path."
-        ERR_KEY_LEN = "GITCORTEX_ENCRYPTION_KEY must be exactly 32 chars."
+        ERR_KEY_LEN = "SOLODAWN_ENCRYPTION_KEY must be exactly 32 chars."
         ERR_ENV_EXISTS = ".env already exists at {0}. Re-run with -Force to overwrite."
         ERR_UPDATE_ENV_MISSING = "Update mode requires an existing .env file, but none was found: {0}"
         ERR_INSTALL_CANCELLED = "Installation cancelled by user."
@@ -145,14 +145,14 @@ $script:Messages = @{
         ERR_UP_FAILED = "docker compose up failed."
         ERR_DOWN_FAILED = "docker compose down -v failed."
 
-        TITLE = "=== GitCortex Docker One-Click Installer ==="
+        TITLE = "=== SoloDawn Docker One-Click Installer ==="
         ISOLATION_TITLE = "Isolation model:"
         ISOLATION_1 = "1) Container can always access its own filesystem."
         ISOLATION_2 = "2) Container can also access host path mounted to {0}."
         ISOLATION_3 = "3) By default, it cannot access your full disk."
 
         PROMPT_HOST_WORKSPACE = "Host folder to mount into container {0}"
-        PROMPT_PORT = "Host port for GitCortex"
+        PROMPT_PORT = "Host port for SoloDawn"
         PROMPT_RUST_LOG = "RUST_LOG level"
         PROMPT_INSTALL_AI_CLIS = "Install AI CLIs during image build (slower but turnkey)"
         PROMPT_WEAK_NETWORK_PROFILE = "Enable weak-network / China optimizations (recommended for users in China)"
@@ -161,7 +161,7 @@ $script:Messages = @{
         PROMPT_RUN_UP = "Run docker compose up -d now"
         PROMPT_RESET_DATA_VOLUME = "Clean existing containers and data volume first (deletes existing projects)"
         PROMPT_AUTO_KEY = "Auto-generate a 32-char encryption key"
-        PROMPT_INPUT_KEY = "Enter GITCORTEX_ENCRYPTION_KEY (exactly 32 chars)"
+        PROMPT_INPUT_KEY = "Enter SOLODAWN_ENCRYPTION_KEY (exactly 32 chars)"
         PROMPT_SET_API_TOKEN = "Configure Docker API Bearer token"
         PROMPT_SET_ANTHROPIC = "Set ANTHROPIC_API_KEY now"
         PROMPT_SET_OPENAI = "Set OPENAI_API_KEY now"
@@ -672,10 +672,10 @@ function Resolve-PrebuiltImageCandidates {
     )
 
     $repo = if ([string]::IsNullOrWhiteSpace($Namespace)) {
-        "gitcortex"
+        "solodawn"
     }
     else {
-        "$Namespace/gitcortex"
+        "$Namespace/solodawn"
     }
 
     $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
@@ -747,7 +747,7 @@ $composeFile = Join-Path $composeDir "docker-compose.yml"
 $envFile = Join-Path $composeDir ".env"
 $updateScript = Join-Path $scriptDir "update-docker.ps1"
 $workspaceMount = "/workspace"
-$dataRoot = "/var/lib/gitcortex"
+$dataRoot = "/var/lib/solodawn"
 
 Select-Language
 
@@ -891,7 +891,7 @@ if (-not $NonInteractive) {
 
     if ([string]::IsNullOrWhiteSpace($DockerApiToken)) {
         if (Read-YesNo (T "PROMPT_SET_API_TOKEN") $false) {
-            $DockerApiToken = Read-Host "GITCORTEX_DOCKER_API_TOKEN"
+            $DockerApiToken = Read-Host "SOLODAWN_DOCKER_API_TOKEN"
         }
     }
 
@@ -952,22 +952,22 @@ if ((Test-Path -LiteralPath $envFile) -and -not $Force) {
 if ($shouldWriteEnv) {
 $envContent = @"
 # Generated by scripts/docker/install-docker.ps1
-GITCORTEX_ENCRYPTION_KEY=$EncryptionKey
-GITCORTEX_DOCKER_API_TOKEN=$DockerApiToken
+SOLODAWN_ENCRYPTION_KEY=$EncryptionKey
+SOLODAWN_DOCKER_API_TOKEN=$DockerApiToken
 ANTHROPIC_API_KEY=$AnthropicApiKey
 OPENAI_API_KEY=$OpenAiApiKey
 GOOGLE_API_KEY=$GoogleApiKey
 PORT=$Port
 RUST_LOG=$RustLog
 HOST_WORKSPACE_ROOT=$composeHostWorkspaceRoot
-GITCORTEX_WORKSPACE_ROOT=$workspaceMount
-GITCORTEX_ALLOWED_ROOTS=$allowedRoots
-GITCORTEX_BUILD_NETWORK_PROFILE=$resolvedBuildNetworkProfile
-GITCORTEX_IMAGE_REGISTRY=$resolvedImageRegistry
-GITCORTEX_IMAGE_NAMESPACE=$resolvedImageNamespace
-GITCORTEX_IMAGE_PULL_POLICY=$ImagePullPolicy
+SOLODAWN_WORKSPACE_ROOT=$workspaceMount
+SOLODAWN_ALLOWED_ROOTS=$allowedRoots
+SOLODAWN_BUILD_NETWORK_PROFILE=$resolvedBuildNetworkProfile
+SOLODAWN_IMAGE_REGISTRY=$resolvedImageRegistry
+SOLODAWN_IMAGE_NAMESPACE=$resolvedImageNamespace
+SOLODAWN_IMAGE_PULL_POLICY=$ImagePullPolicy
 INSTALL_AI_CLIS=$installAiClisValue
-GITCORTEX_AUTO_SETUP_PROJECTS=$autoSetupProjectsValue
+SOLODAWN_AUTO_SETUP_PROJECTS=$autoSetupProjectsValue
 "@
 
 [System.IO.File]::WriteAllText($envFile, $envContent, [System.Text.UTF8Encoding]::new($false))
@@ -979,7 +979,7 @@ $effectiveImageRegistry = $resolvedImageRegistry
 $effectiveImageNamespace = $resolvedImageNamespace
 $effectiveImagePullPolicy = $ImagePullPolicy
 if (-not $shouldWriteEnv -and (Test-Path -LiteralPath $envFile)) {
-    $existingBuildNetworkProfile = Get-EnvValue -Path $envFile -Name "GITCORTEX_BUILD_NETWORK_PROFILE"
+    $existingBuildNetworkProfile = Get-EnvValue -Path $envFile -Name "SOLODAWN_BUILD_NETWORK_PROFILE"
     if (-not [string]::IsNullOrWhiteSpace($existingBuildNetworkProfile)) {
         $effectiveBuildNetworkProfile = $existingBuildNetworkProfile
     }
@@ -987,17 +987,17 @@ if (-not $shouldWriteEnv -and (Test-Path -LiteralPath $envFile)) {
         $effectiveBuildNetworkProfile = "official"
     }
 
-    $existingImageRegistry = Get-EnvValue -Path $envFile -Name "GITCORTEX_IMAGE_REGISTRY"
+    $existingImageRegistry = Get-EnvValue -Path $envFile -Name "SOLODAWN_IMAGE_REGISTRY"
     if (-not [string]::IsNullOrWhiteSpace($existingImageRegistry)) {
         $effectiveImageRegistry = $existingImageRegistry.Trim().TrimEnd("/")
     }
 
-    $existingImageNamespace = Get-EnvValue -Path $envFile -Name "GITCORTEX_IMAGE_NAMESPACE"
+    $existingImageNamespace = Get-EnvValue -Path $envFile -Name "SOLODAWN_IMAGE_NAMESPACE"
     if (-not [string]::IsNullOrWhiteSpace($existingImageNamespace)) {
         $effectiveImageNamespace = $existingImageNamespace.Trim().Trim("/")
     }
 
-    $existingPullPolicy = Get-EnvValue -Path $envFile -Name "GITCORTEX_IMAGE_PULL_POLICY"
+    $existingPullPolicy = Get-EnvValue -Path $envFile -Name "SOLODAWN_IMAGE_PULL_POLICY"
     if ($existingPullPolicy -in @("always", "missing", "never")) {
         $effectiveImagePullPolicy = $existingPullPolicy
     }
@@ -1019,7 +1019,7 @@ try {
     Write-Ok (T "OK_COMPOSE_VALID")
 
     if (-not $SkipBuild) {
-        $targetComposeImage = "gitcortex-gitcortex:latest"
+        $targetComposeImage = "solodawn-solodawn:latest"
         $usedPrebuilt = $false
 
         if ($preferPrebuiltImageEnabled -and $effectiveImagePullPolicy -ne "never") {
@@ -1047,7 +1047,7 @@ try {
             $existingImage = $null
             try {
                 $inspectOutput = & docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedSince}} {{.Size}}" 2>$null |
-                    Where-Object { $_ -match "gitcortex" } |
+                    Where-Object { $_ -match "solodawn" } |
                     Select-Object -First 1
                 if (-not [string]::IsNullOrWhiteSpace($inspectOutput)) {
                     $existingImage = $inspectOutput

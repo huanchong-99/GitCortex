@@ -1,28 +1,28 @@
 services:
-  gitcortex:
+  solodawn:
     build:
       context: ../..
       dockerfile: docker/Dockerfile
       args:
-        GITCORTEX_BUILD_NETWORK_PROFILE: ${GITCORTEX_BUILD_NETWORK_PROFILE:-official}
+        SOLODAWN_BUILD_NETWORK_PROFILE: ${SOLODAWN_BUILD_NETWORK_PROFILE:-official}
         INSTALL_AI_CLIS: ${INSTALL_AI_CLIS:-0}
         BUILDKIT_INLINE_CACHE: "1"
-    working_dir: ${GITCORTEX_WORKSPACE_ROOT:-/workspace}
+    working_dir: ${SOLODAWN_WORKSPACE_ROOT:-/workspace}
     ports:
       - "${PORT:-23456}:23456"
     volumes:
-      - gitcortex-data:/var/lib/gitcortex
-      - ${HOST_WORKSPACE_ROOT:-../..}:${GITCORTEX_WORKSPACE_ROOT:-/workspace}
+      - solodawn-data:/var/lib/solodawn
+      - ${HOST_WORKSPACE_ROOT:-../..}:${SOLODAWN_WORKSPACE_ROOT:-/workspace}
     environment:
-      - GITCORTEX_ASSET_DIR=/var/lib/gitcortex/assets
-      - GITCORTEX_TEMP_DIR=/var/lib/gitcortex
-      - GITCORTEX_ALLOWED_ROOTS=${GITCORTEX_ALLOWED_ROOTS:-/workspace,/var/lib/gitcortex}
+      - SOLODAWN_ASSET_DIR=/var/lib/solodawn/assets
+      - SOLODAWN_TEMP_DIR=/var/lib/solodawn
+      - SOLODAWN_ALLOWED_ROOTS=${SOLODAWN_ALLOWED_ROOTS:-/workspace,/var/lib/solodawn}
       - HOST=0.0.0.0
       - PORT=23456
       - RUST_LOG=${RUST_LOG:-info}
-      - GITCORTEX_ENCRYPTION_KEY=${GITCORTEX_ENCRYPTION_KEY:-}
-      - GITCORTEX_API_TOKEN=${GITCORTEX_DOCKER_API_TOKEN:-}
-      - GITCORTEX_AUTO_SETUP_PROJECTS=${GITCORTEX_AUTO_SETUP_PROJECTS:-1}
+      - SOLODAWN_ENCRYPTION_KEY=${SOLODAWN_ENCRYPTION_KEY:-}
+      - SOLODAWN_API_TOKEN=${SOLODAWN_DOCKER_API_TOKEN:-}
+      - SOLODAWN_AUTO_SETUP_PROJECTS=${SOLODAWN_AUTO_SETUP_PROJECTS:-1}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
@@ -30,7 +30,7 @@ services:
       - QUALITY_GATE_MODE=${QUALITY_GATE_MODE:-shadow}
       - SONAR_TOKEN=${SONAR_TOKEN:-}
       - SONAR_HOST_URL=${SONAR_HOST_URL:-http://sonarqube:9000}
-      - SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-gitcortex}
+      - SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-solodawn}
     depends_on:
       sonarqube:
         condition: service_healthy
@@ -42,7 +42,7 @@ services:
       start_period: 15s
     restart: unless-stopped
     # Data retention: schedule cleanup-quality-data.sh via host cron:
-    #   0 3 * * 0 docker exec gitcortex /bin/bash /opt/gitcortex/scripts/cleanup-quality-data.sh
+    #   0 3 * * 0 docker exec solodawn /bin/bash /opt/solodawn/scripts/cleanup-quality-data.sh
 
   sonarqube-db:
     image: postgres:15
@@ -83,7 +83,11 @@ services:
     restart: unless-stopped
 
 volumes:
-  gitcortex-data:
+  # NOTE: Volume name changed from gitcortex-data to solodawn-data.
+  # Existing deployments: rename your volume or recreate it.
+  # docker volume create solodawn-data
+  # docker run --rm -v gitcortex-data:/from -v solodawn-data:/to alpine sh -c "cp -a /from/. /to/"
+  solodawn-data:
   sonarqube-db-data:
   sonarqube-data:
   sonarqube-extensions:

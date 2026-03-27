@@ -3,11 +3,11 @@
 # Usage: ./cleanup-quality-data.sh [db_path] [log_dir]
 #
 # Schedule via cron (host) or a one-shot container:
-#   0 3 * * 0  /path/to/cleanup-quality-data.sh /var/lib/gitcortex/data.db /var/log/gitcortex
+#   0 3 * * 0  /path/to/cleanup-quality-data.sh /var/lib/solodawn/data.db /var/log/solodawn
 set -euo pipefail
 
-DB_PATH="${1:-/var/lib/gitcortex/data.db}"
-LOG_DIR="${2:-/var/log/gitcortex}"
+DB_PATH="${1:-/var/lib/solodawn/data.db}"
+LOG_DIR="${2:-/var/log/solodawn}"
 RETENTION_DAYS=90
 LOG_COMPRESS_DAYS=7
 

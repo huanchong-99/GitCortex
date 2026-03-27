@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== GitCortex Container Starting ==="
+echo "=== SoloDawn Container Starting ==="
 
-GITCORTEX_ASSET_DIR="${GITCORTEX_ASSET_DIR:-/var/lib/gitcortex/assets}"
-GITCORTEX_TEMP_DIR="${GITCORTEX_TEMP_DIR:-/var/lib/gitcortex}"
-export GITCORTEX_ASSET_DIR GITCORTEX_TEMP_DIR
+SOLODAWN_ASSET_DIR="${SOLODAWN_ASSET_DIR:-/var/lib/solodawn/assets}"
+SOLODAWN_TEMP_DIR="${SOLODAWN_TEMP_DIR:-/var/lib/solodawn}"
+export SOLODAWN_ASSET_DIR SOLODAWN_TEMP_DIR
 
-mkdir -p "${GITCORTEX_ASSET_DIR}" "${GITCORTEX_TEMP_DIR}"
+mkdir -p "${SOLODAWN_ASSET_DIR}" "${SOLODAWN_TEMP_DIR}"
 
 if ! command -v git > /dev/null 2>&1; then
     echo "FATAL: git not found" >&2
@@ -22,17 +22,17 @@ fi
 echo "Node.js: $(node --version)"
 echo "npm: $(npm --version)"
 echo "git: $(git --version)"
-echo "Asset dir: ${GITCORTEX_ASSET_DIR}"
-echo "Temp dir: ${GITCORTEX_TEMP_DIR}"
+echo "Asset dir: ${SOLODAWN_ASSET_DIR}"
+echo "Temp dir: ${SOLODAWN_TEMP_DIR}"
 
 configure_git_safe_directories() {
     local roots_raw roots_normalized
-    roots_raw="${GITCORTEX_ALLOWED_ROOTS:-}"
-    if [[ -n "${GITCORTEX_WORKSPACE_ROOT:-}" ]]; then
+    roots_raw="${SOLODAWN_ALLOWED_ROOTS:-}"
+    if [[ -n "${SOLODAWN_WORKSPACE_ROOT:-}" ]]; then
         if [[ -n "${roots_raw}" ]]; then
-            roots_raw="${roots_raw},${GITCORTEX_WORKSPACE_ROOT}"
+            roots_raw="${roots_raw},${SOLODAWN_WORKSPACE_ROOT}"
         else
-            roots_raw="${GITCORTEX_WORKSPACE_ROOT}"
+            roots_raw="${SOLODAWN_WORKSPACE_ROOT}"
         fi
     fi
 

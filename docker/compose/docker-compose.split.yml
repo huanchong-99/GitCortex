@@ -4,20 +4,20 @@ services:
       context: ../..
       dockerfile: docker/Dockerfile.server
       args:
-        GITCORTEX_BUILD_NETWORK_PROFILE: ${GITCORTEX_BUILD_NETWORK_PROFILE:-official}
+        SOLODAWN_BUILD_NETWORK_PROFILE: ${SOLODAWN_BUILD_NETWORK_PROFILE:-official}
         BUILDKIT_INLINE_CACHE: "1"
     ports:
-      - "${GITCORTEX_PORT:-23456}:23456"
+      - "${SOLODAWN_PORT:-23456}:23456"
     environment:
-      GITCORTEX_RUNNER_MODE: remote
-      GITCORTEX_RUNNER_ADDR: http://runner:50051
-      GITCORTEX_MESSAGE_BUS: redis
-      GITCORTEX_REDIS_URL: redis://redis:6379
-      GITCORTEX_ENCRYPTION_KEY: ${GITCORTEX_ENCRYPTION_KEY}
-      GITCORTEX_API_TOKEN: ${GITCORTEX_API_TOKEN:-}
-      GITCORTEX_CORS_ORIGINS: ${GITCORTEX_CORS_ORIGINS:-}
+      SOLODAWN_RUNNER_MODE: remote
+      SOLODAWN_RUNNER_ADDR: http://runner:50051
+      SOLODAWN_MESSAGE_BUS: redis
+      SOLODAWN_REDIS_URL: redis://redis:6379
+      SOLODAWN_ENCRYPTION_KEY: ${SOLODAWN_ENCRYPTION_KEY}
+      SOLODAWN_API_TOKEN: ${SOLODAWN_API_TOKEN:-}
+      SOLODAWN_CORS_ORIGINS: ${SOLODAWN_CORS_ORIGINS:-}
     volumes:
-      - gitcortex-data:/var/lib/gitcortex
+      - solodawn-data:/var/lib/solodawn
     depends_on:
       redis:
         condition: service_healthy
@@ -34,14 +34,14 @@ services:
       context: ../..
       dockerfile: docker/Dockerfile.runner
       args:
-        GITCORTEX_BUILD_NETWORK_PROFILE: ${GITCORTEX_BUILD_NETWORK_PROFILE:-official}
+        SOLODAWN_BUILD_NETWORK_PROFILE: ${SOLODAWN_BUILD_NETWORK_PROFILE:-official}
         BUILDKIT_INLINE_CACHE: "1"
     environment:
-      GITCORTEX_RUNNER_ADDR: "0.0.0.0:50051"
-      GITCORTEX_MESSAGE_BUS: redis
-      GITCORTEX_REDIS_URL: redis://redis:6379
+      SOLODAWN_RUNNER_ADDR: "0.0.0.0:50051"
+      SOLODAWN_MESSAGE_BUS: redis
+      SOLODAWN_REDIS_URL: redis://redis:6379
     volumes:
-      - ${HOST_WORKSPACE_ROOT:-./workspace}:${GITCORTEX_WORKSPACE_ROOT:-/workspace}
+      - ${HOST_WORKSPACE_ROOT:-./workspace}:${SOLODAWN_WORKSPACE_ROOT:-/workspace}
     restart: unless-stopped
 
   redis:
@@ -57,5 +57,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  gitcortex-data:
+  solodawn-data:
   redis-data:

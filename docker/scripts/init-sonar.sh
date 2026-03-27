@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# init-sonar.sh — Initialize SonarQube for GitCortex
+# init-sonar.sh — Initialize SonarQube for SoloDawn
 # Usage: ./init-sonar.sh [sonar_url] [admin_password]
 set -euo pipefail
 
 SONAR_URL="${1:-http://localhost:9000}"
 ADMIN_PASS="${2:-admin}"
-PROJECT_KEY="gitcortex"
-PROJECT_NAME="GitCortex"
+PROJECT_KEY="solodawn"
+PROJECT_NAME="SoloDawn"
 MAX_WAIT=300
 POLL_INTERVAL=5
 
@@ -56,8 +56,8 @@ done
 echo "[init-sonar] Quality profiles configured."
 
 # ── Step 4: Configure webhook for quality gate results ────────────
-WEBHOOK_NAME="GitCortex Quality Gate"
-WEBHOOK_URL="http://gitcortex:23456/api/webhooks/sonar"
+WEBHOOK_NAME="SoloDawn Quality Gate"
+WEBHOOK_URL="http://solodawn:23456/api/webhooks/sonar"
 
 echo "[init-sonar] Checking webhooks ..."
 webhook_exists=$(curl -sf -u "admin:${ADMIN_PASS}" \

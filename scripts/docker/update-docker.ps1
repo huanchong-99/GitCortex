@@ -34,7 +34,7 @@ $script:Messages = @{
         ERR_COMPOSE_CONFIG = "docker compose 配置校验失败。"
         ERR_BUILD_FAILED = "docker compose build 失败。"
         ERR_UP_FAILED = "docker compose up 失败。"
-        TITLE = "=== GitCortex Docker 更新 ==="
+        TITLE = "=== SoloDawn Docker 更新 ==="
         INFO_PULLING = "正在拉取最新代码..."
         INFO_VALIDATING = "正在校验 compose 配置..."
         INFO_BUILDING = "正在重建 Docker 镜像..."
@@ -71,7 +71,7 @@ $script:Messages = @{
         ERR_COMPOSE_CONFIG = "docker compose config validation failed."
         ERR_BUILD_FAILED = "docker compose build failed."
         ERR_UP_FAILED = "docker compose up failed."
-        TITLE = "=== GitCortex Docker Update ==="
+        TITLE = "=== SoloDawn Docker Update ==="
         INFO_PULLING = "Pulling latest code..."
         INFO_VALIDATING = "Validating compose configuration..."
         INFO_BUILDING = "Rebuilding Docker image..."
@@ -464,10 +464,10 @@ function Resolve-PrebuiltImageCandidates {
     )
 
     $repo = if ([string]::IsNullOrWhiteSpace($Namespace)) {
-        "gitcortex"
+        "solodawn"
     }
     else {
-        "$Namespace/gitcortex"
+        "$Namespace/solodawn"
     }
 
     $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
@@ -585,12 +585,12 @@ try {
         $resolvedPort = "23456"
     }
 
-    $buildNetworkProfile = Get-EnvValue -Path $envFilePath -Name "GITCORTEX_BUILD_NETWORK_PROFILE"
+    $buildNetworkProfile = Get-EnvValue -Path $envFilePath -Name "SOLODAWN_BUILD_NETWORK_PROFILE"
     if ([string]::IsNullOrWhiteSpace($buildNetworkProfile)) {
         $buildNetworkProfile = "official"
     }
 
-    $imageRegistry = Get-EnvValue -Path $envFilePath -Name "GITCORTEX_IMAGE_REGISTRY"
+    $imageRegistry = Get-EnvValue -Path $envFilePath -Name "SOLODAWN_IMAGE_REGISTRY"
     if ([string]::IsNullOrWhiteSpace($imageRegistry)) {
         $imageRegistry = "ghcr.io"
     }
@@ -598,12 +598,12 @@ try {
         $imageRegistry = $imageRegistry.Trim().TrimEnd("/")
     }
 
-    $imageNamespace = Get-EnvValue -Path $envFilePath -Name "GITCORTEX_IMAGE_NAMESPACE"
+    $imageNamespace = Get-EnvValue -Path $envFilePath -Name "SOLODAWN_IMAGE_NAMESPACE"
     if (-not [string]::IsNullOrWhiteSpace($imageNamespace)) {
         $imageNamespace = $imageNamespace.Trim().Trim("/")
     }
 
-    $imagePullPolicy = Get-EnvValue -Path $envFilePath -Name "GITCORTEX_IMAGE_PULL_POLICY"
+    $imagePullPolicy = Get-EnvValue -Path $envFilePath -Name "SOLODAWN_IMAGE_PULL_POLICY"
     if (-not ($imagePullPolicy -in @("always", "missing", "never"))) {
         $imagePullPolicy = "missing"
     }
@@ -618,7 +618,7 @@ try {
     Write-Ok (T "OK_COMPOSE_VALID")
 
     if (-not $SkipBuild) {
-        $targetComposeImage = "gitcortex-gitcortex:latest"
+        $targetComposeImage = "solodawn-solodawn:latest"
         $usedPrebuilt = $false
 
         if ($PreferPrebuiltImage -and $imagePullPolicy -ne "never") {

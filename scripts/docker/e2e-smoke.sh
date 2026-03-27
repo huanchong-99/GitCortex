@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== GitCortex Docker E2E Smoke Test ==="
+echo "=== SoloDawn Docker E2E Smoke Test ==="
 
 COMPOSE_FILE="docker/compose/docker-compose.dev.yml"
 BASE_URL="http://localhost:23456"

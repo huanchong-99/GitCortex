@@ -1,33 +1,33 @@
 services:
-  gitcortex:
+  solodawn:
     build:
       context: ../..
       dockerfile: docker/Dockerfile
       args:
-        GITCORTEX_BUILD_NETWORK_PROFILE: ${GITCORTEX_BUILD_NETWORK_PROFILE:-official}
+        SOLODAWN_BUILD_NETWORK_PROFILE: ${SOLODAWN_BUILD_NETWORK_PROFILE:-official}
         INSTALL_AI_CLIS: ${INSTALL_AI_CLIS:-0}
         BUILDKIT_INLINE_CACHE: "1"
-    working_dir: ${GITCORTEX_WORKSPACE_ROOT:-/workspace}
+    working_dir: ${SOLODAWN_WORKSPACE_ROOT:-/workspace}
     ports:
       - "23456:23456"
     volumes:
-      - gitcortex-dev-data:/var/lib/gitcortex
-      - ${HOST_WORKSPACE_ROOT:-../..}:${GITCORTEX_WORKSPACE_ROOT:-/workspace}
+      - solodawn-dev-data:/var/lib/solodawn
+      - ${HOST_WORKSPACE_ROOT:-../..}:${SOLODAWN_WORKSPACE_ROOT:-/workspace}
     environment:
-      - GITCORTEX_ASSET_DIR=/var/lib/gitcortex/assets
-      - GITCORTEX_TEMP_DIR=/var/lib/gitcortex
-      - GITCORTEX_ALLOWED_ROOTS=${GITCORTEX_ALLOWED_ROOTS:-/workspace,/var/lib/gitcortex}
+      - SOLODAWN_ASSET_DIR=/var/lib/solodawn/assets
+      - SOLODAWN_TEMP_DIR=/var/lib/solodawn
+      - SOLODAWN_ALLOWED_ROOTS=${SOLODAWN_ALLOWED_ROOTS:-/workspace,/var/lib/solodawn}
       - HOST=0.0.0.0
       - PORT=23456
       - RUST_LOG=debug
-      - GITCORTEX_ENCRYPTION_KEY=${GITCORTEX_ENCRYPTION_KEY:?Set GITCORTEX_ENCRYPTION_KEY in docker/compose/.env}
-      - GITCORTEX_API_TOKEN=${GITCORTEX_DOCKER_API_TOKEN:-}
-      - GITCORTEX_AUTO_SETUP_PROJECTS=${GITCORTEX_AUTO_SETUP_PROJECTS:-1}
+      - SOLODAWN_ENCRYPTION_KEY=${SOLODAWN_ENCRYPTION_KEY:?Set SOLODAWN_ENCRYPTION_KEY in docker/compose/.env}
+      - SOLODAWN_API_TOKEN=${SOLODAWN_DOCKER_API_TOKEN:-}
+      - SOLODAWN_AUTO_SETUP_PROJECTS=${SOLODAWN_AUTO_SETUP_PROJECTS:-1}
       # Quality gate configuration
       - QUALITY_GATE_MODE=${QUALITY_GATE_MODE:-shadow}
       - SONAR_TOKEN=${SONAR_TOKEN:-}
       - SONAR_HOST_URL=${SONAR_HOST_URL:-http://sonarqube:9000}
-      - SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-gitcortex}
+      - SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-solodawn}
     env_file:
       - .env
     depends_on:
@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  gitcortex-dev-data:
+  solodawn-dev-data:
   sonarqube-db-data:
   sonarqube-data:
   sonarqube-extensions:

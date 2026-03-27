@@ -9,7 +9,7 @@ trap 'log_error "Installation failed at line $LINENO"' ERR
 require_command node
 require_command npm
 
-log_info "=== GitCortex AI CLI Installation ==="
+log_info "=== SoloDawn AI CLI Installation ==="
 
 CORE_CLIS=(
     "${CLAUDE_CODE_NPM_PKG:-@anthropic-ai/claude-code}"
@@ -37,7 +37,7 @@ for pkg in "${EXTENDED_CLIS[@]}"; do
 done
 
 if command -v gh >/dev/null 2>&1; then
-    : "${GH_EXTENSIONS_DIR:=/opt/gitcortex/gh-extensions}"
+    : "${GH_EXTENSIONS_DIR:=/opt/solodawn/gh-extensions}"
     export GH_EXTENSIONS_DIR
     mkdir -p "$GH_EXTENSIONS_DIR"
 

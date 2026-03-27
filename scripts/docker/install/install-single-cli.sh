@@ -97,7 +97,7 @@ install_copilot() {
         return 1
     fi
 
-    : "${GH_EXTENSIONS_DIR:=/opt/gitcortex/gh-extensions}"
+    : "${GH_EXTENSIONS_DIR:=/opt/solodawn/gh-extensions}"
     export GH_EXTENSIONS_DIR
     mkdir -p "$GH_EXTENSIONS_DIR"
 
@@ -116,7 +116,7 @@ uninstall_copilot() {
         return 1
     fi
 
-    : "${GH_EXTENSIONS_DIR:=/opt/gitcortex/gh-extensions}"
+    : "${GH_EXTENSIONS_DIR:=/opt/solodawn/gh-extensions}"
     export GH_EXTENSIONS_DIR
 
     log_info "Removing GitHub Copilot CLI extension..."

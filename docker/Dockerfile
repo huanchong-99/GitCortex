@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG GITCORTEX_BUILD_NETWORK_PROFILE=official
+ARG SOLODAWN_BUILD_NETWORK_PROFILE=official
 ARG PNPM_VERSION=10.13.1
 ARG RUST_TOOLCHAIN=nightly-2025-12-04
 ARG NODE_MAJOR=22
@@ -9,7 +9,7 @@ ARG NODE_MAJOR=22
 # Stage 1: Frontend build
 # ============================================================
 FROM node:${NODE_MAJOR}-slim AS frontend-builder
-ARG GITCORTEX_BUILD_NETWORK_PROFILE
+ARG SOLODAWN_BUILD_NETWORK_PROFILE
 ARG PNPM_VERSION
 
 WORKDIR /build
@@ -19,7 +19,7 @@ RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 # China mirror for npm/pnpm (only affects pnpm install, not corepack)
 RUN set -eux; \
-    if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         npm config --global set registry https://registry.npmmirror.com; \
         pnpm config set registry https://registry.npmmirror.com --global; \
     fi
@@ -28,7 +28,7 @@ RUN set -eux; \
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY frontend/package.json frontend/
 
-RUN --mount=type=cache,id=gitcortex-pnpm-store,target=/pnpm/store,sharing=locked \
+RUN --mount=type=cache,id=solodawn-pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm config set store-dir /pnpm/store && \
     cd frontend && \
     pnpm install --frozen-lockfile --prefer-offline
@@ -38,7 +38,7 @@ COPY frontend/ frontend/
 COPY shared/ shared/
 
 ENV BROWSERSLIST_IGNORE_OLD_DATA=1 \
-    GITCORTEX_BUILD_SOURCEMAP=0
+    SOLODAWN_BUILD_SOURCEMAP=0
 
 RUN cd frontend && pnpm run build:docker
 
@@ -46,16 +46,16 @@ RUN cd frontend && pnpm run build:docker
 # Stage 2: Rust toolchain + system deps (heavily cached layer)
 # ============================================================
 FROM rust:slim-trixie AS rust-base
-ARG GITCORTEX_BUILD_NETWORK_PROFILE
+ARG SOLODAWN_BUILD_NETWORK_PROFILE
 ARG RUST_TOOLCHAIN
 
 RUN set -eux; \
-    if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/*.sources 2>/dev/null || \
         sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true; \
     fi; \
     printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
-        > /etc/apt/apt.conf.d/80gitcortex-retries; \
+        > /etc/apt/apt.conf.d/80solodawn-retries; \
     apt-get update && apt-get install -y --no-install-recommends \
         git pkg-config libsqlite3-dev libgit2-dev zlib1g-dev \
         cmake make ninja-build clang libclang-dev perl nasm libssl-dev \
@@ -63,7 +63,7 @@ RUN set -eux; \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-    if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         export RUSTUP_DIST_SERVER=https://rsproxy.cn; \
         export RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup; \
     fi; \
@@ -80,7 +80,7 @@ ENV SQLX_OFFLINE=true \
     AWS_LC_SYS_STATIC=1
 
 RUN set -eux; \
-    if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         mkdir -p /usr/local/cargo && \
         printf '%s\n' \
             '[source.crates-io]' \
@@ -99,8 +99,8 @@ RUN set -eux; \
 # ============================================================
 FROM rust-base AS rust-with-chef
 
-RUN --mount=type=cache,id=gitcortex-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=gitcortex-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+RUN --mount=type=cache,id=solodawn-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=solodawn-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     cargo install cargo-chef --locked
 
 # ============================================================
@@ -142,8 +142,8 @@ COPY --from=chef-planner /build/recipe.json recipe.json
 # Uses --profile docker (opt-level=1, codegen-units=256) for
 # faster builds. cargo-chef supports --profile since v0.1.62.
 # BuildKit cache mounts keep the cargo registry/git warm.
-RUN --mount=type=cache,id=gitcortex-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=gitcortex-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+RUN --mount=type=cache,id=solodawn-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=solodawn-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     cargo chef cook --profile docker --recipe-path recipe.json -p server
 
 # Now copy the full project source code.
@@ -156,30 +156,30 @@ COPY assets/ assets/
 COPY shared/ shared/
 COPY --from=frontend-builder /build/frontend/dist frontend/dist
 
-RUN --mount=type=cache,id=gitcortex-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=gitcortex-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+RUN --mount=type=cache,id=solodawn-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=solodawn-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     cargo build --profile docker --locked -p server \
-    && cp /build/target/docker/server /tmp/gitcortex-server
+    && cp /build/target/docker/server /tmp/solodawn-server
 
 # ============================================================
 # Stage 4: Runtime (minimal footprint)
 # ============================================================
 FROM debian:trixie-slim AS runtime
-ARG GITCORTEX_BUILD_NETWORK_PROFILE
+ARG SOLODAWN_BUILD_NETWORK_PROFILE
 ARG INSTALL_AI_CLIS=0
 ARG NODE_MAJOR=22
 
 RUN set -eux; \
-    if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/*.sources 2>/dev/null || \
         sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true; \
     fi; \
     printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
-        > /etc/apt/apt.conf.d/80gitcortex-retries; \
+        > /etc/apt/apt.conf.d/80solodawn-retries; \
     apt-get update && apt-get install -y --no-install-recommends \
         libsqlite3-0 libgit2-1.9 git curl ca-certificates bash gnupg xz-utils \
     && rm -rf /var/lib/apt/lists/* \
-    && if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    && if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         NODE_DIST_URL="https://npmmirror.com/mirrors/node"; \
     else \
         NODE_DIST_URL="https://nodejs.org/dist"; \
@@ -201,7 +201,7 @@ RUN set -eux; \
     && npm config --global set fetch-retry-mintimeout 20000 \
     && npm config --global set fetch-retry-maxtimeout 120000 \
     && npm config --global set fetch-timeout 300000 \
-    && if [ "$GITCORTEX_BUILD_NETWORK_PROFILE" = "china" ]; then \
+    && if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
         npm config --global set registry https://registry.npmmirror.com; \
     fi \
     && if [ "$INSTALL_AI_CLIS" = "1" ]; then \
@@ -222,39 +222,39 @@ RUN set -eux; \
         rm -rf /var/lib/apt/lists/*; \
     fi
 
-ENV NPM_CONFIG_PREFIX=/var/lib/gitcortex/.npm-global \
-    GH_EXTENSIONS_DIR=/var/lib/gitcortex/gh-extensions \
-    PATH=/var/lib/gitcortex/.npm-global/bin:$PATH
+ENV NPM_CONFIG_PREFIX=/var/lib/solodawn/.npm-global \
+    GH_EXTENSIONS_DIR=/var/lib/solodawn/gh-extensions \
+    PATH=/var/lib/solodawn/.npm-global/bin:$PATH
 
-COPY scripts/docker/install/ /opt/gitcortex/install/
-RUN mkdir -p /var/lib/gitcortex/.npm-global \
-        /var/lib/gitcortex/gh-extensions \
+COPY scripts/docker/install/ /opt/solodawn/install/
+RUN mkdir -p /var/lib/solodawn/.npm-global \
+        /var/lib/solodawn/gh-extensions \
     && if [ "$INSTALL_AI_CLIS" = "1" ]; then \
-        bash /opt/gitcortex/install/install-ai-clis.sh; \
+        bash /opt/solodawn/install/install-ai-clis.sh; \
     else \
         echo "Skipping AI CLI installation during image build (INSTALL_AI_CLIS=$INSTALL_AI_CLIS)"; \
     fi
 
-COPY --from=rust-builder /tmp/gitcortex-server /usr/local/bin/gitcortex-server
-COPY assets/scripts/ /opt/gitcortex/assets/scripts/
+COPY --from=rust-builder /tmp/solodawn-server /usr/local/bin/solodawn-server
+COPY assets/scripts/ /opt/solodawn/assets/scripts/
 
-RUN groupadd -r gitcortex && useradd -r -g gitcortex -m gitcortex \
-    && mkdir -p /var/lib/gitcortex/assets /var/lib/gitcortex \
-    && chown -R gitcortex:gitcortex /var/lib/gitcortex
-VOLUME ["/var/lib/gitcortex"]
+RUN groupadd -r solodawn && useradd -r -g solodawn -m solodawn \
+    && mkdir -p /var/lib/solodawn/assets /var/lib/solodawn \
+    && chown -R solodawn:solodawn /var/lib/solodawn
+VOLUME ["/var/lib/solodawn"]
 
-ENV GITCORTEX_ASSET_DIR=/var/lib/gitcortex/assets \
-    GITCORTEX_TEMP_DIR=/var/lib/gitcortex \
+ENV SOLODAWN_ASSET_DIR=/var/lib/solodawn/assets \
+    SOLODAWN_TEMP_DIR=/var/lib/solodawn \
     HOST=0.0.0.0 \
     PORT=23456 \
     RUST_LOG=info
 
 EXPOSE 23456
 
-COPY scripts/docker/entrypoint.sh /opt/gitcortex/entrypoint.sh
-RUN chmod +x /opt/gitcortex/entrypoint.sh
+COPY scripts/docker/entrypoint.sh /opt/solodawn/entrypoint.sh
+RUN chmod +x /opt/solodawn/entrypoint.sh
 
-USER gitcortex
+USER solodawn
 
-ENTRYPOINT ["/opt/gitcortex/entrypoint.sh"]
-CMD ["gitcortex-server"]
+ENTRYPOINT ["/opt/solodawn/entrypoint.sh"]
+CMD ["solodawn-server"]

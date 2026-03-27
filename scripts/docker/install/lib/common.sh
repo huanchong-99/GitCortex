@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # Guard against multiple sourcing
-if [[ -n "${_GITCORTEX_COMMON_SH_LOADED:-}" ]]; then
+if [[ -n "${_SOLODAWN_COMMON_SH_LOADED:-}" ]]; then
     return 0 2>/dev/null || exit 0
 fi
-readonly _GITCORTEX_COMMON_SH_LOADED=1
+readonly _SOLODAWN_COMMON_SH_LOADED=1
 
 # --- Logging ---
 
