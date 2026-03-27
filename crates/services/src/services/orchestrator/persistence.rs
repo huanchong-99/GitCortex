@@ -279,33 +279,6 @@ impl StatePersistence {
         Ok(())
     }
 
-    /// Save task execution progress
-    ///
-    /// **Deprecated / placeholder** — this method is a no-op.
-    /// Full state is persisted via `save_state()` which includes all task
-    /// states. When a dedicated `task_progress` table is introduced, this
-    /// method will perform incremental upserts. Do not rely on it for
-    /// correctness; it exists only to reserve the API surface.
-    #[allow(unused)]
-    #[deprecated(note = "no-op placeholder; use save_state() for full persistence")]
-    pub async fn save_task_progress(
-        &self,
-        workflow_id: &str,
-        task_id: &str,
-        _completed_terminals: &[String],
-        _failed_terminals: &[String],
-    ) -> Result<()> {
-        debug!(
-            "Saving task progress for workflow {} task {}",
-            workflow_id, task_id
-        );
-
-        // This could be stored in a dedicated task progress table
-        // For now, we'll rely on save_state() which includes all task states
-
-        Ok(())
-    }
-
     /// Restore conversation history
     ///
     /// Loads conversation history for a workflow.

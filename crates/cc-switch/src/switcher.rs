@@ -120,10 +120,8 @@ impl ModelSwitcher {
 
     /// 切换模型
     pub async fn switch(&self, cli_type: CliType, config: &SwitchConfig) -> Result<()> {
-        // TODO: 实现备份功能
         if self.backup_before_switch {
-            tracing::debug!("Backing up config before switch...");
-            // self.backup_config(cli_type).await?;
+            tracing::debug!("Backing up config before switch (not yet implemented)");
         }
 
         switch_model(cli_type, config).await

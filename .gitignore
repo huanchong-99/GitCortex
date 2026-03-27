@@ -90,7 +90,9 @@ snapshot.txt
 .codex_logs/
 .runlogs/
 runtime-logs/
+self-test*.log
 check_output.txt
 test_output.txt
 quality-report-*.md
+.tmp_*.log
 test_task.json

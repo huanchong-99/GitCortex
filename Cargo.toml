@@ -8,7 +8,7 @@ members = [
     "crates/utils",
     "crates/local-deployment",
     "crates/deployment",
-    "crates/review",
+
     "crates/cc-switch",
     "crates/feishu-connector",
     "crates/quality",

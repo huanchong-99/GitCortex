@@ -263,11 +263,6 @@ impl EditorConfig {
         ))
     }
 
-    #[allow(dead_code)]
-    fn remote_url(&self, path: &Path) -> Option<String> {
-        self.remote_url_with_hint(path, None)
-    }
-
     pub async fn spawn_local(&self, path: &Path) -> Result<(), EditorOpenError> {
         let (executable, args) = self.resolve_command().await?;
 
