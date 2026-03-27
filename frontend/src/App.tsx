@@ -40,7 +40,7 @@ import { NewDesignScope } from '@/components/ui-new/scope/NewDesignScope';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { NewDesignLayout } from '@/components/layout/NewDesignLayout';
 
-// GitCortex pages
+// SoloDawn pages
 import { Board } from '@/pages/Board';
 import { Pipeline } from '@/pages/Pipeline';
 import { WorkflowDebugPage } from '@/pages/WorkflowDebugPage';

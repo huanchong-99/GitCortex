@@ -8,7 +8,7 @@
       "done": "开始使用"
     },
     "welcome": {
-      "title": "欢迎使用 GitCortex",
+      "title": "欢迎使用 SoloDawn",
       "subtitle": "让我们用几个简单步骤来配置您的环境。您可以跳过此步骤，稍后在设置中配置。",
       "languageLabel": "语言",
       "continueButton": "继续",
@@ -17,7 +17,7 @@
     },
     "model": {
       "title": "配置 AI 模型",
-      "subtitle": "GitCortex 需要至少一个 AI 模型来运行工作流。您可以稍后在设置中添加更多模型。",
+      "subtitle": "SoloDawn 需要至少一个 AI 模型来运行工作流。您可以稍后在设置中添加更多模型。",
       "displayNameLabel": "显示名称",
       "displayNamePlaceholder": "例如：我的 Claude API",
       "apiTypeLabel": "API 类型",
@@ -45,7 +45,7 @@
     },
     "project": {
       "title": "设置项目",
-      "subtitle": "为您的第一个项目选择工作目录。GitCortex 将在此目录中管理您的代码。",
+      "subtitle": "为您的第一个项目选择工作目录。SoloDawn 将在此目录中管理您的代码。",
       "optionalBadge": "可选",
       "directoryLabel": "工作目录",
       "directoryPlaceholder": "选择目录...",
@@ -62,10 +62,10 @@
     },
     "integrations": {
       "title": "集成",
-      "subtitle": "将 GitCortex 与您常用的工具连接。所有集成均为可选项。",
+      "subtitle": "将 SoloDawn 与您常用的工具连接。所有集成均为可选项。",
       "feishu": {
         "label": "飞书 / Lark",
-        "description": "通过飞书机器人接收工作流通知并与 GitCortex 交互。",
+        "description": "通过飞书机器人接收工作流通知并与 SoloDawn 交互。",
         "appIdLabel": "App ID",
         "appIdPlaceholder": "输入飞书 App ID",
         "appSecretLabel": "App Secret",
@@ -75,7 +75,7 @@
     },
     "done": {
       "title": "一切就绪！",
-      "subtitle": "GitCortex 已准备就绪。现在开始创建您的第一个工作流吧。",
+      "subtitle": "SoloDawn 已准备就绪。现在开始创建您的第一个工作流吧。",
       "getStartedButton": "开始使用",
       "rerunHint": "您可以随时在设置中重新运行此设置向导。"
     }
@@ -91,9 +91,9 @@
     "continueButton": "继续",
     "backButton": "返回",
     "welcome": {
-      "title": "欢迎使用 GitCortex",
+      "title": "欢迎使用 SoloDawn",
       "subtitle": "安装已就绪，让我们验证一切正常运行。",
-      "description": "GitCortex 已预装所有必需工具。此向导将帮助您验证安装并配置所需的 AI CLI API 密钥。"
+      "description": "SoloDawn 已预装所有必需工具。此向导将帮助您验证安装并配置所需的 AI CLI API 密钥。"
     },
     "environment": {
       "title": "环境状态",
@@ -107,7 +107,7 @@
     },
     "done": {
       "title": "一切就绪！",
-      "subtitle": "GitCortex 已准备就绪。您随时可以在设置中配置 API 密钥、更新 CLI 工具或更改 npm 镜像。",
+      "subtitle": "SoloDawn 已准备就绪。您随时可以在设置中配置 API 密钥、更新 CLI 工具或更改 npm 镜像。",
       "startButton": "开始使用"
     }
   }

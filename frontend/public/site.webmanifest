@@ -1,15 +1,15 @@
 {
-  "name": "GitCortex",
-  "short_name": "GC",
+  "name": "SoloDawn",
+  "short_name": "SD",
   "icons": [
     {
-      "src": "/favicon-gitcortex-light.svg",
+      "src": "/favicon-solodawn-light.svg",
       "sizes": "any",
       "purpose": "any",
       "type": "image/svg+xml"
     },
     {
-      "src": "/favicon-gitcortex-dark.svg",
+      "src": "/favicon-solodawn-dark.svg",
       "sizes": "any",
       "purpose": "maskable",
       "type": "image/svg+xml"

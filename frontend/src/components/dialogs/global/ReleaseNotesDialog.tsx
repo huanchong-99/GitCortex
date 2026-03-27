@@ -14,7 +14,7 @@ import { getActualTheme } from '@/utils/theme';
 import { defineModal, type NoProps } from '@/lib/modals';
 import { useTranslation } from 'react-i18next';
 
-const RELEASE_NOTES_BASE_URL = 'https://gitcortex.com/release-notes';
+const RELEASE_NOTES_BASE_URL = 'https://solodawn.com/release-notes';
 
 const ReleaseNotesDialogImpl = NiceModal.create<NoProps>(() => {
   const modal = useModal();

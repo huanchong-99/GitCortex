@@ -1,5 +1,5 @@
 export const paths = {
-  // GitCortex paths
+  // SoloDawn paths
   board: () => '/board',
   wizard: () => '/wizard',
   workflows: () => '/workflows',

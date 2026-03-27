@@ -8,7 +8,7 @@
       "done": "시작하기"
     },
     "welcome": {
-      "title": "GitCortex에 오신 것을 환영합니다",
+      "title": "SoloDawn에 오신 것을 환영합니다",
       "subtitle": "몇 가지 간단한 단계를 통해 환경을 설정해 보겠습니다. 이 과정을 건너뛰고 나중에 설정에서 구성할 수도 있습니다.",
       "languageLabel": "언어",
       "continueButton": "계속",
@@ -16,7 +16,7 @@
     },
     "model": {
       "title": "AI 모델 설정",
-      "subtitle": "GitCortex에서 워크플로를 실행하려면 최소 하나의 AI 모델이 필요합니다. 나중에 설정에서 더 추가할 수 있습니다.",
+      "subtitle": "SoloDawn에서 워크플로를 실행하려면 최소 하나의 AI 모델이 필요합니다. 나중에 설정에서 더 추가할 수 있습니다.",
       "displayNameLabel": "표시 이름",
       "displayNamePlaceholder": "예: My Claude API",
       "apiTypeLabel": "API 유형",
@@ -43,7 +43,7 @@
     },
     "project": {
       "title": "프로젝트 설정",
-      "subtitle": "첫 번째 프로젝트의 작업 디렉터리를 선택하세요. GitCortex가 이 디렉터리에서 코드를 관리합니다.",
+      "subtitle": "첫 번째 프로젝트의 작업 디렉터리를 선택하세요. SoloDawn가 이 디렉터리에서 코드를 관리합니다.",
       "optionalBadge": "선택",
       "directoryLabel": "작업 디렉터리",
       "directoryPlaceholder": "디렉터리 선택...",
@@ -60,10 +60,10 @@
     },
     "integrations": {
       "title": "연동",
-      "subtitle": "GitCortex를 자주 사용하는 도구와 연결하세요. 모든 연동은 선택 사항입니다.",
+      "subtitle": "SoloDawn를 자주 사용하는 도구와 연결하세요. 모든 연동은 선택 사항입니다.",
       "feishu": {
         "label": "Feishu / Lark",
-        "description": "Feishu 봇을 통해 워크플로 알림을 받고 GitCortex와 상호작용할 수 있습니다.",
+        "description": "Feishu 봇을 통해 워크플로 알림을 받고 SoloDawn와 상호작용할 수 있습니다.",
         "appIdLabel": "App ID",
         "appIdPlaceholder": "Feishu App ID 입력",
         "appSecretLabel": "App Secret",
@@ -73,7 +73,7 @@
     },
     "done": {
       "title": "모든 준비가 완료되었습니다!",
-      "subtitle": "GitCortex를 사용할 준비가 되었습니다. 첫 번째 워크플로를 만들어 보세요.",
+      "subtitle": "SoloDawn를 사용할 준비가 되었습니다. 첫 번째 워크플로를 만들어 보세요.",
       "getStartedButton": "시작하기",
       "rerunHint": "이 설정은 언제든지 설정에서 다시 실행할 수 있습니다."
     }

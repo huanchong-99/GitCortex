@@ -8,7 +8,7 @@
       "done": "Get Started"
     },
     "welcome": {
-      "title": "Welcome to GitCortex",
+      "title": "Welcome to SoloDawn",
       "subtitle": "Let's set up your environment in a few simple steps. You can skip this and configure everything later in Settings.",
       "languageLabel": "Language",
       "continueButton": "Continue",
@@ -17,7 +17,7 @@
     },
     "model": {
       "title": "Configure an AI Model",
-      "subtitle": "GitCortex needs at least one AI model to run workflows. You can add more later in Settings.",
+      "subtitle": "SoloDawn needs at least one AI model to run workflows. You can add more later in Settings.",
       "displayNameLabel": "Display Name",
       "displayNamePlaceholder": "e.g. My Claude API",
       "apiTypeLabel": "API Type",
@@ -45,7 +45,7 @@
     },
     "project": {
       "title": "Set Up a Project",
-      "subtitle": "Select a working directory for your first project. This is where GitCortex will manage your code.",
+      "subtitle": "Select a working directory for your first project. This is where SoloDawn will manage your code.",
       "optionalBadge": "Optional",
       "directoryLabel": "Working Directory",
       "directoryPlaceholder": "Select a directory...",
@@ -62,10 +62,10 @@
     },
     "integrations": {
       "title": "Integrations",
-      "subtitle": "Connect GitCortex with your favorite tools. All integrations are optional.",
+      "subtitle": "Connect SoloDawn with your favorite tools. All integrations are optional.",
       "feishu": {
         "label": "Feishu / Lark",
-        "description": "Receive workflow notifications and interact with GitCortex through Feishu bot.",
+        "description": "Receive workflow notifications and interact with SoloDawn through Feishu bot.",
         "appIdLabel": "App ID",
         "appIdPlaceholder": "Enter Feishu App ID",
         "appSecretLabel": "App Secret",
@@ -75,7 +75,7 @@
     },
     "done": {
       "title": "You're All Set!",
-      "subtitle": "GitCortex is ready to go. Start by creating your first workflow.",
+      "subtitle": "SoloDawn is ready to go. Start by creating your first workflow.",
       "getStartedButton": "Get Started",
       "rerunHint": "You can re-run this setup anytime from Settings."
     }
@@ -91,9 +91,9 @@
     "continueButton": "Continue",
     "backButton": "Back",
     "welcome": {
-      "title": "Welcome to GitCortex",
+      "title": "Welcome to SoloDawn",
       "subtitle": "Your installation is ready. Let's verify everything is working.",
-      "description": "GitCortex has been installed. This wizard will help you verify system prerequisites, check the installation, and configure API keys for the AI CLIs you want to use."
+      "description": "SoloDawn has been installed. This wizard will help you verify system prerequisites, check the installation, and configure API keys for the AI CLIs you want to use."
     },
     "environment": {
       "title": "Environment Status",
@@ -107,7 +107,7 @@
     },
     "done": {
       "title": "All Set!",
-      "subtitle": "GitCortex is ready to use. You can always revisit settings to configure API keys, update CLI tools, or change the npm mirror.",
+      "subtitle": "SoloDawn is ready to use. You can always revisit settings to configure API keys, update CLI tools, or change the npm mirror.",
       "startButton": "Get Started"
     }
   }

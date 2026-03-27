@@ -4,7 +4,7 @@ import { useAuth } from './auth/useAuth';
 import { secureRandomIdFragment } from '@/utils/id';
 
 const MAX_VISITED_PATHS = 50;
-const SESSION_STORAGE_KEY = 'gitcortex.previous-path.session-id';
+const SESSION_STORAGE_KEY = 'solodawn.previous-path.session-id';
 const visitedByScope = new Map<string, string[]>();
 
 function createSessionId(): string {

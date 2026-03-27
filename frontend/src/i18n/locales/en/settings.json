@@ -71,7 +71,7 @@
           "host": {
             "label": "Remote SSH Host (Optional)",
             "placeholder": "e.g., hostname or IP address",
-            "helper": "Set this if GitCortex is running on a remote server. When set, clicking \"Open in Editor\" will generate a URL to open your editor via SSH instead of spawning a local command."
+            "helper": "Set this if SoloDawn is running on a remote server. When set, clicking \"Open in Editor\" will generate a URL to open your editor via SSH instead of spawning a local command."
           },
           "user": {
             "label": "Remote SSH User (Optional)",
@@ -168,7 +168,7 @@
       },
       "privacy": {
         "title": "Privacy",
-        "description": "Help improve GitCortex by sharing anonymous usage data.",
+        "description": "Help improve SoloDawn by sharing anonymous usage data.",
         "telemetry": {
           "label": "Enable Telemetry",
           "helper": "Enables anonymous usage events tracking to help improve the application. No prompts or project information are collected."
@@ -560,7 +560,7 @@
     },
     "feishu": {
       "enableToggle": "Enable Feishu Integration",
-      "enableDescription": "When enabled, GitCortex can send notifications and receive commands through Feishu bot.",
+      "enableDescription": "When enabled, SoloDawn can send notifications and receive commands through Feishu bot.",
       "connectionStatus": "Connection Status",
       "connected": "Connected",
       "disconnected": "Disconnected",

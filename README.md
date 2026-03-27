@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo.png" alt="GitCortex" width="120" />
+  <img src="assets/logo.png" alt="SoloDawn" width="120" />
 </p>
 
-<h1 align="center">GitCortex</h1>
+<h1 align="center">SoloDawn</h1>
 
 <p align="center">
   <strong>Give it one sentence. It builds the entire project. You just wait for delivery.</strong>
@@ -14,9 +14,9 @@
 
 ---
 
-## What Is GitCortex?
+## What Is SoloDawn?
 
-GitCortex's ultimate design goal is to **complete complex, production-grade products through a simple conversation on a social platform** — not toy demos, but real, complex, production-ready software.
+SoloDawn's ultimate design goal is to **complete complex, production-grade products through a simple conversation on a social platform** — not toy demos, but real, complex, production-ready software.
 
 > **One-liner:** Whether you're a programmer or not, just describe what you need. Everything else is automatic.
 
@@ -30,7 +30,7 @@ There's a fundamental contradiction in AI-assisted coding today:
 
 **For non-programmers** — say, a project manager — they can't even translate a requirement into a technical spec. The reality is: AI can only boost your productivity if you already know how to do the work yourself.
 
-**GitCortex solves both problems:**
+**SoloDawn solves both problems:**
 
 | Who you are | What you do | What happens |
 |---|---|---|
@@ -69,7 +69,7 @@ For non-technical users — provide a vague idea and the system will:
 
 ## Built-in Quality Gates — Solving AI Hallucination at Scale
 
-AI-generated code has a quality problem. GitCortex addresses this head-on with a **three-layer quality gate system** that maximally mitigates AI hallucination in code output:
+AI-generated code has a quality problem. SoloDawn addresses this head-on with a **three-layer quality gate system** that maximally mitigates AI hallucination in code output:
 
 | Gate | Trigger | Scope |
 |------|---------|-------|
@@ -86,7 +86,7 @@ When a quality gate fails, structured fix instructions are automatically sent ba
 ## Core Design Philosophy
 
 - **Upper-layer orchestration, not code generation.** The orchestrator Agent never writes code — it commands the best professional AI CLIs (Claude Code, Gemini CLI, Codex, Amp, Cursor Agent, etc.) to do the work.
-- **Non-invasive by design.** GitCortex doesn't replace any CLI, modify any config, or define new tools. It inherits the full native ecosystem of every CLI — all slash commands, plugins, skills, and MCP servers work unchanged. Your existing setup? Zero migration cost.
+- **Non-invasive by design.** SoloDawn doesn't replace any CLI, modify any config, or define new tools. It inherits the full native ecosystem of every CLI — all slash commands, plugins, skills, and MCP servers work unchanged. Your existing setup? Zero migration cost.
 - **Git-driven event loop.** The orchestrator only consumes LLM tokens when a Git commit event occurs. Between events, it sleeps at zero cost — saving 98%+ tokens compared to polling.
 
 ---
@@ -325,7 +325,7 @@ pnpm run quality:check
 ## Project Structure
 
 ```
-GitCortex/
+SoloDawn/
 ├── crates/                    # Rust workspace
 │   ├── server/                # Axum HTTP/WebSocket server + MCP Task Server
 │   ├── services/              # Business logic
@@ -369,7 +369,7 @@ cd frontend && pnpm test:run && cd ..
 
 ## License
 
-- GitCortex: Apache-2.0
+- SoloDawn: Apache-2.0
 
 ## Blogroll
 https://linux.do/

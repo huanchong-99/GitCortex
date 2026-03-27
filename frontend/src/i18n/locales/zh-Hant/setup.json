@@ -8,7 +8,7 @@
       "done": "開始使用"
     },
     "welcome": {
-      "title": "歡迎使用 GitCortex",
+      "title": "歡迎使用 SoloDawn",
       "subtitle": "讓我們用幾個簡單步驟來設定您的環境。您可以跳過此步驟，稍後在設定中進行配置。",
       "languageLabel": "語言",
       "continueButton": "繼續",
@@ -16,7 +16,7 @@
     },
     "model": {
       "title": "設定 AI 模型",
-      "subtitle": "GitCortex 需要至少一個 AI 模型來執行工作流程。您可以稍後在設定中新增更多模型。",
+      "subtitle": "SoloDawn 需要至少一個 AI 模型來執行工作流程。您可以稍後在設定中新增更多模型。",
       "displayNameLabel": "顯示名稱",
       "displayNamePlaceholder": "例如：我的 Claude API",
       "apiTypeLabel": "API 類型",
@@ -43,7 +43,7 @@
     },
     "project": {
       "title": "設定專案",
-      "subtitle": "為您的第一個專案選擇工作目錄。GitCortex 將在此目錄中管理您的程式碼。",
+      "subtitle": "為您的第一個專案選擇工作目錄。SoloDawn 將在此目錄中管理您的程式碼。",
       "optionalBadge": "可選",
       "directoryLabel": "工作目錄",
       "directoryPlaceholder": "選擇目錄...",
@@ -60,10 +60,10 @@
     },
     "integrations": {
       "title": "整合",
-      "subtitle": "將 GitCortex 與您常用的工具連接。所有整合皆為選用。",
+      "subtitle": "將 SoloDawn 與您常用的工具連接。所有整合皆為選用。",
       "feishu": {
         "label": "飛書 / Lark",
-        "description": "透過飛書機器人接收工作流程通知並與 GitCortex 互動。",
+        "description": "透過飛書機器人接收工作流程通知並與 SoloDawn 互動。",
         "appIdLabel": "App ID",
         "appIdPlaceholder": "輸入飛書 App ID",
         "appSecretLabel": "App Secret",
@@ -73,7 +73,7 @@
     },
     "done": {
       "title": "一切就緒！",
-      "subtitle": "GitCortex 已準備就緒。現在開始建立您的第一個工作流程吧。",
+      "subtitle": "SoloDawn 已準備就緒。現在開始建立您的第一個工作流程吧。",
       "getStartedButton": "開始使用",
       "rerunHint": "您可以隨時在設定中重新執行此設定精靈。"
     }

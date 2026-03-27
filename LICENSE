@@ -1,15 +1,15 @@
-# GitCortex License
+# SoloDawn License
 
-Copyright 2026 GitCortex Contributors
+Copyright 2026 SoloDawn Contributors
 
-GitCortex is a composite work incorporating code from multiple open-source
+SoloDawn is a composite work incorporating code from multiple open-source
 projects. The licensing terms below apply to the respective components.
 
 ---
 
-## 1. GitCortex (Apache License 2.0)
+## 1. SoloDawn (Apache License 2.0)
 
-The GitCortex project as a whole — including the orchestration engine,
+The SoloDawn project as a whole — including the orchestration engine,
 terminal management, workflow system, frontend application, deployment
 tooling, and all original code — is licensed under the Apache License 2.0.
 
@@ -31,7 +31,7 @@ limitations under the License.
 
 Copyright 2025 BloopAI
 
-GitCortex is a derivative work based on Vibe Kanban, which is licensed
+SoloDawn is a derivative work based on Vibe Kanban, which is licensed
 under the Apache License 2.0. The original project's license terms apply
 to all derived portions.
 
@@ -94,7 +94,7 @@ License v3.0 (LGPL-3.0)**.
 The quality gate configuration (`quality/quality-gate.yaml`), the built-in
 rule engine (`crates/quality/src/rules/`), analysis providers
 (`crates/quality/src/provider/`), and all integration logic are original
-GitCortex code licensed under Apache-2.0.
+SoloDawn code licensed under Apache-2.0.
 
 SonarQube is Copyright (C) SonarSource SA.
 
@@ -106,7 +106,7 @@ For the full LGPL-3.0 text, see: https://www.gnu.org/licenses/lgpl-3.0.html
 
 | Component | License | Location |
 |---|---|---|
-| GitCortex (original code) | Apache-2.0 | All directories except as noted below |
+| SoloDawn (original code) | Apache-2.0 | All directories except as noted below |
 | Vibe Kanban (upstream) | Apache-2.0 | Inherited throughout the codebase |
 | CC-Switch | MIT | `crates/cc-switch/` |
 | SonarQube Quality Gate Models | LGPL-3.0 | `crates/quality/src/gate/` |

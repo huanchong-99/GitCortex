@@ -49,9 +49,9 @@ export function ProjectProvider({ children }: Readonly<ProjectProviderProps>) {
   // Centralized page title management
   useEffect(() => {
     if (project) {
-      document.title = `${project.name} | GitCortex`;
+      document.title = `${project.name} | SoloDawn`;
     } else {
-      document.title = 'GitCortex';
+      document.title = 'SoloDawn';
     }
   }, [project]);
 

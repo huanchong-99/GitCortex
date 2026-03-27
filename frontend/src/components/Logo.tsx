@@ -22,7 +22,7 @@ export function Logo() {
         fill="currentColor"
         letterSpacing="-0.5"
       >
-        GitCortex
+        SoloDawn
       </text>
     </svg>
   );

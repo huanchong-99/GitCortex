@@ -77,7 +77,7 @@ function WelcomeStep({ onNext, onSkip }: Readonly<{ onNext: () => void; onSkip: 
       <div className="text-center">
         <Rocket className="mx-auto mb-base size-icon-xl text-brand" weight="duotone" />
         <h2 className="text-xl font-semibold text-high">
-          {t('setup:firstRun.welcome.title', 'Welcome to GitCortex')}
+          {t('setup:firstRun.welcome.title', 'Welcome to SoloDawn')}
         </h2>
         <p className="mt-half text-base text-normal">
           {t(
@@ -91,7 +91,7 @@ function WelcomeStep({ onNext, onSkip }: Readonly<{ onNext: () => void; onSkip: 
         <p>
           {t(
             'setup:firstRun.welcome.description',
-            'GitCortex has been installed with all required tools bundled. This wizard will help you verify the installation and configure API keys for the AI CLIs you want to use.',
+            'SoloDawn has been installed with all required tools bundled. This wizard will help you verify the installation and configure API keys for the AI CLIs you want to use.',
           )}
         </p>
       </div>
@@ -248,7 +248,7 @@ function DoneStep({ onFinish }: Readonly<{ onFinish: () => void }>) {
         <p className="mt-half text-sm text-normal">
           {t(
             'setup:firstRun.done.subtitle',
-            'GitCortex is ready to use. You can always revisit settings to configure API keys, update CLI tools, or change the npm mirror.',
+            'SoloDawn is ready to use. You can always revisit settings to configure API keys, update CLI tools, or change the npm mirror.',
           )}
         </p>
       </div>

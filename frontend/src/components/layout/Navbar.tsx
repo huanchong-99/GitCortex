@@ -53,12 +53,12 @@ const EXTERNAL_LINKS = [
   {
     labelKey: 'navbar.external.docs',
     icon: BookOpen,
-    href: 'https://gitcortex.com/docs',
+    href: 'https://solodawn.com/docs',
   },
   {
     labelKey: 'navbar.external.support',
     icon: MessageCircleQuestion,
-    href: 'https://github.com/BloopAI/gitcortex/issues',
+    href: 'https://github.com/BloopAI/solodawn/issues',
   },
 ];
 

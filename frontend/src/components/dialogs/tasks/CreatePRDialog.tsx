@@ -168,7 +168,7 @@ const CreatePRDialogImpl = NiceModal.create<CreatePRDialogProps>(
         return;
       }
 
-      setPrTitle(`${task.title} (GitCortex)`);
+      setPrTitle(`${task.title} (SoloDawn)`);
       setPrBody(task.description || '');
       setError(null);
       setGhCliHelp(null);
