@@ -772,7 +772,7 @@ mod full_chain_tests {
         );
 
         // Verify URL normalization preserves provider path (no /v1 appended)
-        let normalized = normalize_llm_base_url(&config.api_type, &config.base_url);
+        let normalized = normalize_base_url(&config.api_type, &config.base_url);
         assert_eq!(
             normalized, "https://open.bigmodel.cn/api/paas/v4",
             "openai-compatible must NOT append /v1 to provider URL"
@@ -805,7 +805,7 @@ mod full_chain_tests {
         );
 
         // Verify URL normalization preserves provider path
-        let normalized = normalize_llm_base_url(&config.api_type, &config.base_url);
+        let normalized = normalize_base_url(&config.api_type, &config.base_url);
         assert_eq!(
             normalized, "https://open.bigmodel.cn/api/anthropic",
             "anthropic-compatible must NOT append /v1 to provider URL"
@@ -837,7 +837,7 @@ mod full_chain_tests {
             "Official OpenAI should NOT use Anthropic protocol"
         );
 
-        let normalized = normalize_llm_base_url(&config.api_type, &config.base_url);
+        let normalized = normalize_base_url(&config.api_type, &config.base_url);
         assert_eq!(
             normalized, "https://api.openai.com/v1",
             "Official openai MUST append /v1"
@@ -867,7 +867,7 @@ mod full_chain_tests {
             "Official Anthropic SHOULD use Anthropic protocol"
         );
 
-        let normalized = normalize_llm_base_url(&config.api_type, &config.base_url);
+        let normalized = normalize_base_url(&config.api_type, &config.base_url);
         assert_eq!(
             normalized, "https://api.anthropic.com/v1",
             "Official anthropic MUST append /v1"
