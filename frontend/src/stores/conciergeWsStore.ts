@@ -26,6 +26,7 @@ interface ConciergeWsState {
   _reconnectTimeout: ReturnType<typeof setTimeout> | null;
   _reconnectAttempts: number;
   _manualDisconnect: boolean;
+  _connectDebounceTimer: ReturnType<typeof setTimeout> | null;
 
   // Actions
   connect: (sessionId: string) => void;
@@ -55,6 +56,7 @@ function buildConciergeWsUrl(sessionId: string): string {
 export const useConciergeWsStore = create<ConciergeWsState>((set, get) => {
   function cleanup() {
     const state = get();
+    if (state._connectDebounceTimer) clearTimeout(state._connectDebounceTimer);
     if (state._heartbeatInterval) clearInterval(state._heartbeatInterval);
     if (state._reconnectTimeout) clearTimeout(state._reconnectTimeout);
     if (state._ws) {
@@ -71,6 +73,7 @@ export const useConciergeWsStore = create<ConciergeWsState>((set, get) => {
     }
     set({
       _ws: null,
+      _connectDebounceTimer: null,
       _heartbeatInterval: null,
       _reconnectTimeout: null,
     });
@@ -133,6 +136,7 @@ export const useConciergeWsStore = create<ConciergeWsState>((set, get) => {
     _reconnectTimeout: null,
     _reconnectAttempts: 0,
     _manualDisconnect: false,
+    _connectDebounceTimer: null,
 
     connect(sessionId: string) {
       const state = get();
@@ -149,37 +153,46 @@ export const useConciergeWsStore = create<ConciergeWsState>((set, get) => {
         lastError: null,
       });
 
-      const url = buildConciergeWsUrl(sessionId);
-      const ws = new WebSocket(url);
+      // Debounce actual WebSocket creation to prevent rapid connect/disconnect
+      // cycles caused by React StrictMode or effect re-runs
+      const timer = setTimeout(() => {
+        // Re-check: if disconnected manually during debounce, abort
+        if (get()._manualDisconnect) return;
 
-      ws.onopen = () => {
-        set({ _ws: ws, connectionStatus: 'connected', _reconnectAttempts: 0 });
-        startHeartbeat(ws);
-      };
+        const url = buildConciergeWsUrl(sessionId);
+        const ws = new WebSocket(url);
 
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data as string) as {
-            type: string;
-            payload: unknown;
-          };
-          dispatchMessage(message.type, message.payload);
-        } catch {
-          // ignore malformed messages
-        }
-      };
+        ws.onopen = () => {
+          set({ _ws: ws, connectionStatus: 'connected', _reconnectAttempts: 0 });
+          startHeartbeat(ws);
+        };
 
-      ws.onerror = () => {
-        set({ lastError: 'WebSocket error' });
-      };
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data as string) as {
+              type: string;
+              payload: unknown;
+            };
+            dispatchMessage(message.type, message.payload);
+          } catch {
+            // ignore malformed messages
+          }
+        };
 
-      ws.onclose = () => {
-        cleanup();
-        set({ connectionStatus: 'disconnected' });
-        scheduleReconnect();
-      };
+        ws.onerror = () => {
+          set({ lastError: 'WebSocket error' });
+        };
 
-      set({ _ws: ws });
+        ws.onclose = () => {
+          cleanup();
+          set({ connectionStatus: 'disconnected' });
+          scheduleReconnect();
+        };
+
+        set({ _ws: ws, _connectDebounceTimer: null });
+      }, 150);
+
+      set({ _connectDebounceTimer: timer });
     },
 
     disconnect(_sessionId: string) {

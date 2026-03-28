@@ -32,26 +32,25 @@ export function ConciergeChatContainer({
 
   // Queries
   const { data: sessions } = useConciergeSessions();
+  const wsStatus = useConciergeWsStore((s) => s.connectionStatus);
   const { data: messages, isLoading: messagesLoading } =
-    useConciergeMessages(activeSessionId);
+    useConciergeMessages(activeSessionId, {
+      refetchInterval: wsStatus !== 'connected' ? 5000 : false,
+    });
 
   // Mutations
   const sendMessage = useSendConciergeMessage();
   const createSession = useCreateConciergeSession();
 
-  // Sync with initialSessionId prop changes
+  // Single effect to prevent intermediate state changes that cause
+  // rapid WS connect/disconnect cycles.
   useEffect(() => {
     if (initialSessionId) {
       setActiveSessionId(initialSessionId);
-    }
-  }, [initialSessionId]);
-
-  // Auto-select the first session if none is active
-  useEffect(() => {
-    if (!activeSessionId && sessions && sessions.length > 0) {
+    } else if (!activeSessionId && sessions && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
     }
-  }, [activeSessionId, sessions]);
+  }, [initialSessionId, activeSessionId, sessions]);
 
   // Auto-scroll on new messages
   useEffect(() => {

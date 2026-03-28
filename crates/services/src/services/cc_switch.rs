@@ -260,9 +260,13 @@ fn create_claude_settings(
         serde_json::Value::String("1".to_string()),
     );
     if let Some(url) = base_url {
+        // Claude Code's Anthropic SDK appends "/v1/messages" to ANTHROPIC_BASE_URL,
+        // so strip trailing "/v1" to avoid double-pathing (e.g. .../v1/v1/messages).
+        let url_for_cli = url.trim_end_matches('/');
+        let url_for_cli = url_for_cli.strip_suffix("/v1").unwrap_or(url_for_cli);
         env_obj.insert(
             "ANTHROPIC_BASE_URL".to_string(),
-            serde_json::Value::String(url.to_string()),
+            serde_json::Value::String(url_for_cli.to_string()),
         );
     }
 

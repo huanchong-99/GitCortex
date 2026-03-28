@@ -388,7 +388,7 @@ impl FilesystemService {
                     if let Some(token) = cancel.as_ref()
                         && token.is_cancelled()
                     {
-                        tracing::debug!("Cancellation token triggered");
+                        tracing::trace!("Cancellation token triggered");
                         return false;
                     }
 

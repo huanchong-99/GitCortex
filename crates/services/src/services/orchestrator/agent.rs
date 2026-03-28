@@ -4898,6 +4898,24 @@ impl OrchestratorAgent {
                 continue;
             }
 
+            // G06-009: no-worktree mode — skip merge if task branch does not exist.
+            // In no-worktree mode, Claude Code commits directly to the working
+            // branch, so there is no separate task branch to merge.
+            let branch_exists = crate::services::git::GitService::new()
+                .check_branch_exists(base_repo_path, &task_branch)
+                .unwrap_or(true);
+
+            if !branch_exists {
+                tracing::info!(
+                    task_id = %task_id,
+                    task_branch = %task_branch,
+                    "Task branch does not exist in repository (no-worktree mode), \
+                     skipping merge — commits are already on the working branch"
+                );
+                successfully_merged.push(task_id);
+                continue;
+            }
+
             // G06-005: idempotency — skip branch if it is already an ancestor of target.
             let already_merged = {
                 let git_exe = utils::shell::resolve_executable_path("git").await;

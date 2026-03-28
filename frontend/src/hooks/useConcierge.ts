@@ -36,11 +36,15 @@ export function useConciergeSession(sessionId: string | null) {
 }
 
 /** Fetch messages for a concierge session */
-export function useConciergeMessages(sessionId: string | null) {
+export function useConciergeMessages(
+  sessionId: string | null,
+  options?: { refetchInterval?: number | false },
+) {
   return useQuery({
     queryKey: conciergeKeys.messages(sessionId ?? ''),
     queryFn: () => conciergeApi.listMessages(sessionId!),
     enabled: !!sessionId,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
