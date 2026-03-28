@@ -48,6 +48,21 @@ function WorkflowStatusBadge({ workflowId }: Readonly<{ workflowId: string | nul
   );
 }
 
+function useSyncDraftState(
+  planningDraft: { projectId?: string; materializedWorkflowId?: string | null } | null | undefined,
+  selectedProjectId: string | null | undefined,
+  setSelectedProjectId: (id: string) => void,
+  setMaterializedWorkflowId: (id: string | null) => void,
+) {
+  useEffect(() => {
+    if (!planningDraft) return;
+    if (planningDraft.projectId && planningDraft.projectId !== selectedProjectId) {
+      setSelectedProjectId(planningDraft.projectId);
+    }
+    setMaterializedWorkflowId(planningDraft.materializedWorkflowId ?? null);
+  }, [planningDraft, selectedProjectId, setSelectedProjectId, setMaterializedWorkflowId]);
+}
+
 function useFeishuConnectionStatus(planningDraftId: string | null): boolean {
   const [connected, setConnected] = useState(false);
   useEffect(() => {
@@ -162,27 +177,13 @@ export function CreateChatBoxContainer() {
   const hasServerMessages = !!serverMessages && serverMessages.length > 0;
   const planningMessages = hasServerMessages ? serverMessages : localMessages;
 
-  // Sync right sidebar project when a draft is loaded from the sidebar
-  useEffect(() => {
-    if (planningDraft?.projectId && planningDraft.projectId !== selectedProjectId) {
-      setSelectedProjectId(planningDraft.projectId);
-    }
-  }, [planningDraft?.projectId, selectedProjectId, setSelectedProjectId]);
-
-  // Sync materializedWorkflowId from draft data when switching drafts
-  useEffect(() => {
-    if (planningDraft) {
-      setMaterializedWorkflowId(planningDraft.materializedWorkflowId ?? null);
-    }
-  }, [planningDraft]);
+  // Sync draft-derived state when switching drafts
+  useSyncDraftState(planningDraft, selectedProjectId, setSelectedProjectId, setMaterializedWorkflowId);
 
   // Attachment handling
   const handleInsertMarkdown = useCallback(
     (markdown: string) => {
-      const newMessage = message.trim()
-        ? `${message}\n\n${markdown}`
-        : markdown;
-      setMessage(newMessage);
+      setMessage(message.trim() ? `${message}\n\n${markdown}` : markdown);
     },
     [message, setMessage]
   );
