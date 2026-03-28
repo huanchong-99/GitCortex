@@ -63,6 +63,14 @@ function useFeishuConnectionStatus(planningDraftId: string | null): boolean {
   return connected;
 }
 
+function checkProfileChanged(
+  effectiveProfile: ExecutorProfileId | null,
+  savedProfile: ExecutorProfileId | undefined,
+): boolean {
+  if (!savedProfile || !effectiveProfile) return false;
+  return !areProfilesEqual(effectiveProfile, savedProfile);
+}
+
 function extractPlannerModelConfig(
   config: Record<string, unknown> | null | undefined,
 ): WorkflowModelConfig | null {
@@ -200,10 +208,10 @@ export function CreateChatBoxContainer() {
     [effectiveProfile?.executor, profiles]
   );
 
-  const hasChangedFromDefault = useMemo(() => {
-    if (!config?.executor_profile || !effectiveProfile) return false;
-    return !areProfilesEqual(effectiveProfile, config.executor_profile);
-  }, [effectiveProfile, config?.executor_profile]);
+  const hasChangedFromDefault = useMemo(
+    () => checkProfileChanged(effectiveProfile, config?.executor_profile),
+    [effectiveProfile, config?.executor_profile],
+  );
 
   useEffect(() => {
     if (!hasChangedFromDefault) setSaveAsDefault(false);
