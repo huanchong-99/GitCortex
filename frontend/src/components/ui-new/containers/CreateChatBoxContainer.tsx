@@ -124,6 +124,90 @@ function resolveVariantForExecutor(
   return variants.includes('DEFAULT') ? 'DEFAULT' : (variants[0] ?? null);
 }
 
+function usePlanningDraftActions({
+  planningDraftId,
+  planningDraft,
+  message,
+  setMessage,
+  setIsThinking,
+  setLocalMessages,
+  setMaterializedWorkflowId,
+  sendMessageMutation,
+  confirmMutation,
+  materializeMutation,
+  feishuSyncMutation,
+}: Readonly<{
+  planningDraftId: string | null;
+  planningDraft: { feishuSync?: boolean } | null | undefined;
+  message: string;
+  setMessage: (v: string) => void;
+  setIsThinking: (v: boolean) => void;
+  setLocalMessages: React.Dispatch<React.SetStateAction<PlanningMessageResponse[]>>;
+  setMaterializedWorkflowId: (id: string | null) => void;
+  sendMessageMutation: ReturnType<typeof useSendPlanningMessage>;
+  confirmMutation: ReturnType<typeof useConfirmDraft>;
+  materializeMutation: ReturnType<typeof useMaterializeDraft>;
+  feishuSyncMutation: ReturnType<typeof useTogglePlanningFeishuSync>;
+}>) {
+  const handlePlanningMessage = useCallback(async () => {
+    const trimmed = message.trim();
+    if (!trimmed || !planningDraftId) return;
+
+    setIsThinking(true);
+    setMessage('');
+    try {
+      const newMessages = await sendMessageMutation.mutateAsync({
+        draftId: planningDraftId,
+        message: trimmed,
+      });
+      setLocalMessages((prev) => [...prev, ...newMessages]);
+    } catch (e) {
+      console.error('Failed to send planning message:', e);
+    } finally {
+      setIsThinking(false);
+    }
+  }, [message, planningDraftId, setMessage, sendMessageMutation, setIsThinking, setLocalMessages]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!planningDraftId) return;
+    try {
+      await confirmMutation.mutateAsync(planningDraftId);
+    } catch (e) {
+      console.error('Failed to confirm draft:', e);
+    }
+  }, [planningDraftId, confirmMutation]);
+
+  const handleMaterialize = useCallback(async () => {
+    if (!planningDraftId) return;
+    try {
+      const result = await materializeMutation.mutateAsync(planningDraftId);
+      setMaterializedWorkflowId(result.workflowId);
+    } catch (e) {
+      console.error('Failed to materialize draft:', e);
+    }
+  }, [planningDraftId, materializeMutation, setMaterializedWorkflowId]);
+
+  const handleToggleFeishuSync = useCallback(() => {
+    if (!planningDraftId || !planningDraft) return;
+    feishuSyncMutation.mutate(
+      {
+        draftId: planningDraftId,
+        enabled: !planningDraft.feishuSync,
+        syncHistory: false,
+      },
+      {
+        onError: () => {
+          globalThis.alert(
+            '开启失败：未找到飞书聊天。\n\n请先在飞书中给 Bot 发送一条消息，建立连接后再试。'
+          );
+        },
+      }
+    );
+  }, [planningDraftId, planningDraft, feishuSyncMutation]);
+
+  return { handlePlanningMessage, handleConfirm, handleMaterialize, handleToggleFeishuSync };
+}
+
 export function CreateChatBoxContainer() {
   const { t } = useTranslation('common');
   const { t: tTasks } = useTranslation('tasks');
@@ -311,71 +395,26 @@ export function CreateChatBoxContainer() {
     queryClient,
   ]);
 
-  // === Phase 2: Follow-up messages in planning conversation ===
-  const handlePlanningMessage = useCallback(async () => {
-    const trimmed = message.trim();
-    if (!trimmed || !planningDraftId) return;
-
-    setIsThinking(true);
-    setMessage('');
-    try {
-      const newMessages = await sendMessageMutation.mutateAsync({
-        draftId: planningDraftId,
-        message: trimmed,
-      });
-      setLocalMessages((prev) => [...prev, ...newMessages]);
-    } catch (e) {
-      console.error('Failed to send planning message:', e);
-    } finally {
-      setIsThinking(false);
-    }
-  }, [message, planningDraftId, setMessage, sendMessageMutation]);
-
-  // === Confirm spec ===
-  const handleConfirm = useCallback(async () => {
-    if (!planningDraftId) return;
-    try {
-      await confirmMutation.mutateAsync(planningDraftId);
-    } catch (e) {
-      console.error('Failed to confirm draft:', e);
-    }
-  }, [planningDraftId, confirmMutation]);
-
-  // === Materialize into workflow ===
-  const handleMaterialize = useCallback(async () => {
-    if (!planningDraftId) return;
-    try {
-      const result = await materializeMutation.mutateAsync(planningDraftId);
-      setMaterializedWorkflowId(result.workflowId);
-    } catch (e) {
-      console.error('Failed to materialize draft:', e);
-    }
-  }, [planningDraftId, materializeMutation]);
+  // === Planning draft action handlers (extracted to reduce cognitive complexity) ===
+  const { handlePlanningMessage, handleConfirm, handleMaterialize, handleToggleFeishuSync } =
+    usePlanningDraftActions({
+      planningDraftId,
+      planningDraft,
+      message,
+      setMessage,
+      setIsThinking,
+      setLocalMessages,
+      setMaterializedWorkflowId,
+      sendMessageMutation,
+      confirmMutation,
+      materializeMutation,
+      feishuSyncMutation,
+    });
 
   const handleOpenBoard = useCallback(() => {
-    if (materializedWorkflowId) {
-      navigate(`/board?workflowId=${materializedWorkflowId}&projectId=${projectId ?? ''}`);
-    }
+    if (!materializedWorkflowId) return;
+    navigate(`/board?workflowId=${materializedWorkflowId}&projectId=${projectId ?? ''}`);
   }, [materializedWorkflowId, projectId, navigate]);
-
-  // === Feishu sync toggle ===
-  const handleToggleFeishuSync = useCallback(() => {
-    if (!planningDraftId || !planningDraft) return;
-    feishuSyncMutation.mutate(
-      {
-        draftId: planningDraftId,
-        enabled: !planningDraft.feishuSync,
-        syncHistory: false,
-      },
-      {
-        onError: () => {
-          globalThis.alert(
-            '开启失败：未找到飞书聊天。\n\n请先在飞书中给 Bot 发送一条消息，建立连接后再试。'
-          );
-        },
-      }
-    );
-  }, [planningDraftId, planningDraft, feishuSyncMutation]);
 
   // === Feishu history sync — one-time full push ===
   const handleSyncHistory = useCallback(() => {
