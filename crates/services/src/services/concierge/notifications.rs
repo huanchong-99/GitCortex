@@ -46,7 +46,7 @@ pub async fn watch_workflow_events(
                     None => break, // channel closed
                 }
             }
-            _ = cancel.cancelled() => {
+            () = cancel.cancelled() => {
                 tracing::debug!(
                     session_id = %session_id,
                     "Notification watcher cancelled"

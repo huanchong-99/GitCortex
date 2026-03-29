@@ -371,7 +371,7 @@ impl ConciergeAgent {
         /// Helper: attach Bearer auth header when an API token is configured.
         fn with_auth(
             builder: reqwest::RequestBuilder,
-            token: &Option<String>,
+            token: Option<&String>,
         ) -> reqwest::RequestBuilder {
             match token {
                 Some(t) if !t.trim().is_empty() => builder.bearer_auth(t),
@@ -395,7 +395,7 @@ impl ConciergeAgent {
                             "message": message,
                             "source": "concierge"
                         })),
-                    &api_token,
+                    api_token.as_ref(),
                 )
                 .send()
                 .await?;
@@ -415,7 +415,7 @@ impl ConciergeAgent {
 
                 let resp = with_auth(
                     http.post(format!("{base}/workflows/{workflow_id}/prepare")),
-                    &api_token,
+                    api_token.as_ref(),
                 )
                 .send()
                 .await?;
@@ -437,7 +437,7 @@ impl ConciergeAgent {
 
                 let resp = with_auth(
                     http.post(format!("{base}/workflows/{workflow_id}/start")),
-                    &api_token,
+                    api_token.as_ref(),
                 )
                 .send()
                 .await?;
