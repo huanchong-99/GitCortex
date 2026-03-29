@@ -574,41 +574,39 @@ impl MessageBus {
     }
 
     /// Publishes a terminal completion event to workflow topic and broadcast channel.
-    pub async fn publish_terminal_completed(&self, event: TerminalCompletionEvent) {
+    ///
+    /// Returns an error if the event could not be delivered, allowing callers
+    /// (e.g. `GitWatcher`) to decide whether to retry or advance their cursor.
+    pub async fn publish_terminal_completed(
+        &self,
+        event: TerminalCompletionEvent,
+    ) -> anyhow::Result<()> {
         let workflow_id = event.workflow_id.clone();
-        if let Err(e) = self
-            .publish_workflow_event(&workflow_id, BusMessage::TerminalCompleted(event))
+        self.publish_workflow_event(&workflow_id, BusMessage::TerminalCompleted(event))
             .await
-        {
-            tracing::warn!(
-                workflow_id = %workflow_id,
-                error = %e,
-                "Failed to publish terminal completion event (non-fatal)"
-            );
-        }
+            .map(|_| ())
     }
 
     /// Publishes a git event to workflow topic and broadcast channel.
+    ///
+    /// Returns an error if the event could not be delivered, allowing callers
+    /// (e.g. `GitWatcher`) to decide whether to retry or advance their cursor.
     pub async fn publish_git_event(
         &self,
         workflow_id: &str,
         commit_hash: &str,
         branch: &str,
         message: &str,
-    ) {
+    ) -> anyhow::Result<()> {
         let event = BusMessage::GitEvent {
             workflow_id: workflow_id.to_string(),
             commit_hash: commit_hash.to_string(),
             branch: branch.to_string(),
             message: message.to_string(),
         };
-        if let Err(e) = self.publish_workflow_event(workflow_id, event).await {
-            tracing::warn!(
-                workflow_id = %workflow_id,
-                error = %e,
-                "Failed to publish git event (non-fatal)"
-            );
-        }
+        self.publish_workflow_event(workflow_id, event)
+            .await
+            .map(|_| ())
     }
 
     /// Publishes a terminal prompt detected event.

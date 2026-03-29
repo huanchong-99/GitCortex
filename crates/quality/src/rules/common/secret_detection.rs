@@ -9,8 +9,10 @@ use crate::rules::{CommonAnalysisContext, CommonRule, Rule};
 /// Detects potential secrets, API keys, tokens, and passwords in source code.
 ///
 /// Scans text files line by line for common secret patterns such as AWS keys,
-/// API keys, passwords, private keys, GitHub tokens, and generic hex tokens.
-/// Files named `.env.example` and lines containing `TODO` or `placeholder` are skipped.
+/// API keys, passwords, private keys, GitHub tokens, Slack tokens, Google API keys,
+/// Stripe keys, database connection strings, npm tokens, and generic hex tokens.
+/// Files named `.env.example` and lines containing `TODO`, `placeholder`, `example`,
+/// `dummy`, `mock`, `fake`, `changeme`, or `your-key-here` are skipped.
 #[derive(Debug)]
 pub struct SecretDetectionRule {
     patterns: Vec<SecretPattern>,
@@ -52,6 +54,33 @@ impl Default for SecretDetectionRule {
             SecretPattern {
                 name: "Generic Hex Token",
                 regex: Regex::new(r#"(?i)(token|key)\s*[:=]\s*["'][0-9a-f]{32,}["']"#).unwrap(),
+            },
+            SecretPattern {
+                name: "Slack Token",
+                regex: Regex::new(r"xox[bpors]-[0-9a-zA-Z-]{10,}").unwrap(),
+            },
+            SecretPattern {
+                name: "Google API Key",
+                regex: Regex::new(r"AIza[0-9A-Za-z_-]{35}").unwrap(),
+            },
+            SecretPattern {
+                name: "Stripe Key",
+                regex: Regex::new(r"[sp]k_(live|test)_[0-9a-zA-Z]{24,}").unwrap(),
+            },
+            SecretPattern {
+                name: "Database URL with Password",
+                regex: Regex::new(r"(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@").unwrap(),
+            },
+            SecretPattern {
+                name: "npm Token",
+                regex: Regex::new(r"npm_[A-Za-z0-9]{36}").unwrap(),
+            },
+            SecretPattern {
+                name: "Unquoted Secret Assignment",
+                regex: Regex::new(
+                    r#"(?i)(password|secret|token|api_key)\s*=\s*[^\s'"]{8,}"#,
+                )
+                .unwrap(),
             },
         ];
 
@@ -102,9 +131,17 @@ impl CommonRule for SecretDetectionRule {
         let mut issues = Vec::new();
 
         for (line_idx, line) in text.lines().enumerate() {
-            // Skip lines containing TODO or placeholder
+            // Skip lines containing test/placeholder markers
             let line_lower = line.to_lowercase();
-            if line_lower.contains("todo") || line_lower.contains("placeholder") {
+            if line_lower.contains("todo")
+                || line_lower.contains("placeholder")
+                || line_lower.contains("example")
+                || line_lower.contains("dummy")
+                || line_lower.contains("mock")
+                || line_lower.contains("fake")
+                || line_lower.contains("changeme")
+                || line_lower.contains("your-key-here")
+            {
                 continue;
             }
 
@@ -156,7 +193,7 @@ mod tests {
 
     #[test]
     fn detects_aws_key() {
-        let content = "let aws_key = \"AKIAIOSFODNN7EXAMPLE\";\n";
+        let content = "let aws_key = \"AKIAIOSFODNN7REALKEY1\";\n";
         let issues = analyze_text("config.rs", content);
         assert_eq!(issues.len(), 1);
         assert!(issues[0].message.contains("AWS Access Key"));
@@ -186,8 +223,10 @@ token = "mytoken12345678"
     fn detects_github_token() {
         let content = "GITHUB_TOKEN=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkl\n";
         let issues = analyze_text("ci.yml", content);
-        assert_eq!(issues.len(), 1);
-        assert!(issues[0].message.contains("GitHub Token"));
+        assert!(
+            issues.iter().any(|i| i.message.contains("GitHub Token")),
+            "Should detect GitHub token"
+        );
     }
 
     #[test]
@@ -207,6 +246,24 @@ password = "placeholder_value_here"
         assert!(
             issues.is_empty(),
             "Should skip lines containing TODO or placeholder, got {} issues",
+            issues.len()
+        );
+    }
+
+    #[test]
+    fn skips_lines_with_test_markers() {
+        let content = r#"
+api_key = "example_key_value_12345"
+password = "dummy_password_value"
+token = "mock_token_value_1234"
+secret = "fake_secret_value_123"
+api_key = "changeme_placeholder"
+token = "your-key-here-replace"
+"#;
+        let issues = analyze_text("config.py", content);
+        assert!(
+            issues.is_empty(),
+            "Should skip lines with test markers, got {} issues",
             issues.len()
         );
     }
@@ -239,6 +296,70 @@ fn main() {
 
         let issues = rule.analyze(&ctx);
         assert!(issues.is_empty(), "Should skip binary files");
+    }
+
+    #[test]
+    fn detects_slack_token() {
+        let content = "SLACK_TOKEN=xoxb-1234567890-abcdefghij\n";
+        let issues = analyze_text("config.yml", content);
+        assert!(
+            issues.iter().any(|i| i.message.contains("Slack Token")),
+            "Should detect Slack token"
+        );
+    }
+
+    #[test]
+    fn detects_google_api_key() {
+        let content = "GOOGLE_KEY=AIzaSyA1234567890abcdefghijklmnopqrstuvw\n";
+        let issues = analyze_text("config.yml", content);
+        assert!(
+            issues.iter().any(|i| i.message.contains("Google API Key")),
+            "Should detect Google API key"
+        );
+    }
+
+    #[test]
+    fn detects_stripe_key() {
+        let content = "STRIPE_KEY=sk_test_000000TESTONLY00000000000\n";
+        let issues = analyze_text("config.yml", content);
+        assert!(
+            issues.iter().any(|i| i.message.contains("Stripe Key")),
+            "Should detect Stripe key"
+        );
+    }
+
+    #[test]
+    fn detects_database_url_with_password() {
+        let content = "DATABASE_URL=postgres://admin:s3cretPass@localhost:5432/mydb\n";
+        let issues = analyze_text(".env", content);
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.message.contains("Database URL with Password")),
+            "Should detect database URL with password"
+        );
+    }
+
+    #[test]
+    fn detects_npm_token() {
+        let content = "NPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz1234567890\n";
+        let issues = analyze_text(".npmrc", content);
+        assert!(
+            issues.iter().any(|i| i.message.contains("npm Token")),
+            "Should detect npm token"
+        );
+    }
+
+    #[test]
+    fn detects_unquoted_secret_in_env() {
+        let content = "password=my_super_secret_value\n";
+        let issues = analyze_text(".env", content);
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.message.contains("Unquoted Secret Assignment")),
+            "Should detect unquoted secret assignment"
+        );
     }
 
     #[test]

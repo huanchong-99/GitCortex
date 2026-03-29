@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import type { BaseCodingAgent, ModelConfig } from 'shared/types';
 import type { ModelConfig as WorkflowModelConfig } from '@/components/workflow/types';
 import { useModelsForCli } from './useCliTypes';
@@ -102,15 +102,24 @@ export function useModelConfigForExecutor(
     string | null
   >(null);
 
-  // Auto-select: prefer first custom model, then first official
+  // Auto-select: prefer first custom model, then first official.
+  // Only auto-select when executor changes or no selection exists yet —
+  // otherwise user's manual selection would be overwritten on every
+  // allModels reference change.
+  const prevExecutorRef = useRef(executor);
   useEffect(() => {
+    const executorChanged = prevExecutorRef.current !== executor;
+    prevExecutorRef.current = executor;
+
     if (allModels.length === 0) {
       setSelectedModelConfigId(null);
       return;
     }
-    const preferred = customModels[0] ?? officialModels[0] ?? allModels[0];
-    setSelectedModelConfigId(preferred?.id ?? null);
-  }, [allModels, customModels, officialModels]);
+    if (executorChanged || selectedModelConfigId === null) {
+      const preferred = customModels[0] ?? officialModels[0] ?? allModels[0];
+      setSelectedModelConfigId(preferred?.id ?? null);
+    }
+  }, [allModels, customModels, officialModels, executor, selectedModelConfigId]);
 
   return {
     customModels,

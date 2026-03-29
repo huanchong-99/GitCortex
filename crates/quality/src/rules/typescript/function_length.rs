@@ -5,6 +5,7 @@ use regex::Regex;
 use crate::issue::QualityIssue;
 use crate::rule::{RuleType, Severity};
 use crate::rules::{Rule, TsRule, TsAnalysisContext, RuleConfig};
+use super::count_structural_braces;
 
 /// Checks that individual functions do not exceed a maximum number of lines.
 ///
@@ -118,14 +119,12 @@ impl TsRule for FunctionLengthRule {
             let mut end_line: Option<usize> = None;
 
             for (i, line) in ctx.lines.iter().enumerate().skip(func.start_line) {
-                for ch in line.chars() {
-                    if ch == '{' {
-                        depth += 1;
-                        found_open = true;
-                    } else if ch == '}' {
-                        depth -= 1;
-                    }
+                let (opens, closes) = count_structural_braces(line);
+                for _ in 0..opens {
+                    depth += 1;
+                    found_open = true;
                 }
+                depth -= closes as i32;
                 if found_open && depth <= 0 {
                     end_line = Some(i);
                     break;

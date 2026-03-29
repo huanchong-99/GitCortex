@@ -1,10 +1,5 @@
 //! Planning draft models for orchestrated workspace mode.
 
-use aes_gcm::{
-    Aes256Gcm, Nonce,
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-};
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
@@ -47,58 +42,9 @@ pub const PLANNING_DRAFT_STATUSES: [&str; 5] =
     ["gathering", "spec_ready", "confirmed", "materialized", "cancelled"];
 
 impl PlanningDraft {
-    const ENCRYPTION_KEY_ENV: &str = "SOLODAWN_ENCRYPTION_KEY";
-    const ENCRYPTION_KEY_ENV_LEGACY: &str = "GITCORTEX_ENCRYPTION_KEY";
-
-    /// Get encryption key from environment variable (same as Workflow).
-    fn get_encryption_key() -> anyhow::Result<[u8; 32]> {
-        let key_str = std::env::var(Self::ENCRYPTION_KEY_ENV)
-            .or_else(|_| {
-                let val = std::env::var(Self::ENCRYPTION_KEY_ENV_LEGACY)?;
-                tracing::warn!(
-                    new = Self::ENCRYPTION_KEY_ENV,
-                    old = Self::ENCRYPTION_KEY_ENV_LEGACY,
-                    "Deprecated env var used; please switch to the new name"
-                );
-                Ok(val)
-            })
-            .map_err(|_: std::env::VarError| {
-                anyhow::anyhow!(
-                    "Encryption key not found. Please set {} environment variable with a 32-byte value.",
-                    Self::ENCRYPTION_KEY_ENV
-                )
-            })?;
-
-        if key_str.len() != 32 {
-            return Err(anyhow::anyhow!(
-                "Invalid encryption key length: got {} bytes, expected exactly 32 bytes",
-                key_str.len()
-            ));
-        }
-
-        let key = key_str
-            .as_bytes()
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))?;
-        tracing::debug!("Encryption key loaded from environment");
-        Ok(key)
-    }
-
     /// Encrypt and store the planner API key.
     pub fn set_api_key(&mut self, plaintext: &str) -> anyhow::Result<()> {
-        let key = Self::get_encryption_key()?;
-        let cipher = Aes256Gcm::new_from_slice(&key)
-            .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-
-        let ciphertext = cipher
-            .encrypt(&nonce, plaintext.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
-
-        let mut combined = nonce.to_vec();
-        combined.extend_from_slice(&ciphertext);
-
-        let encrypted = general_purpose::STANDARD.encode(&combined);
+        let encrypted = crate::encryption::encrypt(plaintext)?;
         tracing::debug!(
             encrypted_len = encrypted.len(),
             "API key encrypted successfully"
@@ -112,28 +58,7 @@ impl PlanningDraft {
         match &self.planner_api_key {
             None => Ok(None),
             Some(encoded) => {
-                let key = Self::get_encryption_key()?;
-                let combined = general_purpose::STANDARD
-                    .decode(encoded)
-                    .map_err(|e| anyhow::anyhow!("Base64 decode failed: {e}"))?;
-
-                if combined.len() < 12 {
-                    return Err(anyhow::anyhow!("Invalid encrypted data length"));
-                }
-
-                let (nonce_bytes, ciphertext) = combined.split_at(12);
-                #[allow(deprecated)]
-                let nonce = Nonce::from_slice(nonce_bytes);
-                let cipher = Aes256Gcm::new_from_slice(&key)
-                    .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
-
-                let plaintext_bytes = cipher
-                    .decrypt(nonce, ciphertext)
-                    .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
-
-                let decrypted = String::from_utf8(plaintext_bytes).map_err(|e| {
-                    anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}")
-                })?;
+                let decrypted = crate::encryption::decrypt(encoded)?;
                 tracing::debug!(
                     key_len = decrypted.len(),
                     "API key decrypted successfully"

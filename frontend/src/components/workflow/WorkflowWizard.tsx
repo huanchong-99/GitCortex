@@ -12,6 +12,7 @@ import {
 import type { ModelConfig } from './types';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardValidation } from './hooks/useWizardValidation';
+import { validateAllWizardSteps } from './validators';
 import { useTranslation } from 'react-i18next';
 import { useUserSystem } from '@/components/ConfigProvider';
 import {
@@ -201,8 +202,11 @@ export function WorkflowWizard({
 
   const handleSubmit = async () => {
     const latestConfig = configRef.current;
-    const newErrors = validation.validate(latestConfig);
-    if (Object.keys(newErrors).length > 0) {
+    // Validate ALL visible steps before submission, not just the current step.
+    // This catches cross-step inconsistencies when the user goes back and edits.
+    const allErrors = validateAllWizardSteps(visibleStepIds, latestConfig);
+    if (Object.keys(allErrors).length > 0) {
+      validation.setErrors(allErrors);
       return;
     }
 

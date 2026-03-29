@@ -88,6 +88,9 @@ impl QualityProvider for BuiltinFrontendProvider {
             };
 
             for rule in &rules {
+                if !rule.default_config().enabled {
+                    continue;
+                }
                 let issues = rule.analyze(&ctx);
                 all_issues.extend(issues);
             }

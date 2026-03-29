@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/toast';
 import { useActions } from '@/contexts/ActionsContext';
 import { usePush } from '@/hooks/usePush';
 import { useRenameBranch } from '@/hooks/useRenameBranch';
@@ -9,7 +11,7 @@ import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { ForcePushDialog } from '@/components/dialogs/git/ForcePushDialog';
 import { GitPanel, type RepoInfo } from '@/components/ui-new/views/GitPanel';
 import { Actions } from '@/components/ui-new/actions';
-import type { RepoAction } from '@/components/ui-new/primitives/RepoCard';
+import type { RepoAction } from '@/components/ui-new/containers/RepoCard';
 import type {
   Workspace,
   RepoWithTargetBranch,
@@ -32,6 +34,8 @@ export function GitPanelContainer({
 }: Readonly<GitPanelContainerProps>) {
   const { executeAction } = useActions();
   const navigate = useNavigate();
+  const { showToast } = useToast();
+  const { t } = useTranslation(['tasks', 'common']);
 
   // Hooks for branch management (moved from WorkspacesLayout)
   const renameBranch = useRenameBranch(selectedWorkspace?.id);
@@ -148,11 +152,11 @@ export function GitPanelContainer({
       // Show error state and dialog for other errors
       setPushStates((prev) => ({ ...prev, [repoId]: 'error' }));
       const message =
-        err instanceof Error ? err.message : 'Failed to push changes';
+        err instanceof Error ? err.message : t('gitPanel.pushError.fallbackMessage');
       ConfirmDialog.show({
-        title: 'Error',
+        title: t('gitPanel.pushError.title'),
         message,
-        confirmText: 'OK',
+        confirmText: t('common:buttons.ok'),
         showCancelButton: false,
         variant: 'destructive',
       });
@@ -219,8 +223,10 @@ export function GitPanelContainer({
       }
     } catch (err) {
       console.error('Failed to open repo in editor:', err);
+      const error = err as { message?: string };
+      showToast(error.message ?? 'Failed to open in editor', 'error');
     }
-  }, []);
+  }, [showToast]);
 
   // Handle GitPanel actions using the action system
   const handleActionsClick = useCallback(

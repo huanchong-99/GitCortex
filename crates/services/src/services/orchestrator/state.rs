@@ -307,6 +307,15 @@ impl OrchestratorState {
             .any(|s| !s.failed_terminals.is_empty())
     }
 
+    /// Restore processed commits from persisted data.
+    ///
+    /// Rebuilds both the `HashSet` and the insertion-order `VecDeque` so that
+    /// eviction continues to work correctly after crash recovery.
+    pub fn restore_processed_commits(&mut self, commits: Vec<String>) {
+        self.processed_commits = commits.iter().cloned().collect();
+        self.processed_commits_order = commits.into();
+    }
+
     /// Maximum number of processed commit hashes to retain in memory.
     const MAX_PROCESSED_COMMITS: usize = 10_000;
 
@@ -362,7 +371,7 @@ impl OrchestratorState {
 
         if !valid_transitions {
             tracing::error!(
-                "Invalid state transition: {:?} ??{:?}",
+                "Invalid state transition: {:?} -> {:?}",
                 self.run_state,
                 new_state
             );

@@ -39,7 +39,10 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevokeTitle": "Revocar invitaci\u00f3n",
+    "confirmRevoke": "\u00bfEst\u00e1 seguro de que desea revocar la invitaci\u00f3n para {{email}}? Esta acci\u00f3n no se puede deshacer.",
+    "revokeTooltip": "Revocar invitaci\u00f3n"
   },
   "settings": {
     "title": "Organization Settings",
@@ -63,6 +66,7 @@
     "description": "Debes iniciar sesión para administrar la configuración de la organización.",
     "action": "Iniciar sesión"
   },
+  "confirmRemoveMemberTitle": "Eliminar miembro",
   "confirmRemoveMember": "Are you sure you want to remove this member from the organization?",
   "sharedProjects": {
     "title": "Proyectos Compartidos",
@@ -73,6 +77,8 @@
     "linkedTo": "Vinculado a: {{projectName}}",
     "linked": "Vinculado",
     "linkProject": "Vincular proyecto...",
-    "noAvailableProjects": "No hay proyectos disponibles"
+    "noAvailableProjects": "No hay proyectos disponibles",
+    "confirmUnlinkTitle": "Desvincular proyecto",
+    "confirmUnlink": "\u00bfEst\u00e1 seguro de que desea desvincular \"{{projectName}}\"? El proyecto local permanecer\u00e1, pero ya no estar\u00e1 vinculado a este proyecto remoto."
   }
 }

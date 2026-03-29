@@ -194,6 +194,9 @@ function AppContent() {
                 element={<Navigate to="/board" replace />}
               />
             </Route>
+
+            {/* ========== CATCH-ALL: redirect unknown routes to home ========== */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </SentryRoutes>
         </SearchProvider>
       </ThemeProvider>

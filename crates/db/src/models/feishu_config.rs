@@ -2,11 +2,6 @@
 //!
 //! Stores Feishu (Lark) application configuration for connector integration.
 
-use aes_gcm::{
-    Aes256Gcm,
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-};
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
@@ -192,39 +187,7 @@ impl FeishuAppConfig {
     ///
     /// Reads the key from `SOLODAWN_ENCRYPTION_KEY` (must be exactly 32 bytes).
     pub fn encrypt_secret(plaintext: &str) -> anyhow::Result<String> {
-        let key_str = std::env::var("SOLODAWN_ENCRYPTION_KEY")
-            .or_else(|_| {
-                let val = std::env::var("GITCORTEX_ENCRYPTION_KEY")?;
-                tracing::warn!(
-                    new = "SOLODAWN_ENCRYPTION_KEY",
-                    old = "GITCORTEX_ENCRYPTION_KEY",
-                    "Deprecated env var used; please switch to the new name"
-                );
-                Ok(val)
-            })
-            .map_err(|_: std::env::VarError| {
-                anyhow::anyhow!("SOLODAWN_ENCRYPTION_KEY is not set")
-            })?;
-        if key_str.len() != 32 {
-            return Err(anyhow::anyhow!(
-                "Invalid encryption key length: got {} bytes, expected 32",
-                key_str.len()
-            ));
-        }
-        let key_bytes: [u8; 32] = key_str.as_bytes().try_into().map_err(|_| {
-            anyhow::anyhow!("Invalid encryption key format")
-        })?;
-
-        let cipher = Aes256Gcm::new_from_slice(&key_bytes)
-            .map_err(|e| anyhow::anyhow!("Cipher init failed: {e}"))?;
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-        let ciphertext = cipher
-            .encrypt(&nonce, plaintext.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
-
-        let mut combined = nonce.to_vec();
-        combined.extend_from_slice(&ciphertext);
-        Ok(general_purpose::STANDARD.encode(&combined))
+        crate::encryption::encrypt(plaintext)
     }
 }
 

@@ -110,6 +110,10 @@ impl MergeCoordinator {
         task_worktree_path: &Path,
         commit_message: &str,
     ) -> Result<String> {
+        // G06-002: acquire the per-workflow merge lock internally so callers
+        // don't need to remember. The lock is held for the duration of the merge.
+        let _merge_guard = acquire_workflow_merge_lock(workflow_id).await;
+
         tracing::info!(
             "Merging task branch {} into {} for task {}",
             task_branch,
@@ -119,7 +123,7 @@ impl MergeCoordinator {
 
         // Acquire git service lock and perform merge
         let commit_sha = {
-            let git_service = self.git_service.read().await;
+            let git_service = self.git_service.write().await;
             git_service.merge_changes(
                 base_repo_path,
                 task_worktree_path,

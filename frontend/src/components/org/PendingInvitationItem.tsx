@@ -4,6 +4,7 @@ import type { Invitation } from 'shared/types';
 import { MemberRole } from 'shared/types';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 
 interface PendingInvitationItemProps {
   invitation: Invitation;
@@ -18,12 +19,18 @@ export function PendingInvitationItem({
 }: Readonly<PendingInvitationItemProps>) {
   const { t } = useTranslation('organization');
 
-  const handleRevoke = () => {
-    const confirmed = globalThis.confirm(
-      `Are you sure you want to revoke the invitation for ${invitation.email}? This action cannot be undone.`
-    );
-    if (confirmed) {
-      onRevoke?.(invitation.id);
+  const handleRevoke = async () => {
+    try {
+      const result = await ConfirmDialog.show({
+        title: t('invitationList.confirmRevokeTitle'),
+        message: t('invitationList.confirmRevoke', { email: invitation.email }),
+        variant: 'destructive',
+      });
+      if (result === 'confirmed') {
+        onRevoke?.(invitation.id);
+      }
+    } catch {
+      // User cancelled
     }
   };
 
@@ -52,7 +59,7 @@ export function PendingInvitationItem({
         size="icon"
         onClick={handleRevoke}
         disabled={isRevoking}
-        title="Revoke invitation"
+        title={t('invitationList.revokeTooltip')}
       >
         <Trash2 className="h-4 w-4" />
       </Button>

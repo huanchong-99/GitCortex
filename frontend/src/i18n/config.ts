@@ -12,6 +12,7 @@ import enOrganization from './locales/en/organization.json';
 import enWorkflow from './locales/en/workflow.json';
 import enQuality from './locales/en/quality.json';
 import enSetup from './locales/en/setup.json';
+import enSlashCommands from './locales/en/slashCommands.json';
 import jaCommon from './locales/ja/common.json';
 import jaSettings from './locales/ja/settings.json';
 import jaProjects from './locales/ja/projects.json';
@@ -20,6 +21,7 @@ import jaOrganization from './locales/ja/organization.json';
 import jaWorkflow from './locales/ja/workflow.json';
 import jaQuality from './locales/ja/quality.json';
 import jaSetup from './locales/ja/setup.json';
+import jaSlashCommands from './locales/ja/slashCommands.json';
 import esCommon from './locales/es/common.json';
 import esSettings from './locales/es/settings.json';
 import esProjects from './locales/es/projects.json';
@@ -28,6 +30,7 @@ import esOrganization from './locales/es/organization.json';
 import esWorkflow from './locales/es/workflow.json';
 import esQuality from './locales/es/quality.json';
 import esSetup from './locales/es/setup.json';
+import esSlashCommands from './locales/es/slashCommands.json';
 import koCommon from './locales/ko/common.json';
 import koSettings from './locales/ko/settings.json';
 import koProjects from './locales/ko/projects.json';
@@ -36,6 +39,7 @@ import koOrganization from './locales/ko/organization.json';
 import koWorkflow from './locales/ko/workflow.json';
 import koQuality from './locales/ko/quality.json';
 import koSetup from './locales/ko/setup.json';
+import koSlashCommands from './locales/ko/slashCommands.json';
 import zhHansCommon from './locales/zh-Hans/common.json';
 import zhHansSettings from './locales/zh-Hans/settings.json';
 import zhHansProjects from './locales/zh-Hans/projects.json';
@@ -44,6 +48,7 @@ import zhHansOrganization from './locales/zh-Hans/organization.json';
 import zhHansWorkflow from './locales/zh-Hans/workflow.json';
 import zhHansQuality from './locales/zh-Hans/quality.json';
 import zhHansSetup from './locales/zh-Hans/setup.json';
+import zhHansSlashCommands from './locales/zh-Hans/slashCommands.json';
 import zhHantCommon from './locales/zh-Hant/common.json';
 import zhHantSettings from './locales/zh-Hant/settings.json';
 import zhHantProjects from './locales/zh-Hant/projects.json';
@@ -52,6 +57,7 @@ import zhHantOrganization from './locales/zh-Hant/organization.json';
 import zhHantWorkflow from './locales/zh-Hant/workflow.json';
 import zhHantQuality from './locales/zh-Hant/quality.json';
 import zhHantSetup from './locales/zh-Hant/setup.json';
+import zhHantSlashCommands from './locales/zh-Hant/slashCommands.json';
 
 const resources = {
   en: {
@@ -63,6 +69,7 @@ const resources = {
     workflow: enWorkflow,
     quality: enQuality,
     setup: enSetup,
+    slashCommands: enSlashCommands,
   },
   ja: {
     common: jaCommon,
@@ -73,6 +80,7 @@ const resources = {
     workflow: jaWorkflow,
     quality: jaQuality,
     setup: jaSetup,
+    slashCommands: jaSlashCommands,
   },
   es: {
     common: esCommon,
@@ -83,6 +91,7 @@ const resources = {
     workflow: esWorkflow,
     quality: esQuality,
     setup: esSetup,
+    slashCommands: esSlashCommands,
   },
   ko: {
     common: koCommon,
@@ -93,6 +102,7 @@ const resources = {
     workflow: koWorkflow,
     quality: koQuality,
     setup: koSetup,
+    slashCommands: koSlashCommands,
   },
   'zh-Hans': {
     common: zhHansCommon,
@@ -103,6 +113,7 @@ const resources = {
     workflow: zhHansWorkflow,
     quality: zhHansQuality,
     setup: zhHansSetup,
+    slashCommands: zhHansSlashCommands,
   },
   'zh-Hant': {
     common: zhHantCommon,
@@ -113,6 +124,7 @@ const resources = {
     workflow: zhHantWorkflow,
     quality: zhHantQuality,
     setup: zhHantSetup,
+    slashCommands: zhHantSlashCommands,
   },
 };
 

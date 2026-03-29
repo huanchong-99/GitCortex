@@ -472,6 +472,7 @@ export const useConversationHistory = ({
   const displayedExecutionProcesses = useRef<ExecutionProcessStateStore>({});
   const loadedInitialEntries = useRef(false);
   const streamingProcessIdsRef = useRef<Set<string>>(new Set());
+  const activeStreamControllersRef = useRef<Map<string, { close(): void }>>(new Map());
   const onEntriesUpdatedRef = useRef<OnEntriesUpdated | null>(null);
 
   const mergeIntoDisplayed = (
@@ -677,15 +678,18 @@ export const useConversationHistory = ({
             emitEntries(displayedExecutionProcesses.current, 'running', false);
           },
           onFinished: () => {
+            activeStreamControllersRef.current.delete(executionProcess.id);
             emitEntries(displayedExecutionProcesses.current, 'running', false);
             controller.close();
             resolve();
           },
           onError: () => {
+            activeStreamControllersRef.current.delete(executionProcess.id);
             controller.close();
             reject(new Error('Failed to load running process'));
           },
         });
+        activeStreamControllersRef.current.set(executionProcess.id, controller);
       });
     },
     [emitEntries]
@@ -879,6 +883,14 @@ export const useConversationHistory = ({
         });
       }
     }
+
+    return () => {
+      // Close all active streaming WebSocket connections on unmount
+      for (const controller of activeStreamControllersRef.current.values()) {
+        controller.close();
+      }
+      activeStreamControllersRef.current.clear();
+    };
   }, [
     attempt.id,
     idStatusKey,

@@ -5,7 +5,7 @@ import { Tooltip } from '../primitives/Tooltip';
 import { FileTreeSearchBar } from './FileTreeSearchBar';
 import { FileTreeNode } from './FileTreeNode';
 import type { TreeNode } from '../types/fileTree';
-import { CollapsibleSectionHeader } from '../primitives/CollapsibleSectionHeader';
+import { CollapsibleSectionHeader } from '../containers/CollapsibleSectionHeader';
 import { PERSIST_KEYS } from '@/stores/useUiPreferencesStore';
 
 interface FileTreeProps {

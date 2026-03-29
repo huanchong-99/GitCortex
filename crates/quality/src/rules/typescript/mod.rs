@@ -16,6 +16,38 @@ pub mod type_assertion;
 
 use super::TsRule;
 
+/// Count structural (non-string/template-literal) braces in a line.
+///
+/// Returns `(opens, closes)` ignoring braces inside `'…'`, `"…"`, and `` `…` `` literals.
+pub fn count_structural_braces(line: &str) -> (usize, usize) {
+    let mut opens: usize = 0;
+    let mut closes: usize = 0;
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut in_template = false;
+    let mut escaped = false;
+
+    for ch in line.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        match ch {
+            '\'' if !in_double_quote && !in_template => in_single_quote = !in_single_quote,
+            '"' if !in_single_quote && !in_template => in_double_quote = !in_double_quote,
+            '`' if !in_single_quote && !in_double_quote => in_template = !in_template,
+            '{' if !in_single_quote && !in_double_quote && !in_template => opens += 1,
+            '}' if !in_single_quote && !in_double_quote && !in_template => closes += 1,
+            _ => {}
+        }
+    }
+    (opens, closes)
+}
+
 /// Collect all built-in TypeScript/JavaScript rules
 pub fn all_ts_rules() -> Vec<Box<dyn TsRule>> {
     vec![

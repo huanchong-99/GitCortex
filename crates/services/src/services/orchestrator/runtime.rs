@@ -631,7 +631,18 @@ impl OrchestratorRuntime {
             let entry = idempotency.entry(workflow_id.to_string()).or_default();
             entry.insert(key, command_result.clone());
             if entry.len() > 2048 {
-                entry.clear();
+                // LRU-style eviction: remove oldest half instead of clearing all entries
+                let keys_to_remove: Vec<String> =
+                    entry.keys().take(entry.len() / 2).cloned().collect();
+                for k in &keys_to_remove {
+                    entry.remove(k);
+                }
+                tracing::debug!(
+                    workflow_id = %workflow_id,
+                    evicted = keys_to_remove.len(),
+                    remaining = entry.len(),
+                    "Evicted oldest half of chat idempotency entries"
+                );
             }
         }
 

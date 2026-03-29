@@ -1,9 +1,12 @@
 //! ConciergeAgent: LLM-powered session-scoped assistant.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use tracing;
 
 use db::models::concierge::{ConciergeMessage, ConciergeSession};
@@ -29,6 +32,9 @@ pub struct ConciergeAgent {
     broadcaster: Arc<ConciergeBroadcaster>,
     shared_config: Option<Arc<tokio::sync::RwLock<crate::services::config::Config>>>,
     message_bus: Option<SharedMessageBus>,
+    /// Cancellation tokens for active notification watchers, keyed by
+    /// `"{session_id}:{workflow_id}"`. Cancelled when the session is cleaned up.
+    watcher_tokens: Arc<Mutex<HashMap<String, CancellationToken>>>,
 }
 
 impl ConciergeAgent {
@@ -38,6 +44,24 @@ impl ConciergeAgent {
             broadcaster,
             shared_config: None,
             message_bus: None,
+            watcher_tokens: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Cancel all active notification watchers for a given session.
+    ///
+    /// Should be called when a session is deleted or disconnected.
+    pub async fn cancel_watchers_for_session(&self, session_id: &str) {
+        let mut tokens = self.watcher_tokens.lock().await;
+        let keys_to_remove: Vec<String> = tokens
+            .keys()
+            .filter(|k| k.starts_with(&format!("{session_id}:")))
+            .cloned()
+            .collect();
+        for key in keys_to_remove {
+            if let Some(token) = tokens.remove(&key) {
+                token.cancel();
+            }
         }
     }
 
@@ -206,11 +230,16 @@ impl ConciergeAgent {
                 "I've completed the requested actions. Is there anything else?".to_string();
         }
 
-        // 6. Save assistant response
+        // 6. Reload session to pick up any mutations made by tools (e.g. feishu_sync toggle)
+        let session = ConciergeSession::find_by_id(&self.pool, session_id)
+            .await?
+            .context("Session not found after tool loop")?;
+
+        // 7. Save assistant response
         let assistant_msg = ConciergeMessage::new_assistant(session_id, &final_response);
         ConciergeMessage::insert(&self.pool, &assistant_msg).await?;
 
-        // 7. Broadcast assistant response
+        // 8. Broadcast assistant response
         self.broadcaster
             .broadcast(
                 session_id,
@@ -222,7 +251,7 @@ impl ConciergeAgent {
             )
             .await;
 
-        // 8. Auto-name session from first message
+        // 9. Auto-name session from first message
         if session.name.is_empty() {
             let name = user_message.chars().take(50).collect::<String>();
             let _ = ConciergeSession::update_name(&self.pool, session_id, &name).await;
@@ -330,9 +359,25 @@ impl ConciergeAgent {
 
         let port = std::env::var("BACKEND_PORT").unwrap_or_else(|_| "23456".to_string());
         let base = format!("http://127.0.0.1:{port}/api");
+
+        // Read API token so internal HTTP calls pass the auth middleware.
+        let api_token =
+            utils::env_compat::var_opt_with_compat("SOLODAWN_API_TOKEN", "GITCORTEX_API_TOKEN");
+
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()?;
+
+        /// Helper: attach Bearer auth header when an API token is configured.
+        fn with_auth(
+            builder: reqwest::RequestBuilder,
+            token: &Option<String>,
+        ) -> reqwest::RequestBuilder {
+            match token {
+                Some(t) if !t.trim().is_empty() => builder.bearer_auth(t),
+                _ => builder,
+            }
+        }
 
         match tool_name {
             "send_to_orchestrator" => {
@@ -344,14 +389,16 @@ impl ConciergeAgent {
                     .as_str()
                     .context("Missing 'message' parameter")?;
 
-                let resp = http
-                    .post(format!("{base}/workflows/{workflow_id}/orchestrator/chat"))
-                    .json(&serde_json::json!({
-                        "message": message,
-                        "source": "concierge"
-                    }))
-                    .send()
-                    .await?;
+                let resp = with_auth(
+                    http.post(format!("{base}/workflows/{workflow_id}/orchestrator/chat"))
+                        .json(&serde_json::json!({
+                            "message": message,
+                            "source": "concierge"
+                        })),
+                    &api_token,
+                )
+                .send()
+                .await?;
 
                 if resp.status().is_success() {
                     Ok(format!("Message sent to orchestrator for workflow {workflow_id}."))
@@ -366,10 +413,12 @@ impl ConciergeAgent {
                     .as_str()
                     .context("Missing 'workflow_id'")?;
 
-                let resp = http
-                    .post(format!("{base}/workflows/{workflow_id}/prepare"))
-                    .send()
-                    .await?;
+                let resp = with_auth(
+                    http.post(format!("{base}/workflows/{workflow_id}/prepare")),
+                    &api_token,
+                )
+                .send()
+                .await?;
 
                 if resp.status().is_success() {
                     Ok(format!(
@@ -386,10 +435,12 @@ impl ConciergeAgent {
                     .as_str()
                     .context("Missing 'workflow_id'")?;
 
-                let resp = http
-                    .post(format!("{base}/workflows/{workflow_id}/start"))
-                    .send()
-                    .await?;
+                let resp = with_auth(
+                    http.post(format!("{base}/workflows/{workflow_id}/start")),
+                    &api_token,
+                )
+                .send()
+                .await?;
 
                 if resp.status().is_success() {
                     // Start notification watcher for this workflow
@@ -399,8 +450,21 @@ impl ConciergeAgent {
                             let sid = session.id.clone();
                             let pool = self.pool.clone();
                             let bc = self.broadcaster.clone();
+                            let cancel = CancellationToken::new();
+                            // Store token so we can cancel when the session is cleaned up
+                            let watcher_key =
+                                format!("{}:{}", session.id, workflow_id);
+                            self.watcher_tokens
+                                .lock()
+                                .await
+                                .insert(watcher_key, cancel.clone());
                             tokio::spawn(super::notifications::watch_workflow_events(
-                                sid, workflow_id.to_string(), pool, bc, rx,
+                                sid,
+                                workflow_id.to_string(),
+                                pool,
+                                bc,
+                                rx,
+                                cancel,
                             ));
                         }
                     }

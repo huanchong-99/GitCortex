@@ -7,7 +7,7 @@ import {
   XCircle as XCircleIcon,
 } from '@phosphor-icons/react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
-import { InputField } from '../../ui-new/primitives/InputField';
+import { InputField } from '../../ui-new/containers/InputField';
 import { PrimaryButton } from '../../ui-new/primitives/PrimaryButton';
 import type { ProjectConfig, GitStatus } from '../types';
 import { useTranslation } from 'react-i18next';

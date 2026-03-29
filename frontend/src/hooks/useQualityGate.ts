@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { handleApiResponse } from '@/lib/api';
+import { handleApiResponse, makeRequest } from '@/lib/api';
 import { isQualityGateAvailable } from '@/lib/apiVersionCompat';
 import type {
   QualityRunSummary,
@@ -50,7 +50,7 @@ const qualityApi = {
     workflowId: string
   ): Promise<QualityRunSummary[]> => {
     return qualityFetchSafe(async () => {
-      const response = await fetch(
+      const response = await makeRequest(
         `/api/workflows/${encodeURIComponent(workflowId)}/quality/runs`
       );
       return handleApiResponse<QualityRunSummary[]>(response);
@@ -59,7 +59,7 @@ const qualityApi = {
 
   getRunDetail: async (runId: string): Promise<QualityRunDetail | null> => {
     return qualityFetchSafe(async () => {
-      const response = await fetch(
+      const response = await makeRequest(
         `/api/quality/runs/${encodeURIComponent(runId)}`
       );
       return handleApiResponse<QualityRunDetail | null>(response);
@@ -68,7 +68,7 @@ const qualityApi = {
 
   getIssuesForRun: async (runId: string): Promise<QualityIssueRecord[]> => {
     return qualityFetchSafe(async () => {
-      const response = await fetch(
+      const response = await makeRequest(
         `/api/quality/runs/${encodeURIComponent(runId)}/issues`
       );
       return handleApiResponse<QualityIssueRecord[]>(response);
@@ -79,7 +79,7 @@ const qualityApi = {
     terminalId: string
   ): Promise<QualityRunSummary | null> => {
     return qualityFetchSafe(async () => {
-      const response = await fetch(
+      const response = await makeRequest(
         `/api/terminals/${encodeURIComponent(terminalId)}/quality/latest`
       );
       return handleApiResponse<QualityRunSummary | null>(response);

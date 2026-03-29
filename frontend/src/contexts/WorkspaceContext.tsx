@@ -265,3 +265,11 @@ export function useWorkspaceContext(): WorkspaceContextValue {
   }
   return context;
 }
+
+/**
+ * Optional version of useWorkspaceContext that returns null if no provider exists.
+ * Useful for components that may or may not be inside a WorkspaceProvider.
+ */
+export function useWorkspaceContextOptional(): WorkspaceContextValue | null {
+  return useContext(WorkspaceContext);
+}

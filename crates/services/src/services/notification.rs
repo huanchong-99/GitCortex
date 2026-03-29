@@ -86,9 +86,10 @@ impl NotificationService {
             };
 
             let _ = tokio::process::Command::new("powershell.exe")
-                .arg("-c")
+                .args(["-NoProfile", "-Command"])
                 .arg(format!(
-                    r#"(New-Object Media.SoundPlayer "{file_path}").PlaySync()"#
+                    "(New-Object Media.SoundPlayer '{}').PlaySync()",
+                    file_path.replace('\'', "''")
                 ))
                 .spawn();
         }
@@ -107,10 +108,20 @@ impl NotificationService {
 
     /// Send macOS notification using osascript
     fn send_macos_notification(title: &str, message: &str) {
+        // Sanitize for AppleScript string literals: escape backslashes, double quotes,
+        // and strip control characters that could break the script boundary
+        fn sanitize_applescript(s: &str) -> String {
+            s.replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .chars()
+                .filter(|c| !c.is_control())
+                .collect()
+        }
+
         let script = format!(
-            r#"display notification "{message}" with title "{title}" sound name "Glass""#,
-            message = message.replace('\\', "\\\\").replace('"', r#"\""#),
-            title = title.replace('\\', "\\\\").replace('"', r#"\""#)
+            r#"display notification "{}" with title "{}" sound name "Glass""#,
+            sanitize_applescript(message),
+            sanitize_applescript(title)
         );
 
         let _ = tokio::process::Command::new("osascript")

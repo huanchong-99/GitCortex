@@ -43,6 +43,7 @@ import { SettingsCard } from '@/components/ui-new/primitives/SettingsCard';
 import { Button } from '@/components/ui-new/primitives/Button';
 import { ErrorAlert } from '@/components/ui-new/primitives/ErrorAlert';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 
 const REMOTE_PROJECT_API_UNSUPPORTED_STATUS = 501;
 
@@ -285,6 +286,7 @@ function OrgSelect({
   organizations: Array<{ id: string; name: string }>;
   placeholder: string;
 }>) {
+  const { t } = useTranslation('organization');
   return (
     <div className="relative">
       <select
@@ -306,7 +308,7 @@ function OrgSelect({
           ))
         ) : (
           <option value="no-orgs" disabled>
-            No organizations
+            {t('toasts.noOrganizations')}
           </option>
         )}
       </select>
@@ -372,28 +374,28 @@ export function OrganizationSettingsNew() {
     deleteOrganization,
   } = useOrganizationMutations({
     onRevokeSuccess: () => {
-      setSuccess('Invitation revoked successfully');
+      setSuccess(t('toasts.invitationRevoked'));
       setTimeout(() => setSuccess(null), 3000);
     },
     onRevokeError: (err) => {
       setError(
-        err instanceof Error ? err.message : 'Failed to revoke invitation'
+        err instanceof Error ? err.message : t('toasts.revokeError')
       );
     },
     onRemoveSuccess: () => {
-      setSuccess('Member removed successfully');
+      setSuccess(t('toasts.memberRemoved'));
       setTimeout(() => setSuccess(null), 3000);
     },
     onRemoveError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to remove member');
+      setError(err instanceof Error ? err.message : t('toasts.removeError'));
     },
     onRoleChangeSuccess: () => {
-      setSuccess('Member role updated successfully');
+      setSuccess(t('toasts.roleUpdated'));
       setTimeout(() => setSuccess(null), 3000);
     },
     onRoleChangeError: (err) => {
       setError(
-        err instanceof Error ? err.message : 'Failed to update member role'
+        err instanceof Error ? err.message : t('toasts.roleUpdateError')
       );
     },
     onDeleteSuccess: () => {
@@ -466,7 +468,7 @@ export function OrganizationSettingsNew() {
   // Project mutations
   const { linkToExisting, unlinkProject } = useProjectMutations({
     onLinkSuccess: () => {
-      setSuccess('Project linked successfully');
+      setSuccess(t('toasts.projectLinked'));
       setTimeout(() => setSuccess(null), 3000);
     },
     onLinkError: (err) => {
@@ -474,10 +476,10 @@ export function OrganizationSettingsNew() {
         setError(remoteProjectUnsupportedMessage);
         return;
       }
-      setError(err instanceof Error ? err.message : 'Failed to link project');
+      setError(err instanceof Error ? err.message : t('toasts.linkError'));
     },
     onUnlinkSuccess: () => {
-      setSuccess('Project unlinked successfully');
+      setSuccess(t('toasts.projectUnlinked'));
       setTimeout(() => setSuccess(null), 3000);
     },
     onUnlinkError: (err) => {
@@ -486,7 +488,7 @@ export function OrganizationSettingsNew() {
         return;
       }
       setError(
-        err instanceof Error ? err.message : 'Failed to unlink project'
+        err instanceof Error ? err.message : t('toasts.unlinkError')
       );
     },
   });
@@ -498,7 +500,7 @@ export function OrganizationSettingsNew() {
 
       if (result.action === 'created' && result.organizationId) {
         handleOrgSelect(result.organizationId ?? '');
-        setSuccess('Organization created successfully');
+        setSuccess(t('toasts.organizationCreated'));
         setTimeout(() => setSuccess(null), 3000);
       }
     } catch (err) {
@@ -515,7 +517,7 @@ export function OrganizationSettingsNew() {
       });
 
       if (result.action === 'invited') {
-        setSuccess('Member invited successfully');
+        setSuccess(t('toasts.memberInvited'));
         setTimeout(() => setSuccess(null), 3000);
       }
     } catch (err) {
@@ -533,8 +535,16 @@ export function OrganizationSettingsNew() {
   const handleRemoveMember = async (userId: string) => {
     if (!selectedOrgId) return;
 
-    const confirmed = globalThis.confirm(t('confirmRemoveMember'));
-    if (!confirmed) return;
+    try {
+      const result = await ConfirmDialog.show({
+        title: t('confirmRemoveMemberTitle'),
+        message: t('confirmRemoveMember'),
+        variant: 'destructive',
+      });
+      if (result !== 'confirmed') return;
+    } catch {
+      return;
+    }
 
     setError(null);
     removeMember.mutate({ orgId: selectedOrgId, userId });
@@ -550,10 +560,16 @@ export function OrganizationSettingsNew() {
   const handleDeleteOrganization = async () => {
     if (!selectedOrgId || !selectedOrg) return;
 
-    const confirmed = globalThis.confirm(
-      t('settings.confirmDelete', { orgName: selectedOrg.name })
-    );
-    if (!confirmed) return;
+    try {
+      const result = await ConfirmDialog.show({
+        title: t('settings.deleteOrganization'),
+        message: t('settings.confirmDelete', { orgName: selectedOrg.name }),
+        variant: 'destructive',
+      });
+      if (result !== 'confirmed') return;
+    } catch {
+      return;
+    }
 
     setError(null);
     deleteOrganization.mutate(selectedOrgId);

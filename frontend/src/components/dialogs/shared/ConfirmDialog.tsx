@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -21,12 +22,13 @@ export interface ConfirmDialogProps {
 }
 
 const ConfirmDialogImpl = NiceModal.create<ConfirmDialogProps>((props) => {
+  const { t } = useTranslation('common');
   const modal = useModal();
   const {
     title,
     message,
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
+    confirmText = t('buttons.confirm'),
+    cancelText = t('buttons.cancel'),
     variant = 'default',
     icon = true,
   } = props;

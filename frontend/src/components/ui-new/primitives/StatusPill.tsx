@@ -1,7 +1,5 @@
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
-import type { LucideIcon } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
 
 const statusPillVariants = cva(
@@ -31,7 +29,7 @@ const statusPillVariants = cva(
 export interface StatusPillProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof statusPillVariants> {
-  readonly icon?: LucideIcon;
+  readonly icon?: React.ComponentType<{ className?: string }>;
   readonly label?: React.ReactNode;
 }
 

@@ -89,6 +89,9 @@ impl QualityProvider for BuiltinRustProvider {
             };
 
             for rule in &rules {
+                if !rule.default_config().enabled {
+                    continue;
+                }
                 let issues = rule.analyze(&ctx);
                 for issue in &issues {
                     if issue.rule_id.contains("cyclomatic") {

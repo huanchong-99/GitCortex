@@ -207,6 +207,22 @@ async fn update_spec(
                     .to_string(),
             ));
         }
+        // Enforce forward-only state transitions
+        let valid_transitions = [
+            ("gathering", "spec_ready"),
+            ("spec_ready", "confirmed"),
+        ];
+        if new_status != &draft.status {
+            let is_valid = valid_transitions
+                .iter()
+                .any(|(from, to)| draft.status == *from && new_status.as_str() == *to);
+            if !is_valid {
+                return Err(ApiError::BadRequest(format!(
+                    "Invalid transition: {} \u{2192} {}",
+                    draft.status, new_status
+                )));
+            }
+        }
     }
 
     PlanningDraft::update_spec(
@@ -419,7 +435,8 @@ async fn send_message(
                             let prefix = if role == "user" { "[User]" } else { "[Assistant]" };
                             let text = format!("{prefix} {content}");
                             let truncated = if text.len() > 4000 {
-                                format!("{}...(truncated)", &text[..4000])
+                                let boundary = text.floor_char_boundary(4000);
+                                format!("{}...(truncated)", &text[..boundary])
                             } else {
                                 text
                             };
@@ -632,7 +649,8 @@ async fn toggle_feishu_sync(
                     let text = format!("{prefix} {}", msg.content);
                     // Truncate very long messages for Feishu
                     let truncated = if text.len() > 4000 {
-                        format!("{}...(truncated)", &text[..4000])
+                        let boundary = text.floor_char_boundary(4000);
+                        format!("{}...(truncated)", &text[..boundary])
                     } else {
                         text
                     };

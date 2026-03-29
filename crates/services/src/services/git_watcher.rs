@@ -572,9 +572,13 @@ impl GitWatcher {
 
             // G10-012: Publish full commit message (not just subject) so the
             // orchestrator and DB have the complete body for attribution.
-            self.message_bus
+            if let Err(e) = self
+                .message_bus
                 .publish_git_event(workflow_id, &commit.hash, &commit.branch, &commit.message)
-                .await;
+                .await
+            {
+                tracing::warn!("Failed to publish git event (will retry on next poll): {e}");
+            }
 
             tracing::info!(
                 "Published GitEvent for commit {} (no metadata) on workflow {}",
@@ -617,14 +621,18 @@ impl GitWatcher {
                 "Commit metadata indicates continue mode; skipping TerminalCompleted publish"
             );
 
-            self.message_bus
+            if let Err(e) = self
+                .message_bus
                 .publish_git_event(
                     &metadata.workflow_id,
                     &commit.hash,
                     &commit.branch,
                     &commit.message,
                 )
-                .await;
+                .await
+            {
+                tracing::warn!("Failed to publish git event (will retry on next poll): {e}");
+            }
 
             return Ok(());
         };
@@ -641,7 +649,11 @@ impl GitWatcher {
         };
 
         // Publish to message bus
-        self.message_bus.publish_terminal_completed(event).await;
+        if let Err(e) = self.message_bus.publish_terminal_completed(event).await {
+            tracing::warn!(
+                "Failed to publish TerminalCompleted event (will retry on next poll): {e}"
+            );
+        }
 
         tracing::info!(
             "Published TerminalCompleted event for terminal {}",

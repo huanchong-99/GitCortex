@@ -29,10 +29,20 @@ impl ConditionEvaluator {
     /// # 返回
     /// - `EvaluationResult`: 求值等级和实际值
     pub fn evaluate(condition: &Condition, measure_value: Option<&MeasureValue>) -> EvaluationResult {
-        // 参考 SonarQube: 无值时返回 OK
+        // Missing metric → WARN (provider may have failed or metric not collected).
+        // Previously returned OK, which silently passed the gate when all providers failed.
         let measure = match measure_value {
             Some(v) => v,
-            None => return EvaluationResult::ok(condition.metric, None),
+            None => {
+                return EvaluationResult::warn(
+                    condition.metric,
+                    None,
+                    format!(
+                        "Metric {} has no value — provider may have failed or is not configured",
+                        condition.metric
+                    ),
+                );
+            }
         };
 
         // 解析阈值为可比较值
@@ -159,7 +169,8 @@ mod tests {
     fn test_evaluate_no_measure() {
         let condition = Condition::new(MetricKey::ClippyWarnings, Operator::GreaterThan, "0");
         let result = ConditionEvaluator::evaluate(&condition, None);
-        assert_eq!(result.level, Level::Ok);
+        assert_eq!(result.level, Level::Warn);
+        assert!(result.message.is_some());
     }
 
     #[test]

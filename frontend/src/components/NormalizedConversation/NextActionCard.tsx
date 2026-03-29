@@ -1,15 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Play,
-  Pause,
-  Terminal,
-  FileDiff,
-  Copy,
-  Check,
-  GitBranch,
-  Settings,
-} from 'lucide-react';
+  PlayIcon,
+  PauseIcon,
+  TerminalIcon,
+  GitDiffIcon,
+  CopyIcon,
+  CheckIcon,
+  GitBranchIcon,
+  GearIcon,
+} from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import { ViewProcessesDialog } from '@/components/dialogs/tasks/ViewProcessesDialog';
 import { CreateAttemptDialog } from '@/components/dialogs/tasks/CreateAttemptDialog';
@@ -168,7 +168,7 @@ function FileActionToolbar({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleOpenDiffs} aria-label={t('attempt.diffs')}>
-            <FileDiff className="h-3.5 w-3.5" />
+            <GitDiffIcon className="h-3.5 w-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{t('attempt.diffs')}</TooltipContent>
@@ -178,7 +178,7 @@ function FileActionToolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy} aria-label={t('attempt.clickToCopy')}>
-              {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? <CheckIcon className="h-3.5 w-3.5 text-green-600" /> : <CopyIcon className="h-3.5 w-3.5" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{copied ? t('attempt.copied') : t('attempt.clickToCopy')}</TooltipContent>
@@ -203,7 +203,7 @@ function FileActionToolbar({
               disabled={(hasRunningDevServer ? isStopping : isStarting) || !attemptId || !projectHasDevScript}
               aria-label={hasRunningDevServer ? t('attempt.pauseDev') : t('attempt.startDev')}
             >
-              {hasRunningDevServer ? <Pause className="h-3.5 w-3.5 text-destructive" /> : <Play className="h-3.5 w-3.5" />}
+              {hasRunningDevServer ? <PauseIcon className="h-3.5 w-3.5 text-destructive" /> : <PlayIcon className="h-3.5 w-3.5" />}
             </Button>
           </span>
         </TooltipTrigger>
@@ -216,7 +216,7 @@ function FileActionToolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleViewLogs} disabled={!attemptId} aria-label={t('attempt.viewDevLogs')}>
-              <Terminal className="h-3.5 w-3.5" />
+              <TerminalIcon className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('attempt.viewDevLogs')}</TooltipContent>
@@ -226,7 +226,7 @@ function FileActionToolbar({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleGitActions} disabled={!attemptId} aria-label={t('attempt.gitActions')}>
-            <GitBranch className="h-3.5 w-3.5" />
+            <GitBranchIcon className="h-3.5 w-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{t('attempt.gitActions')}</TooltipContent>
@@ -370,7 +370,7 @@ export function NextActionCard({
           <div
             className={`border-x border-t ${borderClass} px-3 py-2 flex items-start gap-2`}
           >
-            <Settings className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <GearIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span className="text-sm">{setupHelpText}</span>
           </div>
         )}

@@ -16,31 +16,10 @@ interface ActivityItem {
   readonly label: string;
   readonly status: string;
   readonly orderIndex: number;
-  readonly lastActivity?: Date | null;
 }
 
 /** Status values that indicate active terminals */
 const ACTIVE_STATUSES = new Set(['working', 'waiting', 'running', 'starting']);
-
-/**
- * Format relative time for last activity
- */
-function useFormatRelativeTime() {
-  const { t } = useTranslation('workflow');
-
-  return (date: Date | null | undefined): string => {
-    if (!date) return '';
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-
-    if (diffSec < 60) return t('terminalActivity.timeAgo.seconds', { count: diffSec });
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return t('terminalActivity.timeAgo.minutes', { count: diffMin });
-    const diffHour = Math.floor(diffMin / 60);
-    return t('terminalActivity.timeAgo.hours', { count: diffHour });
-  };
-}
 
 /**
  * Single terminal activity item with recent output preview
@@ -53,7 +32,6 @@ function TerminalActivityItem({
   workflowId: string;
 }>) {
   const recentOutput = useRecentTerminalOutput(item.id, 3);
-  const formatRelativeTime = useFormatRelativeTime();
 
   return (
     <Link
@@ -64,9 +42,6 @@ function TerminalActivityItem({
         <StatusIndicator status={item.status} />
         <span className="font-medium text-foreground">[T{item.orderIndex + 1}]</span>
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
-        {item.lastActivity && (
-          <span className="text-low text-[10px]">{formatRelativeTime(item.lastActivity)}</span>
-        )}
       </div>
       {recentOutput.length > 0 && (
         <div className="mt-1 pl-4 text-[10px] font-mono text-low max-h-12 overflow-hidden">
@@ -125,7 +100,6 @@ export function TerminalActivityPanel({ workflowId }: Readonly<TerminalActivityP
           label: terminal.role?.trim() || task.name || t('terminalActivity.defaultLabel'),
           status: terminal.status,
           orderIndex: terminal.orderIndex,
-          lastActivity: null, // Will be populated from terminalStore
         }))
     );
   }, [workflow, workflowTasks, t]);

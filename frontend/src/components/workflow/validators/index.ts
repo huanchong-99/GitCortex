@@ -30,6 +30,22 @@ export function validateWizardStep(
   return stepValidators[step](config);
 }
 
+/**
+ * Validates ALL visible wizard steps and returns combined errors.
+ * Used before final submission to catch cross-step inconsistencies.
+ */
+export function validateAllWizardSteps(
+  visibleSteps: readonly WizardStep[],
+  config: WizardConfig
+): Record<string, string> {
+  const allErrors: Record<string, string> = {};
+  for (const step of visibleSteps) {
+    const stepErrors = stepValidators[step](config);
+    Object.assign(allErrors, stepErrors);
+  }
+  return allErrors;
+}
+
 // Re-export validators using export...from syntax
 export { validateStep0Project } from './step0Project';
 export { validateStep1Basic } from './step1Basic';

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/toast';
 import {
   useConciergeMessages,
   useSendConciergeMessage,
@@ -28,6 +29,7 @@ export function ConciergeChatContainer({
   const [showSessions, setShowSessions] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const wsConnectedRef = useRef(false);
 
   // Queries
@@ -91,12 +93,24 @@ export function ConciergeChatContainer({
   // Handlers
   const handleSubmit = useCallback(() => {
     if (!activeSessionId || !inputValue.trim()) return;
-    sendMessage.mutate({
-      sessionId: activeSessionId,
-      data: { message: inputValue.trim(), source: 'web' },
-    });
-    setInputValue('');
-  }, [activeSessionId, inputValue, sendMessage]);
+    const trimmed = inputValue.trim();
+    sendMessage.mutate(
+      {
+        sessionId: activeSessionId,
+        data: { message: trimmed, source: 'web' },
+      },
+      {
+        onSuccess: () => {
+          setInputValue('');
+        },
+        onError: (error) => {
+          const message =
+            error instanceof Error ? error.message : 'Failed to send message';
+          showToast(message, 'error');
+        },
+      }
+    );
+  }, [activeSessionId, inputValue, sendMessage, showToast]);
 
   const handleCreateSession = useCallback(() => {
     createSession.mutate(

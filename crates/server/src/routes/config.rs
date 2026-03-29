@@ -153,6 +153,10 @@ async fn update_config(
     // Get old config state before updating
     let old_config = deployment.config().read().await.clone();
 
+    // NOTE: This endpoint performs a full config replacement (not partial/merge update).
+    // Concurrent writers may overwrite each other's changes. Clients should read-modify-write.
+    tracing::debug!("Performing full config replacement (atomic overwrite, not partial merge)");
+
     match save_config_to_file(&new_config, &config_path) {
         Ok(()) => {
             let mut config = deployment.config().write().await;
@@ -256,16 +260,24 @@ async fn sync_model_library_to_db(
                 api_type: None,
                 has_api_key: false,
             };
-            if let Ok(()) = tmp.set_api_key(&item.api_key) {
-                if let Some(ref encrypted) = tmp.encrypted_api_key {
-                    let _ = db::models::ModelConfig::update_credentials(
-                        pool,
-                        &item.id,
-                        encrypted,
-                        Some(&item.base_url),
-                        &item.api_type,
-                    )
-                    .await;
+            match tmp.set_api_key(&item.api_key) {
+                Ok(()) => {
+                    if let Some(ref encrypted) = tmp.encrypted_api_key {
+                        if let Err(e) = db::models::ModelConfig::update_credentials(
+                            pool,
+                            &item.id,
+                            encrypted,
+                            Some(&item.base_url),
+                            &item.api_type,
+                        )
+                        .await
+                        {
+                            tracing::warn!(model_id = %item.id, error = %e, "Failed to update credentials in DB");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(model_id = %item.id, error = %e, "Failed to encrypt API key — credentials not synced");
                 }
             }
         }

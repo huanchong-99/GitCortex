@@ -1156,11 +1156,9 @@ next_action: handoff\n"
     /// Call this method with each line of PTY output.
     /// If a prompt is detected, publishes a `TerminalPromptDetected` event.
     ///
-    /// [G07-003] NOTE: Several special prompt paths (Claude bypass, unexpected-changes,
-    /// handoff-stall) bypass the `auto_confirm` guard and always auto-respond. This is
-    /// intentional for orchestrated workflows but may surprise users who set auto_confirm=false
-    /// expecting full manual control. TODO: Add a strict mode that respects auto_confirm
-    /// for all prompt paths, or document the bypass behavior clearly in user-facing docs.
+    /// [G07-003] NOTE: All chunk-level prompt paths (Claude bypass, unexpected-changes,
+    /// handoff-stall) now respect the `auto_confirm` guard. When `auto_confirm=false`,
+    /// these handlers are skipped, ensuring manual-mode users retain full control.
     pub async fn process_output(&self, terminal_id: &str, output: &str) {
         let mut terminals = self.terminals.write().await;
 
@@ -1543,7 +1541,7 @@ next_action: handoff\n"
         // Chunk-level fallback: Codex can ask whether it should continue after
         // seeing "unexpected changes I didn't make". Auto-answer this to keep
         // orchestrated workflows non-blocking.
-        if !state.should_debounce() && has_unexpected_changes_followup_context {
+        if state.auto_confirm && !state.should_debounce() && has_unexpected_changes_followup_context {
             let decision = PromptDecision::LLMDecision {
                 response: UNEXPECTED_CHANGES_CONTINUE_RESPONSE.to_string(),
                 reasoning:
@@ -1605,7 +1603,7 @@ next_action: handoff\n"
         // Chunk-level fallback: some agents finish their checks and then ask for
         // "what next?" instead of creating the required handoff commit.
         // Auto-instruct them to execute the completion contract immediately.
-        if has_handoff_stall_context {
+        if state.auto_confirm && has_handoff_stall_context {
             let handoff_continue_response = Self::build_handoff_stall_continue_response(
                 &state.workflow_id,
                 &state.task_id,

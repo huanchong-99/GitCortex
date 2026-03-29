@@ -256,6 +256,10 @@ module.exports = {
           {
             paths: [
               {
+                name: 'lucide-react',
+                message: 'Use @phosphor-icons/react instead of lucide-react in ui-new components.',
+              },
+              {
                 name: '@/lib/api',
                 message: 'Presentational components cannot import API. Pass data via props.',
               },

@@ -137,7 +137,16 @@ pub trait ContainerService {
         }
 
         // Always finalize failed or killed executions, regardless of next action
-        let action = ctx.execution_process.executor_action().unwrap();
+        let action = match ctx.execution_process.executor_action() {
+            Ok(a) => a,
+            Err(e) => {
+                tracing::error!(
+                    execution_process_id = %ctx.execution_process.id,
+                    "Failed to parse executor_action: {e} — finalizing to avoid stuck task"
+                );
+                return true;
+            }
+        };
         if matches!(
             ctx.execution_process.status,
             ExecutionProcessStatus::Failed | ExecutionProcessStatus::Killed

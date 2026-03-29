@@ -863,10 +863,6 @@ function renderToolUseBody(
  * Main component  *
  *******************/
 
-export const DisplayConversationEntryMaxWidth = (props: Props) => {
-  return <DisplayConversationEntry {...props} />;
-};
-
 function renderEntryBody(
   entry: NormalizedEntry,
   taskAttempt?: WorkspaceWithSession
@@ -1026,4 +1022,4 @@ function DisplayConversationEntry({
   }
 }
 
-export default DisplayConversationEntryMaxWidth;
+export default DisplayConversationEntry;

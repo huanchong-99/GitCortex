@@ -5,8 +5,7 @@ pub fn open_browser(url: &str) -> Result<(), Box<dyn std::error::Error + Send + 
     if is_wsl2() {
         // In WSL2, use PowerShell to open the browser
         tokio::process::Command::new("powershell.exe")
-            .arg("-Command")
-            .arg(format!("Start-Process '{url}'"))
+            .args(["-NoProfile", "-Command", "Start-Process", url])
             .spawn()?;
         Ok(())
     } else {

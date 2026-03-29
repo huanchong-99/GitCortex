@@ -9,7 +9,6 @@ use db::models::{
     project::{Project, SearchMatchType, SearchResult},
     project_repo::ProjectRepo,
 };
-use fst::{Map, MapBuilder};
 use ignore::WalkBuilder;
 use moka::future::Cache;
 use notify::{RecommendedWatcher, RecursiveMode};
@@ -53,31 +52,21 @@ pub struct IndexedFile {
     pub is_ignored: bool, // Track if file is gitignored
 }
 
-/// File index build result containing indexed files and FST map
-#[derive(Debug)]
-pub struct FileIndex {
-    pub files: Vec<IndexedFile>,
-    pub map: Map<Vec<u8>>,
-}
-
 /// Errors that can occur during file index building
 #[derive(Error, Debug)]
 pub enum FileIndexError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    Fst(#[from] fst::Error),
-    #[error(transparent)]
     Walk(#[from] ignore::Error),
     #[error(transparent)]
     StripPrefix(#[from] std::path::StripPrefixError),
 }
 
-/// Cached repository data with FST index and git stats
+/// Cached repository data with git stats
 #[derive(Clone)]
 pub struct CachedRepo {
     pub head_sha: String,
-    pub fst_index: Map<Vec<u8>>,
     pub indexed_files: Vec<IndexedFile>,
     pub stats: Arc<FileStats>,
     pub build_ts: Instant,
@@ -459,22 +448,20 @@ impl FileSearchCache {
             .map_err(|e| format!("Failed to get git stats: {e}"))?;
 
         // Build file index
-        let file_index = Self::build_file_index(repo_path)
+        let indexed_files = Self::build_file_index(repo_path)
             .map_err(|e| format!("Failed to build file index: {e}"))?;
 
         Ok(CachedRepo {
             head_sha: head_info.oid,
-            fst_index: file_index.map,
-            indexed_files: file_index.files,
+            indexed_files,
             stats,
             build_ts: Instant::now(),
         })
     }
 
-    /// Build FST index from filesystem traversal using superset approach
-    fn build_file_index(repo_path: &Path) -> Result<FileIndex, FileIndexError> {
+    /// Build file index from filesystem traversal using superset approach
+    fn build_file_index(repo_path: &Path) -> Result<Vec<IndexedFile>, FileIndexError> {
         let mut indexed_files = Vec::new();
-        let mut fst_keys = Vec::new();
 
         // Build superset walker - include ignored files but exclude .git and performance killers
         let mut builder = WalkBuilder::new(repo_path);
@@ -569,29 +556,10 @@ impl FileSearchCache {
                 is_ignored,
             };
 
-            // Store the key for FST along with file index
-            let file_index = indexed_files.len() as u64;
-            fst_keys.push((relative_path_lower, file_index));
             indexed_files.push(indexed_file);
         }
 
-        // Sort keys for FST (required for building)
-        fst_keys.sort_by(|a, b| a.0.cmp(&b.0));
-
-        // Remove duplicates (keep first occurrence)
-        fst_keys.dedup_by(|a, b| a.0 == b.0);
-
-        // Build FST
-        let mut fst_builder = MapBuilder::memory();
-        for (key, value) in fst_keys {
-            fst_builder.insert(&key, value)?;
-        }
-
-        let fst_map = fst_builder.into_map();
-        Ok(FileIndex {
-            files: indexed_files,
-            map: fst_map,
-        })
+        Ok(indexed_files)
     }
 
     /// Background worker for cache building

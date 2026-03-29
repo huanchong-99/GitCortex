@@ -564,7 +564,10 @@ impl Workspace {
         archived: Option<bool>,
         limit: Option<i64>,
     ) -> Result<Vec<WorkspaceWithStatus>, sqlx::Error> {
-        // Fetch all workspaces with status (uses cached SQLx query)
+        // Build archived filter: NULL means no filter, otherwise match exact value.
+        // SQLite stores booleans as 0/1, so we pass an i32.
+        let archived_filter: Option<i32> = archived.map(|a| i32::from(a));
+
         let records = sqlx::query!(
             r#"SELECT
                 w.id AS "id!: Uuid",
@@ -602,7 +605,9 @@ impl Workspace {
                 ) IN ('failed','killed') THEN 1 ELSE 0 END AS "is_errored!: i64"
 
             FROM workspaces w
-            ORDER BY w.updated_at DESC"#
+            WHERE (?1 IS NULL OR w.archived = ?1)
+            ORDER BY w.updated_at DESC"#,
+            archived_filter,
         )
         .fetch_all(pool)
         .await?;
@@ -626,8 +631,6 @@ impl Workspace {
                 is_running: rec.is_running != 0,
                 is_errored: rec.is_errored != 0,
             })
-            // Apply archived filter if provided
-            .filter(|ws| archived.map_or(true, |a| ws.workspace.archived == a))
             .collect();
 
         // Apply limit if provided (already sorted by updated_at DESC from query)

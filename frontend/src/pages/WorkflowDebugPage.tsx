@@ -2,38 +2,9 @@ import { useParams } from 'react-router-dom';
 import { useWorkflow } from '@/hooks/useWorkflows';
 import { useWorkflowInvalidation } from '@/hooks/useWorkflowInvalidation';
 import { TerminalDebugView } from '@/components/terminal/TerminalDebugView';
-import type { Terminal, TerminalStatus } from '@/components/workflow/TerminalCard';
+import type { Terminal } from '@/components/workflow/TerminalCard';
 import type { WorkflowTask } from '@/components/workflow/PipelineView';
-
-/**
- * Maps backend terminal status string to frontend TerminalStatus type
- */
-function mapTerminalStatus(status: string): TerminalStatus {
-  switch (status) {
-    case 'idle':
-    case 'not_started':
-      return 'not_started';
-    case 'starting':
-      return 'starting';
-    case 'waiting':
-      return 'waiting';
-    case 'running':
-    case 'working':
-      return 'working';
-    case 'completed':
-      return 'completed';
-    case 'failed':
-      return 'failed';
-    case 'cancelled':
-      return 'cancelled';
-    case 'review_passed':
-      return 'review_passed';
-    case 'review_rejected':
-      return 'review_rejected';
-    default:
-      return 'not_started';
-  }
-}
+import { mapTerminalStatus } from '@/utils/terminalStatus';
 
 export function WorkflowDebugPage() {
   const { workflowId } = useParams<{ workflowId: string }>();

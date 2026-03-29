@@ -18,6 +18,7 @@ import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { MultiFileSearchTextarea } from '@/components/ui/multi-file-search-textarea';
 import { useScriptPlaceholders } from '@/hooks/useScriptPlaceholders';
 import { repoApi } from '@/lib/api';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import type { Repo, UpdateRepo } from 'shared/types';
 
 interface RepoScriptsFormState {
@@ -77,14 +78,16 @@ export function ReposSettingsNew() {
 
   // Handle repo selection from dropdown
   const handleRepoSelect = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (id === selectedRepoId) return;
 
       if (hasUnsavedChanges) {
-        const confirmed = globalThis.window.confirm(
-          t('settings.repos.save.confirmSwitch')
-        );
-        if (!confirmed) return;
+        const result = await ConfirmDialog.show({
+          title: t('settings.repos.save.confirmSwitchTitle'),
+          message: t('settings.repos.save.confirmSwitch'),
+          variant: 'destructive',
+        });
+        if (result !== 'confirmed') return;
         setDraft(null);
         setSelectedRepo(null);
         setSuccess(false);
@@ -106,21 +109,27 @@ export function ReposSettingsNew() {
     if (repoIdParam === selectedRepoId) return;
 
     if (hasUnsavedChanges) {
-      const confirmed = globalThis.window.confirm(
-        t('settings.repos.save.confirmSwitch')
-      );
-      if (!confirmed) {
-        if (selectedRepoId) {
-          setSearchParams({ repoId: selectedRepoId });
-        } else {
-          setSearchParams({});
+      (async () => {
+        const result = await ConfirmDialog.show({
+          title: t('settings.repos.save.confirmSwitchTitle'),
+          message: t('settings.repos.save.confirmSwitch'),
+          variant: 'destructive',
+        });
+        if (result !== 'confirmed') {
+          if (selectedRepoId) {
+            setSearchParams({ repoId: selectedRepoId });
+          } else {
+            setSearchParams({});
+          }
+          return;
         }
-        return;
-      }
-      setDraft(null);
-      setSelectedRepo(null);
-      setSuccess(false);
-      setError(null);
+        setDraft(null);
+        setSelectedRepo(null);
+        setSuccess(false);
+        setError(null);
+        setSelectedRepoId(repoIdParam);
+      })();
+      return;
     }
 
     setSelectedRepoId(repoIdParam);

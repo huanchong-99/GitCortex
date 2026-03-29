@@ -254,9 +254,21 @@ async fn add_channel(
 
 async fn remove_channel(
     State(deployment): State<DeploymentImpl>,
-    Path((_id, channel_id)): Path<(String, String)>,
+    Path((id, channel_id)): Path<(String, String)>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    ConciergeSessionChannel::delete_by_id(&deployment.db().pool, &channel_id)
+    let pool = &deployment.db().pool;
+
+    // Verify the channel belongs to the requested session before deleting.
+    let channel = ConciergeSessionChannel::find_by_id(pool, &channel_id)
+        .await
+        .map_err(|e| ApiError::Internal(format!("{e}")))?
+        .ok_or_else(|| ApiError::NotFound("Channel not found".to_string()))?;
+
+    if channel.session_id != id {
+        return Err(ApiError::NotFound("Channel not found".to_string()));
+    }
+
+    ConciergeSessionChannel::delete_by_id(pool, &channel_id)
         .await
         .map_err(|e| ApiError::Internal(format!("{e}")))?;
     Ok(ResponseJson(ApiResponse::success(())))
@@ -330,7 +342,8 @@ async fn update_settings(
                                 };
                                 let text = format!("{prefix} {}", msg.content);
                                 let truncated = if text.len() > 4000 {
-                                    format!("{}...(truncated)", &text[..4000])
+                                    let boundary = text.floor_char_boundary(4000);
+                                    format!("{}...(truncated)", &text[..boundary])
                                 } else {
                                     text
                                 };

@@ -38,6 +38,7 @@ use crate::{
 const CHAT_EVENT_ALLOWED_PROVIDER: &str = "telegram";
 const CHAT_EVENT_REPLAY_WINDOW: Duration = Duration::from_secs(15 * 60);
 const CHAT_EVENT_TIMESTAMP_TOLERANCE_SECS: i64 = 300;
+const CHAT_REPLAY_CACHE_MAX_SIZE: usize = 10_000;
 
 static CHAT_REPLAY_CACHE: Lazy<tokio::sync::Mutex<HashMap<String, Instant>>> =
     Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
@@ -153,6 +154,18 @@ async fn ensure_not_replayed(provider: &str, provider_message_id: &str) -> Resul
         return Err(ApiError::Conflict(
             "Duplicate chat event detected (replay blocked)".to_string(),
         ));
+    }
+
+    // Cap size to prevent unbounded memory growth under high traffic.
+    if cache.len() >= CHAT_REPLAY_CACHE_MAX_SIZE {
+        // Evict the oldest entry (earliest Instant).
+        if let Some(oldest_key) = cache
+            .iter()
+            .min_by_key(|(_, seen_at)| **seen_at)
+            .map(|(k, _)| k.clone())
+        {
+            cache.remove(&oldest_key);
+        }
     }
 
     cache.insert(cache_key, now);

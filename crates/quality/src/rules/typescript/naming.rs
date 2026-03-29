@@ -36,7 +36,7 @@ impl Default for NamingConventionRule {
                 .expect("invalid class_pattern regex"),
             interface_pattern: Regex::new(r"interface\s+(\w+)")
                 .expect("invalid interface_pattern regex"),
-            type_pattern: Regex::new(r"type\s+(\w+)")
+            type_pattern: Regex::new(r"\btype\s+(\w+)\s*[=<{]")
                 .expect("invalid type_pattern regex"),
             enum_pattern: Regex::new(r"enum\s+(\w+)")
                 .expect("invalid enum_pattern regex"),
@@ -360,6 +360,27 @@ function MyComponent(props) {
         assert!(
             issues.is_empty(),
             "expected no issues for PascalCase React component, got: {:?}",
+            issues.iter().map(|i| &i.message).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn typeof_does_not_trigger_false_positive() {
+        let src = r#"
+const x = typeof someVar;
+if (typeof value === "string") {}
+const t = typeof obj !== "undefined";
+type MyAlias = string;
+"#;
+        let lines: Vec<&str> = src.lines().collect();
+        let config = RuleConfig::default();
+        let ctx = make_context(src, &lines, &config);
+        let rule = NamingConventionRule::default();
+        let issues = rule.analyze(&ctx);
+        // Only the type alias `MyAlias` should be checked (and pass), `typeof` should not match
+        assert!(
+            issues.is_empty(),
+            "expected no issues for typeof usage, got: {:?}",
             issues.iter().map(|i| &i.message).collect::<Vec<_>>()
         );
     }

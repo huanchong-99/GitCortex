@@ -4,7 +4,6 @@
 //! slash commands), and forwards chat messages to the orchestrator.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -774,23 +773,20 @@ impl FeishuService {
 /// Wraps [`FeishuMessenger`] to implement the [`ChatConnector`] trait.
 pub struct FeishuConnector {
     messenger: Arc<FeishuMessenger>,
-    /// G32-017: Use AtomicBool instead of RwLock<bool> to eliminate lock
-    /// contention in the synchronous `is_connected()` trait method.
-    connected: Arc<AtomicBool>,
+    /// Live connection flag shared with the underlying [`FeishuClient`].
+    /// The client sets this to `true` on WebSocket connect and `false` on
+    /// disconnect, so `is_connected()` always reflects real transport state.
+    ws_connected: Arc<tokio::sync::RwLock<bool>>,
 }
 
 impl FeishuConnector {
-    /// Create a new connector from a shared messenger.
-    pub fn new(messenger: Arc<FeishuMessenger>) -> Self {
+    /// Create a new connector from a shared messenger and the client's live
+    /// connected flag (obtained via [`FeishuService::connected_flag`]).
+    pub fn new(messenger: Arc<FeishuMessenger>, ws_connected: Arc<tokio::sync::RwLock<bool>>) -> Self {
         Self {
             messenger,
-            connected: Arc::new(AtomicBool::new(false)),
+            ws_connected,
         }
-    }
-
-    /// Mark the connector as connected (called after WebSocket is established).
-    pub fn set_connected(&self, value: bool) {
-        self.connected.store(value, Ordering::Release);
     }
 }
 
@@ -814,8 +810,12 @@ impl ChatConnector for FeishuConnector {
     }
 
     fn is_connected(&self) -> bool {
-        // G32-017: AtomicBool provides lock-free reads — no contention with
-        // concurrent `set_connected` calls.
-        self.connected.load(Ordering::Acquire)
+        // Use try_read to avoid blocking in this synchronous trait method.
+        // Falls back to `false` if the lock is currently held by a writer
+        // (transient — the writer is the reconnect loop toggling the flag).
+        self.ws_connected
+            .try_read()
+            .map(|guard| *guard)
+            .unwrap_or(false)
     }
 }

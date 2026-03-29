@@ -402,7 +402,8 @@
         "error": "Failed to save project settings",
         "unsavedChanges": "• You have unsaved changes",
         "discard": "Discard",
-        "confirmSwitch": "You have unsaved changes. Are you sure you want to switch projects? Your changes will be lost."
+        "confirmSwitch": "You have unsaved changes. Are you sure you want to switch projects? Your changes will be lost.",
+        "confirmSwitchTitle": "Unsaved Changes"
       }
     },
     "repos": {
@@ -457,7 +458,8 @@
         "error": "Failed to save repository settings",
         "unsavedChanges": "You have unsaved changes",
         "discard": "Discard",
-        "confirmSwitch": "You have unsaved changes. Are you sure you want to switch repositories? Your changes will be lost."
+        "confirmSwitch": "You have unsaved changes. Are you sure you want to switch repositories? Your changes will be lost.",
+        "confirmSwitchTitle": "Unsaved Changes"
       }
     },
     "feishu": {

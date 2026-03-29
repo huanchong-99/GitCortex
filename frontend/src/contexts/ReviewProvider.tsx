@@ -148,36 +148,36 @@ export function ReviewProvider({
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
 
-  useEffect(() => {
-    return () => clearComments();
-  }, [attemptId]);
-
-  const addComment = (comment: Omit<ReviewComment, 'id'>) => {
+  const addComment = useCallback((comment: Omit<ReviewComment, 'id'>) => {
     const newComment: ReviewComment = {
       ...comment,
       id: genId(),
     };
     setComments((prev) => [...prev, newComment]);
-  };
+  }, []);
 
-  const updateComment = (id: string, text: string) => {
+  const updateComment = useCallback((id: string, text: string) => {
     setComments((prev) =>
       prev.map((comment) =>
         comment.id === id ? { ...comment, text } : comment
       )
     );
-  };
+  }, []);
 
-  const deleteComment = (id: string) => {
+  const deleteComment = useCallback((id: string) => {
     setComments((prev) => prev.filter((comment) => comment.id !== id));
-  };
+  }, []);
 
-  const clearComments = () => {
+  const clearComments = useCallback(() => {
     setComments([]);
     setDrafts({});
-  };
+  }, []);
 
-  const setDraft = (key: string, draft: ReviewDraft | null) => {
+  useEffect(() => {
+    return () => clearComments();
+  }, [attemptId, clearComments]);
+
+  const setDraft = useCallback((key: string, draft: ReviewDraft | null) => {
     setDrafts((prev) => {
       if (draft === null) {
         const newDrafts = { ...prev };
@@ -186,7 +186,7 @@ export function ReviewProvider({
       }
       return { ...prev, [key]: draft };
     });
-  };
+  }, []);
 
   const generateReviewMarkdown = useCallback(() => {
     if (comments.length === 0) return '';
@@ -230,7 +230,7 @@ export function ReviewProvider({
       setDraft,
       generateReviewMarkdown,
     }),
-    [comments, drafts, generateReviewMarkdown]
+    [comments, drafts, addComment, updateComment, deleteComment, clearComments, setDraft, generateReviewMarkdown]
   );
 
   return (

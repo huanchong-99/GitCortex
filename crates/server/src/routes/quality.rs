@@ -17,6 +17,7 @@ use ts_rs::TS;
 use utils::response::ApiResponse;
 
 use crate::DeploymentImpl;
+use crate::error::ApiError;
 
 /// Summary response for a quality run, tailored for list views.
 #[derive(Debug, Clone, Serialize, TS)]
@@ -104,52 +105,50 @@ impl From<db::models::QualityRun> for QualityRunDetail {
 pub async fn list_quality_runs(
     State(deployment): State<DeploymentImpl>,
     Path(workflow_id): Path<String>,
-) -> Json<ApiResponse<Vec<QualityRunSummary>>> {
+) -> Result<Json<ApiResponse<Vec<QualityRunSummary>>>, ApiError> {
     let runs = db::models::QualityRun::find_by_workflow(&deployment.db().pool, &workflow_id)
         .await
-        .unwrap_or_default();
+        .map_err(ApiError::Database)?;
 
     let summaries: Vec<QualityRunSummary> = runs.into_iter().map(QualityRunSummary::from).collect();
-    Json(ApiResponse::success(summaries))
+    Ok(Json(ApiResponse::success(summaries)))
 }
 
 /// GET /quality/runs/:run_id
 pub async fn get_quality_run(
     State(deployment): State<DeploymentImpl>,
     Path(run_id): Path<String>,
-) -> Json<ApiResponse<Option<QualityRunDetail>>> {
+) -> Result<Json<ApiResponse<Option<QualityRunDetail>>>, ApiError> {
     let run = db::models::QualityRun::find_by_id(&deployment.db().pool, &run_id)
         .await
-        .ok()
-        .flatten();
+        .map_err(ApiError::Database)?;
 
-    Json(ApiResponse::success(run.map(QualityRunDetail::from)))
+    Ok(Json(ApiResponse::success(run.map(QualityRunDetail::from))))
 }
 
 /// GET /quality/runs/:run_id/issues
 pub async fn get_quality_issues(
     State(deployment): State<DeploymentImpl>,
     Path(run_id): Path<String>,
-) -> Json<ApiResponse<Vec<db::models::QualityIssueRecord>>> {
+) -> Result<Json<ApiResponse<Vec<db::models::QualityIssueRecord>>>, ApiError> {
     let issues = db::models::QualityIssueRecord::find_by_run(&deployment.db().pool, &run_id)
         .await
-        .unwrap_or_default();
+        .map_err(ApiError::Database)?;
 
-    Json(ApiResponse::success(issues))
+    Ok(Json(ApiResponse::success(issues)))
 }
 
 /// GET /terminals/:terminal_id/quality/latest
 pub async fn get_terminal_latest_quality(
     State(deployment): State<DeploymentImpl>,
     Path(terminal_id): Path<String>,
-) -> Json<ApiResponse<Option<QualityRunSummary>>> {
+) -> Result<Json<ApiResponse<Option<QualityRunSummary>>>, ApiError> {
     let run =
         db::models::QualityRun::find_latest_by_terminal(&deployment.db().pool, &terminal_id)
             .await
-            .ok()
-            .flatten();
+            .map_err(ApiError::Database)?;
 
-    Json(ApiResponse::success(run.map(QualityRunSummary::from)))
+    Ok(Json(ApiResponse::success(run.map(QualityRunSummary::from))))
 }
 
 /// Quality routes nested under /workflows

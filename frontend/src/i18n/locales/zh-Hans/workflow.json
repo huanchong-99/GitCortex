@@ -177,7 +177,8 @@
     },
     "messages": {
       "verifySuccess": "连接验证成功",
-      "confirmDelete": "确定删除 {{name}} 的模型配置吗？"
+      "confirmDelete": "确定删除 {{name}} 的模型配置吗？",
+      "confirmDeleteTitle": "删除模型"
     },
     "errors": {
       "apiKeyRequired": "请先输入 API Key",
@@ -541,5 +542,11 @@
       "minutes": "{{count}}分钟前",
       "hours": "{{count}}小时前"
     }
+  },
+  "promptDialog": {
+    "submitting": "提交中...",
+    "submit": "提交",
+    "noOptions": "未检测到选项。请手动输入响应。",
+    "enterResponse": "输入响应"
   }
 }

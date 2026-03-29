@@ -60,6 +60,14 @@ pub async fn ci_webhook(
         }
     }
 
+    // G35-009: Warn when accepting unauthenticated webhooks (no secret configured)
+    if utils::env_compat::var_with_compat("SOLODAWN_CI_WEBHOOK_SECRET", "GITCORTEX_CI_WEBHOOK_SECRET")
+        .map(|s| s.trim().is_empty())
+        .unwrap_or(true)
+    {
+        tracing::warn!("CI webhook accepting unauthenticated request — SOLODAWN_CI_WEBHOOK_SECRET is not configured");
+    }
+
     // Parse payload after signature validation
     let payload: CiWebhookPayload = match serde_json::from_slice(&body) {
         Ok(p) => p,

@@ -1,7 +1,7 @@
 import { ArrowSquareOutIcon, SpinnerIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { CollapsibleSectionHeader } from '../primitives/CollapsibleSectionHeader';
+import { CollapsibleSectionHeader } from '../containers/CollapsibleSectionHeader';
 import { VirtualizedProcessLogs } from '../containers/VirtualizedProcessLogs';
 import { PERSIST_KEYS } from '@/stores/useUiPreferencesStore';
 import { getDevServerWorkingDir } from '@/lib/devServerUtils';
@@ -43,7 +43,7 @@ export function PreviewControls({
       )}
     >
       <CollapsibleSectionHeader
-        title="Dev Server Logs"
+        title={t('preview.logs.title')}
         persistKey={PERSIST_KEYS.devServerSection}
         contentClassName="flex flex-col flex-1 overflow-hidden"
       >

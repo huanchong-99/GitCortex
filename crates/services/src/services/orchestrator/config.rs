@@ -279,6 +279,28 @@ impl OrchestratorConfig {
         if self.rate_limit_requests_per_second == 0 {
             return Err("Rate limit must be greater than 0".to_string());
         }
+
+        let valid_api_types = [
+            "openai",
+            "anthropic",
+            "openai-compatible",
+            "anthropic-compatible",
+        ];
+        if !valid_api_types.contains(&self.api_type.as_str()) {
+            return Err(format!(
+                "Invalid api_type: {}. Must be one of: {:?}",
+                self.api_type, valid_api_types
+            ));
+        }
+
+        let valid_modes = ["off", "shadow", "warn", "enforce"];
+        if !valid_modes.contains(&self.quality_gate_mode.as_str()) {
+            return Err(format!(
+                "Invalid quality_gate_mode: {}. Must be one of: {:?}",
+                self.quality_gate_mode, valid_modes
+            ));
+        }
+
         Ok(())
     }
 }

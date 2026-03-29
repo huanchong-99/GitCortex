@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
 import { Field, FieldLabel, FieldError } from '../../ui-new/primitives/Field';
-import { CollapsibleSection } from '../../ui-new/primitives/CollapsibleSection';
+import { CollapsibleSection } from '../../ui-new/containers/CollapsibleSection';
 import { cn } from '@/lib/utils';
 import { CLI_TYPES, GIT_COMMIT_FORMAT } from '../constants';
 import type { WizardConfig, AdvancedConfig } from '../types';

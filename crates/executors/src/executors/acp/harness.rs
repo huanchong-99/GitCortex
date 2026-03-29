@@ -437,6 +437,7 @@ impl AcpAgentHarness {
                         );
 
                         let mut current_req = Some(initial_req);
+                        let mut had_error = false;
 
                         while let Some(req) = current_req.take() {
                             tracing::trace!(?req, "sending ACP prompt request");
@@ -449,6 +450,7 @@ impl AcpAgentHarness {
                                     let _ = log_tx.send(AcpEvent::Done(stop_reason).to_string());
                                 }
                                 Err(e) => {
+                                    had_error = true;
                                     tracing::debug!("error {} {e} {:?}", e.code, e.data);
                                     if e.code
                                         == agent_client_protocol::ErrorCode::INTERNAL_ERROR.code
@@ -486,7 +488,12 @@ impl AcpAgentHarness {
 
                         // Notify container of completion
                         if let Some(tx) = exit_signal_tx.take() {
-                            let _ = tx.send(ExecutorExitResult::Success);
+                            let result = if had_error {
+                                ExecutorExitResult::Failure
+                            } else {
+                                ExecutorExitResult::Success
+                            };
+                            let _ = tx.send(result);
                         }
 
                         // Cancel session work

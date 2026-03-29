@@ -1,6 +1,6 @@
 import { type FileChange } from 'shared/types';
 import { useUserSystem } from '@/components/ConfigProvider';
-import { Trash2, FilePlus2, ArrowRight, FileX, FileClock } from 'lucide-react';
+import { TrashIcon, FilePlusIcon, ArrowRightIcon, FileXIcon, ClockCounterClockwiseIcon } from '@phosphor-icons/react';
 import { getHighLightLanguageFromPath } from '@/utils/extToLanguage';
 import { getActualTheme } from '@/utils/theme';
 import EditDiffRenderer from './EditDiffRenderer';
@@ -56,10 +56,10 @@ const FileChangeRenderer = ({
 
   const statusIcon = (() => {
     if (statusAppearance === 'denied') {
-      return <FileX className="h-3 w-3" />;
+      return <FileXIcon className="h-3 w-3" />;
     }
     if (statusAppearance === 'timed_out') {
-      return <FileClock className="h-3 w-3" />;
+      return <ClockCounterClockwiseIcon className="h-3 w-3" />;
     }
     return null;
   })();
@@ -95,7 +95,7 @@ const FileChangeRenderer = ({
     if (isDelete(change)) {
       return {
         titleNode: path,
-        icon: <Trash2 className="h-3 w-3" />,
+        icon: <TrashIcon className="h-3 w-3" />,
         expandable: false,
       };
     }
@@ -107,7 +107,7 @@ const FileChangeRenderer = ({
             Rename {path} to {change.new_path}
           </>
         ),
-        icon: <ArrowRight className="h-3 w-3" />,
+        icon: <ArrowRightIcon className="h-3 w-3" />,
         expandable: false,
       };
     }
@@ -115,7 +115,7 @@ const FileChangeRenderer = ({
     if (isWrite(change)) {
       return {
         titleNode: path,
-        icon: <FilePlus2 className="h-3 w-3" />,
+        icon: <FilePlusIcon className="h-3 w-3" />,
         expandable: true,
       };
     }

@@ -1,3 +1,5 @@
+// All routes return 501 Not Implemented — feature not yet available
+
 use axum::{
     Router,
     extract::{Json, Path, State},

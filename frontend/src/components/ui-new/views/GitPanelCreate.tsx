@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { CollapsibleSectionHeader } from '@/components/ui-new/primitives/CollapsibleSectionHeader';
+import { CollapsibleSectionHeader } from '@/components/ui-new/containers/CollapsibleSectionHeader';
 import { SelectedReposList } from '@/components/ui-new/primitives/SelectedReposList';
 import { ProjectSelectorContainer } from '@/components/ui-new/containers/ProjectSelectorContainer';
 import { RecentReposListContainer } from '@/components/ui-new/containers/RecentReposListContainer';

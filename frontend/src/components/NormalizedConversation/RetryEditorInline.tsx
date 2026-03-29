@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { VariantSelector } from '@/components/tasks/VariantSelector';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Paperclip, Send, X } from 'lucide-react';
+import { WarningCircleIcon, SpinnerGapIcon, PaperclipIcon, PaperPlaneTiltIcon, XIcon } from '@phosphor-icons/react';
 import { imagesApi } from '@/lib/api';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { useAttemptExecution } from '@/hooks/useAttemptExecution';
@@ -145,7 +145,7 @@ export function RetryEditorInline({
         />
         {isSending && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background/60">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <SpinnerGapIcon className="h-4 w-4 animate-spin" />
           </div>
         )}
       </div>
@@ -172,14 +172,14 @@ export function RetryEditorInline({
             title="Attach image"
             aria-label="Attach image"
           >
-            <Paperclip className="h-3 w-3" />
+            <PaperclipIcon className="h-3 w-3" />
           </Button>
           <Button variant="outline" onClick={onCancel} disabled={isSending}>
-            <X className="h-3 w-3 mr-1" />{' '}
+            <XIcon className="h-3 w-3 mr-1" />{' '}
             {t('buttons.cancel', { ns: 'common' })}
           </Button>
           <Button onClick={onSend} disabled={!canSend || isSending}>
-            <Send className="h-3 w-3 mr-1" />{' '}
+            <PaperPlaneTiltIcon className="h-3 w-3 mr-1" />{' '}
             {t('buttons.send', { ns: 'common', defaultValue: 'Send' })}
           </Button>
         </div>
@@ -187,7 +187,7 @@ export function RetryEditorInline({
 
       {sendError && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          <WarningCircleIcon className="h-4 w-4" />
           <AlertDescription>{sendError}</AlertDescription>
         </Alert>
       )}

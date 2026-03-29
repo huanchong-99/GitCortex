@@ -19,7 +19,7 @@ import DisplayConversationEntry from '@/components/NormalizedConversation/Displa
 import { useMessageEditContext } from '@/contexts/MessageEditContext';
 import { useChangesView } from '@/contexts/ChangesViewContext';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
-import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
+import { useWorkspaceContextOptional } from '@/contexts/WorkspaceContext';
 import { cn } from '@/lib/utils';
 import {
   ScriptFixerDialog,
@@ -685,13 +685,8 @@ function ScriptEntryWithFix({
   sessionId?: string;
 }>) {
   // Try to get repos from workspace context - may not be available in all contexts
-  let repos: RepoWithTargetBranch[] = [];
-  try {
-    const workspaceContext = useWorkspaceContext();
-    repos = workspaceContext.repos;
-  } catch {
-    // Context not available, fix button won't be shown
-  }
+  const workspaceContext = useWorkspaceContextOptional();
+  const repos: RepoWithTargetBranch[] = workspaceContext?.repos ?? [];
 
   // Use ref to access current repos without causing callback recreation
   const reposRef = useRef(repos);

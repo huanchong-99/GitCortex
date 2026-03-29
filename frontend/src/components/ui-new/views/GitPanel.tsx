@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 import {
   RepoCard,
   type RepoAction,
-} from '@/components/ui-new/primitives/RepoCard';
-import { InputField } from '@/components/ui-new/primitives/InputField';
+} from '@/components/ui-new/containers/RepoCard';
+import { InputField } from '@/components/ui-new/containers/InputField';
 import { ErrorAlert } from '@/components/ui-new/primitives/ErrorAlert';
-import { CollapsibleSection } from '../primitives/CollapsibleSection';
-import { CollapsibleSectionHeader } from '../primitives/CollapsibleSectionHeader';
+import { CollapsibleSection } from '../containers/CollapsibleSection';
+import { CollapsibleSectionHeader } from '../containers/CollapsibleSectionHeader';
 import { PERSIST_KEYS } from '@/stores/useUiPreferencesStore';
 
 export interface RepoInfo {

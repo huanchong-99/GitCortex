@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { CLI_TYPES } from '../constants';
 import type { WizardConfig, ModelConfig, ApiType } from '../types';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { useModelStore } from '@/stores/modelStore';
 import { useToast } from '@/components/ui/toast';
 
@@ -301,10 +302,15 @@ export const Step3Models: React.FC<Step3ModelsProps> = ({
     handleCloseDialog();
   };
 
-  const handleDelete = (modelId: string) => {
+  const handleDelete = async (modelId: string) => {
     const modelName =
       config.models.find((model) => model.id === modelId)?.displayName ?? '';
-    if (globalThis.window.confirm(t('step3.messages.confirmDelete', { name: modelName }))) {
+    const result = await ConfirmDialog.show({
+      title: t('step3.messages.confirmDeleteTitle'),
+      message: t('step3.messages.confirmDelete', { name: modelName }),
+      variant: 'destructive',
+    });
+    if (result === 'confirmed') {
       const updatedModels = config.models.filter((m) => m.id !== modelId);
       onUpdate({ models: updatedModels });
     }

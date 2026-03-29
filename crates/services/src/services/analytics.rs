@@ -1,8 +1,6 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-    time::Duration,
-};
+use std::time::Duration;
+
+use sha2::{Digest, Sha256};
 
 use os_info;
 use serde_json::{Value, json};
@@ -116,8 +114,10 @@ impl AnalyticsService {
 
 /// Generates a consistent, anonymous user ID for npm package telemetry.
 /// Returns a hex string prefixed with "npm_user_"
+/// Generates a consistent, anonymous user ID using SHA-256 for deterministic
+/// hashing across Rust versions (unlike `DefaultHasher` which is not stable).
 pub fn generate_user_id() -> String {
-    let mut hasher = DefaultHasher::new();
+    let mut hasher = Sha256::new();
 
     #[cfg(target_os = "macos")]
     {
@@ -128,7 +128,7 @@ pub fn generate_user_id() -> String {
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if let Some(line) = stdout.lines().find(|l| l.contains("IOPlatformUUID")) {
-                line.hash(&mut hasher);
+                hasher.update(line.as_bytes());
             }
         }
     }
@@ -136,7 +136,7 @@ pub fn generate_user_id() -> String {
     #[cfg(target_os = "linux")]
     {
         if let Ok(machine_id) = std::fs::read_to_string("/etc/machine-id") {
-            machine_id.trim().hash(&mut hasher);
+            hasher.update(machine_id.trim().as_bytes());
         }
     }
 
@@ -152,22 +152,27 @@ pub fn generate_user_id() -> String {
             .output()
         {
             if output.status.success() {
-                output.stdout.hash(&mut hasher);
+                hasher.update(&output.stdout);
             }
         }
     }
 
     // Add username for per-user differentiation
     if let Ok(user) = std::env::var("USER").or_else(|_| std::env::var("USERNAME")) {
-        user.hash(&mut hasher);
+        hasher.update(user.as_bytes());
     }
 
     // Add home directory for additional entropy
     if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
-        home.hash(&mut hasher);
+        hasher.update(home.as_bytes());
     }
 
-    format!("npm_user_{:016x}", hasher.finish())
+    let result = hasher.finalize();
+    // Take first 8 bytes (16 hex chars) for a compact ID
+    format!(
+        "npm_user_{:016x}",
+        u64::from_be_bytes(result[..8].try_into().unwrap())
+    )
 }
 
 fn get_device_info() -> Value {

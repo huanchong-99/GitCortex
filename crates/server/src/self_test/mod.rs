@@ -128,7 +128,8 @@ fn print_human_report(report: &SelfTestReport) {
         if let Some(err) = &r.error {
             // Truncate long errors
             let short = if err.len() > 120 {
-                format!("{}...", &err[..120])
+                let boundary = err.floor_char_boundary(120);
+                format!("{}...", &err[..boundary])
             } else {
                 err.clone()
             };

@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { RepoAction } from '@/components/ui-new/primitives/RepoCard';
+import type { RepoAction } from '@/components/ui-new/containers/RepoCard';
 
 export const RIGHT_MAIN_PANEL_MODES = {
   CHANGES: 'changes',

@@ -1,6 +1,6 @@
 //! LLM client abstractions and implementations.
 
-use std::{future::Future, num::NonZeroU32, sync::Arc, time::Duration};
+use std::{num::NonZeroU32, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use governor::{
@@ -10,7 +10,6 @@ use governor::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tokio::time::sleep;
 
 use utils::url::normalize_base_url;
 
@@ -41,41 +40,6 @@ pub trait LLMClient: Send + Sync {
     }
 }
 
-/// Retries an async operation with exponential backoff.
-pub async fn retry_with_backoff<T, E, F, Fut>(max_retries: u32, mut operation: F) -> Result<T, E>
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
-{
-    let mut last_error = None;
-
-    for attempt in 0..max_retries {
-        match operation().await {
-            Ok(result) => {
-                if attempt > 0 {
-                    tracing::info!("Operation succeeded on attempt {}", attempt + 1);
-                }
-                return Ok(result);
-            }
-            Err(e) if attempt < max_retries - 1 => {
-                tracing::warn!(
-                    "Attempt {} failed, retrying in {}ms",
-                    attempt + 1,
-                    1000 * (attempt + 1)
-                );
-                last_error = Some(e);
-                sleep(Duration::from_millis(1000 * u64::from(attempt + 1))).await;
-            }
-            Err(e) => {
-                tracing::error!("All {} attempts failed", max_retries);
-                return Err(e);
-            }
-        }
-    }
-
-    Err(last_error.unwrap())
-}
-
 /// Wraps an LLM client with a per-second rate limiter.
 pub struct RateLimitedClient<T> {
     inner: T,
@@ -102,9 +66,11 @@ where
     T: LLMClient,
 {
     async fn chat(&self, messages: Vec<LLMMessage>) -> anyhow::Result<LLMResponse> {
-        self.rate_limiter
-            .check()
-            .map_err(|_| anyhow::anyhow!("rate limit exceeded"))?;
+        // Use until_ready() to wait for a token instead of check() which rejects
+        // immediately. With check(), a transient rate-limit rejection gets
+        // misclassified as a provider failure by ResilientLLMClient's circuit
+        // breaker, potentially marking a healthy provider as dead.
+        self.rate_limiter.until_ready().await;
         self.inner.chat(messages).await
     }
 
@@ -614,16 +580,24 @@ mod rate_limit_tests {
     }
 
     #[tokio::test]
-    async fn rate_limiter_blocks_excessive_requests() {
+    async fn rate_limiter_waits_instead_of_rejecting() {
+        // until_ready() blocks until a token is available rather than
+        // rejecting immediately, so the third request should succeed
+        // after a short wait — not fail with "rate limit exceeded".
         let client = RateLimitedClient::new(MockLLMClient::new(), 2).expect("rate limit");
         let messages = test_messages();
 
         assert!(client.chat(messages.clone()).await.is_ok());
         assert!(client.chat(messages.clone()).await.is_ok());
 
-        let result = client.chat(messages.clone()).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("rate limit"));
+        // Third request will block briefly until a token refills, then succeed.
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            client.chat(messages.clone()),
+        )
+        .await;
+        assert!(result.is_ok(), "until_ready should unblock within the timeout");
+        assert!(result.unwrap().is_ok(), "chat should succeed after waiting");
     }
 
     #[tokio::test]

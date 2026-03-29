@@ -12,7 +12,10 @@
     "connect": "Connect",
     "disconnect": "Disconnect",
     "close": "Close",
-    "replay": "Replay"
+    "replay": "Replay",
+    "confirm": "Confirm",
+    "submit": "Submit",
+    "ok": "OK"
   },
   "states": {
     "loading": "Loading...",
@@ -385,6 +388,53 @@
     "systemMessage": "System",
     "sessionList": "Conversations",
     "feishuSync": "Feishu Sync",
-    "progressNotifications": "Progress Notifications"
+    "progressNotifications": "Progress Notifications",
+    "viewWorkflowProgress": "View workflow progress",
+    "feishuSyncEnabled": "Feishu sync enabled",
+    "feishuSyncDisabled": "Feishu sync disabled",
+    "syncHistory": "Sync History",
+    "syncHistoryTooltip": "Send all history messages to Feishu",
+    "thinking": "Thinking...",
+    "syncLabel": "Sync:",
+    "syncTools": "Tools",
+    "syncTerminal": "Terminal",
+    "syncProgress": "Progress",
+    "syncCompletion": "Completion",
+    "pipeline": "Pipeline",
+    "tasksProgress": "Tasks: {{completed}}/{{total}} completed",
+    "terminalsWorking_one": "{{count}} terminal working",
+    "terminalsWorking_other": "{{count}} terminals working",
+    "toolCall": "Tool: {{name}}",
+    "toolResult": "Result: {{name}}"
+  },
+  "approval": {
+    "submittingApproval": "Submitting approval",
+    "approve": "Approve",
+    "submitting": "Submitting...",
+    "approveRequest": "Approve request",
+    "provideDenialReason": "Provide denial reason",
+    "deny": "Deny",
+    "submittingDenial": "Submitting denial",
+    "wouldYouLikeToApprove": "Would you like to approve this?",
+    "denialPlaceholder": "Let the agent know why this request was denied... Type @ to insert tags or search files."
+  },
+  "feishuChannel": {
+    "notConnected": "Feishu not connected",
+    "channelTitle": "Feishu Channel",
+    "currentBinding": "Current binding:",
+    "none": "None",
+    "switchSession": "Switch bound session..."
+  },
+  "statusBar": {
+    "orchestrator": "Orchestrator",
+    "active": "Active",
+    "inactive": "Inactive",
+    "terminalsRunning": "{{count}} Terminals Running",
+    "tokensNA": "Tokens: N/A",
+    "git": "Git:",
+    "gitListening": "Listening",
+    "gitConnecting": "Connecting...",
+    "gitReconnecting": "Reconnecting...",
+    "gitDisconnected": "Disconnected"
   }
 }

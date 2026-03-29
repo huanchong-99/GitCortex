@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { ListChecksIcon, CaretDownIcon } from '@phosphor-icons/react';
-import { Circle, Check, CircleDot } from 'lucide-react';
+import { CircleIcon, CheckCircleIcon, CircleHalfIcon } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import type { TodoItem } from 'shared/types';
 
@@ -13,12 +13,12 @@ interface ChatTodoListProps {
 function getStatusIcon(status?: string) {
   const s = (status || '').toLowerCase();
   if (s === 'completed')
-    return <Check aria-hidden className="h-4 w-4 text-success" />;
+    return <CheckCircleIcon aria-hidden weight="fill" className="h-4 w-4 text-success" />;
   if (s === 'in_progress' || s === 'in-progress')
-    return <CircleDot aria-hidden className="h-4 w-4 text-blue-500" />;
+    return <CircleHalfIcon aria-hidden weight="fill" className="h-4 w-4 text-blue-500" />;
   if (s === 'cancelled')
-    return <Circle aria-hidden className="h-4 w-4 text-gray-400" />;
-  return <Circle aria-hidden className="h-4 w-4 text-muted-foreground" />;
+    return <CircleIcon aria-hidden className="h-4 w-4 text-gray-400" />;
+  return <CircleIcon aria-hidden className="h-4 w-4 text-muted-foreground" />;
 }
 
 export function ChatTodoList({ todos, expanded, onToggle }: Readonly<ChatTodoListProps>) {

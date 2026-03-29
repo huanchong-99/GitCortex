@@ -2295,12 +2295,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fst"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ab85b9b05e3978cc9a9cf8fea7f01b494e1a09ed3037e16ba39edc7a29eb61a"
-
-[[package]]
 name = "futures"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6587,7 +6581,6 @@ dependencies = [
  "enum_dispatch",
  "executors",
  "feishu-connector",
- "fst",
  "futures",
  "futures-util",
  "git2",

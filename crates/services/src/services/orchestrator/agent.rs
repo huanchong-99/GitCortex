@@ -646,7 +646,7 @@ impl OrchestratorAgent {
             }
         }
 
-        // 濞存粌顑勫▎銏狀嚗椤忓棗绠?
+        // Stall recovery: detect and recover stuck workflows
         let mut stall_recovery_tracker = StallRecoveryTracker::default();
         let mut watchdog = interval(Self::STALL_WATCHDOG_TICK);
         watchdog.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -722,7 +722,17 @@ impl OrchestratorAgent {
             BusMessage::Shutdown => {
                 return Ok(true);
             }
-            _ => {}
+            BusMessage::Instruction(..)
+            | BusMessage::StatusUpdate { .. }
+            | BusMessage::TerminalStatusUpdate { .. }
+            | BusMessage::TaskStatusUpdate { .. }
+            | BusMessage::Error { .. }
+            | BusMessage::TerminalMessage { .. }
+            | BusMessage::TerminalInput { .. }
+            | BusMessage::TerminalPromptDecision { .. }
+            | BusMessage::ProviderStateChanged { .. } => {
+                // Outbound-only or UI-notification events — no action needed in agent loop
+            }
         }
         Ok(false)
     }
@@ -781,10 +791,10 @@ impl OrchestratorAgent {
                     if task_terminals.is_empty() && !any_active_terminal {
                         tracing::info!(
                             task_id = %task.id, task_name = %task.name,
-                            "Auto-completing orphaned pending task: no terminals and no active work"
+                            "Auto-failing orphaned pending task: no terminals and no active work"
                         );
                         db::models::WorkflowTask::update_status(
-                            &self.db.pool, &task.id, "completed",
+                            &self.db.pool, &task.id, "failed",
                         ).await?;
                     }
                 }
@@ -1432,7 +1442,7 @@ impl OrchestratorAgent {
                 status: TerminalCompletionStatus::Completed,
                 ..event
             };
-            self.message_bus.publish_terminal_completed(promoted_event).await;
+            self.message_bus.publish_terminal_completed(promoted_event).await?;
             return Ok(());
         }
 
@@ -1501,7 +1511,7 @@ impl OrchestratorAgent {
             };
             self.message_bus
                 .publish_terminal_completed(promoted_event)
-                .await;
+                .await?;
             return Ok(());
         }
 
@@ -2799,9 +2809,6 @@ impl OrchestratorAgent {
         // 3. Check if all terminals in the task are done and auto-sync workflow
         self.auto_sync_workflow_completion(&workflow_id).await?;
 
-        // 4. Awaken orchestrator to process the event
-        self.awaken().await;
-
         Ok(())
     }
 
@@ -2863,25 +2870,7 @@ impl OrchestratorAgent {
             self.execute_single_instruction(fix_instruction).await?;
         }
 
-        // 4. Awaken orchestrator to process the event
-        self.awaken().await;
-
         Ok(())
-    }
-
-
-
-    /// Awaken the orchestrator to process events
-    async fn awaken(&self) {
-        // Check if orchestrator is idle and needs to be awakened
-        let state = self.state.read().await;
-        if state.run_state == OrchestratorRunState::Idle {
-            tracing::debug!("Orchestrator is idle, ensuring it processes pending events");
-            // Drop the read lock before we potentially do anything else
-            drop(state);
-        }
-        // The orchestrator's event loop will automatically process
-        // any messages we published to the message bus
     }
 
     /// Resolve the project working directory from the workflow's project.
@@ -4268,9 +4257,10 @@ impl OrchestratorAgent {
 
         #[cfg(windows)]
         {
-            let output = std::process::Command::new("taskkill")
+            let output = tokio::process::Command::new("taskkill")
                 .args(["/PID", &pid.to_string(), "/T", "/F"])
                 .output()
+                .await
                 .map_err(|e| anyhow!("failed to execute taskkill: {e}"))?;
 
             if output.status.success() {
@@ -4837,11 +4827,6 @@ impl OrchestratorAgent {
             );
             return Ok(());
         }
-
-        // G06-002: acquire the per-workflow merge lock so that auto-merge and
-        // manual merge (REST endpoint) cannot run concurrently for the same workflow.
-        let _merge_guard =
-            crate::services::merge_coordinator::acquire_workflow_merge_lock(&workflow.id).await;
 
         let base_repo_path = self.resolve_project_working_dir().await?;
         self.trigger_merge(
@@ -5430,7 +5415,7 @@ impl OrchestratorAgent {
             .await?;
         let diff = String::from_utf8_lossy(&output.stdout).to_string();
         Ok(if diff.len() > 2000 {
-            diff[..2000].to_string() + "\n[...truncated]"
+            diff[..diff.floor_char_boundary(2000)].to_string() + "\n[...truncated]"
         } else {
             diff
         })

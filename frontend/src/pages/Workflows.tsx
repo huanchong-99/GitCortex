@@ -55,6 +55,7 @@ import {
 } from '@/components/workflow/PipelineView';
 import { WizardConfig, wizardConfigToCreateRequest } from '@/components/workflow/types';
 import type { TerminalStatus } from '@/components/workflow/TerminalCard';
+import { mapTerminalStatus } from '@/utils/terminalStatus';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { CreateProjectDialog } from '@/components/ui-new/dialogs/CreateProjectDialog';
@@ -387,22 +388,6 @@ function getWorkflowStatusBadgeClass(status: string): string {
   return WORKFLOW_STATUS_BADGE_CLASSES[status] ?? 'bg-gray-100 text-gray-800';
 }
 
-// G13-010: Safe terminal status mapping — avoids unsafe `as TerminalStatus` cast
-const TERMINAL_STATUS_SET = new Set<TerminalStatus>([
-  'not_started', 'starting', 'waiting', 'working',
-  'completed', 'failed', 'cancelled', 'review_passed', 'review_rejected',
-]);
-
-function mapTerminalStatusSafe(status: string): TerminalStatus {
-  if (TERMINAL_STATUS_SET.has(status as TerminalStatus)) {
-    return status as TerminalStatus;
-  }
-  // Map common backend aliases
-  if (status === 'running') return 'working';
-  if (status === 'idle') return 'not_started';
-  return 'not_started';
-}
-
 function mapMergeTerminalStatus(status: string): TerminalStatus {
   switch (status) {
     case 'merging':
@@ -436,7 +421,7 @@ function mapWorkflowTasks(
           modelConfigId: terminal.modelConfigId,
           role: terminal.role || undefined,
           orderIndex: terminal.orderIndex,
-          status: mapTerminalStatusSafe(terminal.status),
+          status: mapTerminalStatus(terminal.status),
         })),
     }));
 }

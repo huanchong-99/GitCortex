@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -103,6 +104,7 @@ export function WorkflowPromptDialog({
   submitError,
   onSubmit,
 }: Readonly<WorkflowPromptDialogProps>) {
+  const { t } = useTranslation('workflow');
   const mode = getPromptDialogMode(prompt);
 
   const choiceOptions = useMemo(() => normalizeChoiceOptions(prompt), [prompt]);
@@ -157,7 +159,7 @@ export function WorkflowPromptDialog({
           disabled={isSubmitting || inputValue.trim().length === 0}
           data-testid="workflow-prompt-submit-input"
         >
-          {isSubmitting ? 'Submitting...' : 'Submit'}
+          {isSubmitting ? t('promptDialog.submitting') : t('promptDialog.submit')}
         </Button>
       </div>
     </form>
@@ -168,9 +170,9 @@ export function WorkflowPromptDialog({
       return (
         <div className="space-y-3">
           <p className="text-sm text-low" data-testid="workflow-prompt-empty-options">
-            No options were detected. Enter a response manually.
+            {t('promptDialog.noOptions')}
           </p>
-          {renderInputSubmit('Enter response', 'text')}
+          {renderInputSubmit(t('promptDialog.enterResponse'), 'text')}
         </div>
       );
     }
@@ -206,7 +208,7 @@ export function WorkflowPromptDialog({
             disabled={isSubmitting}
             data-testid="workflow-prompt-submit-option"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit'}
+            {isSubmitting ? t('promptDialog.submitting') : t('promptDialog.submit')}
           </Button>
         </div>
       </div>

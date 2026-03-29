@@ -80,6 +80,7 @@ impl JsonRpcPeer {
             let mut reader = BufReader::new(stdout);
             let mut buffer = String::new();
 
+            let mut had_error = false;
             loop {
                 buffer.clear();
                 match reader.read_line(&mut buffer).await {
@@ -99,6 +100,7 @@ impl JsonRpcPeer {
                                     .await
                                     .is_err()
                                 {
+                                    had_error = true;
                                     break;
                                 }
                                 reader_peer
@@ -112,6 +114,7 @@ impl JsonRpcPeer {
                                     .await
                                     .is_err()
                                 {
+                                    had_error = true;
                                     break;
                                 }
                                 reader_peer
@@ -124,6 +127,7 @@ impl JsonRpcPeer {
                                     .await
                                     .is_err()
                                 {
+                                    had_error = true;
                                     break;
                                 }
                             }
@@ -136,12 +140,14 @@ impl JsonRpcPeer {
                                     Ok(true) => break,
                                     Ok(false) => {}
                                     Err(_) => {
+                                        had_error = true;
                                         break;
                                     }
                                 }
                             }
                             Err(_) => {
                                 if callbacks.on_non_json(line).await.is_err() {
+                                    had_error = true;
                                     break;
                                 }
                             }
@@ -149,12 +155,18 @@ impl JsonRpcPeer {
                     }
                     Err(err) => {
                         tracing::warn!("Error reading Codex output: {err}");
+                        had_error = true;
                         break;
                     }
                 }
             }
 
-            exit_tx.send_exit_signal(ExecutorExitResult::Success).await;
+            let exit_result = if had_error {
+                ExecutorExitResult::Failure
+            } else {
+                ExecutorExitResult::Success
+            };
+            exit_tx.send_exit_signal(exit_result).await;
             let _ = reader_peer.shutdown().await;
         });
 

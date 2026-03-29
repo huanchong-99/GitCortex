@@ -8,6 +8,7 @@
 use crate::issue::QualityIssue;
 use crate::rule::{RuleType, Severity};
 use crate::rules::{Rule, TsRule, TsAnalysisContext};
+use super::count_structural_braces;
 use regex::Regex;
 
 /// Built-in rule that checks React hooks usage rules in TypeScript/JSX files.
@@ -97,44 +98,44 @@ impl TsRule for ReactHooksRule {
                 in_loop_header = true;
             }
 
-            // Count braces to track depth
-            for ch in trimmed.chars() {
-                if ch == '{' {
-                    brace_depth += 1;
-                    if in_conditional_header {
-                        in_conditional_header = false;
-                        conditional_depth += 1;
-                        conditional_start_depths.push(brace_depth);
-                    }
-                    if in_loop_header {
-                        in_loop_header = false;
-                        loop_depth += 1;
-                        loop_start_depths.push(brace_depth);
-                    }
-                } else if ch == '}' {
-                    // Check if we're leaving a conditional block
-                    if let Some(&start) = conditional_start_depths.last() {
-                        if brace_depth == start {
-                            conditional_start_depths.pop();
-                            conditional_depth -= 1;
-                        }
-                    }
-                    // Check if we're leaving a loop block
-                    if let Some(&start) = loop_start_depths.last() {
-                        if brace_depth == start {
-                            loop_start_depths.pop();
-                            loop_depth -= 1;
-                        }
-                    }
-                    // Check if we're leaving the function scope
-                    if let Some(fn_depth) = function_scope_depth {
-                        if brace_depth == fn_depth + 1 {
-                            function_scope_depth = None;
-                            had_early_return = false;
-                        }
-                    }
-                    brace_depth -= 1;
+            // Count braces to track depth (ignoring braces inside strings/templates)
+            let (opens, closes) = count_structural_braces(trimmed);
+            for _ in 0..opens {
+                brace_depth += 1;
+                if in_conditional_header {
+                    in_conditional_header = false;
+                    conditional_depth += 1;
+                    conditional_start_depths.push(brace_depth);
                 }
+                if in_loop_header {
+                    in_loop_header = false;
+                    loop_depth += 1;
+                    loop_start_depths.push(brace_depth);
+                }
+            }
+            for _ in 0..closes {
+                // Check if we're leaving a conditional block
+                if let Some(&start) = conditional_start_depths.last() {
+                    if brace_depth == start {
+                        conditional_start_depths.pop();
+                        conditional_depth -= 1;
+                    }
+                }
+                // Check if we're leaving a loop block
+                if let Some(&start) = loop_start_depths.last() {
+                    if brace_depth == start {
+                        loop_start_depths.pop();
+                        loop_depth -= 1;
+                    }
+                }
+                // Check if we're leaving the function scope
+                if let Some(fn_depth) = function_scope_depth {
+                    if brace_depth == fn_depth + 1 {
+                        function_scope_depth = None;
+                        had_early_return = false;
+                    }
+                }
+                brace_depth -= 1;
             }
 
             // Detect early returns (return statements not at the end of a function)

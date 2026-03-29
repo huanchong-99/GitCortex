@@ -15,10 +15,16 @@ export function validateStep4Terminals(config: WizardConfig): Record<string, str
     return errors;
   }
 
+  const validTaskIds = new Set(config.tasks.map((t) => t.id));
+
   config.terminals.forEach((terminal, index) => {
     const terminalKey = terminal.id.trim() || String(index);
     const cliTypeId = terminal.cliTypeId.trim();
     const modelConfigId = terminal.modelConfigId.trim();
+
+    if (!validTaskIds.has(terminal.taskId)) {
+      errors[`terminal-${terminalKey}-task`] = 'validation.terminals.taskNotFound';
+    }
 
     if (!cliTypeId) {
       errors[`terminal-${terminalKey}-cli`] = 'validation.terminals.cliRequired';

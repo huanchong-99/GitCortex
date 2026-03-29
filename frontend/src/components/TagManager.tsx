@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { tagsApi } from '@/lib/api';
 import { TagEditDialog } from '@/components/dialogs/tasks/TagEditDialog';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import type { Tag } from 'shared/types';
 
 export function TagManager() {
@@ -46,15 +47,15 @@ export function TagManager() {
 
   const handleDelete = useCallback(
     async (tag: Tag) => {
-      if (
-        !confirm(
-          t('settings.general.tags.manager.deleteConfirm', {
-            tagName: tag.tagName,
-          })
-        )
-      ) {
-        return;
-      }
+      const result = await ConfirmDialog.show({
+        title: t('settings.general.tags.manager.actions.deleteTag'),
+        message: t('settings.general.tags.manager.deleteConfirm', {
+          tagName: tag.tagName,
+        }),
+        variant: 'destructive',
+      });
+
+      if (result !== 'confirmed') return;
 
       try {
         await tagsApi.delete(tag.id);

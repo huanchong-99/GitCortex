@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkflow, workflowKeys } from '@/hooks/useWorkflows';
 import { makeRequest, handleApiResponse } from '@/lib/api';
@@ -55,6 +55,16 @@ export function useWorkflowLiveStatus(workflowId: string | null) {
       invalidationTimerRef.current = null;
     }, 300);
   }, [queryClient, workflowId]);
+
+  // Clean up debounce timer on unmount or workflowId change
+  useEffect(() => {
+    return () => {
+      if (invalidationTimerRef.current) {
+        clearTimeout(invalidationTimerRef.current);
+        invalidationTimerRef.current = null;
+      }
+    };
+  }, [workflowId]);
 
   const pushEvent = useCallback(
     (event: Omit<LiveEvent, 'id' | 'timestamp'>) => {

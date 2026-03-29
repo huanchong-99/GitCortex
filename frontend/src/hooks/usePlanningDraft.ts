@@ -91,9 +91,16 @@ export function useConfirmDraft() {
 
 /** Materialize a confirmed draft into a workflow */
 export function useMaterializeDraft() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (draftId: string) => {
       return planningDraftsApi.materialize(draftId);
+    },
+    onSuccess: (_data, draftId) => {
+      queryClient.invalidateQueries({
+        queryKey: planningDraftKeys.byId(draftId),
+      });
     },
   });
 }

@@ -51,8 +51,10 @@ jobs:
       uses: ./.github/actions/setup-sccache
 
     - name: Run quality gate (shadow mode)
-      run: bash scripts/quality/run-quality-gate.sh repo shadow
-      continue-on-error: true
+      run: bash scripts/quality/run-quality-gate.sh repo ${QUALITY_GATE_MODE:-shadow}
+      continue-on-error: ${{ env.QUALITY_GATE_MODE == 'shadow' }}
+      env:
+        QUALITY_GATE_MODE: shadow
 
     - name: Show sccache statistics
       if: always()

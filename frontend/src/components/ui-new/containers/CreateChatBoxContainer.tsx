@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCreateMode } from '@/contexts/CreateModeContext';
@@ -136,6 +137,7 @@ function usePlanningDraftActions({
   confirmMutation,
   materializeMutation,
   feishuSyncMutation,
+  showToast,
 }: Readonly<{
   planningDraftId: string | null;
   planningDraft: { feishuSync?: boolean } | null | undefined;
@@ -148,6 +150,7 @@ function usePlanningDraftActions({
   confirmMutation: ReturnType<typeof useConfirmDraft>;
   materializeMutation: ReturnType<typeof useMaterializeDraft>;
   feishuSyncMutation: ReturnType<typeof useTogglePlanningFeishuSync>;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }>) {
   const handlePlanningMessage = useCallback(async () => {
     const trimmed = message.trim();
@@ -163,6 +166,8 @@ function usePlanningDraftActions({
       setLocalMessages((prev) => [...prev, ...newMessages]);
     } catch (e) {
       console.error('Failed to send planning message:', e);
+      const err = e as { message?: string };
+      showToast(err.message ?? 'Failed to send planning message', 'error');
     } finally {
       setIsThinking(false);
     }
@@ -174,8 +179,10 @@ function usePlanningDraftActions({
       await confirmMutation.mutateAsync(planningDraftId);
     } catch (e) {
       console.error('Failed to confirm draft:', e);
+      const err = e as { message?: string };
+      showToast(err.message ?? 'Failed to confirm draft', 'error');
     }
-  }, [planningDraftId, confirmMutation]);
+  }, [planningDraftId, confirmMutation, showToast]);
 
   const handleMaterialize = useCallback(async () => {
     if (!planningDraftId) return;
@@ -184,8 +191,10 @@ function usePlanningDraftActions({
       setMaterializedWorkflowId(result.workflowId);
     } catch (e) {
       console.error('Failed to materialize draft:', e);
+      const err = e as { message?: string };
+      showToast(err.message ?? 'Failed to materialize draft', 'error');
     }
-  }, [planningDraftId, materializeMutation, setMaterializedWorkflowId]);
+  }, [planningDraftId, materializeMutation, setMaterializedWorkflowId, showToast]);
 
   const handleToggleFeishuSync = useCallback(() => {
     if (!planningDraftId || !planningDraft) return;
@@ -197,13 +206,14 @@ function usePlanningDraftActions({
       },
       {
         onError: () => {
-          globalThis.alert(
-            '开启失败：未找到飞书聊天。\n\n请先在飞书中给 Bot 发送一条消息，建立连接后再试。'
+          showToast(
+            '开启失败：未找到飞书聊天。请先在飞书中给 Bot 发送一条消息，建立连接后再试。',
+            'error'
           );
         },
       }
     );
-  }, [planningDraftId, planningDraft, feishuSyncMutation]);
+  }, [planningDraftId, planningDraft, feishuSyncMutation, showToast]);
 
   return { handlePlanningMessage, handleConfirm, handleMaterialize, handleToggleFeishuSync };
 }
@@ -213,6 +223,7 @@ export function CreateChatBoxContainer() {
   const { t: tTasks } = useTranslation('tasks');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const { profiles, config, updateAndSaveConfig } = useUserSystem();
   const {
     repos,
@@ -409,6 +420,7 @@ export function CreateChatBoxContainer() {
       confirmMutation,
       materializeMutation,
       feishuSyncMutation,
+      showToast,
     });
 
   const handleOpenBoard = useCallback(() => {
@@ -427,13 +439,14 @@ export function CreateChatBoxContainer() {
       },
       {
         onError: () => {
-          globalThis.alert(
-            '同步失败：未找到飞书聊天。\n\n请先在飞书中给 Bot 发送一条消息，建立连接后再试。'
+          showToast(
+            '同步失败：未找到飞书聊天。请先在飞书中给 Bot 发送一条消息，建立连接后再试。',
+            'error'
           );
         },
       }
     );
-  }, [planningDraftId, feishuSyncMutation]);
+  }, [planningDraftId, feishuSyncMutation, showToast]);
 
   // Determine error
   const displayError = (() => {

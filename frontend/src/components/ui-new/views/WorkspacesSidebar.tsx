@@ -5,7 +5,7 @@ import {
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import type { Workspace } from '@/components/ui-new/hooks/useWorkspaces';
-import { InputField } from '@/components/ui-new/primitives/InputField';
+import { InputField } from '@/components/ui-new/containers/InputField';
 import { WorkspaceSummary } from '@/components/ui-new/primitives/WorkspaceSummary';
 import { SectionHeader } from '../primitives/SectionHeader';
 

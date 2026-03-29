@@ -12,7 +12,10 @@
     "connect": "连接",
     "disconnect": "断开连接",
     "close": "关闭",
-    "replay": "重播"
+    "replay": "重播",
+    "confirm": "确认",
+    "submit": "提交",
+    "ok": "确定"
   },
   "states": {
     "loading": "加载中...",
@@ -385,6 +388,53 @@
     "systemMessage": "系统",
     "sessionList": "对话列表",
     "feishuSync": "飞书同步",
-    "progressNotifications": "进度推送"
+    "progressNotifications": "进度推送",
+    "viewWorkflowProgress": "查看工作流进度",
+    "feishuSyncEnabled": "飞书同步已开启",
+    "feishuSyncDisabled": "飞书同步已关闭",
+    "syncHistory": "同步历史",
+    "syncHistoryTooltip": "将历史消息全量发送到飞书",
+    "thinking": "思考中...",
+    "syncLabel": "同步：",
+    "syncTools": "工具",
+    "syncTerminal": "终端",
+    "syncProgress": "进度",
+    "syncCompletion": "完成通知",
+    "pipeline": "流水线",
+    "tasksProgress": "任务：{{completed}}/{{total}} 已完成",
+    "terminalsWorking_one": "{{count}} 个终端正在工作",
+    "terminalsWorking_other": "{{count}} 个终端正在工作",
+    "toolCall": "工具：{{name}}",
+    "toolResult": "结果：{{name}}"
+  },
+  "approval": {
+    "submittingApproval": "正在提交批准",
+    "approve": "批准",
+    "submitting": "提交中...",
+    "approveRequest": "批准请求",
+    "provideDenialReason": "提供拒绝原因",
+    "deny": "拒绝",
+    "submittingDenial": "正在提交拒绝",
+    "wouldYouLikeToApprove": "是否批准此请求？",
+    "denialPlaceholder": "告知代理此请求被拒绝的原因... 输入 @ 可插入标签或搜索文件。"
+  },
+  "feishuChannel": {
+    "notConnected": "飞书未连接",
+    "channelTitle": "飞书通道",
+    "currentBinding": "当前绑定：",
+    "none": "无",
+    "switchSession": "切换绑定会话..."
+  },
+  "statusBar": {
+    "orchestrator": "编排器",
+    "active": "活跃",
+    "inactive": "未激活",
+    "terminalsRunning": "{{count}} 个终端运行中",
+    "tokensNA": "令牌：N/A",
+    "git": "Git：",
+    "gitListening": "监听中",
+    "gitConnecting": "连接中...",
+    "gitReconnecting": "重新连接中...",
+    "gitDisconnected": "已断开"
   }
 }

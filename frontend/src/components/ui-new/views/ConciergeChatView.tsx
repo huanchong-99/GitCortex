@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react';
 import type { ConciergeMessage, ConciergeSession } from '@/lib/conciergeApi';
 import type { WorkflowDetailDto } from 'shared/types';
+import { useTranslation } from 'react-i18next';
 
 function workflowStatusClass(status: string): string {
   if (status === 'running' || status === 'completed') return 'bg-success/20 text-success';
@@ -64,8 +65,9 @@ interface ConciergeChatViewProps {
 }
 
 function SourceBadge({ provider }: { readonly provider: string | null }) {
+  const { t } = useTranslation('common');
   if (!provider) return null;
-  const label = provider === 'feishu' ? '飞书' : '网页';
+  const label = provider === 'feishu' ? t('concierge.sourceFeishu') : t('concierge.sourceWeb');
   return (
     <span className="inline-flex items-center rounded bg-secondary px-1 py-px text-xs text-low">
       {label}
@@ -74,10 +76,11 @@ function SourceBadge({ provider }: { readonly provider: string | null }) {
 }
 
 function ToolMessage({ message }: { readonly message: ConciergeMessage }) {
+  const { t } = useTranslation('common');
   const isCall = message.role === 'tool_call';
   const label = isCall
-    ? `Tool: ${message.toolName ?? 'unknown'}`
-    : `Result: ${message.toolName ?? 'unknown'}`;
+    ? t('concierge.toolCall', { name: message.toolName ?? 'unknown' })
+    : t('concierge.toolResult', { name: message.toolName ?? 'unknown' });
 
   return (
     <details className="rounded border bg-secondary px-base py-half text-sm text-low">
@@ -171,29 +174,30 @@ function SyncTogglesPanel({
   readonly toggles: SyncToggles;
   readonly onUpdate: (key: keyof SyncToggles, value: boolean) => void;
 }) {
+  const { t } = useTranslation('common');
   return (
     <div className="flex flex-wrap items-center gap-base px-base py-half border-b bg-secondary/30">
       <span className="flex items-center gap-1 text-xs text-low">
         <GearIcon className="size-icon-xs" />
-        Sync:
+        {t('concierge.syncLabel')}
       </span>
       <SyncToggleCheckbox
-        label="Tools"
+        label={t('concierge.syncTools')}
         checked={toggles.syncTools}
         onChange={(v) => onUpdate('syncTools', v)}
       />
       <SyncToggleCheckbox
-        label="Terminal"
+        label={t('concierge.syncTerminal')}
         checked={toggles.syncTerminal}
         onChange={(v) => onUpdate('syncTerminal', v)}
       />
       <SyncToggleCheckbox
-        label="Progress"
+        label={t('concierge.syncProgress')}
         checked={toggles.syncProgress}
         onChange={(v) => onUpdate('syncProgress', v)}
       />
       <SyncToggleCheckbox
-        label="Completion"
+        label={t('concierge.syncCompletion')}
         checked={toggles.notifyOnCompletion}
         onChange={(v) => onUpdate('notifyOnCompletion', v)}
       />
@@ -202,6 +206,7 @@ function SyncTogglesPanel({
 }
 
 function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetailDto }) {
+  const { t } = useTranslation('common');
   const tasks = workflow.tasks ?? [];
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const allTerminals = tasks.flatMap(t => t.terminals ?? []);
@@ -219,13 +224,13 @@ function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetail
           className="ml-auto flex items-center gap-1 text-xs text-brand hover:text-brand/80"
         >
           <ArrowSquareOutIcon className="size-icon-xs" />
-          Pipeline
+          {t('concierge.pipeline')}
         </a>
       </div>
       {tasks.length > 0 && (
         <div className="mt-half flex flex-col gap-px">
           <span className="text-xs text-low">
-            Tasks: {completedTasks}/{tasks.length} completed
+            {t('concierge.tasksProgress', { completed: completedTasks, total: tasks.length })}
           </span>
           {tasks.map(task => (
             <div key={task.id} className="flex items-center gap-half text-xs">
@@ -246,7 +251,7 @@ function WorkflowProgressPanel({ workflow }: { readonly workflow: WorkflowDetail
           ))}
           {workingTerminals.length > 0 && (
             <span className="text-xs text-low">
-              {workingTerminals.length} terminal{workingTerminals.length > 1 ? 's' : ''} working
+              {t('concierge.terminalsWorking', { count: workingTerminals.length })}
             </span>
           )}
         </div>
@@ -277,6 +282,7 @@ export function ConciergeChatView({
   syncToggles,
   onUpdateSyncToggle,
 }: ConciergeChatViewProps) {
+  const { t } = useTranslation('common');
   return (
     <div className="flex h-full flex-col bg-primary font-ibm-plex-sans">
       {/* Header */}
@@ -287,7 +293,7 @@ export function ConciergeChatView({
             href={`/pipeline/${activeWorkflowId}`}
             className="flex items-center gap-1 rounded-full bg-success/20 px-base py-px text-xs text-success hover:bg-success/30 transition-colors"
           >
-            <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" /><span>查看工作流进度</span>
+            <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" /><span>{t('concierge.viewWorkflowProgress')}</span>
           </a>
         )}
         {onToggleFeishuSync && (
@@ -299,10 +305,10 @@ export function ConciergeChatView({
                 ? 'bg-brand/20 text-brand hover:bg-brand/30'
                 : 'bg-secondary text-low hover:text-normal'
             }`}
-            title={feishuSync ? '飞书同步已开启' : '飞书同步已关闭'}
+            title={feishuSync ? t('concierge.feishuSyncEnabled') : t('concierge.feishuSyncDisabled')}
           >
             <span className={`inline-block size-1.5 rounded-full ${feishuSync ? 'bg-brand' : 'bg-secondary'}`} />{' '}
-            飞书同步
+            {t('concierge.feishuSync')}
           </button>
         )}
         {onSyncHistory && (
@@ -310,10 +316,10 @@ export function ConciergeChatView({
             type="button"
             onClick={onSyncHistory}
             className="flex items-center gap-1 rounded px-half py-px text-xs bg-secondary text-low hover:text-normal hover:bg-tertiary transition-colors"
-            title="将历史消息全量发送到飞书"
+            title={t('concierge.syncHistoryTooltip')}
           >
             <ArrowSquareOutIcon className="size-icon-xs" />
-            同步历史
+            {t('concierge.syncHistory')}
           </button>
         )}
         <div className="relative ml-auto">
@@ -322,7 +328,7 @@ export function ConciergeChatView({
             onClick={onToggleSessions}
             className="flex items-center gap-1 rounded bg-secondary px-half py-px text-sm text-normal hover:text-high"
           >
-            Sessions
+            {t('concierge.sessionList')}
             <CaretDownIcon className="size-icon-xs" />
           </button>
           {showSessions && (
@@ -345,7 +351,7 @@ export function ConciergeChatView({
                 className="flex w-full items-center gap-1 border-t px-base py-half text-sm text-low hover:text-normal"
               >
                 <PlusIcon className="size-icon-xs" />
-                New session
+                {t('concierge.newSession')}
               </button>
             </div>
           )}
@@ -366,7 +372,7 @@ export function ConciergeChatView({
         {isLoading && (
           <div className="flex items-center gap-half text-sm text-low">
             <RobotIcon className="size-icon-xs animate-pulse" />
-            Thinking...
+            {t('concierge.thinking')}
           </div>
         )}
         <div ref={bottomRef} />
@@ -384,7 +390,7 @@ export function ConciergeChatView({
           type="text"
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
-          placeholder="Type a message..."
+          placeholder={t('concierge.sendPlaceholder')}
           className="flex-1 rounded bg-secondary px-base py-half text-base text-normal placeholder:text-low focus:outline-none focus:ring-1 focus:ring-brand"
         />
         <button

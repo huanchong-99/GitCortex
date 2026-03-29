@@ -39,7 +39,10 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevokeTitle": "Revoke Invitation",
+    "confirmRevoke": "Are you sure you want to revoke the invitation for {{email}}? This action cannot be undone.",
+    "revokeTooltip": "Revoke invitation"
   },
   "settings": {
     "title": "Organization Settings",
@@ -63,7 +66,23 @@
     "description": "You need to be logged in to manage organization settings.",
     "action": "Login"
   },
+  "confirmRemoveMemberTitle": "Remove Member",
   "confirmRemoveMember": "Are you sure you want to remove this member from the organization?",
+  "toasts": {
+    "invitationRevoked": "Invitation revoked successfully",
+    "revokeError": "Failed to revoke invitation",
+    "memberRemoved": "Member removed successfully",
+    "removeError": "Failed to remove member",
+    "roleUpdated": "Member role updated successfully",
+    "roleUpdateError": "Failed to update member role",
+    "organizationCreated": "Organization created successfully",
+    "memberInvited": "Member invited successfully",
+    "projectLinked": "Project linked successfully",
+    "linkError": "Failed to link project",
+    "projectUnlinked": "Project unlinked successfully",
+    "unlinkError": "Failed to unlink project",
+    "noOrganizations": "No organizations"
+  },
   "sharedProjects": {
     "title": "Shared Projects",
     "description": "Remote projects in {{orgName}} and their links to local projects",
@@ -76,6 +95,8 @@
     "linkedTo": "Linked to: {{projectName}}",
     "linked": "Linked",
     "linkProject": "Link project...",
-    "noAvailableProjects": "No available projects"
+    "noAvailableProjects": "No available projects",
+    "confirmUnlinkTitle": "Unlink Project",
+    "confirmUnlink": "Are you sure you want to unlink \"{{projectName}}\"? The local project will remain, but it will no longer be linked to this remote project."
   }
 }

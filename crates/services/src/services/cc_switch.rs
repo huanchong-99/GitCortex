@@ -917,7 +917,7 @@ impl CCSwitchService {
                     api_key_source = api_key_source,
                     has_custom_base_url = terminal.custom_base_url.is_some(),
                     custom_base_url = ?terminal.custom_base_url,
-                    api_key_prefix = &api_key[..api_key.len().min(4)],
+                    api_key_prefix = "***",
                     "Resolved API key for Claude Code terminal"
                 );
 

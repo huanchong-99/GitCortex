@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
+import { useToast } from '@/components/ui/toast';
 import { GitPanelCreate } from '@/components/ui-new/views/GitPanelCreate';
 import { useMultiRepoBranches } from '@/hooks/useRepoBranches';
 import { useProjects } from '@/hooks/useProjects';
@@ -26,6 +27,7 @@ export function GitPanelCreateContainer({
   } = useCreateMode();
   const { projects } = useProjects();
   const { updateProject } = useProjectMutations();
+  const { showToast } = useToast();
   const [isBinding, setIsBinding] = useState(false);
   const autoLoadedForProject = useRef<string | null>(null);
 
@@ -67,6 +69,8 @@ export function GitPanelCreateContainer({
         addRepo(repo);
       } catch (e) {
         console.error('[GitPanelCreate] Failed to auto-load bound repo:', e);
+        const err = e as { message?: string };
+        showToast(err.message ?? 'Failed to load bound repository', 'error');
         clearRepos();
       }
     };
@@ -95,6 +99,8 @@ export function GitPanelCreateContainer({
       });
     } catch (e) {
       console.error('[GitPanelCreate] Failed to bind repo:', e);
+      const err = e as { message?: string };
+      showToast(err.message ?? 'Failed to bind repository', 'error');
     } finally {
       setIsBinding(false);
     }

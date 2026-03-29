@@ -126,7 +126,7 @@ impl Merge {
         )
         .fetch_one(pool)
         .await
-        .map(Into::into)
+        .and_then(TryInto::try_into)
     }
     /// Create a new PR record (when PR is opened)
     pub async fn create_pr(
@@ -169,7 +169,7 @@ impl Merge {
         )
         .fetch_one(pool)
         .await
-        .map(Into::into)
+        .and_then(TryInto::try_into)
     }
 
     /// Get all open PRs for monitoring
@@ -196,7 +196,7 @@ impl Merge {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows.into_iter().map(Into::into).collect())
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 
     /// Update PR status for a workspace
@@ -258,7 +258,7 @@ impl Merge {
         .await?;
 
         // Convert to appropriate types based on merge_type
-        Ok(rows.into_iter().map(Into::into).collect())
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 
     /// Find all merges for a workspace and specific repo
@@ -291,7 +291,7 @@ impl Merge {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows.into_iter().map(Into::into).collect())
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 
     /// Get the latest PR status for each workspace (for workspace summaries)
@@ -335,45 +335,75 @@ impl Merge {
 }
 
 // Conversion implementations
-impl From<MergeRow> for DirectMerge {
-    fn from(row: MergeRow) -> Self {
-        DirectMerge {
+impl TryFrom<MergeRow> for DirectMerge {
+    type Error = sqlx::Error;
+
+    fn try_from(row: MergeRow) -> Result<Self, Self::Error> {
+        Ok(DirectMerge {
             id: row.id,
             workspace_id: row.workspace_id,
             repo_id: row.repo_id,
-            merge_commit: row
-                .merge_commit
-                .expect("direct merge must have merge_commit"),
+            merge_commit: row.merge_commit.ok_or_else(|| {
+                sqlx::Error::ColumnDecode {
+                    index: "merge_commit".to_string(),
+                    source: Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "direct merge must have merge_commit",
+                    )),
+                }
+            })?,
             target_branch_name: row.target_branch_name,
             created_at: row.created_at,
-        }
+        })
     }
 }
 
-impl From<MergeRow> for PrMerge {
-    fn from(row: MergeRow) -> Self {
-        PrMerge {
+impl TryFrom<MergeRow> for PrMerge {
+    type Error = sqlx::Error;
+
+    fn try_from(row: MergeRow) -> Result<Self, Self::Error> {
+        Ok(PrMerge {
             id: row.id,
             workspace_id: row.workspace_id,
             repo_id: row.repo_id,
             target_branch_name: row.target_branch_name,
             pr_info: PullRequestInfo {
-                number: row.pr_number.expect("pr merge must have pr_number"),
-                url: row.pr_url.expect("pr merge must have pr_url"),
-                status: row.pr_status.expect("pr merge must have status"),
+                number: row.pr_number.ok_or_else(|| sqlx::Error::ColumnDecode {
+                    index: "pr_number".to_string(),
+                    source: Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "pr merge must have pr_number",
+                    )),
+                })?,
+                url: row.pr_url.ok_or_else(|| sqlx::Error::ColumnDecode {
+                    index: "pr_url".to_string(),
+                    source: Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "pr merge must have pr_url",
+                    )),
+                })?,
+                status: row.pr_status.ok_or_else(|| sqlx::Error::ColumnDecode {
+                    index: "pr_status".to_string(),
+                    source: Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "pr merge must have status",
+                    )),
+                })?,
                 merged_at: row.pr_merged_at,
                 merge_commit_sha: row.pr_merge_commit_sha,
             },
             created_at: row.created_at,
-        }
+        })
     }
 }
 
-impl From<MergeRow> for Merge {
-    fn from(row: MergeRow) -> Self {
+impl TryFrom<MergeRow> for Merge {
+    type Error = sqlx::Error;
+
+    fn try_from(row: MergeRow) -> Result<Self, Self::Error> {
         match row.merge_type {
-            MergeType::Direct => Merge::Direct(DirectMerge::from(row)),
-            MergeType::Pr => Merge::Pr(PrMerge::from(row)),
+            MergeType::Direct => Ok(Merge::Direct(DirectMerge::try_from(row)?)),
+            MergeType::Pr => Ok(Merge::Pr(PrMerge::try_from(row)?)),
         }
     }
 }

@@ -5,7 +5,7 @@ import {
   DiffLineType,
   parseInstance,
 } from '@git-diff-view/react';
-import { SquarePen } from 'lucide-react';
+import { PencilSimpleIcon } from '@phosphor-icons/react';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { getHighLightLanguageFromPath } from '@/utils/extToLanguage';
 import { getActualTheme } from '@/utils/theme';
@@ -100,7 +100,7 @@ function EditDiffRenderer({
   return (
     <div>
       <div className={headerClass}>
-        <SquarePen className="h-3 w-3" />
+        <PencilSimpleIcon className="h-3 w-3" />
         <button
           type="button"
           onClick={() => setExpanded()}

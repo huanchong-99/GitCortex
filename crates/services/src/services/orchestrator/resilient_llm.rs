@@ -260,23 +260,19 @@ impl LLMClient for ResilientLLMClient {
             let idx = (start_index + offset) % provider_count;
             let entry = &self.providers[idx];
 
-            // Check circuit breaker: skip dead providers unless probe interval elapsed.
-            {
-                let state = entry.state.read().await;
-                if state.is_dead && !Self::should_probe(&state) {
-                    tracing::debug!(
-                        "ResilientLLMClient: skipping dead provider {} ({})",
-                        idx,
-                        entry.name,
-                    );
-                    continue;
-                }
-            }
-
-            // Mark probe timestamp if this is a probe attempt.
+            // Check circuit breaker and mark probe timestamp atomically
+            // to prevent TOCTOU race where multiple threads probe simultaneously.
             {
                 let mut state = entry.state.write().await;
                 if state.is_dead {
+                    if !Self::should_probe(&state) {
+                        tracing::debug!(
+                            "ResilientLLMClient: skipping dead provider {} ({})",
+                            idx,
+                            entry.name,
+                        );
+                        continue;
+                    }
                     tracing::info!(
                         "ResilientLLMClient: probing dead provider {} ({})",
                         idx,

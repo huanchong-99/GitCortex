@@ -10,6 +10,7 @@ import {
 import { Unlink } from 'lucide-react';
 import type { Project, RemoteProject } from 'shared/types';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 
 interface RemoteProjectItemProps {
   remoteProject: RemoteProject;
@@ -35,14 +36,20 @@ export function RemoteProjectItem({
   disabledReason,
 }: Readonly<RemoteProjectItemProps>) {
   const { t } = useTranslation('organization');
-  const handleUnlinkClick = () => {
+  const handleUnlinkClick = async () => {
     if (!linkedLocalProject || disabled) return;
 
-    const confirmed = globalThis.confirm(
-      `Are you sure you want to unlink "${linkedLocalProject.name}"? The local project will remain, but it will no longer be linked to this remote project.`
-    );
-    if (confirmed) {
-      onUnlink(linkedLocalProject.id);
+    try {
+      const result = await ConfirmDialog.show({
+        title: t('sharedProjects.confirmUnlinkTitle'),
+        message: t('sharedProjects.confirmUnlink', { projectName: linkedLocalProject.name }),
+        variant: 'destructive',
+      });
+      if (result === 'confirmed') {
+        onUnlink(linkedLocalProject.id);
+      }
+    } catch {
+      // User cancelled
     }
   };
 

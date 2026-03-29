@@ -8,6 +8,10 @@
     "advanced": {
       "workingBranch": "Working Branch",
       "placeholder": "e.g acme Corp"
+    },
+    "pushError": {
+      "title": "Error",
+      "fallbackMessage": "Failed to push changes"
     }
   },
   "loading": "Loading tasks...",

@@ -1,6 +1,8 @@
 import { useCallback, useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { FeishuChannelPanel } from '../views/FeishuChannelPanel';
+import { useToast } from '@/components/ui/toast';
 
 import {
   useFeishuChannel,
@@ -11,6 +13,8 @@ import { usePlanningDrafts } from '@/hooks/usePlanningDraft';
 import { feishuApi, planningDraftsApi } from '@/lib/api';
 
 export function FeishuChannelContainer() {
+  const { t } = useTranslation('common');
+  const { showToast } = useToast();
   const [feishuConnected, setFeishuConnected] = useState(false);
   const [selectedValue, setSelectedValue] = useState('');
   const [switching, setSwitching] = useState(false);
@@ -67,8 +71,9 @@ export function FeishuChannelContainer() {
             matched ? { id: value, name: matched.name } : null
           );
         } catch {
-          globalThis.alert(
-            '绑定失败：未找到飞书聊天。\n\n请先在飞书中给 Bot 发送一条消息。'
+          showToast(
+            '绑定失败：未找到飞书聊天。请先在飞书中给 Bot 发送一条消息。',
+            'error'
           );
         } finally {
           setSwitching(false);
@@ -81,7 +86,7 @@ export function FeishuChannelContainer() {
         });
       }
     },
-    [switchChannel, channel?.chatId, allItems]
+    [switchChannel, channel?.chatId, allItems, showToast]
   );
 
   // Resolve displayed active session: local override > server data
@@ -97,6 +102,13 @@ export function FeishuChannelContainer() {
       selectedValue={selectedValue}
       onSelectChange={handleSelectChange}
       isPending={switchChannel.isPending || switching}
+      labels={{
+        notConnected: t('feishuChannel.notConnected'),
+        channelTitle: t('feishuChannel.channelTitle'),
+        currentBinding: t('feishuChannel.currentBinding'),
+        noneLabel: t('feishuChannel.none'),
+        switchSession: t('feishuChannel.switchSession'),
+      }}
     />
   );
 }

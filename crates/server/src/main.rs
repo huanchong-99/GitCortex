@@ -378,46 +378,18 @@ pub async fn shutdown_signal() {
 }
 
 pub async fn perform_cleanup_actions(deployment: &DeploymentImpl) {
-    deployment
+    if let Err(e) = deployment
         .container()
         .kill_all_running_processes()
         .await
-        .expect("Failed to cleanly kill running execution processes");
+    {
+        tracing::error!(error = %e, "Failed to cleanly kill running execution processes during shutdown");
+    }
 }
 
 /// Decrypt an AES-256-GCM encrypted secret stored as base64 (nonce || ciphertext).
 fn decrypt_feishu_secret(encrypted: &str) -> anyhow::Result<String> {
-    use aes_gcm::{
-        Aes256Gcm, Nonce,
-        aead::{Aead, KeyInit},
-    };
-    use base64::{Engine as _, engine::general_purpose};
-
-    let key_str = utils::env_compat::var_with_compat("SOLODAWN_ENCRYPTION_KEY", "GITCORTEX_ENCRYPTION_KEY")
-        .map_err(|_| anyhow::anyhow!("SOLODAWN_ENCRYPTION_KEY not set"))?;
-    if key_str.len() != 32 {
-        return Err(anyhow::anyhow!("Invalid encryption key length"));
-    }
-    let key_bytes: [u8; 32] = key_str
-        .as_bytes()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))?;
-
-    let combined = general_purpose::STANDARD
-        .decode(encrypted)
-        .map_err(|e| anyhow::anyhow!("Base64 decode failed: {e}"))?;
-    if combined.len() < 12 {
-        return Err(anyhow::anyhow!("Invalid encrypted data length"));
-    }
-    let (nonce_bytes, ciphertext) = combined.split_at(12);
-    #[allow(deprecated)]
-    let nonce = Nonce::from_slice(nonce_bytes);
-    let cipher = Aes256Gcm::new_from_slice(&key_bytes)
-        .map_err(|e| anyhow::anyhow!("Cipher init failed: {e}"))?;
-    let plaintext = cipher
-        .decrypt(nonce, ciphertext)
-        .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
-    String::from_utf8(plaintext).map_err(|e| anyhow::anyhow!("Invalid UTF-8: {e}"))
+    db::encryption::decrypt(encrypted)
 }
 
 /// Attempt to start the Feishu connector by loading config from the database.

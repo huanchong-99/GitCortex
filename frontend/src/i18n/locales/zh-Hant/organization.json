@@ -39,7 +39,10 @@
     "loading": "載入邀請中...",
     "none": "沒有待處理的邀請",
     "invited": "邀請於 {{date}}",
-    "pending": "待處理"
+    "pending": "待處理",
+    "confirmRevokeTitle": "撤銷邀請",
+    "confirmRevoke": "您確定要撤銷發送給 {{email}} 的邀請嗎？此操作無法復原。",
+    "revokeTooltip": "撤銷邀請"
   },
   "settings": {
     "title": "組織設定",
@@ -63,6 +66,7 @@
     "description": "您需要登入才能管理組織設定。",
     "action": "登入"
   },
+  "confirmRemoveMemberTitle": "移除成員",
   "confirmRemoveMember": "您確定要從組織中移除此成員嗎？",
   "sharedProjects": {
     "title": "共享專案",
@@ -73,6 +77,8 @@
     "linkedTo": "連結到：{{projectName}}",
     "linked": "已連結",
     "linkProject": "連結專案...",
-    "noAvailableProjects": "沒有可用的專案"
+    "noAvailableProjects": "沒有可用的專案",
+    "confirmUnlinkTitle": "取消連結專案",
+    "confirmUnlink": "您確定要取消連結 \"{{projectName}}\" 嗎？本地專案將保留，但不再與此遠端專案關聯。"
   }
 }

@@ -40,6 +40,14 @@ pub struct PersistedState {
     /// Total error count for this workflow run
     pub error_count: u32,
 
+    /// Commit hashes already processed (idempotency on recovery).
+    #[serde(default)]
+    pub processed_commits: Vec<String>,
+
+    /// Checkpoint keys already processed (`terminal_id:commit_hash`).
+    #[serde(default)]
+    pub processed_checkpoints: Vec<String>,
+
     /// Last update timestamp
     pub updated_at: DateTime<Utc>,
 }
@@ -106,6 +114,8 @@ impl From<OrchestratorState> for PersistedState {
             conversation_history: state.conversation_history,
             total_tokens_used: state.total_tokens_used,
             error_count: state.error_count,
+            processed_commits: state.processed_commits.into_iter().collect(),
+            processed_checkpoints: state.processed_checkpoints.into_iter().collect(),
             updated_at: Utc::now(),
         }
     }
@@ -124,6 +134,8 @@ impl From<&OrchestratorState> for PersistedState {
             conversation_history: state.conversation_history.clone(),
             total_tokens_used: state.total_tokens_used,
             error_count: state.error_count,
+            processed_commits: state.processed_commits.iter().cloned().collect(),
+            processed_checkpoints: state.processed_checkpoints.iter().cloned().collect(),
             updated_at: Utc::now(),
         }
     }
@@ -208,6 +220,8 @@ impl StatePersistence {
             state.conversation_history = persisted.conversation_history;
             state.total_tokens_used = persisted.total_tokens_used;
             state.error_count = persisted.error_count;
+            state.restore_processed_commits(persisted.processed_commits);
+            state.processed_checkpoints = persisted.processed_checkpoints.into_iter().collect();
 
             debug!("State loaded successfully for workflow {}", workflow_id);
 

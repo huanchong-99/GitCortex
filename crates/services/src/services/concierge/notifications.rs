@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use sqlx::SqlitePool;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use tracing;
 
 use super::sync::{ConciergeBroadcaster, ConciergeEvent};
@@ -33,10 +34,26 @@ pub async fn watch_workflow_events(
     pool: SqlitePool,
     broadcaster: Arc<ConciergeBroadcaster>,
     mut workflow_rx: mpsc::Receiver<crate::services::orchestrator::message_bus::BusMessage>,
+    cancel: CancellationToken,
 ) {
     use crate::services::orchestrator::message_bus::BusMessage;
 
-    while let Some(bus_msg) = workflow_rx.recv().await {
+    loop {
+        let bus_msg = tokio::select! {
+            msg = workflow_rx.recv() => {
+                match msg {
+                    Some(m) => m,
+                    None => break, // channel closed
+                }
+            }
+            _ = cancel.cancelled() => {
+                tracing::debug!(
+                    session_id = %session_id,
+                    "Notification watcher cancelled"
+                );
+                break;
+            }
+        };
         // Reload session to check current settings
         let session = match ConciergeSession::find_by_id(&pool, &session_id).await {
             Ok(Some(s)) => s,

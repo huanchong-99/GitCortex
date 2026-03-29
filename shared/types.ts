@@ -539,7 +539,12 @@ executor_profile_id: ExecutorProfileId,
  * Optional relative path to execute the agent in (relative to container_ref).
  * If None, uses the container_ref directory directly.
  */
-working_dir: string | null, };
+working_dir: string | null, 
+/**
+ * Allow the CLI to ask clarifying questions via AskUserQuestion tool.
+ * True for workspace session mode (direct user chat), false for workflow terminals.
+ */
+allow_user_questions: boolean, };
 
 export type CodingAgentFollowUpRequest = { prompt: string, session_id: string, 
 /**
@@ -550,7 +555,11 @@ executor_profile_id: ExecutorProfileId,
  * Optional relative path to execute the agent in (relative to container_ref).
  * If None, uses the container_ref directory directly.
  */
-working_dir: string | null, };
+working_dir: string | null, 
+/**
+ * Allow the CLI to ask clarifying questions via AskUserQuestion tool.
+ */
+allow_user_questions: boolean, };
 
 export type ReviewRequest = { executor_profile_id: ExecutorProfileId, context: Array<RepoReviewContext> | null, prompt: string, 
 /**

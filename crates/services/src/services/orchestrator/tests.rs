@@ -647,7 +647,7 @@ mod orchestrator_tests {
             metadata: None,
         };
 
-        bus.publish_terminal_completed(event).await;
+        bus.publish_terminal_completed(event).await.unwrap();
 
         let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub.recv())
             .await
@@ -2929,7 +2929,8 @@ next_action: handoff";
             "feature/test",
             "feat: add new feature",
         )
-        .await;
+        .await
+        .unwrap();
 
         // Verify message received on topic
         let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub.recv()).await;
@@ -2960,7 +2961,8 @@ next_action: handoff";
 
         // Publish git event
         bus.publish_git_event("wf-1", "abc123", "main", "fix: bug fix")
-            .await;
+            .await
+            .unwrap();
 
         // Verify broadcast received
         let msg =
@@ -3451,7 +3453,8 @@ next_action: handoff",
 
         // Publish to wf-1 only
         bus.publish_git_event("wf-1", "abc123", "main", "commit message")
-            .await;
+            .await
+            .unwrap();
 
         // wf-1 should receive
         let msg = tokio::time::timeout(std::time::Duration::from_millis(100), sub_wf1.recv()).await;

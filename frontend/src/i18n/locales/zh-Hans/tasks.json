@@ -8,6 +8,10 @@
     "advanced": {
       "workingBranch": "工作分支",
       "placeholder": "例如：Acme Corp"
+    },
+    "pushError": {
+      "title": "错误",
+      "fallbackMessage": "推送更改失败"
     }
   },
   "loading": "加载任务中...",

@@ -56,17 +56,50 @@ fn extract_fenced_json(text: &str) -> Option<&str> {
 }
 
 /// Extract inline JSON from text like: `some text {"tool":"x","params":{}} more text`
+///
+/// Handles braces inside JSON string values correctly by tracking whether
+/// the parser is inside a quoted string literal (with backslash-escape awareness).
 fn extract_inline_json(text: &str) -> Option<&str> {
+    // Fast path: try parsing the entire text as a ToolCall directly
+    if text.trim().starts_with('{') {
+        if serde_json::from_str::<serde_json::Value>(text.trim()).is_ok() {
+            let trimmed = text.trim();
+            // Verify it has a "tool" field before returning
+            if trimmed.contains(r#""tool""#) {
+                // Return slice of original text
+                let offset = text.find(trimmed)?;
+                return Some(&text[offset..offset + trimmed.len()]);
+            }
+        }
+    }
+
     // Find the first `{"tool"` pattern
     let needle = r#"{"tool""#;
     let start = text.find(needle)?;
     let candidate = &text[start..];
 
-    // Find matching closing brace by counting braces
-    let mut depth = 0;
+    // Find matching closing brace by counting braces, respecting string literals.
+    // Inside a JSON string (after an unescaped `"`), braces are not structural.
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escape_next = false;
     let mut end = 0;
+
     for (i, ch) in candidate.char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        if in_string {
+            match ch {
+                '\\' => escape_next = true,
+                '"' => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
         match ch {
+            '"' => in_string = true,
             '{' => depth += 1,
             '}' => {
                 depth -= 1;
@@ -142,6 +175,31 @@ async fn execute_create_project(
     let repo_path = params["repo_path"]
         .as_str()
         .context("Missing 'repo_path' parameter")?;
+
+    // Validate repo_path: reject path traversal components and dangerous patterns
+    let repo_path_buf = std::path::PathBuf::from(repo_path);
+    for component in repo_path_buf.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                return Ok(
+                    "Rejected: repo_path must not contain '..' path traversal components."
+                        .to_string(),
+                );
+            }
+            std::path::Component::Normal(seg) => {
+                let s = seg.to_string_lossy();
+                if s.starts_with('.') && s != ".git" {
+                    return Ok(format!(
+                        "Rejected: repo_path contains suspicious hidden segment '{s}'."
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    if !repo_path_buf.is_absolute() {
+        return Ok("Rejected: repo_path must be an absolute path.".to_string());
+    }
 
     // Check for duplicate name
     let existing = Project::find_all(pool).await?;

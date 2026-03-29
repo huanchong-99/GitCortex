@@ -67,8 +67,15 @@ impl TsRule for TypeAssertionRule {
         let is_tsx = ctx.file_path.ends_with(".tsx");
 
         for (i, line) in ctx.lines.iter().enumerate() {
+            let trimmed = line.trim();
+
             // Skip comment lines
             if self.comment_pattern.is_match(line) {
+                continue;
+            }
+
+            // Skip import/export rename lines (`import { X as Y }`, `export { X as Y }`)
+            if trimmed.starts_with("import ") || trimmed.starts_with("export ") {
                 continue;
             }
 
@@ -192,6 +199,26 @@ const y = <number>otherValue;
         let rule = TypeAssertionRule::default();
         let issues = rule.analyze(&ctx);
         assert!(issues.is_empty(), "should skip angle-bracket patterns in .tsx files");
+    }
+
+    #[test]
+    fn skips_import_export_renames() {
+        let src = r#"
+import { useState as useStateAlias } from 'react';
+export { default as MyComponent } from './MyComponent';
+import type { Foo as Bar } from 'baz';
+export { Something as Other };
+const x = value as string;
+"#;
+        let lines: Vec<&str> = src.lines().collect();
+        let config = RuleConfig::default();
+        let ctx = make_context("test.ts", src, &lines, &config);
+        let rule = TypeAssertionRule::default();
+        let issues = rule.analyze(&ctx);
+        // Should only detect the real assertion on `value as string`, not import/export renames
+        assert_eq!(issues.len(), 1, "expected 1 issue, got {}: {:?}",
+            issues.len(), issues.iter().map(|i| &i.message).collect::<Vec<_>>());
+        assert!(issues[0].message.contains("as string"));
     }
 
     #[test]

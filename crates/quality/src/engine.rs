@@ -142,10 +142,21 @@ impl QualityEngine {
                     reports.push(report);
                 }
                 Ok(Err(e)) => {
-                    warn!("Provider analysis failed: {}", e);
+                    warn!("Provider analysis failed: {} — metrics from this provider will be missing, which may cause quality gate conditions to WARN", e);
+                    // Include a failed provider report so the evaluator sees the gap
+                    reports.push(crate::provider::ProviderReport::failure(
+                        "unknown-provider",
+                        0,
+                        format!("Provider failed: {}", e),
+                    ));
                 }
                 Err(e) => {
-                    warn!("Provider task panicked: {}", e);
+                    warn!("Provider task panicked: {} — metrics from this provider will be missing, which may cause quality gate conditions to WARN", e);
+                    reports.push(crate::provider::ProviderReport::failure(
+                        "unknown-provider",
+                        0,
+                        format!("Provider panicked: {}", e),
+                    ));
                 }
             }
         }

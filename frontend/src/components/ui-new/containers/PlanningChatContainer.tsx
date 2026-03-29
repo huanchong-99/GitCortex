@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/toast';
 import { useCreateMode } from '@/contexts/CreateModeContext';
 import { useUserSystem } from '@/components/ConfigProvider';
 import type { ModelConfig as WorkflowModelConfig } from '@/components/workflow/types';
@@ -23,6 +24,7 @@ import { PlanningChat } from '../primitives/PlanningChat';
 export function PlanningChatContainer() {
   const navigate = useNavigate();
   const { config } = useUserSystem();
+  const { showToast } = useToast();
   const { selectedProjectId, message, setMessage } = useCreateMode();
 
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -67,6 +69,8 @@ export function PlanningChatContainer() {
         setLocalMessages((prev) => [...prev, ...newMessages]);
       } catch (e) {
         console.error('Failed to send planning message:', e);
+        const err = e as { message?: string };
+        showToast(err.message ?? 'Failed to send planning message', 'error');
       } finally {
         setIsThinking(false);
       }
@@ -92,6 +96,8 @@ export function PlanningChatContainer() {
         setMessage('');
       } catch (e) {
         console.error('Failed to create planning draft:', e);
+        const err = e as { message?: string };
+        showToast(err.message ?? 'Failed to create planning draft', 'error');
       } finally {
         setIsThinking(false);
       }
@@ -112,8 +118,10 @@ export function PlanningChatContainer() {
       await confirmMutation.mutateAsync(draftId);
     } catch (e) {
       console.error('Failed to confirm draft:', e);
+      const err = e as { message?: string };
+      showToast(err.message ?? 'Failed to confirm draft', 'error');
     }
-  }, [draftId, confirmMutation]);
+  }, [draftId, confirmMutation, showToast]);
 
   // Materialize into workflow and navigate
   const handleMaterialize = useCallback(async () => {
@@ -124,8 +132,10 @@ export function PlanningChatContainer() {
       navigate(`/board?workflowId=${result.workflowId}`);
     } catch (e) {
       console.error('Failed to materialize draft:', e);
+      const err = e as { message?: string };
+      showToast(err.message ?? 'Failed to materialize draft', 'error');
     }
-  }, [draftId, materializeMutation, navigate]);
+  }, [draftId, materializeMutation, navigate, showToast]);
 
   if (!selectedProjectId) {
     return null;

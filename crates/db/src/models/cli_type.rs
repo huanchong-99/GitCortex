@@ -2,11 +2,6 @@
 //!
 //! Stores supported AI coding agent CLI information like Claude Code, Gemini CLI, Codex, etc.
 
-use aes_gcm::{
-    Aes256Gcm, Nonce,
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-};
-use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqlitePool};
@@ -181,47 +176,9 @@ impl CliType {
 }
 
 impl ModelConfig {
-    const ENCRYPTION_KEY_ENV: &str = "SOLODAWN_ENCRYPTION_KEY";
-    const ENCRYPTION_KEY_ENV_LEGACY: &str = "GITCORTEX_ENCRYPTION_KEY";
-
-    /// Get encryption key from environment variable
-    fn get_encryption_key() -> anyhow::Result<[u8; 32]> {
-        let key_str = std::env::var(Self::ENCRYPTION_KEY_ENV)
-            .or_else(|_| {
-                let val = std::env::var(Self::ENCRYPTION_KEY_ENV_LEGACY)?;
-                tracing::warn!(
-                    new = Self::ENCRYPTION_KEY_ENV,
-                    old = Self::ENCRYPTION_KEY_ENV_LEGACY,
-                    "Deprecated env var used; please switch to the new name"
-                );
-                Ok(val)
-            })
-            .map_err(|_: std::env::VarError| anyhow::anyhow!(
-                "Encryption key not found. Please set {} environment variable with a 32-byte value.",
-                Self::ENCRYPTION_KEY_ENV
-            ))?;
-
-        key_str
-            .as_bytes()
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Invalid encryption key format"))
-    }
-
     /// Set API key with encryption
     pub fn set_api_key(&mut self, plaintext: &str) -> anyhow::Result<()> {
-        let key = Self::get_encryption_key()?;
-        let cipher = Aes256Gcm::new_from_slice(&key)
-            .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-
-        let ciphertext = cipher
-            .encrypt(&nonce, plaintext.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
-
-        let mut combined = nonce.to_vec();
-        combined.extend_from_slice(&ciphertext);
-
-        self.encrypted_api_key = Some(general_purpose::STANDARD.encode(&combined));
+        self.encrypted_api_key = Some(crate::encryption::encrypt(plaintext)?);
         Ok(())
     }
 
@@ -229,30 +186,7 @@ impl ModelConfig {
     pub fn get_api_key(&self) -> anyhow::Result<Option<String>> {
         match &self.encrypted_api_key {
             None => Ok(None),
-            Some(encoded) => {
-                let key = Self::get_encryption_key()?;
-                let combined = general_purpose::STANDARD
-                    .decode(encoded)
-                    .map_err(|e| anyhow::anyhow!("Base64 decode failed: {e}"))?;
-
-                if combined.len() < 12 {
-                    return Err(anyhow::anyhow!("Invalid encrypted data length"));
-                }
-
-                let (nonce_bytes, ciphertext) = combined.split_at(12);
-                #[allow(deprecated)]
-                let nonce = Nonce::from_slice(nonce_bytes);
-                let cipher = Aes256Gcm::new_from_slice(&key)
-                    .map_err(|e| anyhow::anyhow!("Invalid encryption key: {e}"))?;
-
-                let plaintext_bytes = cipher
-                    .decrypt(nonce, ciphertext)
-                    .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
-
-                Ok(Some(String::from_utf8(plaintext_bytes).map_err(|e| {
-                    anyhow::anyhow!("Invalid UTF-8 in decrypted data: {e}")
-                })?))
-            }
+            Some(encoded) => crate::encryption::decrypt(encoded).map(Some),
         }
     }
 

@@ -78,17 +78,16 @@ pub async fn get_provider_status(
         }));
     }
 
-    // Fall back to DB-based baseline if no active agent
+    // No active orchestrator — return configured providers with unknown status
     let configs = ModelConfig::find_all(&deployment.db().pool)
         .await
         .unwrap_or_default();
 
     let providers: Vec<ProviderStatus> = configs
         .iter()
-        .enumerate()
-        .map(|(i, c)| ProviderStatus {
+        .map(|c| ProviderStatus {
             name: c.display_name.clone(),
-            is_active: i == 0,
+            is_active: false,
             is_dead: false,
             consecutive_failures: 0,
             total_requests: 0,
@@ -96,12 +95,9 @@ pub async fn get_provider_status(
         })
         .collect();
 
-    let active_provider = providers
-        .first().map_or_else(|| "none".to_string(), |p| p.name.clone());
-
     Json(ApiResponse::success(ProviderHealthResponse {
         providers,
-        active_provider,
+        active_provider: "none".to_string(),
     }))
 }
 

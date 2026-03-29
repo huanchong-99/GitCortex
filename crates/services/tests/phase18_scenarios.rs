@@ -346,7 +346,7 @@ async fn test_message_bus_terminal_completion_event() {
         metadata: None,
     };
 
-    message_bus.publish_terminal_completed(event.clone()).await;
+    message_bus.publish_terminal_completed(event.clone()).await.unwrap();
 
     // Receive the event
     let received: BusMessage =

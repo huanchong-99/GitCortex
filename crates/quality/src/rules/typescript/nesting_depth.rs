@@ -8,6 +8,7 @@ use regex::Regex;
 use crate::issue::QualityIssue;
 use crate::rule::{RuleType, Severity};
 use crate::rules::{Rule, TsRule, TsAnalysisContext, RuleConfig};
+use super::count_structural_braces;
 
 /// Reports lines where control-flow nesting depth exceeds a configurable maximum.
 #[derive(Debug)]
@@ -71,31 +72,31 @@ impl TsRule for NestingDepthRule {
             // Determine if this line contains a nesting keyword.
             let is_nesting_line = self.nesting_pattern.is_match(trimmed);
 
-            // Process braces to track depth changes.
-            for ch in trimmed.chars() {
-                if ch == '{' {
-                    depth += 1;
-                    // Check right after incrementing — if this brace is from a nesting
-                    // construct and we just exceeded the max, report it.
-                    if is_nesting_line && depth > max_depth && !reported.contains(&i) {
-                        let line_number = (i as u32) + 1;
-                        let issue = QualityIssue::new(
-                            "ts:nesting-depth",
-                            RuleType::CodeSmell,
-                            Severity::Major,
-                            crate::rule::AnalyzerSource::Other("built-in".into()),
-                            format!(
-                                "Nesting depth {} exceeds maximum allowed depth of {} at line {}",
-                                depth, max_depth, line_number
-                            ),
-                        )
-                        .with_location(ctx.file_path.to_string(), line_number);
-                        issues.push(issue);
-                        reported.insert(i);
-                    }
-                } else if ch == '}' {
-                    depth = depth.saturating_sub(1);
+            // Process braces to track depth changes (ignoring braces inside strings/templates).
+            let (opens, closes) = count_structural_braces(trimmed);
+            for _ in 0..opens {
+                depth += 1;
+                // Check right after incrementing — if this brace is from a nesting
+                // construct and we just exceeded the max, report it.
+                if is_nesting_line && depth > max_depth && !reported.contains(&i) {
+                    let line_number = (i as u32) + 1;
+                    let issue = QualityIssue::new(
+                        "ts:nesting-depth",
+                        RuleType::CodeSmell,
+                        Severity::Major,
+                        crate::rule::AnalyzerSource::Other("built-in".into()),
+                        format!(
+                            "Nesting depth {} exceeds maximum allowed depth of {} at line {}",
+                            depth, max_depth, line_number
+                        ),
+                    )
+                    .with_location(ctx.file_path.to_string(), line_number);
+                    issues.push(issue);
+                    reported.insert(i);
                 }
+            }
+            for _ in 0..closes {
+                depth = depth.saturating_sub(1);
             }
         }
 

@@ -1,7 +1,7 @@
 //! CLI Type API Routes
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 use axum::{
     Router,
@@ -98,6 +98,28 @@ type InstallJobRegistry = Arc<tokio::sync::RwLock<HashMap<String, broadcast::Sen
 /// Lazily-initialized global install job registry and CliInstaller.
 static INSTALL_REGISTRY: std::sync::OnceLock<InstallJobRegistry> = std::sync::OnceLock::new();
 static CLI_INSTALLER: std::sync::OnceLock<CliInstaller> = std::sync::OnceLock::new();
+
+/// Tracks CLI type IDs with an in-progress install or uninstall operation.
+/// Prevents concurrent install/uninstall for the same CLI from corrupting state.
+static INSTALL_IN_PROGRESS: std::sync::OnceLock<Mutex<HashSet<String>>> =
+    std::sync::OnceLock::new();
+
+fn get_install_in_progress() -> &'static Mutex<HashSet<String>> {
+    INSTALL_IN_PROGRESS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// RAII guard that removes the CLI type ID from the in-progress set on drop.
+struct InstallGuard {
+    cli_type_id: String,
+}
+
+impl Drop for InstallGuard {
+    fn drop(&mut self) {
+        if let Ok(mut set) = get_install_in_progress().lock() {
+            set.remove(&self.cli_type_id);
+        }
+    }
+}
 
 fn get_install_registry() -> &'static InstallJobRegistry {
     INSTALL_REGISTRY.get_or_init(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())))
@@ -260,27 +282,27 @@ async fn install_cli(
     // Generate a unique job ID
     let job_id = format!("job-{}", uuid::Uuid::new_v4());
 
-    // TODO: Check if an installation is already running for this cli_type_id.
-    // If so, return StatusCode::CONFLICT.
-    // Example (when CliInstallHistory DB model is available):
-    //   let running = CliInstallHistory::find_running(&deployment.db().pool, &cli_type_id).await?;
-    //   if running.is_some() {
-    //       return Err(ApiError::Conflict(
-    //           format!("Installation already in progress for {cli_type_id}")
-    //       ));
-    //   }
-
-    // TODO: Create a CliInstallHistory record with status="running"
-    // Example:
-    //   CliInstallHistory::create(
-    //       &deployment.db().pool,
-    //       &job_id, &cli_type_id, "install", "running",
-    //   ).await?;
+    // Guard: prevent concurrent install/uninstall for the same CLI type
+    {
+        let mut in_progress = get_install_in_progress()
+            .lock()
+            .map_err(|_| ApiError::Internal("Lock poisoned".to_string()))?;
+        if !in_progress.insert(cli_type_id.clone()) {
+            return Err(ApiError::Conflict(format!(
+                "Installation already in progress for {cli_type_id}"
+            )));
+        }
+    }
 
     // Spawn background installation task
     let bg_cli_name = cli_type.name.clone();
     let bg_job_id = job_id.clone();
+    let bg_cli_type_id = cli_type_id.clone();
     tokio::spawn(async move {
+        // RAII guard ensures cleanup even on panic
+        let _guard = InstallGuard {
+            cli_type_id: bg_cli_type_id,
+        };
         tracing::info!(
             job_id = %bg_job_id,
             cli_name = %bg_cli_name,
@@ -371,15 +393,27 @@ async fn uninstall_cli(
     // Generate a unique job ID
     let job_id = format!("job-{}", uuid::Uuid::new_v4());
 
-    // TODO: Check if an uninstall is already running for this cli_type_id.
-    // If so, return StatusCode::CONFLICT.
-
-    // TODO: Create a CliInstallHistory record with action="uninstall", status="running"
+    // Guard: prevent concurrent install/uninstall for the same CLI type
+    {
+        let mut in_progress = get_install_in_progress()
+            .lock()
+            .map_err(|_| ApiError::Internal("Lock poisoned".to_string()))?;
+        if !in_progress.insert(cli_type_id.clone()) {
+            return Err(ApiError::Conflict(format!(
+                "Uninstallation already in progress for {cli_type_id}"
+            )));
+        }
+    }
 
     // Spawn background uninstall task
     let bg_cli_name = cli_type.name.clone();
     let bg_job_id = job_id.clone();
+    let bg_cli_type_id = cli_type_id.clone();
     tokio::spawn(async move {
+        // RAII guard ensures cleanup even on panic
+        let _guard = InstallGuard {
+            cli_type_id: bg_cli_type_id,
+        };
         tracing::info!(
             job_id = %bg_job_id,
             cli_name = %bg_cli_name,
@@ -462,64 +496,41 @@ async fn get_install_status(
     State(deployment): State<DeploymentImpl>,
     Path(cli_type_id): Path<String>,
 ) -> Result<ResponseJson<Value>, ApiError> {
-    tracing::info!(cli_type_id = %cli_type_id, "Getting install status");
-
     // Validate cli_type_id exists
     let _cli_type = CliTypeModel::find_by_id(&deployment.db().pool, &cli_type_id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("CLI type not found: {cli_type_id}")))?;
 
-    // TODO: Query latest CliInstallHistory for this cli_type_id
-    // Example:
-    //   let history = CliInstallHistory::find_latest(&deployment.db().pool, &cli_type_id)
-    //       .await?
-    //       .ok_or_else(|| ApiError::NotFound(
-    //           format!("No install history found for {cli_type_id}")
-    //       ))?;
-    //   return Ok(ResponseJson(json!({
-    //       "status": history.status,
-    //       "exit_code": history.exit_code,
-    //       "output": history.output,
-    //       "error": history.error,
-    //   })));
+    // Check if there is currently an active install/uninstall for this CLI
+    let is_active = get_install_in_progress()
+        .lock()
+        .map(|set| set.contains(&cli_type_id))
+        .unwrap_or(false);
 
-    // Placeholder response until CliInstallHistory is available
-    Ok(ResponseJson(json!({
-        "status": "unknown",
-        "exit_code": null,
-        "output": null,
-        "error": null
-    })))
+    if is_active {
+        return Ok(ResponseJson(json!({
+            "status": "running",
+            "exit_code": null,
+            "output": null,
+            "error": null
+        })));
+    }
+
+    Err(ApiError::NotImplemented(
+        "Install history persistence is not yet implemented. Use the WebSocket endpoint to stream live install progress.".to_string(),
+    ))
 }
 
 /// GET /api/cli_types/:cli_type_id/install/history
 /// Get paginated install history for a CLI type.
 async fn get_install_history(
-    State(deployment): State<DeploymentImpl>,
-    Path(cli_type_id): Path<String>,
-    Query(params): Query<PaginationParams>,
+    State(_deployment): State<DeploymentImpl>,
+    Path(_cli_type_id): Path<String>,
+    Query(_params): Query<PaginationParams>,
 ) -> Result<ResponseJson<Vec<CliInstallHistory>>, ApiError> {
-    tracing::info!(
-        cli_type_id = %cli_type_id,
-        limit = params.limit,
-        offset = params.offset,
-        "Getting install history"
-    );
-
-    // Validate cli_type_id exists
-    let _cli_type = CliTypeModel::find_by_id(&deployment.db().pool, &cli_type_id)
-        .await?
-        .ok_or_else(|| ApiError::NotFound(format!("CLI type not found: {cli_type_id}")))?;
-
-    // TODO: Query paginated CliInstallHistory for this cli_type_id
-    // Example:
-    //   let history = CliInstallHistory::find_by_cli_type(
-    //       &deployment.db().pool, &cli_type_id, params.limit, params.offset,
-    //   ).await?;
-    //   return Ok(ResponseJson(history));
-
-    // Placeholder: return empty list until CliInstallHistory is available
-    Ok(ResponseJson(vec![]))
+    Err(ApiError::NotImplemented(
+        "Install history persistence is not yet implemented.".to_string(),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -529,19 +540,11 @@ async fn get_install_history(
 /// GET /api/cli_types/status/cached
 /// Get cached detection results without re-running detection.
 async fn get_cached_status(
-    State(deployment): State<DeploymentImpl>,
+    State(_deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<Vec<CliDetectionCache>>, ApiError> {
-    tracing::info!("Getting cached CLI detection status");
-
-    // TODO: Query CliDetectionCache table when available
-    // Example:
-    //   let cached = CliDetectionCache::find_all(&deployment.db().pool).await?;
-    //   return Ok(ResponseJson(cached));
-
-    let _ = &deployment;
-
-    // Placeholder: return empty list until CliDetectionCache is available
-    Ok(ResponseJson(vec![]))
+    Err(ApiError::NotImplemented(
+        "Detection result caching is not yet implemented. Use GET /api/cli_types/detect for live detection.".to_string(),
+    ))
 }
 
 /// POST /api/cli_types/detect/refresh

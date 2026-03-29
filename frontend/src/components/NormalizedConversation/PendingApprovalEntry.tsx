@@ -16,9 +16,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { approvalsApi } from '@/lib/api';
-import { Check, X } from 'lucide-react';
+import { CheckIcon, XIcon } from '@phosphor-icons/react';
 import WYSIWYGEditor from '@/components/ui/wysiwyg';
 
+import { useTranslation } from 'react-i18next';
 import { useHotkeysContext } from 'react-hotkeys-hook';
 import { TabNavContext } from '@/contexts/TabNavigationContext';
 import { useKeyApproveRequest, useKeyDenyApproval, Scope } from '@/keyboard';
@@ -83,6 +84,7 @@ function ActionButtons({
   onApprove: () => void;
   onStartDeny: () => void;
 }>) {
+  const { t } = useTranslation('common');
   return (
     <div className="flex items-center gap-1.5 pr-4">
       <Tooltip>
@@ -92,14 +94,14 @@ function ActionButtons({
             variant="ghost"
             className="h-8 w-8 rounded-full p-0"
             disabled={disabled}
-            aria-label={isResponding ? 'Submitting approval' : 'Approve'}
+            aria-label={isResponding ? t('approval.submittingApproval') : t('approval.approve')}
             aria-busy={isResponding}
           >
-            <Check className="h-5 w-5" />
+            <CheckIcon className="h-5 w-5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{isResponding ? 'Submitting…' : 'Approve request'}</p>
+          <p>{isResponding ? t('approval.submitting') : t('approval.approveRequest')}</p>
         </TooltipContent>
       </Tooltip>
 
@@ -110,14 +112,14 @@ function ActionButtons({
             variant="ghost"
             className="h-8 w-8 rounded-full p-0"
             disabled={disabled}
-            aria-label={isResponding ? 'Submitting denial' : 'Deny'}
+            aria-label={isResponding ? t('approval.submittingDenial') : t('approval.deny')}
             aria-busy={isResponding}
           >
-            <X className="h-5 w-5" />
+            <XIcon className="h-5 w-5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{isResponding ? 'Submitting…' : 'Provide denial reason'}</p>
+          <p>{isResponding ? t('approval.submitting') : t('approval.provideDenialReason')}</p>
         </TooltipContent>
       </Tooltip>
     </div>
@@ -139,12 +141,13 @@ function DenyReasonForm({
   onSubmit: () => void;
   projectId?: string;
 }>) {
+  const { t } = useTranslation('common');
   return (
     <div className="flex flex-col gap-2 p-4">
       <WYSIWYGEditor
         value={value}
         onChange={onChange}
-        placeholder="Let the agent know why this request was denied... Type @ to insert tags or search files."
+        placeholder={t('approval.denialPlaceholder')}
         disabled={isResponding}
         className="min-h-[80px]"
         projectId={projectId}
@@ -157,13 +160,22 @@ function DenyReasonForm({
           onClick={onCancel}
           disabled={isResponding}
         >
-          Cancel
+          {t('buttons.cancel')}
         </Button>
         <Button size="sm" onClick={onSubmit} disabled={isResponding}>
-          Deny
+          {t('approval.deny')}
         </Button>
       </div>
     </div>
+  );
+}
+
+function ApprovePromptText() {
+  const { t } = useTranslation('common');
+  return (
+    <span className="text-muted-foreground">
+      {t('approval.wouldYouLikeToApprove')}
+    </span>
   );
 }
 
@@ -323,9 +335,7 @@ const PendingApprovalEntry = ({
             <div className="flex items-center justify-between gap-1.5 pl-4">
               <div className="flex items-center gap-1.5">
                 {!isEnteringReason && (
-                  <span className="text-muted-foreground">
-                    Would you like to approve this?
-                  </span>
+                  <ApprovePromptText />
                 )}
               </div>
               {!isEnteringReason && (

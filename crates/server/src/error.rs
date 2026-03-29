@@ -76,6 +76,8 @@ pub enum ApiError {
     Conflict(String),
     #[error("Forbidden: {0}")]
     Forbidden(String),
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl From<&'static str> for ApiError {
@@ -172,6 +174,7 @@ impl IntoResponse for ApiError {
             ApiError::BadRequest(_) => (StatusCode::BAD_REQUEST, "BadRequest"),
             ApiError::Conflict(_) => (StatusCode::CONFLICT, "ConflictError"),
             ApiError::Forbidden(_) => (StatusCode::FORBIDDEN, "ForbiddenError"),
+            ApiError::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "NotImplemented"),
         };
 
         let error_message = match &self {
@@ -213,7 +216,10 @@ impl IntoResponse for ApiError {
                 "An internal error occurred. Please try again.".to_string()
             }
             ApiError::NotFound(msg) => msg.clone(),
-            ApiError::BadRequest(msg) | ApiError::Conflict(msg) | ApiError::Forbidden(msg) => {
+            ApiError::BadRequest(msg)
+            | ApiError::Conflict(msg)
+            | ApiError::Forbidden(msg)
+            | ApiError::NotImplemented(msg) => {
                 msg.clone()
             }
             _ => {

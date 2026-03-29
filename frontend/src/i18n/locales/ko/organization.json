@@ -39,7 +39,10 @@
     "loading": "Loading invitations...",
     "none": "No pending invitations",
     "invited": "Invited {{date}}",
-    "pending": "Pending"
+    "pending": "Pending",
+    "confirmRevokeTitle": "초대 철회",
+    "confirmRevoke": "{{email}}에 대한 초대를 철회하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "revokeTooltip": "초대 철회"
   },
   "settings": {
     "title": "Organization Settings",
@@ -63,6 +66,7 @@
     "description": "조직 설정을 관리하려면 로그인해야 합니다.",
     "action": "로그인"
   },
+  "confirmRemoveMemberTitle": "멤버 제거",
   "confirmRemoveMember": "Are you sure you want to remove this member from the organization?",
   "sharedProjects": {
     "title": "공유 프로젝트",
@@ -73,6 +77,8 @@
     "linkedTo": "연결됨: {{projectName}}",
     "linked": "연결됨",
     "linkProject": "프로젝트 연결...",
-    "noAvailableProjects": "사용 가능한 프로젝트가 없습니다"
+    "noAvailableProjects": "사용 가능한 프로젝트가 없습니다",
+    "confirmUnlinkTitle": "프로젝트 연결 해제",
+    "confirmUnlink": "\"{{projectName}}\"의 연결을 해제하시겠습니까? 로컬 프로젝트는 유지되지만, 이 원격 프로젝트와의 연결은 해제됩니다."
   }
 }

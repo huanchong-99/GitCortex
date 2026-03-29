@@ -39,7 +39,7 @@ use uuid::Uuid;
 
 // Import DTOs
 use crate::routes::terminals::start_terminal;
-use crate::routes::workflows_dto::{WorkflowDetailDto, WorkflowListItemDto};
+use crate::routes::workflows_dto::{TerminalDto, WorkflowDetailDto, WorkflowListItemDto};
 use crate::{DeploymentImpl, error::ApiError};
 
 #[cfg(test)]
@@ -1841,48 +1841,64 @@ async fn start_workflow(
         // Auto-dispatch task descriptions as initial instructions to each terminal.
         // This makes DIY mode fully automated — terminals receive their instructions
         // without manual user intervention via WebSocket.
-        let message_bus = deployment.message_bus().clone();
-        for task in &tasks {
-            let task_terminals =
-                Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
-            for terminal in &task_terminals {
-                if let Some(ref pty_session_id) = terminal.pty_session_id {
-                    let instruction = task.description.as_deref().unwrap_or(&task.name);
-                    if !instruction.is_empty() {
-                        // Small delay to ensure Claude Code has initialized
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                        message_bus
-                            .publish_terminal_input(
-                                &terminal.id,
-                                pty_session_id,
-                                instruction,
-                                None,
-                            )
-                            .await;
-                        // Send submit keystroke after a brief delay
-                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                        message_bus
-                            .publish_terminal_input(
-                                &terminal.id,
-                                pty_session_id,
-                                "",
-                                None,
-                            )
-                            .await;
-                        tracing::info!(
-                            terminal_id = %terminal.id,
-                            task_name = %task.name,
-                            "DIY: dispatched task instruction to terminal"
-                        );
+        // Spawned as a background task so the HTTP response returns immediately
+        // instead of blocking N * 2.5s per terminal.
+        {
+            let dispatch_bus = deployment.message_bus().clone();
+            let dispatch_db = deployment.db().pool.clone();
+            let dispatch_tasks: Vec<_> = tasks
+                .iter()
+                .map(|t| (t.id.clone(), t.name.clone(), t.description.clone()))
+                .collect();
+            tokio::spawn(async move {
+                for (task_id, task_name, task_description) in &dispatch_tasks {
+                    let task_terminals = match Terminal::find_by_task(&dispatch_db, task_id).await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            tracing::warn!(task_id = %task_id, error = %e, "DIY: failed to fetch terminals for dispatch");
+                            continue;
+                        }
+                    };
+                    for terminal in &task_terminals {
+                        if let Some(ref pty_session_id) = terminal.pty_session_id {
+                            let instruction = task_description.as_deref().unwrap_or(task_name);
+                            if !instruction.is_empty() {
+                                // Small delay to ensure Claude Code has initialized
+                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                dispatch_bus
+                                    .publish_terminal_input(
+                                        &terminal.id,
+                                        pty_session_id,
+                                        instruction,
+                                        None,
+                                    )
+                                    .await;
+                                // Send submit keystroke after a brief delay
+                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                                dispatch_bus
+                                    .publish_terminal_input(
+                                        &terminal.id,
+                                        pty_session_id,
+                                        "",
+                                        None,
+                                    )
+                                    .await;
+                                tracing::info!(
+                                    terminal_id = %terminal.id,
+                                    task_name = %task_name,
+                                    "DIY: dispatched task instruction to terminal"
+                                );
+                            }
+                        } else {
+                            tracing::warn!(
+                                terminal_id = %terminal.id,
+                                task_name = %task_name,
+                                "DIY: terminal has no PTY session, skipping instruction dispatch"
+                            );
+                        }
                     }
-                } else {
-                    tracing::warn!(
-                        terminal_id = %terminal.id,
-                        task_name = %task.name,
-                        "DIY: terminal has no PTY session, skipping instruction dispatch"
-                    );
                 }
-            }
+            });
         }
 
         // Spawn background quiet-window monitor for DIY terminals.
@@ -1892,6 +1908,7 @@ async fn start_workflow(
         let diy_db = deployment.db().pool.clone();
         let diy_wf_id = workflow_id.clone();
         let diy_process_manager = deployment.process_manager().clone();
+        let diy_message_bus = deployment.message_bus().clone();
         tokio::spawn(async move {
             const QUIET_SECS: u64 = 60;
             const POLL_SECS: u64 = 15;
@@ -1909,7 +1926,10 @@ async fn start_workflow(
 
                 let tasks = match db::models::WorkflowTask::find_by_workflow(&diy_db, &diy_wf_id).await {
                     Ok(t) => t,
-                    Err(_) => break,
+                    Err(e) => {
+                        tracing::warn!(workflow_id = %diy_wf_id, error = %e, "DIY: failed to fetch tasks");
+                        break;
+                    }
                 };
 
                 let mut all_tasks_done = true;
@@ -1921,7 +1941,10 @@ async fn start_workflow(
 
                     let terminals = match db::models::Terminal::find_by_task(&diy_db, &task.id).await {
                         Ok(t) => t,
-                        Err(_) => continue,
+                        Err(e) => {
+                            tracing::warn!(task_id = %task.id, error = %e, "DIY: failed to fetch terminals for task");
+                            continue;
+                        }
                     };
 
                     for terminal in &terminals {
@@ -1955,9 +1978,22 @@ async fn start_workflow(
                                 quiet_secs = QUIET_SECS,
                                 "DIY: terminal quiet for {}s, marking completed", QUIET_SECS
                             );
-                            let _ = db::models::Terminal::update_status(
+                            if let Err(e) = db::models::Terminal::update_status(
                                 &diy_db, &terminal.id, "completed",
-                            ).await;
+                            ).await {
+                                tracing::warn!(terminal_id = %terminal.id, error = %e, "DIY: failed to update terminal status");
+                            }
+                            // Broadcast terminal status change so frontend updates
+                            if let Err(e) = diy_message_bus.publish_workflow_event(
+                                &diy_wf_id,
+                                BusMessage::TerminalStatusUpdate {
+                                    workflow_id: diy_wf_id.clone(),
+                                    terminal_id: terminal.id.clone(),
+                                    status: "completed".to_string(),
+                                },
+                            ).await {
+                                tracing::warn!(terminal_id = %terminal.id, error = %e, "DIY: failed to broadcast terminal status update");
+                            }
                         }
                     }
 
@@ -1967,7 +2003,20 @@ async fn start_workflow(
                         let all_done = terms.iter().all(|t| t.status == "completed" || t.status == "failed");
                         if all_done && !terms.is_empty() {
                             tracing::info!(task_id = %task.id, task_name = %task.name, "DIY: all terminals done, marking task completed");
-                            let _ = db::models::WorkflowTask::update_status(&diy_db, &task.id, "completed").await;
+                            if let Err(e) = db::models::WorkflowTask::update_status(&diy_db, &task.id, "completed").await {
+                                tracing::warn!(task_id = %task.id, error = %e, "DIY: failed to update task status");
+                            }
+                            // Broadcast task status change so frontend updates
+                            if let Err(e) = diy_message_bus.publish_workflow_event(
+                                &diy_wf_id,
+                                BusMessage::TaskStatusUpdate {
+                                    workflow_id: diy_wf_id.clone(),
+                                    task_id: task.id.clone(),
+                                    status: "completed".to_string(),
+                                },
+                            ).await {
+                                tracing::warn!(task_id = %task.id, error = %e, "DIY: failed to broadcast task status update");
+                            }
                         }
                     }
                 }
@@ -1977,7 +2026,19 @@ async fn start_workflow(
                     let all_done = refreshed_tasks.iter().all(|t| t.status == "completed" || t.status == "failed");
                     if all_done && !refreshed_tasks.is_empty() {
                         tracing::info!(workflow_id = %diy_wf_id, "DIY: all tasks completed, marking workflow completed");
-                        let _ = db::models::Workflow::update_status(&diy_db, &diy_wf_id, "completed").await;
+                        if let Err(e) = db::models::Workflow::update_status(&diy_db, &diy_wf_id, "completed").await {
+                            tracing::warn!(workflow_id = %diy_wf_id, error = %e, "DIY: failed to update workflow status");
+                        }
+                        // Broadcast workflow status change so frontend updates
+                        if let Err(e) = diy_message_bus.publish_workflow_event(
+                            &diy_wf_id,
+                            BusMessage::StatusUpdate {
+                                workflow_id: diy_wf_id.clone(),
+                                status: "completed".to_string(),
+                            },
+                        ).await {
+                            tracing::warn!(workflow_id = %diy_wf_id, error = %e, "DIY: failed to broadcast workflow status update");
+                        }
                         break;
                     }
                 }
@@ -2466,7 +2527,7 @@ async fn create_runtime_terminal(
     State(deployment): State<DeploymentImpl>,
     Path((workflow_id, task_id)): Path<(Uuid, String)>,
     Json(req): Json<CreateRuntimeTerminalRequest>,
-) -> Result<ResponseJson<ApiResponse<Terminal>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<TerminalDto>>, ApiError> {
     let workflow_id = workflow_id.to_string();
     let workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
@@ -2590,7 +2651,7 @@ async fn create_runtime_terminal(
         created_terminal
     };
 
-    Ok(ResponseJson(ApiResponse::success(terminal)))
+    Ok(ResponseJson(ApiResponse::success(TerminalDto::from_terminal(&terminal))))
 }
 
 /// POST /api/workflows/recover
@@ -2808,7 +2869,7 @@ async fn update_task_status(
 async fn list_task_terminals(
     State(deployment): State<DeploymentImpl>,
     Path((workflow_id, task_id)): Path<(Uuid, String)>,
-) -> Result<ResponseJson<ApiResponse<Vec<Terminal>>>, ApiError> {
+) -> Result<ResponseJson<ApiResponse<Vec<TerminalDto>>>, ApiError> {
     let workflow_id = workflow_id.to_string();
     let _workflow = Workflow::find_by_id(&deployment.db().pool, &workflow_id)
         .await?
@@ -2821,7 +2882,8 @@ async fn list_task_terminals(
     validate_task_workflow_scope(&task, &workflow_id)?;
 
     let terminals = Terminal::find_by_task(&deployment.db().pool, &task_id).await?;
-    Ok(ResponseJson(ApiResponse::success(terminals)))
+    let terminals_dto: Vec<TerminalDto> = terminals.iter().map(TerminalDto::from_terminal).collect();
+    Ok(ResponseJson(ApiResponse::success(terminals_dto)))
 }
 
 /// POST /api/workflows/:workflow_id/prompts/respond

@@ -60,6 +60,16 @@ impl TsRule for TodoCommentsRule {
 
         for (idx, line) in ctx.lines.iter().enumerate() {
             if let Some(mat) = pattern.find(line) {
+                // Skip matches inside string literals: if the text before the match
+                // contains an odd number of quote characters, the match is inside a string.
+                let before_match = &line[..mat.start()];
+                let double_quotes = before_match.chars().filter(|&c| c == '"').count();
+                let single_quotes = before_match.chars().filter(|&c| c == '\'').count();
+                let backticks = before_match.chars().filter(|&c| c == '`').count();
+                if double_quotes % 2 != 0 || single_quotes % 2 != 0 || backticks % 2 != 0 {
+                    continue;
+                }
+
                 let line_number = (idx + 1) as u32;
 
                 // Extract the rest of the comment text after the match for context.
@@ -156,6 +166,19 @@ function add(a: number, b: number): number {
 "#;
         let issues = run_rule(source);
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn skips_todo_inside_string_literals() {
+        let source = r#"const msg = "// TODO: this is data";
+const other = '// FIXME: also data';
+const tpl = `// HACK: template string`;
+// TODO: real comment
+"#;
+        let issues = run_rule(source);
+        assert_eq!(issues.len(), 1, "expected 1 issue (real comment only), got {}: {:?}",
+            issues.len(), issues.iter().map(|i| &i.message).collect::<Vec<_>>());
+        assert_eq!(issues[0].line, Some(4));
     }
 
     #[test]

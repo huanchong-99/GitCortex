@@ -1,5 +1,13 @@
 import { ChatCircleIcon, LinkSimpleIcon } from '@phosphor-icons/react';
 
+interface FeishuChannelPanelLabels {
+  readonly notConnected: string;
+  readonly channelTitle: string;
+  readonly currentBinding: string;
+  readonly noneLabel: string;
+  readonly switchSession: string;
+}
+
 interface FeishuChannelPanelProps {
   readonly connected: boolean;
   readonly activeSessionId: string | null;
@@ -8,6 +16,7 @@ interface FeishuChannelPanelProps {
   readonly selectedValue: string;
   readonly onSelectChange: (value: string) => void;
   readonly isPending: boolean;
+  readonly labels: FeishuChannelPanelLabels;
 }
 
 export function FeishuChannelPanel({
@@ -18,13 +27,14 @@ export function FeishuChannelPanel({
   selectedValue,
   onSelectChange,
   isPending,
+  labels,
 }: FeishuChannelPanelProps) {
   if (!connected) {
     return (
       <div className="border-b px-base py-half">
         <div className="flex items-center gap-half text-xs text-low">
           <ChatCircleIcon className="size-icon-xs" />
-          <span>飞书未连接</span>
+          <span>{labels.notConnected}</span>
         </div>
       </div>
     );
@@ -34,15 +44,15 @@ export function FeishuChannelPanel({
     <div className="border-b px-base py-half">
       <div className="mb-half flex items-center gap-half text-xs text-low">
         <ChatCircleIcon className="size-icon-xs text-brand" />
-        <span className="font-medium text-normal">飞书通道</span>
+        <span className="font-medium text-normal">{labels.channelTitle}</span>
       </div>
 
       {/* Current binding */}
       <div className="mb-half flex items-center gap-half text-xs">
         <LinkSimpleIcon className="size-icon-xs shrink-0" />
-        <span className="text-low">当前绑定：</span>
+        <span className="text-low">{labels.currentBinding}</span>
         <span className="truncate text-normal">
-          {activeSessionName ?? '无'}
+          {activeSessionName ?? labels.noneLabel}
         </span>
       </div>
 
@@ -54,7 +64,7 @@ export function FeishuChannelPanel({
           disabled={isPending}
           onChange={(e) => onSelectChange(e.target.value)}
         >
-          <option value="">切换绑定会话...</option>
+          <option value="">{labels.switchSession}</option>
           {sessions.map((s) => (
             <option key={s.id} value={s.id}>
               {s.id === activeSessionId ? `✓ ${s.name}` : s.name}

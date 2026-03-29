@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useExecutionProcessesContext } from '@/contexts/ExecutionProcessesContext';
 import { useLogsPanel } from '@/contexts/LogsPanelContext';
 import { ProcessListItem } from '../primitives/ProcessListItem';
-import { CollapsibleSectionHeader } from '../primitives/CollapsibleSectionHeader';
-import { InputField } from '../primitives/InputField';
+import { CollapsibleSectionHeader } from './CollapsibleSectionHeader';
+import { InputField } from './InputField';
 import { CaretUpIcon, CaretDownIcon } from '@phosphor-icons/react';
 import { PERSIST_KEYS } from '@/stores/useUiPreferencesStore';
 

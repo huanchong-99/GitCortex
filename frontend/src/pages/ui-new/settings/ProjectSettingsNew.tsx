@@ -22,6 +22,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { RepoPickerDialog } from '@/components/dialogs/shared/RepoPickerDialog';
 import { CreateProjectDialog } from '@/components/ui-new/dialogs/CreateProjectDialog';
+import { ConfirmDialog } from '@/components/ui-new/dialogs/ConfirmDialog';
 import { projectsApi } from '@/lib/api';
 import { repoBranchKeys } from '@/hooks/useRepoBranches';
 import type { Project, Repo, UpdateProject } from 'shared/types';
@@ -93,17 +94,19 @@ export function ProjectSettingsNew() {
 
   // Handle project selection from dropdown
   const handleProjectSelect = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (id === 'no-projects') return;
       // No-op if same project
       if (id === selectedProjectId) return;
 
       // Confirm if there are unsaved changes
       if (hasUnsavedChanges) {
-        const confirmed = globalThis.window.confirm(
-          t('settings.projects.save.confirmSwitch')
-        );
-        if (!confirmed) return;
+        const result = await ConfirmDialog.show({
+          title: t('settings.projects.save.confirmSwitchTitle'),
+          message: t('settings.projects.save.confirmSwitch'),
+          variant: 'destructive',
+        });
+        if (result !== 'confirmed') return;
 
         // Clear local state before switching
         setDraft(null);
@@ -137,24 +140,30 @@ export function ProjectSettingsNew() {
 
     // Confirm if there are unsaved changes
     if (hasUnsavedChanges) {
-      const confirmed = globalThis.window.confirm(
-        t('settings.projects.save.confirmSwitch')
-      );
-      if (!confirmed) {
-        // Revert URL to previous value
-        if (selectedProjectId) {
-          setSearchParams({ projectId: selectedProjectId });
-        } else {
-          setSearchParams({});
+      (async () => {
+        const result = await ConfirmDialog.show({
+          title: t('settings.projects.save.confirmSwitchTitle'),
+          message: t('settings.projects.save.confirmSwitch'),
+          variant: 'destructive',
+        });
+        if (result !== 'confirmed') {
+          // Revert URL to previous value
+          if (selectedProjectId) {
+            setSearchParams({ projectId: selectedProjectId });
+          } else {
+            setSearchParams({});
+          }
+          return;
         }
-        return;
-      }
 
-      // Clear local state before switching
-      setDraft(null);
-      setSelectedProject(null);
-      setSuccess(false);
-      setError(null);
+        // Clear local state before switching
+        setDraft(null);
+        setSelectedProject(null);
+        setSuccess(false);
+        setError(null);
+        setSelectedProjectId(projectIdParam);
+      })();
+      return;
     }
 
     setSelectedProjectId(projectIdParam);

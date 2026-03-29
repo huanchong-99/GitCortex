@@ -253,18 +253,6 @@ impl QualityRun {
             .await
     }
 
-    /// Delete quality runs older than given days (data retention)
-    pub async fn delete_older_than(pool: &SqlitePool, days: i32) -> sqlx::Result<u64> {
-        let result = sqlx::query(
-            r"DELETE FROM quality_run
-            WHERE created_at < datetime('now', '-' || ?1 || ' days')",
-        )
-        .bind(days)
-        .execute(pool)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
     /// Backfill legacy workflows: create placeholder quality_run records for
     /// terminals that completed before the quality gate existed (status='completed'
     /// but no corresponding quality_run). This allows the UI to show a consistent view.

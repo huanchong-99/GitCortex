@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { XIcon } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { usePortalContainer } from '@/contexts/PortalContainerContext';
@@ -76,7 +76,7 @@ const DialogContent = React.forwardRef<
               'cursor-pointer'
             )}
           >
-            <X className="h-4 w-4" />
+            <XIcon className="h-4 w-4" />
             <span className="sr-only">{t('buttons.close')}</span>
           </DialogPrimitive.Close>
         )}

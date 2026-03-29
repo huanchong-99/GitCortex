@@ -3,7 +3,9 @@ use std::sync::OnceLock;
 use sentry_tracing::{EventFilter, SentryLayer};
 use tracing::Level;
 
-const SENTRY_DSN: &str = "https://1065a1d276a581316999a07d5dffee26@o4509603705192449.ingest.de.sentry.io/4509605576441937";
+/// Hardcoded fallback DSN (already public in repo history).
+/// Production deployments should override via `SENTRY_DSN` env var.
+const DEFAULT_SENTRY_DSN: &str = "https://1065a1d276a581316999a07d5dffee26@o4509603705192449.ingest.de.sentry.io/4509605576441937";
 
 static INIT_GUARD: OnceLock<sentry::ClientInitGuard> = OnceLock::new();
 
@@ -32,8 +34,10 @@ fn environment() -> &'static str {
 
 pub fn init_once(source: SentrySource) {
     INIT_GUARD.get_or_init(|| {
+        let dsn = std::env::var("SENTRY_DSN")
+            .unwrap_or_else(|_| DEFAULT_SENTRY_DSN.to_string());
         sentry::init((
-            SENTRY_DSN,
+            dsn,
             sentry::ClientOptions {
                 release: sentry::release_name!(),
                 environment: Some(environment().into()),

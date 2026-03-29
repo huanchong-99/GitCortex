@@ -7,6 +7,7 @@ use regex::Regex;
 use crate::issue::QualityIssue;
 use crate::rule::{RuleType, Severity};
 use crate::rules::{Rule, TsRule, TsAnalysisContext, RuleConfig};
+use super::count_structural_braces;
 
 /// Calculates cyclomatic complexity for TypeScript/JavaScript functions
 /// and reports functions that exceed a configurable threshold.
@@ -142,13 +143,13 @@ fn find_closing_brace(lines: &[&str], start_line: usize) -> Option<usize> {
     let mut found_open = false;
 
     for (i, line) in lines.iter().enumerate().skip(start_line) {
-        for ch in line.chars() {
-            if ch == '{' {
-                depth += 1;
-                found_open = true;
-            } else if ch == '}' {
-                depth -= 1;
-            }
+        let (opens, closes) = count_structural_braces(line);
+        for _ in 0..opens {
+            depth += 1;
+            found_open = true;
+        }
+        for _ in 0..closes {
+            depth -= 1;
             if found_open && depth == 0 {
                 return Some(i);
             }
