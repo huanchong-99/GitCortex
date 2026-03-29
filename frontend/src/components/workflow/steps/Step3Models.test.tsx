@@ -4,13 +4,19 @@ import { Step3Models } from './Step3Models';
 import type { WizardConfig } from '../types';
 import { renderWithI18n, setTestLanguage, i18n } from '@/test/renderWithI18n';
 
+const mockConfirmDialogShow = vi.fn();
+vi.mock('@/components/ui-new/dialogs/ConfirmDialog', () => ({
+  ConfirmDialog: {
+    show: (...args: unknown[]) => mockConfirmDialogShow(...args),
+  },
+}));
+
 describe('Step3Models', () => {
   const mockOnUpdate = vi.fn();
-  const mockConfirm = vi.fn<[string], boolean>();
 
   beforeEach(async () => {
     mockOnUpdate.mockClear();
-    vi.spyOn(globalThis, 'confirm').mockImplementation(mockConfirm);
+    mockConfirmDialogShow.mockClear();
     await setTestLanguage();
   });
 
@@ -177,8 +183,8 @@ describe('Step3Models', () => {
     expect(screen.getByLabelText(i18n.t('workflow:step3.fields.displayName.label'))).toHaveValue('Claude 3.5');
   });
 
-  it('should allow deleting a model', () => {
-    mockConfirm.mockReturnValue(true);
+  it('should allow deleting a model', async () => {
+    mockConfirmDialogShow.mockResolvedValue('confirmed');
 
     const configWithModels: WizardConfig = {
       ...defaultConfig,
@@ -205,8 +211,18 @@ describe('Step3Models', () => {
     const deleteButton = screen.getByTitle(i18n.t('workflow:step3.deleteLabel'));
     fireEvent.click(deleteButton);
 
-    expect(mockConfirm).toHaveBeenCalledWith(i18n.t('workflow:step3.messages.confirmDelete', { name: 'Claude 3.5' }));
-    expect(mockOnUpdate).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockConfirmDialogShow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: i18n.t('workflow:step3.messages.confirmDeleteTitle'),
+          message: i18n.t('workflow:step3.messages.confirmDelete', { name: 'Claude 3.5' }),
+          variant: 'destructive',
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(mockOnUpdate).toHaveBeenCalled();
+    });
   });
 
   it('should auto-fill base URL based on API type selection', () => {

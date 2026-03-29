@@ -150,7 +150,7 @@ describe('useQualityRuns', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([mockRunSummary]);
-    expect(fetch).toHaveBeenCalledWith('/api/workflows/wf-1/quality/runs');
+    expect(fetch).toHaveBeenCalledWith('/api/workflows/wf-1/quality/runs', expect.any(Object));
   });
 
   it('should not fetch when workflowId is undefined', () => {
@@ -186,7 +186,7 @@ describe('useQualityRunDetail', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockRunDetail);
-    expect(fetch).toHaveBeenCalledWith('/api/quality/runs/run-1');
+    expect(fetch).toHaveBeenCalledWith('/api/quality/runs/run-1', expect.any(Object));
   });
 
   it('should not fetch when runId is undefined', () => {
@@ -211,7 +211,7 @@ describe('useQualityIssues', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([mockIssue]);
-    expect(fetch).toHaveBeenCalledWith('/api/quality/runs/run-1/issues');
+    expect(fetch).toHaveBeenCalledWith('/api/quality/runs/run-1/issues', expect.any(Object));
   });
 
   it('should not fetch when runId is undefined', () => {
@@ -238,7 +238,7 @@ describe('useTerminalLatestQuality', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(mockRunSummary);
     expect(fetch).toHaveBeenCalledWith(
-      '/api/terminals/term-1/quality/latest'
+      '/api/terminals/term-1/quality/latest', expect.any(Object)
     );
   });
 

@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { SlashCommands } from './SlashCommands';
 import type { SlashCommandPresetDto } from 'shared/types';
 import { I18nextProvider } from 'react-i18next';
-import { i18n } from '@/test/renderWithI18n';
+import { i18n, setTestLanguage } from '@/test/renderWithI18n';
 
 // ============================================================================
 // Test Utilities
@@ -68,8 +68,9 @@ const mockSlashCommands: SlashCommandPresetDto[] = [
 // ============================================================================
 
 describe('SlashCommands Page', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await setTestLanguage('en');
   });
 
   describe('List Rendering', () => {
@@ -144,7 +145,7 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('empty.title')).toBeInTheDocument();
+        expect(screen.getByText('No Slash Commands Yet')).toBeInTheDocument();
       });
     });
   });
@@ -156,7 +157,7 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       // The Loader component receives t('loading') which resolves to 'loading' (raw key)
-      expect(screen.getByText('loading')).toBeInTheDocument();
+      expect(screen.getByText('Loading slash commands...')).toBeInTheDocument();
     });
   });
 
@@ -174,7 +175,7 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('errors.loadFailed')).toBeInTheDocument();
+        expect(screen.getByText('Failed to load slash commands')).toBeInTheDocument();
       });
     });
   });
@@ -191,10 +192,10 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('title')).toBeInTheDocument();
+        expect(screen.getByText('Slash Commands')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('createButton')).toBeInTheDocument();
+      expect(screen.getByText('New Command')).toBeInTheDocument();
     });
 
     it('should open create dialog when clicking Create button', async () => {
@@ -210,15 +211,15 @@ describe('SlashCommands Page', () => {
       render(<SlashCommands />, { wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText('title')).toBeInTheDocument();
+        expect(screen.getByText('Slash Commands')).toBeInTheDocument();
       });
 
-      const createButton = screen.getByText('createButton');
+      const createButton = screen.getByText('New Command');
       await user.click(createButton);
 
       // Dialog should appear with form title
       await waitFor(() => {
-        expect(screen.getByText('form.createTitle')).toBeInTheDocument();
+        expect(screen.getByText('Create Slash Command')).toBeInTheDocument();
       });
     });
   });

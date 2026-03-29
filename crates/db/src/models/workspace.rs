@@ -566,7 +566,7 @@ impl Workspace {
     ) -> Result<Vec<WorkspaceWithStatus>, sqlx::Error> {
         // Build archived filter: NULL means no filter, otherwise match exact value.
         // SQLite stores booleans as 0/1, so we pass an i32.
-        let archived_filter: Option<i32> = archived.map(|a| i32::from(a));
+        let archived_filter: Option<i32> = archived.map(i32::from);
 
         let records = sqlx::query!(
             r#"SELECT

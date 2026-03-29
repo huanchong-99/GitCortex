@@ -15,7 +15,7 @@ import { Step5Commands } from '@/components/workflow/steps/Step5Commands';
 import type { SlashCommandPresetDto } from 'shared/types';
 import type { CommandConfig } from '@/components/workflow/types';
 import { I18nextProvider } from 'react-i18next';
-import { i18n } from '@/test/renderWithI18n';
+import { i18n, setTestLanguage } from '@/test/renderWithI18n';
 
 // ============================================================================
 // Test Utilities
@@ -67,8 +67,9 @@ const mockPresets: SlashCommandPresetDto[] = [
 // ============================================================================
 
 describe('Slash Commands E2E: User Workflows', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    await setTestLanguage('en');
   });
 
   describe('Scenario 1: View Slash Commands List', () => {
@@ -84,7 +85,7 @@ describe('Slash Commands E2E: User Workflows', () => {
 
       // Wait for commands to load (i18n key fallback for title)
       await waitFor(() => {
-        expect(screen.getByText('title')).toBeInTheDocument();
+        expect(screen.getByText('Slash Commands')).toBeInTheDocument();
       });
 
       // Commands should be displayed
@@ -110,16 +111,16 @@ describe('Slash Commands E2E: User Workflows', () => {
 
       // Wait for page to load
       await waitFor(() => {
-        expect(screen.getByText('title')).toBeInTheDocument();
+        expect(screen.getByText('Slash Commands')).toBeInTheDocument();
       });
 
       // Click Create button (renders as raw i18n key)
-      const createButton = screen.getByText('createButton');
+      const createButton = screen.getByText('New Command');
       await user.click(createButton);
 
       // Dialog should appear with create form title
       await waitFor(() => {
-        expect(screen.getByText('form.createTitle')).toBeInTheDocument();
+        expect(screen.getByText('Create Slash Command')).toBeInTheDocument();
       });
     });
   });
@@ -264,6 +265,11 @@ describe('Workflow Integration E2E: Step5Commands', () => {
 // ============================================================================
 
 describe('E2E: Real-World User Scenarios', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setTestLanguage('en');
+  });
+
   describe('Scenario 6: Complete Workflow Setup', () => {
     it('should navigate from empty state to creating a command', async () => {
       const user = userEvent.setup();
@@ -279,18 +285,18 @@ describe('E2E: Real-World User Scenarios', () => {
 
       // Should show empty state (raw i18n key)
       await waitFor(() => {
-        expect(screen.getByText('empty.title')).toBeInTheDocument();
+        expect(screen.getByText('No Slash Commands Yet')).toBeInTheDocument();
       });
 
       // Create button should be available
-      const createButton = screen.getByText('createButton');
+      const createButton = screen.getByText('New Command');
       expect(createButton).toBeInTheDocument();
 
       // Clicking should open creation dialog
       await user.click(createButton);
 
       await waitFor(() => {
-        expect(screen.getByText('form.createTitle')).toBeInTheDocument();
+        expect(screen.getByText('Create Slash Command')).toBeInTheDocument();
       });
     });
   });
@@ -310,7 +316,7 @@ describe('E2E: Real-World User Scenarios', () => {
 
       // Should show error state (raw i18n key)
       await waitFor(() => {
-        expect(screen.getByText('errors.loadFailed')).toBeInTheDocument();
+        expect(screen.getByText('Failed to load slash commands')).toBeInTheDocument();
       });
     });
   });
@@ -330,18 +336,18 @@ describe('E2E: Real-World User Scenarios', () => {
 
       // Should show empty state
       await waitFor(() => {
-        expect(screen.getByText('empty.title')).toBeInTheDocument();
+        expect(screen.getByText('No Slash Commands Yet')).toBeInTheDocument();
       });
 
       // Create button should be present
-      const createButton = screen.getByText('createButton');
+      const createButton = screen.getByText('New Command');
       expect(createButton).toBeInTheDocument();
 
       // Clicking should open creation dialog
       await user.click(createButton);
 
       await waitFor(() => {
-        expect(screen.getByText('form.createTitle')).toBeInTheDocument();
+        expect(screen.getByText('Create Slash Command')).toBeInTheDocument();
       });
     });
   });
