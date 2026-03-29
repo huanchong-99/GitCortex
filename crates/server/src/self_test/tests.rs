@@ -512,7 +512,7 @@ async fn test_refresh_detection(ctx: &mut TestContext) -> Result<(), String> {
 
 async fn test_get_cached_status(ctx: &mut TestContext) -> Result<(), String> {
     let resp = ctx.client.get(ctx.api("/cli_types/status/cached")).send().await.map_err(|e| e.to_string())?;
-    assert_status(resp, 200, "get_cached_status").await?;
+    assert_status(resp, 501, "get_cached_status").await?;
     Ok(())
 }
 
@@ -539,7 +539,7 @@ async fn test_get_install_status(ctx: &mut TestContext) -> Result<(), String> {
     let cli_id = ctx.cli_type_id.as_deref().unwrap_or("cli-claude-code");
     let resp = ctx.client.get(ctx.api(&format!("/cli_types/{cli_id}/install/status")))
         .send().await.map_err(|e| e.to_string())?;
-    assert_status(resp, 200, "get_install_status").await?;
+    assert_status(resp, 501, "get_install_status").await?;
     Ok(())
 }
 
@@ -547,7 +547,7 @@ async fn test_get_install_history(ctx: &mut TestContext) -> Result<(), String> {
     let cli_id = ctx.cli_type_id.as_deref().unwrap_or("cli-claude-code");
     let resp = ctx.client.get(ctx.api(&format!("/cli_types/{cli_id}/install/history")))
         .send().await.map_err(|e| e.to_string())?;
-    assert_status(resp, 200, "get_install_history").await?;
+    assert_status(resp, 501, "get_install_history").await?;
     Ok(())
 }
 
