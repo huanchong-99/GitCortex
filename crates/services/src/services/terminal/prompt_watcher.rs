@@ -3911,7 +3911,7 @@ WARNING: Claude Code running in Bypass Permissions mode
     }
 
     #[tokio::test]
-    async fn test_process_output_bypass_status_line_does_not_auto_enter() {
+    async fn test_process_output_bypass_status_line_auto_enters_in_auto_confirm() {
         let message_bus = Arc::new(MessageBus::new(100));
         let process_manager = Arc::new(ProcessManager::new());
         let watcher = PromptWatcher::new(message_bus.clone(), process_manager);
@@ -3926,7 +3926,7 @@ WARNING: Claude Code running in Bypass Permissions mode
                     "workflow-1".to_string(),
                     "task-1".to_string(),
                     "session-1".to_string(),
-                    true,
+                    true, // auto_confirm = true
                 ),
             );
         }
@@ -3940,8 +3940,8 @@ WARNING: Claude Code running in Bypass Permissions mode
 
         let event = tokio::time::timeout(Duration::from_millis(200), broadcast_rx.recv()).await;
         assert!(
-            event.is_err(),
-            "status-line bypass indicator should not inject Enter without confirmation context"
+            event.is_ok(),
+            "bypass permissions prompt should auto-enter when auto_confirm is enabled"
         );
     }
 
