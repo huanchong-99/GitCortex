@@ -945,13 +945,27 @@ async fn create_workflow(
         // Track this branch to avoid conflicts within the same batch
         existing_branches.push(branch.clone());
 
+        // Only bind vk_task_id when the referenced VK task actually exists in
+        // the tasks table.  The wizard sends frontend-generated UUIDs as task.id
+        // for internal tracking; these must NOT be treated as FK references.
+        let vk_task_id = match task_req.id.as_deref().and_then(|id| Uuid::parse_str(id).ok()) {
+            Some(candidate) => {
+                let exists: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = ?)",
+                )
+                .bind(candidate)
+                .fetch_one(&deployment.db().pool)
+                .await
+                .unwrap_or(false);
+                if exists { Some(candidate) } else { None }
+            }
+            None => None,
+        };
+
         let task = WorkflowTask {
             id: task_id.clone(),
             workflow_id: workflow_id.clone(),
-            vk_task_id: task_req
-                .id
-                .as_deref()
-                .and_then(|id| Uuid::parse_str(id).ok()),
+            vk_task_id,
             name: task_req.name.clone(),
             description: task_req.description.clone(),
             branch,

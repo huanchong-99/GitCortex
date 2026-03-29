@@ -24,6 +24,7 @@
 5. Anthropic-compatible LLM client switched to streaming mode (504 fix)
 6. SonarCloud: 4 issues fixed (negated condition, String.raw, complexity extractions)
 7. Multiple CreateChatBoxContainer complexity reductions
+8. DIY wizard FK constraint fix (vk_task_id referencing non-existent VK tasks)
 
 ## Step 3: Local Testing — Sequential Execution
 
@@ -32,9 +33,9 @@
 | 1st | Task 4 (Refactor+Test) | ✅ Completed | 4/4 tasks, 5 commits |
 | 2nd | Task 3 (Express→Rust) | ✅ Completed | 2/2 tasks |
 | 3rd | Task 1 (Knowledge Base) | ✅ Completed | 6 tasks |
-| 4th | Task 7 (Web Memo) | 🔄 IN PROGRESS | Re-creating with new models |
+| 4th | Task 7 (Web Memo) | ⏸ Skipped | Re-testing deferred |
 | 5th | Task 5 (Microservices) | ⏳ Pending | |
-| 6th | Task 6 (Kutt Security) | ⏳ Pending (DIY mode) | |
+| 6th | Task 6 (Kutt Security) | 🔄 IN PROGRESS | DIY mode, 3 tasks parallel, GLM-5 |
 | 7th | Task 2 (Hoppscotch) | ⏳ Pending | |
 
 ## Known Issues
