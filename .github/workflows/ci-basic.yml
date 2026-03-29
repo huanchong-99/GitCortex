@@ -39,7 +39,7 @@ jobs:
       run: cargo nextest run --workspace --exclude solodawn-tray --lib --test-threads=1
 
     - name: Check generated types are up-to-date
-      run: pnpm run generate-types:check
+      run: cargo run --bin generate_types -- --check
 
     - name: Show sccache statistics
       if: always()
