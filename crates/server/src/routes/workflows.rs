@@ -1833,6 +1833,53 @@ async fn start_workflow(
             terminals_activated = terminals.iter().filter(|t| t.status == "waiting").count(),
             "DIY workflow started (no orchestrator)"
         );
+
+        // Auto-dispatch task descriptions as initial instructions to each terminal.
+        // This makes DIY mode fully automated — terminals receive their instructions
+        // without manual user intervention via WebSocket.
+        let message_bus = deployment.message_bus().clone();
+        for task in &tasks {
+            let task_terminals =
+                Terminal::find_by_task(&deployment.db().pool, &task.id).await?;
+            for terminal in &task_terminals {
+                if let Some(ref pty_session_id) = terminal.pty_session_id {
+                    let instruction = task.description.as_deref().unwrap_or(&task.name);
+                    if !instruction.is_empty() {
+                        // Small delay to ensure Claude Code has initialized
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        message_bus
+                            .publish_terminal_input(
+                                &terminal.id,
+                                pty_session_id,
+                                instruction,
+                                None,
+                            )
+                            .await;
+                        // Send submit keystroke after a brief delay
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                        message_bus
+                            .publish_terminal_input(
+                                &terminal.id,
+                                pty_session_id,
+                                "",
+                                None,
+                            )
+                            .await;
+                        tracing::info!(
+                            terminal_id = %terminal.id,
+                            task_name = %task.name,
+                            "DIY: dispatched task instruction to terminal"
+                        );
+                    }
+                } else {
+                    tracing::warn!(
+                        terminal_id = %terminal.id,
+                        task_name = %task.name,
+                        "DIY: terminal has no PTY session, skipping instruction dispatch"
+                    );
+                }
+            }
+        }
     }
 
     refresh_prompt_watcher_registrations(&deployment, &workflow_id).await;
