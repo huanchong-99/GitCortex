@@ -137,7 +137,7 @@ fn api_key_from_headers(headers: &HeaderMap) -> Result<String, ApiError> {
 
 fn http_client() -> Result<Client, ApiError> {
     Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(90))
         .build()
         .map_err(|e| ApiError::Internal(format!("Failed to create HTTP client: {e}")))
 }
@@ -298,7 +298,7 @@ async fn verify_anthropic_model(
     let payload = serde_json::json!({
         "model": model_id,
         "messages": [{"role": "user", "content": "ping"}],
-        "max_tokens": 1
+        "max_tokens": 32
     });
 
     let response = client
