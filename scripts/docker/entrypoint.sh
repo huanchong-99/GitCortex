@@ -64,4 +64,17 @@ configure_git_safe_directories() {
 
 configure_git_safe_directories
 
+# ── Pre-exec diagnostics ──
+echo "Binary: $(command -v "$1" 2>/dev/null || echo 'NOT FOUND')"
+if command -v "$1" >/dev/null 2>&1; then
+    ls -la "$(command -v "$1")"
+    echo "ELF header (first 4 bytes): $(xxd -l 4 -p "$(command -v "$1")" 2>/dev/null || echo 'xxd not available')"
+    echo "Dynamic libs:"
+    ldd "$(command -v "$1")" 2>&1 || echo "  ldd failed"
+fi
+echo "Kernel: $(uname -r)"
+echo "Arch: $(uname -m)"
+echo "Executing: $*"
+echo "─────────────────────────────────"
+
 exec "$@"
