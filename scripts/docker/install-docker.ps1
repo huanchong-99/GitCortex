@@ -540,9 +540,9 @@ function Invoke-ComposeBuildWithRetry {
         if ($attempt -eq 1) {
             $buildkitConf = Join-Path ([System.IO.Path]::GetTempPath()) "solodawn-buildkitd.toml"
             Set-Content -Path $buildkitConf -Value "[worker.oci]`n  max-parallelism = 2" -Encoding ASCII
-            $null = & docker buildx rm solodawn-safe 2>$null
-            & docker buildx create --name solodawn-safe --driver docker-container `
-                --config $buildkitConf --use 2>$null | Out-Null
+            try { & docker buildx rm solodawn-safe 2>&1 | Out-Null } catch {}
+            try { & docker buildx create --name solodawn-safe --driver docker-container `
+                --config $buildkitConf --use 2>&1 | Out-Null } catch {}
         }
 
         $composeDir = Split-Path $ComposeFilePath -Parent
