@@ -534,17 +534,43 @@ function Invoke-ComposeBuildWithRetry {
             & docker pull debian:trixie-slim 2>&1 | Select-Object -Last 1
         }
 
+        # Create a BuildKit builder limited to 2 parallel stages to prevent RPC disconnect.
+        # Default BuildKit runs ALL independent stages in parallel, which crashes the daemon
+        # on machines with limited resources.
+        if ($attempt -eq 1) {
+            $buildkitConf = Join-Path ([System.IO.Path]::GetTempPath()) "solodawn-buildkitd.toml"
+            Set-Content -Path $buildkitConf -Value "[worker.oci]`n  max-parallelism = 2" -Encoding ASCII
+            $null = & docker buildx rm solodawn-safe 2>$null
+            & docker buildx create --name solodawn-safe --driver docker-container `
+                --config $buildkitConf --use 2>$null | Out-Null
+        }
+
+        $composeDir = Split-Path $ComposeFilePath -Parent
+        $contextDir = (Resolve-Path (Join-Path $composeDir "../..")).Path
+        $dockerfile = Join-Path $contextDir "docker/Dockerfile"
+        $envContent = Get-Content $EnvFilePath -ErrorAction SilentlyContinue
+        $buildProfile = "official"
+        $installClis = "0"
+        foreach ($line in $envContent) {
+            if ($line -match "^SOLODAWN_BUILD_NETWORK_PROFILE=(.+)$") { $buildProfile = $Matches[1] }
+            if ($line -match "^INSTALL_AI_CLIS=(.+)$") { $installClis = $Matches[1] }
+        }
+
         $buildArgs = @(
-            "compose",
-            "--ansi", "never",
+            "buildx", "build",
+            "--builder", "solodawn-safe",
+            "--file", $dockerfile,
+            "--tag", "compose-solodawn:latest",
+            "--build-arg", "SOLODAWN_BUILD_NETWORK_PROFILE=$buildProfile",
+            "--build-arg", "INSTALL_AI_CLIS=$installClis",
+            "--build-arg", "BUILDKIT_INLINE_CACHE=1",
             "--progress", "plain",
-            "-f", $ComposeFilePath,
-            "--env-file", $EnvFilePath,
-            "build"
+            "--load"
         )
         if ($ShouldPullBaseImages) {
             $buildArgs += "--pull"
         }
+        $buildArgs += $contextDir
 
         $result = Invoke-ProcessWithWatchdog -FilePath "docker" -ArgumentList $buildArgs `
             -StallTimeoutSeconds $stallTimeoutSeconds -PollIntervalSeconds $pollIntervalSeconds
