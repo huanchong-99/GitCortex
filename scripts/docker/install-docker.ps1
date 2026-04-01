@@ -120,7 +120,7 @@ $script:Messages = @{
         WARN_BUILD_LOG_TAIL = "最后 60 行构建日志："
 
         INFO_EXISTING_IMAGE = "检测到已有镜像: {0}"
-        INFO_BUILD_SKIPPED = "已跳过构建，复用现有镜像。"
+        INFO_BUILD_SKIPPED = "已跳过本地编译（使用预构建镜像）。"
         PROMPT_REBUILD_IMAGE = "是否重新构建镜像（选 N 复用现有镜像）"
 
         OPEN_URL = "访问地址: http://localhost:{0}"
@@ -206,7 +206,7 @@ $script:Messages = @{
         WARN_BUILD_LOG_TAIL = "Last 60 build log lines:"
 
         INFO_EXISTING_IMAGE = "Existing image detected: {0}"
-        INFO_BUILD_SKIPPED = "Build skipped, reusing existing image."
+        INFO_BUILD_SKIPPED = "Local compilation skipped (using prebuilt image)."
         PROMPT_REBUILD_IMAGE = "Rebuild image (choose N to reuse existing)"
 
         OPEN_URL = "Open: http://localhost:{0}"
