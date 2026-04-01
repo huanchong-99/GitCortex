@@ -877,20 +877,24 @@ if ($NonInteractive -and -not $PreferPrebuiltImage.IsPresent) {
 }
 
 if (-not $NonInteractive) {
+    $preferPrebuiltImageEnabled = Read-YesNo (T "PROMPT_USE_PREBUILT_IMAGE") $true
     $HostWorkspaceRoot = Read-Default (Tf "PROMPT_HOST_WORKSPACE" @($workspaceMount)) $HostWorkspaceRoot
     $Port = Read-Default (T "PROMPT_PORT") $Port
     $RustLog = Read-Default (T "PROMPT_RUST_LOG") $RustLog
-    $InstallAiClis = Read-YesNo (T "PROMPT_INSTALL_AI_CLIS") $InstallAiClis.IsPresent
-    $resolvedBuildNetworkProfile = if (Read-YesNo (T "PROMPT_WEAK_NETWORK_PROFILE") ($resolvedBuildNetworkProfile -eq "china")) {
-        "china"
+    if (-not $preferPrebuiltImageEnabled) {
+        $InstallAiClis = Read-YesNo (T "PROMPT_INSTALL_AI_CLIS") $InstallAiClis.IsPresent
+        $resolvedBuildNetworkProfile = if (Read-YesNo (T "PROMPT_WEAK_NETWORK_PROFILE") ($resolvedBuildNetworkProfile -eq "china")) {
+            "china"
+        }
+        else {
+            "official"
+        }
     }
-    else {
-        "official"
-    }
-    $preferPrebuiltImageEnabled = Read-YesNo (T "PROMPT_USE_PREBUILT_IMAGE") $true
     $autoSetupProjectsEnabled = Read-YesNo (T "PROMPT_AUTO_SETUP_PROJECTS") $autoSetupProjectsEnabled
     $resetDataVolume = Read-YesNo (T "PROMPT_RESET_DATA_VOLUME") $resetDataVolume
-    $SkipBuild = -not (Read-YesNo (T "PROMPT_RUN_BUILD") (-not $SkipBuild.IsPresent))
+    if (-not $preferPrebuiltImageEnabled) {
+        $SkipBuild = -not (Read-YesNo (T "PROMPT_RUN_BUILD") (-not $SkipBuild.IsPresent))
+    }
     $SkipStart = -not (Read-YesNo (T "PROMPT_RUN_UP") (-not $SkipStart.IsPresent))
 
     if ([string]::IsNullOrWhiteSpace($EncryptionKey)) {
