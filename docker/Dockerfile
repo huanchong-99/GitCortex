@@ -6,47 +6,10 @@ ARG RUST_TOOLCHAIN=nightly-2025-12-04
 ARG NODE_MAJOR=22
 
 # ============================================================
-# Stage 1: Frontend build
-# ============================================================
-FROM node:${NODE_MAJOR}-slim AS frontend-builder
-ARG SOLODAWN_BUILD_NETWORK_PROFILE
-ARG PNPM_VERSION
-
-WORKDIR /build
-
-# Enable corepack pnpm — zero network cost, no npm install -g
-RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
-# China mirror for npm/pnpm (only affects pnpm install, not corepack)
-RUN set -eux; \
-    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
-        npm config --global set registry https://registry.npmmirror.com; \
-        pnpm config set registry https://registry.npmmirror.com --global; \
-    fi
-
-# Layer 1: dependency manifest only → cached unless lockfile changes
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-COPY frontend/package.json frontend/
-
-RUN --mount=type=cache,id=solodawn-pnpm-store,target=/pnpm/store,sharing=locked \
-    pnpm config set store-dir /pnpm/store && \
-    cd frontend && \
-    ( pnpm install --frozen-lockfile --prefer-offline 2>&1 || \
-      ( echo "pnpm install failed, clearing store and retrying..." && \
-        rm -rf /pnpm/store/* && \
-        pnpm install --frozen-lockfile ) )
-
-# Layer 2: source code → only rebuilds when src changes
-COPY frontend/ frontend/
-COPY shared/ shared/
-
-ENV BROWSERSLIST_IGNORE_OLD_DATA=1 \
-    SOLODAWN_BUILD_SOURCEMAP=0
-
-RUN cd frontend && pnpm run build:docker
-
-# ============================================================
-# Stage 2: Rust toolchain + system deps (heavily cached layer)
+# Stage 1: Rust toolchain + system deps (heavily cached layer)
+# Moved before frontend-builder so that COPY --from=rust-base
+# can be used to serialize BuildKit stages and prevent the
+# daemon from crashing on resource-constrained machines.
 # ============================================================
 FROM rust:slim-trixie AS rust-base
 ARG SOLODAWN_BUILD_NETWORK_PROFILE
@@ -96,6 +59,52 @@ RUN set -eux; \
             'index = "sparse+https://rsproxy.cn/crates.io-index/"' \
             >> /usr/local/cargo/config.toml; \
     fi
+
+# ============================================================
+# Stage 2: Frontend build
+# ============================================================
+FROM node:${NODE_MAJOR}-slim AS frontend-builder
+ARG SOLODAWN_BUILD_NETWORK_PROFILE
+ARG PNPM_VERSION
+
+WORKDIR /build
+
+# Enable corepack pnpm — zero network cost, no npm install -g
+RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+# China mirror for npm/pnpm (only affects pnpm install, not corepack)
+RUN set -eux; \
+    if [ "$SOLODAWN_BUILD_NETWORK_PROFILE" = "china" ]; then \
+        npm config --global set registry https://registry.npmmirror.com; \
+        pnpm config set registry https://registry.npmmirror.com --global; \
+    fi
+
+# Layer 1: dependency manifest only → cached unless lockfile changes
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY frontend/package.json frontend/
+
+# Force BuildKit to finish rust-base before starting pnpm install.
+# Without this, BuildKit runs rust-base apt-get and pnpm install in
+# parallel, which crashes the daemon on resource-constrained machines.
+COPY --from=rust-base /etc/os-release /tmp/.buildkit-sync
+RUN rm -f /tmp/.buildkit-sync
+
+RUN --mount=type=cache,id=solodawn-pnpm-store,target=/pnpm/store,sharing=locked \
+    pnpm config set store-dir /pnpm/store && \
+    cd frontend && \
+    ( pnpm install --frozen-lockfile --prefer-offline 2>&1 || \
+      ( echo "pnpm install failed, clearing store and retrying..." && \
+        rm -rf /pnpm/store/* && \
+        pnpm install --frozen-lockfile ) )
+
+# Layer 2: source code → only rebuilds when src changes
+COPY frontend/ frontend/
+COPY shared/ shared/
+
+ENV BROWSERSLIST_IGNORE_OLD_DATA=1 \
+    SOLODAWN_BUILD_SOURCEMAP=0
+
+RUN cd frontend && pnpm run build:docker
 
 # ============================================================
 # Stage 3: Install cargo-chef (shared by planner and builder)
@@ -173,9 +182,6 @@ ARG INSTALL_AI_CLIS=0
 ARG NODE_MAJOR=22
 
 # Force BuildKit to wait for rust-base before starting runtime apt-get.
-# Without this, BuildKit runs rust-base apt-get, runtime apt-get, and
-# pnpm install all in parallel, which can crash the daemon on machines
-# with limited resources (RPC EOF disconnect).
 COPY --from=rust-base /etc/os-release /tmp/.buildkit-sync
 RUN rm -f /tmp/.buildkit-sync
 
