@@ -730,28 +730,30 @@ function Try-PullPrebuiltImage {
             continue
         }
 
-        if (Test-ImageExistsLocal -Image $candidate) {
-            Write-Info (Tf "INFO_PREBUILT_PRESENT" @($candidate))
-            try {
-                & docker image tag $candidate $TargetTag 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Info (T "INFO_PREBUILT_USED")
-                    return $true
-                }
-            } catch { }
-        }
-
+        # Always try pull first to get the latest image
         Write-Info (Tf "INFO_TRY_PULL_PREBUILT" @($candidate))
+        $pullOk = $false
         try {
             & docker pull $candidate 2>&1
+            if ($LASTEXITCODE -eq 0) { $pullOk = $true }
+        } catch { }
+
+        if (-not $pullOk) {
+            Write-Warn "[WARN] Pull failed for $candidate"
+            # Fall back to local image only if pull fails
+            if (Test-ImageExistsLocal -Image $candidate) {
+                Write-Info (Tf "INFO_PREBUILT_PRESENT" @($candidate))
+            } else {
+                continue
+            }
+        }
+
+        # Tag the (pulled or local-fallback) image as compose target
+        try {
+            & docker image tag $candidate $TargetTag 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
-                try {
-                    & docker image tag $candidate $TargetTag 2>&1 | Out-Null
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Info (T "INFO_PREBUILT_USED")
-                        return $true
-                    }
-                } catch { }
+                Write-Info (T "INFO_PREBUILT_USED")
+                return $true
             }
         } catch { }
     }
