@@ -430,7 +430,9 @@ function Test-RetryableBuildFailure {
         "error pulling image configuration",
         "error reading from server: EOF",
         "rpc error: code = Unavailable",
-        "failed to receive status"
+        "failed to receive status",
+        "ERR_PNPM_READ_FROM_STORE",
+        "Unexpected end of JSON input"
     )
 
     foreach ($pattern in $patterns) {
