@@ -746,6 +746,18 @@ function Try-PullPrebuiltImage {
     Write-Host "  [TARGET] Compose expects: $TargetTag" -ForegroundColor Cyan
     $targetExists = Test-ImageExistsLocal -Image $TargetTag
     Write-Host "  [TARGET] $TargetTag exists locally: $targetExists" -ForegroundColor $(if ($targetExists) { "Yellow" } else { "Green" })
+
+    # Pre-pull cleanup: remove ALL solodawn images and dangling layers to prevent
+    # Docker from reusing stale/corrupt cached layers instead of pulling fresh ones
+    if ($localImages) {
+        Write-Host "  [CLEAN] Removing old solodawn images to force fresh pull..." -ForegroundColor Yellow
+        foreach ($img in $localImages) {
+            $imgRef = ($img -split '\s+')[0]
+            try { & docker rmi -f $imgRef 2>&1 | Out-Null } catch { }
+        }
+        try { & docker image prune -f 2>&1 | Out-Null } catch { }
+        Write-Host "  [CLEAN] Done" -ForegroundColor Green
+    }
     Write-Host ""
 
     foreach ($candidate in $Candidates) {
@@ -788,9 +800,27 @@ function Try-PullPrebuiltImage {
             & docker image tag $candidate $TargetTag 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "  [TAG]   SUCCESS" -ForegroundColor Green
-                Write-Info (T "INFO_PREBUILT_USED")
-                Write-Host ""
-                return $true
+
+                # Post-pull integrity check: verify binary is not 0 bytes
+                Write-Host "  [VERIFY] Checking /usr/local/bin/solodawn-server size..." -ForegroundColor Cyan
+                $sizeCheck = $null
+                try {
+                    $sizeCheck = & docker run --rm --entrypoint sh $TargetTag -c "stat -c '%s' /usr/local/bin/solodawn-server 2>/dev/null || echo 0" 2>&1
+                } catch { }
+                $binSize = 0
+                if ($sizeCheck) { [int]::TryParse(($sizeCheck | Select-Object -First 1).ToString().Trim(), [ref]$binSize) | Out-Null }
+
+                if ($binSize -gt 0) {
+                    Write-Host "  [VERIFY] Binary size: $binSize bytes — OK" -ForegroundColor Green
+                    Write-Info (T "INFO_PREBUILT_USED")
+                    Write-Host ""
+                    return $true
+                } else {
+                    Write-Host "  [VERIFY] CORRUPT — binary is 0 bytes! Removing and trying next candidate..." -ForegroundColor Red
+                    try { & docker rmi -f $candidate $TargetTag 2>&1 | Out-Null } catch { }
+                    try { & docker system prune -f 2>&1 | Out-Null } catch { }
+                    continue
+                }
             } else {
                 Write-Host "  [TAG]   FAILED — exit code $LASTEXITCODE" -ForegroundColor Red
             }
