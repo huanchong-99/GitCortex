@@ -695,18 +695,14 @@ function Resolve-PrebuiltImageCandidates {
         [string]$BuildNetworkProfile
     )
 
-    $repo = if ([string]::IsNullOrWhiteSpace($Namespace)) {
-        "solodawn"
-    }
-    else {
-        "$Namespace/solodawn"
-    }
+    $ns = if ([string]::IsNullOrWhiteSpace($Namespace)) { "huanchong-99" } else { $Namespace }
+    $repo = "$ns/solodawn"
 
     $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
 
     $candidates = @(
-        "$Registry/$repo:latest-$profileTag",
-        "$Registry/$repo:latest"
+        "${Registry}/${repo}:latest-${profileTag}",
+        "${Registry}/${repo}:latest"
     )
 
     return $candidates | Select-Object -Unique
@@ -876,7 +872,8 @@ else {
 }
 $preferPrebuiltImageEnabled = $PreferPrebuiltImage.IsPresent
 if ($NonInteractive -and -not $PreferPrebuiltImage.IsPresent) {
-    $preferPrebuiltImageEnabled = ($resolvedBuildNetworkProfile -eq "china")
+    # Default to prebuilt image for all users (avoids 25-min Rust compilation)
+    $preferPrebuiltImageEnabled = $true
 }
 
 if (-not $NonInteractive) {
@@ -1043,11 +1040,12 @@ try {
     Write-Ok (T "OK_COMPOSE_VALID")
 
     if (-not $SkipBuild) {
-        $targetComposeImage = "solodawn-solodawn:latest"
+        $targetComposeImage = "compose-solodawn:latest"
         $usedPrebuilt = $false
 
         if ($preferPrebuiltImageEnabled -and $effectiveImagePullPolicy -ne "never") {
-            $pullCandidates = Resolve-PrebuiltImageCandidates -Registry $effectiveImageRegistry -Namespace $effectiveImageNamespace -BuildNetworkProfile $effectiveBuildNetworkProfile
+            $nsForPull = if ([string]::IsNullOrWhiteSpace($effectiveImageNamespace)) { "huanchong-99" } else { $effectiveImageNamespace }
+            $pullCandidates = Resolve-PrebuiltImageCandidates -Registry $effectiveImageRegistry -Namespace $nsForPull -BuildNetworkProfile $effectiveBuildNetworkProfile
 
             $shouldTryPull = $false
             switch ($effectiveImagePullPolicy) {
