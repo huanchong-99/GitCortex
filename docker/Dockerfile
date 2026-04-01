@@ -30,10 +30,11 @@ COPY frontend/package.json frontend/
 
 RUN --mount=type=cache,id=solodawn-pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm config set store-dir /pnpm/store && \
-    pnpm store prune 2>/dev/null || true && \
     cd frontend && \
-    pnpm install --frozen-lockfile --prefer-offline || \
-    (echo "Retrying pnpm install without cache..." && pnpm store prune && pnpm install --frozen-lockfile)
+    ( pnpm install --frozen-lockfile --prefer-offline 2>&1 || \
+      ( echo "pnpm install failed, clearing store and retrying..." && \
+        rm -rf /pnpm/store/* && \
+        pnpm install --frozen-lockfile ) )
 
 # Layer 2: source code → only rebuilds when src changes
 COPY frontend/ frontend/

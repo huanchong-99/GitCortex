@@ -552,7 +552,7 @@ function Invoke-ComposeBuildWithRetry {
         $retryable = $false
         if (-not $result.Stalled -and $result.ExitCode -eq 0) {
             # Verify image actually exists (BuildKit RPC disconnect can exit 0 without producing image)
-            $null = & docker image inspect compose-solodawn:latest 2>$null
+            try { $null = & docker image inspect compose-solodawn:latest 2>&1 } catch {}
             if ($LASTEXITCODE -ne 0) {
                 Write-Warn "Build reported success but image not found. Treating as retryable failure."
                 $retryable = $true
