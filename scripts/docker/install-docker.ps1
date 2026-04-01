@@ -524,6 +524,14 @@ function Invoke-ComposeBuildWithRetry {
             Write-Info (Tf "INFO_BUILD_RETRY" @($attempt, $maxAttempts))
         }
 
+        # Pre-pull base images to avoid BuildKit RPC disconnect from concurrent large downloads
+        if ($attempt -eq 1) {
+            Write-Host "  Pre-pulling base images to prevent concurrent download overload..."
+            & docker pull rust:slim-trixie 2>&1 | Select-Object -Last 1
+            & docker pull node:22-slim 2>&1 | Select-Object -Last 1
+            & docker pull debian:trixie-slim 2>&1 | Select-Object -Last 1
+        }
+
         $buildArgs = @(
             "compose",
             "--ansi", "never",
