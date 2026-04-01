@@ -1106,8 +1106,22 @@ try {
 
     if (-not $SkipStart) {
         Write-Info (T "INFO_STARTING")
-        & docker compose --ansi never -f $composeFile --env-file $envFile up -d --force-recreate --no-build
-        if ($LASTEXITCODE -ne 0) {
+        $upMaxRetries = 3
+        $upSuccess = $false
+        for ($upAttempt = 1; $upAttempt -le $upMaxRetries; $upAttempt++) {
+            try {
+                & docker compose --ansi never -f $composeFile --env-file $envFile up -d --force-recreate --no-build 2>&1
+            } catch { }
+            if ($LASTEXITCODE -eq 0) {
+                $upSuccess = $true
+                break
+            }
+            if ($upAttempt -lt $upMaxRetries) {
+                Write-Warn "[WARN] docker compose up failed (attempt $upAttempt/$upMaxRetries), retrying in 5s..."
+                Start-Sleep -Seconds 5
+            }
+        }
+        if (-not $upSuccess) {
             throw (T "ERR_UP_FAILED")
         }
         Write-Ok (T "OK_STARTED")
