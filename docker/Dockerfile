@@ -181,8 +181,13 @@ ARG SOLODAWN_BUILD_NETWORK_PROFILE
 ARG INSTALL_AI_CLIS=0
 ARG NODE_MAJOR=22
 
-# Force BuildKit to wait for rust-base before starting runtime apt-get.
-COPY --from=rust-base /etc/os-release /tmp/.buildkit-sync
+# Force BuildKit to complete ALL prior stages before starting runtime.
+# rust-builder depends on frontend-builder (for frontend/dist) and
+# rust-base (for toolchain), so this single dependency serializes the
+# entire build chain: rust-base → frontend-builder → rust-builder → runtime.
+# Without this, BuildKit runs multiple stages in parallel, which crashes
+# the Docker daemon on Windows 10 + WSL2 due to I/O pressure.
+COPY --from=rust-builder /tmp/solodawn-server /tmp/.buildkit-sync
 RUN rm -f /tmp/.buildkit-sync
 
 RUN set -eux; \
