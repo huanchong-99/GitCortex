@@ -32,9 +32,6 @@ services:
       - SONAR_TOKEN=${SONAR_TOKEN:-}
       - SONAR_HOST_URL=${SONAR_HOST_URL:-http://sonarqube:9000}
       - SONAR_PROJECT_KEY=${SONAR_PROJECT_KEY:-solodawn}
-    depends_on:
-      sonarqube:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:23456/api/health"]
       interval: 30s
@@ -46,6 +43,7 @@ services:
     #   0 3 * * 0 docker exec solodawn /bin/bash /opt/solodawn/scripts/cleanup-quality-data.sh
 
   sonarqube-db:
+    profiles: ["sonarqube"]
     image: postgres:15
     environment:
       - POSTGRES_USER=sonar
@@ -61,6 +59,7 @@ services:
     restart: unless-stopped
 
   sonarqube:
+    profiles: ["sonarqube"]
     image: sonarqube:10.5-community
     depends_on:
       sonarqube-db:
