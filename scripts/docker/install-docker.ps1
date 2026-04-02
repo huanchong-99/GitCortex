@@ -84,6 +84,7 @@ $script:Messages = @{
         PROMPT_OVERWRITE_ENV = ".env 已存在，是否覆盖"
         PROMPT_RUN_UPDATE_FLOW = "检测到已有 Docker 配置，是否改为执行更新流程"
         PROMPT_USE_PREBUILT_IMAGE = "拉取预构建镜像（推荐，免去本地编译）"
+        PROMPT_PREBUILT_LITE = "使用精简版镜像（~756MB，不含AI CLI，推荐） 选N则拉取完整版（~2.3GB，含AI CLI）"
 
         INFO_KEY_GENERATED = "已生成加密密钥。"
         INFO_KEY_GENERATED_NON_INTERACTIVE = "非交互模式：已自动生成 32 位加密密钥。"
@@ -170,6 +171,7 @@ $script:Messages = @{
         PROMPT_OVERWRITE_ENV = ".env already exists. Overwrite it"
         PROMPT_RUN_UPDATE_FLOW = "Existing Docker config detected. Switch to update flow instead"
         PROMPT_USE_PREBUILT_IMAGE = "Pull prebuilt image (recommended, skips local compilation)"
+        PROMPT_PREBUILT_LITE = "Use lite image (~756MB, no AI CLIs, recommended) Choose N for full (~2.3GB, with AI CLIs)"
 
         INFO_KEY_GENERATED = "Encryption key generated."
         INFO_KEY_GENERATED_NON_INTERACTIVE = "Non-interactive mode: generated 32-char encryption key."
@@ -692,18 +694,25 @@ function Resolve-PrebuiltImageCandidates {
     param(
         [string]$Registry,
         [string]$Namespace,
-        [string]$BuildNetworkProfile
+        [string]$BuildNetworkProfile,
+        [bool]$Lite = $false
     )
 
     $ns = if ([string]::IsNullOrWhiteSpace($Namespace)) { "huanchong-99" } else { $Namespace }
     $repo = "$ns/solodawn"
 
-    $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
-
-    $candidates = @(
-        "${Registry}/${repo}:latest-${profileTag}",
-        "${Registry}/${repo}:latest"
-    )
+    if ($Lite) {
+        $candidates = @(
+            "${Registry}/${repo}:latest-lite",
+            "${Registry}/${repo}:latest"
+        )
+    } else {
+        $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
+        $candidates = @(
+            "${Registry}/${repo}:latest-${profileTag}",
+            "${Registry}/${repo}:latest"
+        )
+    }
 
     return $candidates | Select-Object -Unique
 }
@@ -947,6 +956,7 @@ else {
     $ImageNamespace.Trim().Trim("/")
 }
 $preferPrebuiltImageEnabled = $PreferPrebuiltImage.IsPresent
+$preferPrebuiltLite = $true
 if ($NonInteractive -and -not $PreferPrebuiltImage.IsPresent) {
     # Default to prebuilt image for all users (avoids 25-min Rust compilation)
     $preferPrebuiltImageEnabled = $true
@@ -954,6 +964,10 @@ if ($NonInteractive -and -not $PreferPrebuiltImage.IsPresent) {
 
 if (-not $NonInteractive) {
     $preferPrebuiltImageEnabled = Read-YesNo (T "PROMPT_USE_PREBUILT_IMAGE") $true
+    $preferPrebuiltLite = $true
+    if ($preferPrebuiltImageEnabled) {
+        $preferPrebuiltLite = Read-YesNo (T "PROMPT_PREBUILT_LITE") $true
+    }
     $HostWorkspaceRoot = Read-Default (Tf "PROMPT_HOST_WORKSPACE" @($workspaceMount)) $HostWorkspaceRoot
     $Port = Read-Default (T "PROMPT_PORT") $Port
     $RustLog = Read-Default (T "PROMPT_RUST_LOG") $RustLog
@@ -1125,7 +1139,7 @@ try {
 
         if ($preferPrebuiltImageEnabled -and $effectiveImagePullPolicy -ne "never") {
             $nsForPull = if ([string]::IsNullOrWhiteSpace($effectiveImageNamespace)) { "huanchong-99" } else { $effectiveImageNamespace }
-            $pullCandidates = Resolve-PrebuiltImageCandidates -Registry $effectiveImageRegistry -Namespace $nsForPull -BuildNetworkProfile $effectiveBuildNetworkProfile
+            $pullCandidates = Resolve-PrebuiltImageCandidates -Registry $effectiveImageRegistry -Namespace $nsForPull -BuildNetworkProfile $effectiveBuildNetworkProfile -Lite $preferPrebuiltLite
 
             $shouldTryPull = $false
             switch ($effectiveImagePullPolicy) {

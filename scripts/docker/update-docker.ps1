@@ -460,7 +460,8 @@ function Resolve-PrebuiltImageCandidates {
     param(
         [string]$Registry,
         [string]$Namespace,
-        [string]$BuildNetworkProfile
+        [string]$BuildNetworkProfile,
+        [bool]$Lite = $true
     )
 
     $repo = if ([string]::IsNullOrWhiteSpace($Namespace)) {
@@ -470,12 +471,18 @@ function Resolve-PrebuiltImageCandidates {
         "$Namespace/solodawn"
     }
 
-    $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
-
-    $candidates = @(
-        "$Registry/$repo:latest-$profileTag",
-        "$Registry/$repo:latest"
-    )
+    if ($Lite) {
+        $candidates = @(
+            "$Registry/$repo:latest-lite",
+            "$Registry/$repo:latest"
+        )
+    } else {
+        $profileTag = if ($BuildNetworkProfile -eq "china") { "china" } else { "official" }
+        $candidates = @(
+            "$Registry/$repo:latest-$profileTag",
+            "$Registry/$repo:latest"
+        )
+    }
 
     return $candidates | Select-Object -Unique
 }
@@ -698,7 +705,7 @@ try {
         $usedPrebuilt = $false
 
         if ($PreferPrebuiltImage -and $imagePullPolicy -ne "never") {
-            $pullCandidates = Resolve-PrebuiltImageCandidates -Registry $imageRegistry -Namespace $imageNamespace -BuildNetworkProfile $buildNetworkProfile
+            $pullCandidates = Resolve-PrebuiltImageCandidates -Registry $imageRegistry -Namespace $imageNamespace -BuildNetworkProfile $buildNetworkProfile -Lite $true
 
             $shouldTryPull = $false
             switch ($imagePullPolicy) {
