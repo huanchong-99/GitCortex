@@ -505,6 +505,7 @@ function Try-PullPrebuiltImage {
     Write-Host "╔══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "║  Docker Local Image Scan (solodawn)                 ║" -ForegroundColor Cyan
     Write-Host "╚══════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    $localImages = $null
     try {
         $localImages = & docker images --format "{{.Repository}}:{{.Tag}}  ID={{.ID}}  Created={{.CreatedSince}}  Size={{.Size}}" 2>$null |
             Where-Object { $_ -match "solodawn" }
