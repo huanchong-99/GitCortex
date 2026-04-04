@@ -224,48 +224,78 @@ Any CLI that runs in a terminal and supports slash commands can be integrated.
 | pnpm | 10.13.1 | `pnpm --version` |
 | Git | Any recent | `git --version` |
 
-### Local Development
+### Getting Started After Cloning
+
+> 中文版请参阅 [README.zh-CN.md](README.zh-CN.md)
+
+#### 1. Install Rust Toolchain
 
 ```bash
-# 1. Install dependencies
+rustup install nightly-2025-12-04
+rustup default nightly-2025-12-04
+```
+
+#### 2. Install Required Cargo Tools
+
+```bash
+cargo install cargo-watch
+cargo install sqlx-cli --features sqlite
+```
+
+#### 3. Install Node.js Dependencies
+
+```bash
 pnpm install
+```
 
-# 2. Set encryption key (required, exactly 32 characters)
-# Linux/macOS:
-export SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"
-# Windows PowerShell:
+#### 4. Set Environment Variables
+
+**Linux / macOS:**
+
+```bash
+export SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"  # Must be exactly 32 characters
+```
+
+**Windows PowerShell:**
+
+```powershell
 $env:SOLODAWN_ENCRYPTION_KEY="12345678901234567890123456789012"
+```
 
-# 3. Initialize database
+#### 5. Initialize Database
+
+```bash
 pnpm run prepare-db
+```
 
-# 4. Start dev servers (frontend + backend)
+#### 6. Start Development Servers
+
+```bash
 pnpm run dev
 ```
 
-Default URLs:
-- Frontend: `http://localhost:23457`
-- Backend API: `http://localhost:23456/api`
+This starts both the backend (Rust/Axum) and frontend (Vite/React) dev servers.
 
-On first launch, the **Setup Wizard** guides you through environment detection, AI model configuration, and project setup.
+- **Frontend:** http://localhost:23457
+- **Backend API:** http://localhost:23456/api
 
-### Production Build
+On first launch, the **Setup Wizard** will guide you through environment detection, AI model configuration, and project setup.
+
+#### 7. (Optional) Production Build
 
 ```bash
-# 1. Build backend
+# Build backend
 cargo build --release -p server
 
-# 2. Build frontend (static assets, embedded into backend)
+# Build frontend
 cd frontend && pnpm build && cd ..
 
-# 3. Set encryption key (required)
+# Set encryption key and run
 export SOLODAWN_ENCRYPTION_KEY="your-32-character-secret-key-here"
-
-# 4. Run
 ./target/release/server
 ```
 
-Production mode serves both frontend and API on a single port: `http://localhost:23456`
+Production mode serves both frontend and API on a single port: http://localhost:23456
 
 ### Docker (One-Click Install)
 
